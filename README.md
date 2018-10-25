@@ -12,3 +12,16 @@ Create a pull request with the content of the blog post placed in the `drafts` f
 `img` folder contains images used in the blog `adoc` files
 
 Once approved, the blog post will be moved from `drafts` to `publish`.
+
+# Docker container for development
+```
+git clone https://github.com/OpenLiberty/blogs.git
+git clone https://github.com/OpenLiberty/openliberty.io.git
+docker pull kinueng/openliberty.io
+docker run --name website -it -p 4000:4000 -v /Users/kueng/work/sandboxes/openliberty.io:/home/jekyll kinueng/openliberty.io
+
+docker exec -it website rm -rf /home/jekyll/src/main/content/_drafts /home/jekyll/src/main/content/_posts /home/jekyll/src/main/content/img/blog
+docker cp blogs/drafts website:/home/jekyll/src/main/content/_drafts
+docker cp blogs/publish website:/home/jekyll/src/main/content/_posts
+docker cp blogs/img/blog website:/home/jekyll/src/main/content/img
+```
