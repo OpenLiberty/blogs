@@ -1,9 +1,13 @@
 # Contributing to the blog
 Create a pull request with the content of the blog post placed in the `drafts` folder using the following file naming scheme: `YYYY-MM-DD-post-title.extension`. HTML, markdown, and AsciiDoc formats can be used. The file extension would be .html, .md, or .adoc respectively. In the blog post file the following front matter variables must be set:
 - layout: post
-- categories: blog
 - title: `title of the blog post`
+- date: `YYYY-MM-DD hh:mm:ss`
+- categories: blog
 - author_picture: `secure url to author picture`
+- blog_description: `Description of blog post`
+- seo-title: `Blog Title to be Displayed on Search Engine Results Pages`
+- seo-description: `Blog Description to be Displayed on Search Engine Results Pages`
 
 `drafts` folder contains blog posts that are still in draft and are not ready to be published
 
@@ -12,6 +16,10 @@ Create a pull request with the content of the blog post placed in the `drafts` f
 `img` folder contains images used in the blog `adoc` files
 
 Once approved, the blog post will be moved from `drafts` to `publish`.
+
+If you would like to add a blog post that is actually a link to an existing third party blog post, you can follow the normal steps described above for creating a blog post. You simply need to add the following to the liquid front matter: 
+- redirect_to: 
+  - `link`
 
 # Docker container for development
 
