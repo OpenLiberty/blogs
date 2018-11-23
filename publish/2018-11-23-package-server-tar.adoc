@@ -1,0 +1,105 @@
+---
+layout: post
+title: Package server TAR files for simpler Dockerfiles
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/u/3322532
+seo-title: Package server TAR files for simpler Dockerfiles - OpenLiberty.io. 
+seo-description: Try out writing simpler Dockerfiles by packaging your server as a TAR file. Also try the support for sharding in Java 11 with JDBC 4.3. A quick roundup of a couple of things you can try in the current Open Liberty development builds.
+blog_description: "Try out writing simpler Dockerfiles by packaging your server as a TAR file. Also try the support for sharding in Java 11 with JDBC 4.3. A quick roundup of a couple of things you can try in the current Open Liberty development builds."
+---
+= Package server TAR files for simpler Dockerfiles
+Laura Cowen <http://github.com/lauracowen>
+
+A quick roundup of a couple of things you can try in the current https://openliberty.io/downloads/[Open Liberty development builds] (i.e. beta-level):
+
+* <<servertar,Package server TAR files for simpler Dockerfiles>>
+* <<jdbc,Support for sharding in Java 11 (JDBC 4.3)>>
+
+
+
+[#servertar]
+== Package server TAR files for simpler Dockerfiles
+
+Liberty’s server package tool now supports packaging to `.tar` and `.tar.gz` files. The package tool has long supported generating to `.zip` and `.jar` files (and on z/OS `.pax`) but, until now, the most common packaging format on Linux hasn’t been an option.
+
+So why now? It all relates to making Liberty work better with Docker. Docker’s `ADD` command has built-in support for extracting `.tar` files. Adding a server package to your Dockerfile is now really simple.
+
+Instead of doing this:
+
+[source]
+----
+   FROM open-liberty
+   COPY defaultServer.zip /tmp/defaultServer.zip
+   EXEC apt-get update && apt-get install unzip && unzip /tmp/defaultServer.zip /opt/ol/ && apt-get remove -y unzip && rm -rf /var/lib/apt/lists/*
+----
+
+you can now simply write:
+
+[source]
+----
+   FROM open-liberty
+   ADD defaultServer.tar.gz /opt/ol/
+----
+
+
+[#jdbc]
+== Support for sharding in Java 11 (JDBC 4.3)
+
+If your JDBC driver supports the 4.3 specification level, the JDBC 4.3 feature enables you to take advantage of new capabilities in JDBC 4.3, including requesting connections and support for sharding. This feature requires Java 11.
+
+It is now possible to request connections for a specific sharding key and optionally, super sharding key, if your database supports sharding and provides a JDBC 4.3 compliant driver.
+
+Enable the feature in your server configuration (`server.xml`):
+
+[source,xml]
+----
+<featureManager>
+  <feature>jdbc-4.3</feature>
+  <feature>jndi-1.0</feature>
+  ...
+</featureManager>
+----
+
+Configure one or more data sources in the `server.xml` as you would with the prior version JDBC features. For example:
+
+[source,xml]
+----
+<dataSource jndiName="jdbc/43datasource">
+  <properties databaseName="sampledb" serverName="host1.rchland.ibm.com" portNumber="1234"/>
+  <containerAuthData user="user1" password="pwd1"/>
+</dataSource>
+----
+
+Use the data source from your application in your app:
+
+[source,java]
+----
+@Resource(lookup = "jdbc/43datasource")
+DataSource datasource;
+// Always cache sharding keys to ensure that matching of pooled connections can be successful.
+// The JDBC spec does not require an .equals implementation.
+ShardingKey key1, key2;
+...
+public void init(ServletConfig config) throws ServletException {
+    try {
+        key1 = datasource.createShardingKeyBuilder().subkey("key1", JDBCType.VARCHAR).build();
+        key2 = datasource.createShardingKeyBuilder().subkey("key2", JDBCType.VARCHAR).build();
+    } catch (SQLException x) {
+        throw new ServletException(x);
+    }
+}
+...
+try (Connection con = datasource.createConnectionBuilder().shardingKey(key1).build()) {
+    // use connection
+}
+----
+
+For more info, see:
+
+* https://www.jcp.org/aboutJava/communityprocess/mrel/jsr221/index3.html[JDBC 4.3 specification]
+* https://docs.oracle.com/en/java/javase/11/docs/api/java.sql/java/sql/package-summary.html[JDBC 4.3 JavaDoc]
+
+
+== Try it now in development builds of Open Liberty
+
+Take a look at the latest https://openliberty.io/downloads/[Open Liberty development builds].
