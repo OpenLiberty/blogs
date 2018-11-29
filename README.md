@@ -33,6 +33,19 @@ docker cp blogs/publish website:/home/jekyll/src/main/content/_posts
 docker cp blogs/img/blog website:/home/jekyll/src/main/content/img
 ```
 
+### Restarting the container
+If you try to run the `docker run....` command above when the container already exists, you'll get an error like this:
+
+```
+docker: Error response from daemon: Conflict. The container name "/website" is already in use by container "ddc88f127404e8df53ad149245f636a54f6d5b501ac93477985c27a12b061a94". You have to remove (or rename) that container to be able to reuse that name.
+```
+
+Instead, run `docker start website`.
+
+If you then run `docker ps`, you can see that the `website` container is now running. However, it takes a few mins for the whole site to come back up so that you can access it from `0.0.0.0:4000`. So be patient.
+
+Then run the four commands above to update the running container with your new edits.
+
 
 ### How to know when your changes are rendered by the container
 You will see `Jekyll` detect your new files and regenerate the blog files.  You will want to wait for the line "...done in XXXX seconds."
