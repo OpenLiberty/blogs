@@ -1,0 +1,81 @@
+---
+layout: post
+title: Threading (and why you probably don’t need to tune Open Liberty)
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/u/6999500
+seo-title: Threading (and why you probably don’t need to tune Open Liberty) - OpenLiberty.io. 
+seo-description: All the application code running on Liberty runs in a single thread pool, so it must be REALLY important to tune it. Right? Nope, not really. The defaults are actually very good. More importantly, the defaults are very good for a wide range of workload types.
+blog_description: "All the application code running on Liberty runs in a single thread pool, so it must be REALLY important to tune it. Right? Nope, not really. The defaults are actually very good. More importantly, the defaults are very good for a wide range of workload types."
+---
+= Threading (and why you probably don’t need to tune Open Liberty)
+Gary Picher <https://github.com/garypicher>
+
+All the application code running on Liberty runs in a single thread pool, so it must be REALLY important to tune it. Right?
+
+Nope, not really. The defaults are actually very good. More importantly, the defaults are very good for a wide range of workload types.
+
+Liberty has a single thread pool called the _default executor_. This doesn’t mean that every single thread in a thread dump is in this thread pool. If you take a thread dump and look closely, you’ll see a bunch of utility threads like OSGi framework threads, JVM garbage collections threads, Java NIO selector threads, etc...
+
+== Threading settings
+
+Let’s take a look at some of the threading settings that are configured using the executor, what their defaults are, and what they mean:
+
+* `coreThreads` – This is essentially a ‘minimum threads’ value; once Liberty creates enough threads to exceed the `coreThreads` value, we’ll never get rid of threads to drop below it. The underlying executor creates a new thread for each piece of offered work, until there are `coreThreads` threads in the pool. Once the `coreThreads` size is reached, the Liberty threadpool auto-tuning algorithm controls the number of threads in the range between `coreThreads` and `maxThreads`.
++
+The default value for `coreThreads` is `-1`, which means that at runtime we set `coreThreads` to a multiple of the number of hardware threads on your system. Currently, that multiple is `2`, but we reserve the right to change that.
+
+* `maxThreads` – This one is pretty obvious. It’s the maximum number of threads that we can possibly create for this thread pool. Ever.
+
+  The default value is `-1`, which translates to `MAX_INT` or, essentially, infinite.
+
+  You might be thinking, isn’t ‘infinite’ kind of a bad default for `maxThreads`? It’s actually quite a sensible default. That’s because Liberty uses an auto-tuning algorithm to find the sweet spot for how many threads the server needs. I’ll go into more detail below but, essentially, Liberty is always playing around and adjusting the number of threads in the pool in-between the defined bounds for `coreThreads` and `maxThreads`.
+
+  Saying that the default for `maxThreads` is infinite is basically saying “do NOT restrict the Liberty auto-tuning algorithm”. Let it do its job with no bounds. Don’t worry, though; setting `maxThreads` to the default doesn’t mean that Liberty WILL create `MAX_INT` threads. We technically could but it would never, ever, be beneficial to do so. So we never will even come remotely close.
+
+* `keepAlive` – This kinda implies that it’s the amount of time an idle thread will remain in the pool before it goes away. However, due to the details of how the auto-tuning algorithm works (explained below), this setting never comes into play. The default is `60s` but, like I said, it just simply never comes into play.
+
+* `name` – This is the name of the thread pool, and it’s also part of the name of the threads that live in this pool. The default is `Default Executor`. Don’t change it. There’s no point, and it just makes it more difficult to find the default executor threads in a thread dump if you happen to be looking for them.
+
+* `rejectedWorkPolicy` – This is what happens when a piece of work gets submitted to the executor but the work queue that backs the executor is full. You can choose to either have the submitting thread run the work, or you can choose to have an exception be thrown to the submitter. Here’s the thing, though...the work queue that backs the default executor is infinite. If we reject work, it’s because your server is out of memory, in which case you’ve got bigger problems than what to do with rejected work. The default is to throw an exception to the submitter, and there’s no reason to change it.
+
+* `stealPolicy` – This is a dead setting. We used to have it so that the default executor used a series of thread-local work queues that could steal from each other in an attempt to boost performance. As it turns out, it didn’t boost performance much, if at all, and it caused a lot of headaches. So we removed this feature from the default executor but, for backwards compatibility, we still have to honor this configuration option. The `stealPolicy` setting controlled some of the behavior of that work-stealing feature but now that the feature is gone, this setting does absolutely nothing.
+
+Alright, so to summarize thus far, the only settings of the executor that are remotely interesting to change are the `coreThreads` and `maxThreads`. These settings, as already discussed, serve as bounds for the Liberty auto-tuning algorithm. Let’s get into a little more detail about how that algorithm works.
+
+== How the auto-tuning algorithm works
+
+The Liberty default executor is broken into two pieces: (a) the _underlying implementation_, and (b) the _controller thread_. The underlying implementation is the actual physical thread pool, and the controller thread determines the thread pool size of the underlying implementation. The controller thread is free to choose any pool size in between `coreThreads` and `maxThreads` but note that, from the perspective of the underlying implementation, the pool size is always constant.
+
+Here’s an example. Let’s say you use the defaults for `coreThreads` and `maxThreads` and that you have eight hardware threads on your system. At run time, the controller thread is bounded by `coreThreads` of `16` and `maxThreads` of `MAX_INT`. Let’s say that the controller thread determines that `18` is the current optimal number of threads. The controller thread then sets BOTH `coreThreads` and `maxThreads` of the underlying implementation to the same value, `18`.
+
+This is why the `keepAlive` setting of the executor is useless. At the level where it matters (on the underlying implementation), `coreThreads` is always equal to `maxThreads`, so there are never any idle threads sitting around waiting to go away.
+
+Now, just because the controller thread determined that `18` is the optimal pool size RIGHT NOW doesn’t mean that it can’t change its mind. It’s actually running on a loop and analyzing throughput. It’s constantly recalculating what the optimal pool size is based on its throughput observations.
+
+If you start a server and don’t run any workload, it’ll settle on a lower value for the pool size. If you ramp up the workload, the server will adjust and increase the number of threads, although I should note that this might take a few minutes. The algorithm doesn’t want to over-respond to quick changes in workload, so it does take its time increasing the number of threads (or decreasing them, if workload gets reduced).
+
+== Fighting deadlocks in the executor
+
+Those are the basics of how the threading model works but let me just discuss one more detail that comes into play. It used to be possible sometimes to deadlock the executor. In other words, all threads in the executor would be occupied but they would all be occupied waiting for OTHER work to complete, work that had been queued to the executor. But the executor didn’t have any threads left. The Liberty auto-tuning algorithm used to not handle this situation very well and would sometimes give up trying to add threads to break the deadlock.
+
+This behavior led a lot of folks to set the `coreThreads` value of the executor to a high number to ensure that the executor never deadlocked. So we modified the auto-tuning algorithm to aggressively fight deadlocks. Now, it is essentially impossible for the executor to deadlock. So if you’ve manually set `coreThreads` in the past to avoid executor deadlocks, you might want to consider reverting back to the default.
+
+That’s it in a nutshell.
+
+What should you take away from this? Don’t tweak the default executor settings (unless you really, really have to)! We try really, really hard to make the defaults work for as many types of workloads as possible. Yes, there will be some edge cases where you may need to adjust `coreThreads` and `maxThreads`, but at least try the defaults first.
+
+== Optimizing for cloud
+
+One of the many consequences of running on the cloud is that there are usually a greater number of layers involved when compared with running on a bare metal machine. The "layers" could refer to the virtualization of different resources (CPU, storage etc.) or simply that completing a task might involve more network hops because the location of the machine having the resource (say, the database) is more uncertain across a large farm of cloud machines than it is in a more controlled on-premise environment. Regardless, the presence of more layers invariably leads to performance overheads and so the latency associated with each task could be significantly higher when running on the cloud. Depending on application design, higher latency environments can require many more application threads to fully exploit the available CPU resources, as threads may spend time blocked on remote task execution.
+
+We enhanced the default thread pool autonomics to be more highly performing in cloud (high latency) scenarios.
+
+Higher latency tasks may require large thread pool sizes for optimal throughput. The prior controller only adjusted the pool size by +/-1 thread at each evaluation cycle, which would take a long time to grow the pool to a large size. The controller adjusts the pool size by a multiple of the number of hardware threads available. Using the number of hardware threads increments makes the adjustments proportional to the computing resources available for the Liberty threads to use. It allows the pool size to grow more quickly. The number of hardware threads multiplier that is used to determine the pool increment/decrement value starts at one. It is increased as the pool size grows past threshold levels (thresholds are defined also as multiples of number of hardware threads), so that the amount of each pool size change remains proportional to the pool size.
+
+As discussed earlier, the controller uses observations of throughput at different pool sizes to decide whether to grow or shrink the pool. However, there are a variety of factors other than the pool size that can affect throughput, such as competing workloads, Java GC pauses, or unknown delay factors on other systems involved in the transaction. The prior implementation considered only historical throughput data in the range current pool size +/-1. Within that narrow range of pool size, the correlation between pool size and throughput may not be very strong, considering the other factors that can affect throughput. So the controller considers throughput for a broader range of pool sizes when making grow/shrink decisions. It looks at historical throughput data for _current-pool-size +/- (pool-increment * N)_, where _N_ is an internal constant. This broader scope improves the correlation between pool size and throughput, making it less likely that the controller will be misled by random noise (throughput variation not related to pool size) in the historical data.
+
+Applications can undergo a change in behavior (_phase change_) for a variety of reasons: Application input, environment, language runtime can all change over time. Such workload changes could cause the historical throughput data to be unrepresentative of the "current" state of the system. To reduce the probability of making grow/shrink decisions based on unrepresentative throughput data, an aging factor discards data for a pool size if that pool size has not been tried recently. Aging out old data improves the controller’s ability to adapt to change in workload conditions.
+
+The CPU resources available to the Liberty server are an important input to thread pool grow/shrink decisions. In particular, if the CPU usage is already high, adding threads is unlikely to improve throughput. This is pretty much common sense; manual thread pool tuning exercises always consider the CPU utilization as an input when seeking the optimal pool size. A "CPU high" indicator is included in the thread pool controller: if a "CPU high" condition is detected, the controller is less inclined to grow the thread pool, and more inclined to shrink it. The CPU state is monitored by reading Java MBeans for Process CPU (percent utilization of CPUs available to the Java process) and System CPU (percent utilization of all CPU resources in the system).
+
+The changes we made to optimize Liberty for running in the cloud produced significant speedups in application throughput in several high latency test cases, using the default thread pool executor without any tuning. These high-latency throughput improvements were achieved without generating too many threads for low-latency workloads, so low-latency throughput was on par with the historical controller implementation.
