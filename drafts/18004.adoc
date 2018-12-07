@@ -57,8 +57,8 @@ What else can Open Liberty 18.0.0.4 do for your microservices? Take a look:
 *  <<mpMetrics,New connection pool metrics (Monitor 1.0 with MicroProfile Metrics 1.1 updates)>>
 *  <<reactive,Reactive extensions to JAX-RS 2.1>>
 *  <<servertar,Package server TAR files for simpler Dockerfiles>>
-*  <<serverargs,Ability to pass application arguments through server command line>>
-*  <<issues,Some bug fixes>>
+*  <<root,Specify a root directory when packaging servers>>
+*  <<bugs,Bug fix>>
 
 
 As we don't have a full set of documentation implemented for Open Liberty yet, some of the items below point to the https://www.ibm.com/support/knowledgecenter/SSEQTP_liberty/as_ditamaps/was900_welcome_liberty.html[official documentation for WebSphere Liberty] (WebSphere Liberty is built on Open Liberty).
@@ -182,9 +182,11 @@ Instead of doing this:
 
 [source]
 ----
-   FROM open-liberty
-   COPY defaultServer.zip /tmp/defaultServer.zip
-   EXEC apt-get update && apt-get install unzip && unzip /tmp/defaultServer.zip /opt/ol/ && apt-get remove -y unzip && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && \
+apt-get install unzip && \
+unzip /tmp/defaultServer.zip /opt/ol/ && \
+apt-get remove -y unzip && \
+rm -rf /var/lib/apt/lists/*
 ----
 
 you can now simply write:
@@ -201,20 +203,32 @@ you can now simply write:
 [#serverargs]
 == Ability to pass application arguments through server command line
 
-Specify MicroProfile Config https://github.com/OpenLiberty/open-liberty/issues/1610[parameters on the command line] when starting an Open Liberty server. Handy when working with Docker containers or doing demos where you need to be able to change config easily.
+You can now specify Liberty server variables when you launch the Liberty server. These variables can be used in `server.xml`, MicroProfile config, and are also made available to SpringBoot apps via their `main` method. When running the Liberty `server start` command, use `--<variable>=<value>` syntax and separate the variables from the server configuration using `--` for example:
+
+    server start defaultServer -- --myArgument=value
+
+when packaging Liberty as an executable JAR file the `--` is not necessary so you can do:
+
+    java -jar defaultServer.jar --myArgument=value
 
 
 
 //
 
-[#issues]
-== Some bug fixes
+[#root]
+== Specify a root directory when packaging servers
 
-=== Add option to change root of server package
+When packaging a server from the command line using the server package command, you can now optionally specify the Open Liberty root directory in the archive. This enables you to extract the archive into your directory structure and not have to manually modify it to fit your naming scheme.
 
-A https://github.com/OpenLiberty/open-liberty/issues/5428[bug fix] to the new capability to https://github.com/OpenLiberty/open-liberty/issues/4480[allow user to specify server root in package archive] which was delivered in 18.0.0.3.
+For example, to obtain an archive called `myServerPackage.zip` which contains the archived Open Liberty server with the folder structure `/MyRoot/...` instead of `/wlp/...`, run the command:
 
-=== Remove acceptLicence requirement when installing Liberty features
+    server package myServer --archive=myServerPackage.zip --server-root=MyRoot
+
+For more info, see: https://openliberty.io/docs/ref/command/server-package.html[server package]
+
+
+[#bugs]
+== Bug fix: Remove acceptLicence requirement when installing Liberty features
 
 An historic requirement no longer necessary. All Open Liberty features are licensed under the EPL like the runtime.
 
