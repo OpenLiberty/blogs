@@ -1,0 +1,82 @@
+---
+layout: post
+title: HTTP Forwarded and X-Forwarded-* header support
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/u/3322532
+seo-title: HTTP Forwarded and X-Forwarded-* header support - OpenLiberty.io. 
+seo-description: HTTP Forwarded and X-Forwarded-* header support means that developers and applications can obtain the original client endpoint information presented by a proxy or a load balancer using the Forwarded or X-Forwarded-* headers instead of the current TCP connected endpoint.
+blog_description: "HTTP Forwarded and X-Forwarded-* header support means that developers and applications can obtain the original client endpoint information presented by a proxy or a load balancer using the Forwarded or X-Forwarded-* headers instead of the current TCP connected endpoint."
+---
+= HTTP Forwarded and X-Forwarded-* header support - dev build update
+Laura Cowen <http://github.com/lauracowen>
+
+
+HTTP Forwarded and X-Forwarded-* header support means that programmers and applications can obtain the original client endpoint information presented by a proxy or a load balancer using the Forwarded or X-Forwarded-* headers instead of the current TCP connected endpoint. This information can be retrieved using certain Servlet API calls or the NCSA Access Log.
+
+You can use the Forwarded and X-Forwarded-* headers by configuring a new element in the `server.xml`. Optionally, you can provide a regular expression that declares the internal/trusted proxy servers. In addition, you can optionally configure a Boolean type attribute that, if the HTTP Channel has verified the specific remote client information, the NCSA Access Log reflects the Forwarded and X-Forwarded-* headers when recording the remote IP, host, and/or the request protocol.
+
+Support for X-Forwarded-* and Forwarded headers in Liberty means better integration with front end HTTP load balancers and web servers. Also, if you thought you were dependent on using another app server that supports the X-Forwarded-* header, you're out of excuses now: try your app on https://openliberty.io/[Open Liberty].
+
+== Try the HTTP Forwarded and X-Forwarded-* header support in Open Liberty
+
+To use the Forwarded and X-Forwarded-* header support, you need https://openliberty.io/downloads[the latest development build of Open Liberty], then configure the `server.xml` with a new element called `<remoteIp>`. This can be enabled in two modes: one `remoteIp` for each endpoint, or one common `remoteIp` for multiple endpoints.
+
+Using a distinct `remoteIp` for each endpoint:
+
+[source,xml]
+----
+<featureManager> 
+        <feature>servlet-4.0</feature> 
+    </featureManager> 
+    <httpEndpoint id="defaultHttpEndpoint"  
+                        httpPort="9080"  
+                        httpsPort="9443">  
+               <remoteIp proxies="<regular_expression>" useRemoteIpInAccessLog="<true/false>"/>  
+    </httpEndpoint> 
+----
+
+
+Using a common `remoteIp`:
+
+[source,xml]
+----
+<featureManager> 
+        <feature>servlet-4.0</feature> 
+    </featureManager> 
+    <httpEndpoint id="defaultHttpEndpoint"  
+                        httpPort="9080"  
+                        httpsPort="9443" 
+                        remoteIpRef="myRemoteIp">  
+    </httpEndpoint> 
+    <httpEndpoint id="otherHttpEndpoint"  
+                        httpPort="9081"  
+                        httpsPort="9444" 
+                        remoteIpRef="myRemoteIp">  
+    </httpEndpoint> 
+    <remoteIp id="myRemoteIp" proxies="<regular_expression>" useRemoteIpInAccessLog="<true/false>"/>
+----
+
+
+==== Stuff you might need to know
+
+Any of the servlet features supported by Liberty can be configured to retrieve the remote client IP, the host and/or the request protocol.
+
+The `<remoteIp>` element can be optionally configured to provide a regular expression through a new configuration attribute called proxies. This is used to declare trusted Proxy node identifiers which can be IPv4/IPv6 addresses, an obfuscated token (which always starts with the underscore character), or a token called "unknown". If the `<httpEndpoint>` is configured to use the headers, and no regular expression is provided, the default value is:
+
+    10.\d{1,3}.\d{1,3}.\d{1,3}|192.168.\d{1,3}.\d{1,3}|169.254.\d{1,3}.\d{1,3}|127.\d{1,3}.\d{1,3}.\d{1,3}|172.1[6-9]{1}.\d{1,3}.\d{1,3}|172.2[0-9]{1}.\d{1,3}.\d{1,3}|172.3[0-1]{1}.\d{1,3}.\d{1,3}|0:0:0:0:0:0:0:1|::1
+
+The `<remoteIp>` element can be optionally configured to provide a Boolean-type configuration attribute called `useRemoteIpInAccessLog`, defaulted to `false`. This means that, by default, the NCSA Access Log (if configured) continues to reference the connected endpoint's TCP information when recording remote IP, host, and/or request protocol. When set to `true`, the NCSA Access Log (if configured) reflects the X-Forwarded-* or Forwarded headers when recording the remote client IP, host, and/or the request protocol if the HTTP Channel has verified remote client information.
+
+Enable the https://www.ibm.com/support/knowledgecenter/en/SSEQTP_liberty/com.ibm.websphere.wlp.doc/ae/rwlp_http_accesslogs.html[HTTP Access Log] when `useRemoteIpInAccessLog` is set to `true`.
+
+
+
+//
+
+## Ready to give it a try?
+
+Take a look at the https://openliberty.io/downloads[latest daily development build] on our Downloads page.
+
+[link=https://stackoverflow.com/tags/open-liberty]
+image::/img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="center"]
+
