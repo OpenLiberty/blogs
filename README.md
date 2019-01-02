@@ -2,12 +2,11 @@
 Create a pull request with the content of the blog post placed in the `drafts` folder using the following file naming scheme: `YYYY-MM-DD-post-title.extension`. HTML, markdown, and AsciiDoc formats can be used. The file extension would be .html, .md, or .adoc respectively. In the blog post file the following front matter variables must be set:
 - layout: post
 - title: `title of the blog post`
-- date: `YYYY-MM-DD hh:mm:ss`
 - categories: blog
 - author_picture: `secure url to author picture`
-- blog_description: `Description of blog post`
-- seo-title: `Blog Title to be Displayed on Search Engine Results Pages`
-- seo-description: `Blog Description to be Displayed on Search Engine Results Pages`
+- blog_description: `Description of blog post used in the preview card on openliberty.io/blog`
+- seo-title: `Blog Title used in search results and on social media - OpenLiberty.io`
+- seo-description: `Blog Description used in search results and on social media`
 
 `drafts` folder contains blog posts that are still in draft and are not ready to be published
 
