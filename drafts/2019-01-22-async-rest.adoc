@@ -10,19 +10,29 @@ Andy McCright <https://github.com/andymc12>
 = Asynchronous REST with JAX-RS and MicroProfile
 
 JAX-RS and MicroProfile Rest Client make writing and consuming RESTful services
-both easy and powerful. Leveraging their asynchronous capabilities can be even
-more powerful. Let's see how.  We'll follow a sample travel planning service at:
+both easy and powerful, especially when using their asynchronous capabilities.
+In this post, we'll look at how to use asynchronous JAX-RS resource methods on
+the server side. There are limited use cases in which async is suitable on the
+server, so we'll try to cover those cases where it is most useful. Async on the
+client can be very beneficial.  We'll cover the advantages, and we'll also go
+over the different ways of implementing an asynchronous client including the
+JAX-RS 2.0 async APIs, the JAX-RS 2.1 reactive APIs, and the MicroProfile Rest
+Client 1.1 type-safe, async APIs.
+
+We'll follow a sample travel planning service at:
 https://github.com/OpenLiberty/sample-async-rest
 
 The application makes RESTful calls to an airline service, hotel service, and
 car rental service in order to make reservations and determine the total cost of
 the trip.
 
+
+
 == Async on the server (JAX-RS 2.0 and 2.1)
 
 A JAX-RS resource method can be made asynchronous by using the `@Suspended`
 annotation on a parameter of type, `AsyncResponse`. Usually, the resource method
-would return `void` since the actual response would be returned via the
+would return `void` since the actual response would be returned using the
 `AsyncResponse.resume(Object)` method. Here is an example:
 
 [source,java]
@@ -55,51 +65,50 @@ public class AirlineService {
 }
 ----
 
-So what does this actually do? First, notice that there is a fixed thread pool -
+So what does this actually do? First, notice that there is a fixed thread pool,
 limited to 10 threads (this is for simplicity - a better practice would be to
-make the thread pool size configurable via
-https://microprofile.io/project/eclipse/microprofile-config[MicroProfile Config]
+make the thread pool size configurable with
+https://openliberty.io/guides/microprofile-config.html[MicroProfile Config]
 so that you could change this setting without recompiling). We might choose to
 limit the size of the thread pool to prevent overloading the back-end resource,
 a database in this case.
 
 Next, notice that the `getReservation` resource method doesn't actually return
-anything. Instead it creates a new `Reservation` in a runnable (via lambda) that
-makes a database call and then returns the reservation to the client via the
-`AsyncResponse` object. This means that the thread invoking the `getReservation`
-method can return immediately to handle new requests. The client won't see a
-response, however, until the call to the `Reservation` has been constructed and
-passed to the `resume` method - which might take a little while depending on how
-long the database request might take (`DBHelper...`). This example is
-essentially throttling access to the database.
+anything. Instead it creates a new `Reservation` in a `Runnable` (via lambda)
+that makes a database call and then returns the reservation to the client
+through the `AsyncResponse` object. This means that the thread invoking the
+`getReservation` method can return immediately to handle new requests. The
+client won't see a response, however, until the call to the `Reservation` has
+been constructed and passed to the `resume` method, which might take a little
+while depending on how long the database request might take (`DBHelper...`).
+This example is essentially throttling access to the database.
 
-Let's suppose that the database is running slow for some reason. If we had
-implemented this method synchronously, we might run into a situation where the
-database starts rejecting work - leading to exceptions thrown back to the
-client. By implementing this asynchronously, we limit the connections to 10 -
-additional requests would be queued until they could eventually be executed by
-the executor service. This is ideal so long as the database can eventually
-catch up with the work.
+Let's suppose that the database is running slowly for some reason. If we
+implement this method synchronously, we might run into a situation where the
+database starts rejecting work, leading to exceptions thrown back to the client.
+By implementing this asynchronously, we limit the connections to 10; additional
+requests would be queued until they could eventually be executed by the executor
+service. This is ideal so long as the database can eventually catch up with the
+work.
 
 In practice, it is my opinion that there are relatively few use cases where
 asynchronous methods on the server are more effective than their synchronous
 counterparts. Throttling access to another resource (as above) is one use case.
 Others might include where the thread factory has created threads optimized for
 the response (i.e. they already contain data on a ThreadLocal). Perhaps there is
-a performance benefit on some application servers - since Liberty (both
-https://www.openliberty.io[OpenLiberty] and
-https://developer.ibm.com/wasdev/[WebSphere Liberty]) uses a well-tuned, global
-https://developer.ibm.com/wasdev/docs/was-liberty-threading-and-why-you-probably-dont-need-to-tune-it/[thread pool],
+a performance benefit on some application servers;
+https://www.openliberty.io[Open Liberty] uses a
+https://developer.ibm.com/wasdev/docs/was-liberty-threading-and-why-you-probably-dont-need-to-tune-it/[well-tuned, global thread pool],
 there aren't a lot of performance benefits to using async methods on the server.
 
 But the client is a different story...
 
-== Async on the client with JAX-RS 2.0
+== Async on the Client Using Callbacks (JAX-RS 2.0)
 
 Let's say that your service returns a result that is composed of the results of
 a few other remote services. You could invoke those remote services serially,
 but that really only makes sense if your thread pool is limited. Instead, you
-could invoke the services asynchronously - using more threads, but saving time
+could invoke the services asynchronously, using more threads, but saving time
 for the entire call. Here is an example:
 
 [source,java]
@@ -185,8 +194,8 @@ public class MyTravelPlanningService {
 }
 ----
 
-This slightly more complex example uses an `InvocationCallback` that will be
-notified when the async response has completed (either via the `completed`
+This slightly more complex example uses an `InvocationCallback` which will be
+notified when the async response has completed (either through the `completed`
 method if the response is successful, or the `failed` method if not). We tell
 the client to invoke the services asynchronously by invoking the `async()`
 method on the `Invocation.Builder` object that is returned from the `request()`
@@ -195,14 +204,14 @@ instance of the callback to asynchronously invoke three different services.
 We'll only end up waiting for as long as the longest of those three services.
 Very efficient!
 
-Note: In a failure case we log the exception and then propagate it back to
-the client.  Also, we are caching and re-using the `WebTarget` for
-each remote service. This avoids a lot of object creation in the JAX-RS
-implementation code, improving overall performance.
+In a failure case we log the exception and then propagate it back to the client.
+Also, we are caching and re-using the `WebTarget` for each remote service. This
+avoids a lot of object creation in the JAX-RS implementation code, improving
+overall performance.
 
-This works well, but JAX-RS 2.1 gives us another option - a reactive client API.
+This works well, but JAX-RS 2.1 gives us another option: a reactive client API.
 
-== Async on the client with JAX-RS 2.1 Reactive APIs
+== Async on the Client Using Reactive APIs (JAX-RS 2.1)
 
 JAX-RS 2.1 adds support for reactive APIs. Out of the box, JAX-RS 2.1 supports
 a `CompletionStage` return type. This allows users to string together a chain
@@ -305,7 +314,7 @@ Rest Client. It is a proxy-based, type safe client API for RESTful services.
 Starting in MP Rest Client 1.1, you can make asynchronous calls using Java 8's
 `CompletionStage`. Let's check out that approach:
 
-== Async in MicroProfile Rest Client
+== Async on the Client Using Type-Safe Interfaces (MicroProfile Rest Client 1.1)
 
 https://github.com/eclipse/microprofile-rest-client[MicroProfile Rest Client]
 takes a different approach to accessing remote RESTful services - a more
@@ -435,7 +444,7 @@ is invoked on the async thread.
 
 image::/img/blog/asyncREST-thread-local-solution.png[]
 
-The `AsyncInvocationInterceptor` must be created via a
+The `AsyncInvocationInterceptor` must be created by a
 `AsyncInvocationInterceptorFactory` like so:
 
 [source,java]
@@ -475,6 +484,7 @@ It's getting easier to do things asynchronously with REST and Java. JAX-RS and
 MicroProfile give you some powerful tools in this space. Hopefully now you are
 more prepared to write and consumer RESTful services asynchronously.
 
-If you've got any questions or run into any problems, please let us know.
+If you've got any questions or run into any problems, please let us know. You
+can reach me on Twitter at https://twitter.com/AndrewMcCright[@AndrewMcCright].
 
 Thanks!
