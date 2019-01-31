@@ -1,0 +1,36 @@
+---
+layout: post
+title: Additional support for Java deserialization vulnerability
+categories: blog
+author_picture:
+seo-title: Additional support for Java deserialization vulnerability - OpenLiberty.io
+seo-description: JDK provided a mitigation mechanism for Java deserialization vulnerability which covers readObject method of java.io.ObjectInputStream class only. This function adds supporting subclasses of readObject method of java.io.ObjectInputStream. The list of the malicious classes can be configurable.
+blog_description: JDK provided a mitigation mechanism for Java deserialization vulnerability which covers readObject method of java.io.ObjectInputStream class only. This function adds supporting subclasses of readObject method of java.io.ObjectInputStream. The list of the malicious classes can be configurable.
+---
+= Additional support for Java deserialization vulnerability
+Toshi Yamamoto <https://github.com/barecode>
+
+In order to mitigate known Java deserialization vulnerabilities, one needs to prevent deserializing malicious classes while processing the readObject method of java.io.ObjectInputStream and it's subclasses. 
+The JDK provides a mitigation mechanism (JEP 290: Filter Incoming Serialization Data http://openjdk.java.net/jeps/290). However, it only covers the readOjbect method but not it's subclasses.
+Without this functionality, there is a potential for some subclass to inject malicious code into the environment and as a result some unforeseen events such as a data breach, a data loss, or other vulnerabilities might occur.
+
+This new support will observe the readObject method of java.io.ObjectInputStream and its subclasses and will detect potential malicious objects.
+
+The list of the malicious classes can be configured by adding the following element in the server.xml file:
+
+<serialFilter class="<class name to prohibit deserializing>" mode="Enforce" permission="Deny" />
+
+Note that the class name can contain a wild card '*' at the end of line.
+
+For example 
+
+<serialFilter class="com.unknownco.*" mode="Enforce" permission="Deny" />
+
+Multiple serialFilter elements can be set. For example:
+
+<serialFilter class="com.unknownco.*" mode="Enforce" permission="Deny" />
+
+<serialFilter class="com.notrust.*" mode="Enforce" permission="Deny" />
+
+When the filter prevents the deserialization, java.io.InvalidClassException with message ID CWWKS8027E is thrown. As a result, readObject throws java.io.InvalidClassException which prevents deserializing it.
+
