@@ -1,0 +1,298 @@
+---
+layout: post
+title:  "Open Liberty and Java 11"
+date:   2019-01-21 16:45:00 -0000
+categories: blog
+blog_description: "Run an Open Liberty server on Java 11"
+author_picture: https://avatars2.githubusercontent.com/u/5427967
+seo-title: Run an Open Liberty server on Java 11
+seo-description: How to run an Open Liberty server on Java 11.
+blog_description: How to run an Open Liberty server on Java 11.
+---
+:description: How to run an Open Liberty server on Java 11.
+=  Open Liberty and Java 11
+Andy Guibert <https://github.com/aguibert>
+
+The Java community threw application servers quite the curve-ball with Java 9, 10, and 11 updates, but we did it! Open Liberty is now supported on Java 11.
+
+Java 11 was officially released in September 2018, which is the https://www.oracle.com/technetwork/java/java-se-support-roadmap.html[first LTS (long term support) major release since Java 8]. Java 9 and 10 were released a while back, but these were not LTS releases. Now that there is a new version of Java that has a decent lifespan, let's look at the new functionality since Java 8, and what it takes to run Open Liberty apps on Java 11.
+
+[link=https://adoptopenjdk.net/index.html?variant=openjdk11&jvmVariant=openj9]
+image::/img/blog/blog_btn_Download_OpenJ9.svg[Download Java 11, align="center"]
+
+== New functionality in Java 9/10/11
+
+There is a ton of new stuff in the JDK since Java 8, but here is the stuff that I think is the most exciting from the perspective of an application running on Open Liberty:
+
+* Flow API (Reactive Streams)
+* Standard HTTP Client
+* Transport Layer Security (TLS) 1.3
+* var for local variables
+* jshell
+* process API enhancements
+* immutable set builders
+
+=== Flow API (Reactive Streams) - https://openjdk.java.net/jeps/266[JEP 266]
+
+Reactive programming has gained a lot of popularity, especially when used in distributed systems. Libraries like RxJava make this possible in older Java versions, and now the JDK has officially defined a set of interfaces. Specifically, `Publisher<T>`, `Subscriber<T>`, and `Processor<T,R>`.
+
+https://www.baeldung.com/java-9-reactive-streams[Here is a great article from Baeldung] giving an intro to the Flow API.
+
+=== Standard HTTP Client - https://openjdk.java.net/jeps/321[JEP 321]
+
+Finally Java has a much needed improvement above the old `HttpURLConnection` with a standardized HTTP Client API. You can now invoke HTTP requests without packaging extra libraries such as Apache HTTP Client. Invoking a simple GET request looks like this:
+
+[source,java]
+----
+HttpClient client = HttpClient.newHttpClient();
+HttpRequest request = HttpRequest.newBuilder()
+          .uri(URI.create("https://openliberty.io"))
+          .build();
+
+HttpResponse<String> response = client.send(request, BodyHandlers.ofString());
+System.out.println(response.body());
+----
+
+https://dzone.com/articles/java-11-standardized-http-client-api[Here is a nice blog on DZone] that goes into more examples.
+
+=== Transport Layer Security (TLS) 1.3 - https://openjdk.java.net/jeps/332[JEP 332]
+
+The new TLSv1.3 protocol is a major overhaul of TLS and offers significant security improvements. The Open Liberty security team found a few important compatibility bugs that we were able to get fixed in OpenJ9 JDK 11.0.2, and is the reason why we don't support 11.0.0 or 11.0.1. Shout out to the OpenJ9 team for getting these important fixes into a release for us!
+
+=== var for local variables - https://openjdk.java.net/jeps/286[JEP 286]
+
+Java has gotten some flak over the years for being a verbose language. Being type-safe is nice, but if you're writing some short-lived variables in private helper methods, the repeated declaration of types can get quite tedious. With local variable type inference, a lot of the ceremony of type declaration gets removed.
+
+[source,java]
+----
+// Java 6
+HashMap<Foo,List<Bar>> barMap = new HashMap<Foo,List<Bar>>();
+
+// Java 7
+HashMap<Foo,List<Bar>> barMap = new HashMap<>();
+
+// Java 10
+var barMap = new HashMap<Foo,List<Bar>>();
+----
+
+=== The Java Shell - https://openjdk.java.net/jeps/222[JEP 222]
+
+The Java Shell (a.k.a. `jshell`) is a super handy command-line utility that offers a REPL shell with full-blown Java language features and tab completion.
+
+----
+$ jshell
+jshell> System.out.println("Hello world!")
+Hello world!
+
+jshell> System.getProperty("java.vendor")
+$1 ==> "Eclipse OpenJ9"
+----
+
+Also, if you're a Java whiz, https://youtu.be/nP-UeleMgE4?t=196[it can be used for conference talks in place of slides!]
+
+=== Process API enhancements - https://openjdk.java.net/jeps/102[JEP 102]
+
+The `java.lang.Process` API has been enhanced so you can do some really convenient things without dipping into native code such as:
+
+- Getting detailed process info (pid, start cmd, cpu time, user)
+- List all child processes on the system
+- List child processes of the current process
+
+=== Immutable Set builders - https://openjdk.java.net/jeps/269[JEP 269]
+
+Initializing a simple fixed collection is something we do very frequently, but it has always been a bit clunky. Now we finally have a nice and concise way to do so.
+
+[source,java]
+----
+// Pre-JDK 9
+List<String> list = Collections.unmodifiableList(Arrays.asList("one", "two", "three"));
+
+// JDK 9
+var list = List.of("one", "two", "three"); // List<String>
+var set =  Set.of("one", "two", "three");  // Set<String>
+var map =  Map.of("one", 1,                // Map<String,Integer>
+                  "two", 2,
+                  "three", 3);
+----
+
+== How to run Open Liberty on Java 11
+
+First of all, if you don't have a copy of it already, you will need to https://adoptopenjdk.net/index.html?variant=openjdk11&jvmVariant=openj9[download Java 11].
+
+NOTE: Currently Open Liberty supports Java 11.0.2 (or newer) on the OpenJ9 VM. Other Java VMs, such as Hotspot, are not supported due to some outstanding VM bugs.
+
+Next, you will need Open Liberty 19.0.0.1 or newer.
+
+If you are using https://www.openliberty.io/guides/maven-intro.html[Maven], here are the coordinates:
+[source,xml]
+----
+<dependency>
+    <groupId>io.openliberty</groupId>
+    <artifactId>openliberty-runtime</artifactId>
+    <version>19.0.0.1</version>
+    <type>zip</type>
+</dependency>
+----
+
+Or for https://openliberty.io/guides/gradle-intro.html[Gradle]:
+[source,groovy]
+----
+dependencies {
+    libertyRuntime group: 'io.openliberty', name: 'openliberty-runtime', version: '[19.0.0.1,)'
+}
+----
+
+Or you can https://openliberty.io/downloads/[download OpenLiberty directly here].
+
+There are a number of ways to control the Java executable used by the Open Liberty server. The following list describes the order of precedence:
+
+. `JAVA_HOME` in `${server.config.dir}/server.env`
+. `JAVA_HOME` in `${wlp.install.dir}/etc/server.env`
+. `JAVA_HOME` set in the environment
+. searching the `PATH` in the environment
+
+To confirm that Open Liberty is using the intended Java level, you can check the first line of console output:
+
+----
+$ export JAVA_HOME=/path/to/java11
+
+$ export PATH=$JAVA_HOME/bin:$PATH
+
+$ bin/server run myServer
+
+Launching myServer (WebSphere Application Server 19.0.0.1/wlp-1.0.24.201901191232) on Eclipse OpenJ9 VM, version 11.0.2 (en_US)
+[AUDIT   ] CWWKE0001I: The server myServer has been launched.
+...
+----
+
+== Run a simple REST application on Java 11
+
+To run an application on Open Liberty that uses Java 11, we can start by defining the new compiler compliance level in your `pom.xml` file if using Maven:
+[source,xml]
+----
+<plugin>
+    <groupId>org.apache.maven.plugins</groupId>
+    <artifactId>maven-compiler-plugin</artifactId>
+    <version>3.8.0</version>
+    <configuration>
+        <release>11</release>
+    </configuration>
+</plugin>
+----
+
+
+Or, if you are using Gradle, you can set it in the `build.gradle` file like so:
+[source,groovy]
+----
+sourceCompatibility = 11
+targetCompatibility = 11
+----
+
+NOTE: It is not required to set a compiler compliance level of Java 11 in order to run an existing application on Java 11, but in order to leverage any of the new language features you will need to do so.
+
+Clone https://github.com/aguibert/basic-liberty[this sample project] and run it using Gradle:
+----
+$ git clone git@github.com:aguibert/basic-liberty.git
+
+$ git checkout java11-blog
+
+$ ./gradlew libertyStart
+----
+
+Then open a browser to http://localhost:8080/basic-liberty-1.0-SNAPSHOT/ and you should see the following output:
+----
+Hello world
+The java runtime is version: 11
+----
+
+To stop the server, run the command: `./gradlew libertyStop`
+
+== Java 11 changes that impact Open Liberty
+
+There have been a lot of good enhancements to Java between Java 8 and 11, such as local variables and the Flow API, but there are a few changes that are likely to cause problems for existing applications.
+
+=== Removal of Java EE and CORBA APIs from the JDK
+
+In Java 11, several modules (groupings of Java packages) were https://openjdk.java.net/jeps/320[removed from the JDK]. Your applications may have been relying on some of these removed packages, but the good news is that all of the removed packages are provided by existing Open Liberty features. Here is a table that shows what Open Liberty features to enable for each removed package:
+
+[options="header"]
+|===
+|Removed Module |Removed Package(s) |Equivalent Open Liberty Feature
+
+|java.activation
+|javax.activation
+|jaxb-2.2
+
+|java.corba
+v|javax.activity
+javax.rmi 
+javax.rmi.CORBA 
+org.omg.*
+|ejbRemote-3.2
+
+|java.transaction
+|javax.transaction
+|jdbc-4.X features
+
+|java.xml.bind
+|javax.xml.bind.*
+|jaxb-2.2
+
+|java.xml.ws.annotation
+|javax.annotation
+|Most Java EE 7 or 8 features
+
+|java.xml.ws
+v|javax.jws.*
+javax.xml.soap 
+javax.xml.ws.*
+|jaxws-2.2
+|===
+
+=== Introduction of the Java Platform Module System (JPMS)
+
+In Java 9, one of the biggest changes to Java was delivered, under http://openjdk.java.net/jeps/261[JEP 261: The Module System]. This introduces a new Java construct called a "module" which is essentially an archive that is a collection of Java packages, with a `module-info.class` descriptor at the root of the archive. Using the `module-info` descriptor, a module can define what packages it exposes, what services it provides, what services it requires, and what modules it requires.
+
+Here is an example of what a `module-info.java` might look like:
+[source,java]
+----
+module com.foo {
+  // Declare what packages are exported from this module
+  exports com.foo.api;
+  exports com.foo.spi to com.foo.othermodule;
+
+  // Declare a package as "open" so that other modules can perform deep reflection into it
+  // This is useful for CDI injection or JPA entity weaving
+  opens com.foo.internal.jpa.entities;
+
+  // Declare what modules this module requires
+  // By default, every module automatically requires the 'java.base' module
+  requires java.sql;
+  requires java.xml;
+
+  // Declare used and provided services
+  uses java.sql.Driver;
+  provides com.foo.api.FooService
+      with com.foo.internal.FooServiceImpl;
+}
+----
+
+The JDK itself is now organized into Java modules, and it looks something like this:
+
+image::/img/blog/blog_java11_jpms.png[]
+
+The intent is for the entire Java ecosystem to eventually organize itself into Java modules, but for now Java modules are not defined in the JavaEE/JakartaEE/MicroProfile space. *While you can technically include a Java module in your Open Liberty application, the module-info descriptor will have no effect at the moment.*
+
+==== JPMS Access Restrictions
+
+While JPMS does introduce some interesting architectural capabilities and brings a long-needed modularity system into the JDK, it does so at the expense of several popular Java technologies, namely CDI and JPA. The reason for this is that Java modules cannot access members of non-exported packages from other Java modules, and Java code may no longer perform deep reflection (i.e. things that require `setAccessible(true)`) on members of Java modules. If either of these rules are violated, an `IllegalAccessException` is thrown.
+
+Since this is such a major compatibility issue for most of the Java ecosystem, a "kill switch" (formally known as the `--illegal-access=permit` JVM option) has been introduced. It is enabled by default and allows code in unnamed modules to access and perform deep reflection on all named modules. It is important to note that eventually the kill switch will not be enabled by default, and later it will be removed entirely, so it is best to stop writing code that uses deep reflection and start migrating to alternative approaches.
+
+== Useful references for Java 11 migration
+
+While this blog post focused mainly on Java 11 migration within the context of Liberty, there are many great resources out there for generic Java 11 migration, as well as Java 11 feature highlights. To name a few:
+
+- https://blog.codefx.org/java/java-11-migration-guide/[All You Need To Know For Migrating To Java 11 by Nicolai Parlog]
+- https://docs.oracle.com/en/java/javase/11/migrate/index.html[Oracle's Official Java 11 Migration Guide]
+
