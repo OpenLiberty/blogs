@@ -18,7 +18,7 @@ Once approved, the blog post will be moved from `drafts` to `publish`.
 
 If you would like to add a blog post that is actually a link to an existing third party blog post, you can follow the normal steps described above for creating a blog post. You simply need to add the following attributes to the liquid front matter: 
 - redirect_link: 'link'
-- permalink: /blog/redirected
+- permalink: /blog/redirected.html
 
 # Docker container for development
 
