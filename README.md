@@ -1,5 +1,5 @@
 # Contributing to the blog
-Create a pull request with the content of the blog post placed in the `drafts` folder using the following file naming scheme: `YYYY-MM-DD-post-title.extension`. HTML, markdown, and AsciiDoc formats can be used. The file extension would be .html, .md, or .adoc respectively. In the blog post file the following front matter variables must be set:
+Create a pull request with the content of the blog post placed in the `drafts` folder using the following file naming scheme: `YYYY-MM-DD-post-title.extension`.  Blogs are written in [AsciiDoc](https://asciidoctor.org/docs/asciidoc-writers-guide/) format with a file extension of `.adoc`. In the blog post file the following front matter variables must be set:
 - layout: post
 - title: `title of the blog post`
 - categories: blog
@@ -12,9 +12,11 @@ Create a pull request with the content of the blog post placed in the `drafts` f
 
 `publish` folder contains blog posts that are ready to be published
 
-`img` folder contains images used in the blog `adoc` files
+`img/blog` folder contains images used in the blog `adoc` files
 
 Once approved, the blog post will be moved from `drafts` to `publish`.
+
+### Contributing a third party blog post
 
 If you would like to add a blog post that is actually a link to an existing third party blog post, you can follow the normal steps described above for creating a blog post. You simply need to add the following attributes to the liquid front matter: 
 - redirect_link: 'link'
