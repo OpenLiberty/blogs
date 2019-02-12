@@ -1,17 +1,30 @@
 # Contributing to the blog
-Create a pull request with the content of the blog post placed in the `drafts` folder using the following file naming scheme: `YYYY-MM-DD-post-title.extension`. HTML, markdown, and AsciiDoc formats can be used. The file extension would be .html, .md, or .adoc respectively. In the blog post file the following front matter variables must be set:
+Create a pull request with the content of the blog post placed in the `drafts` folder using the following file naming scheme: `YYYY-MM-DD-post-title.extension`.  Blogs are written in [AsciiDoc](https://asciidoctor.org/docs/asciidoc-writers-guide/) format with a file extension of `.adoc`. In the blog post file the following front matter variables must be set:
 - layout: post
-- categories: blog
 - title: `title of the blog post`
+- categories: blog
 - author_picture: `secure url to author picture`
+     - If a picture cannot be found, the openliberty.io logo can be used instead https://openliberty.io/favicon.ico
+- blog_description: `Description of blog post used in the preview card on openliberty.io/blog`
+     - Please keep your `blog_description` to around 60 words
+- seo-title: `Blog Title used in search results and on social media - OpenLiberty.io`
+     - Please ensure that your `seo-title` ends with ` - OpenLiberty.io`
+- seo-description: `Blog Description used in search results and on social media`
+     - Please keep your `seo-description` between 50-300 characters
 
 `drafts` folder contains blog posts that are still in draft and are not ready to be published
 
 `publish` folder contains blog posts that are ready to be published
 
-`img` folder contains images used in the blog `adoc` files
+`img/blog` folder contains images used in the blog `adoc` files
 
 Once approved, the blog post will be moved from `drafts` to `publish`.
+
+### Contributing a third party blog post
+
+If you would like to add a blog post that is actually a link to an existing third party blog post, you can follow the normal steps described above for creating a blog post. You simply need to add the following attributes to the liquid front matter: 
+- redirect_link: 'link'
+- permalink: /blog/redirected.html
 
 # Docker container for development
 
