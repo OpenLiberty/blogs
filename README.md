@@ -4,9 +4,13 @@ Create a pull request with the content of the blog post placed in the `drafts` f
 - title: `title of the blog post`
 - categories: blog
 - author_picture: `secure url to author picture`
+     - If a picture cannot be found, the openliberty.io logo can be used instead https://openliberty.io/favicon.ico
 - blog_description: `Description of blog post used in the preview card on openliberty.io/blog`
+     - Please keep your `blog_description` to around 60 words
 - seo-title: `Blog Title used in search results and on social media - OpenLiberty.io`
+     - Please ensure that your `seo-title` ends with ` - OpenLiberty.io`
 - seo-description: `Blog Description used in search results and on social media`
+     - Please keep your `seo-description` between 50-300 characters
 
 `drafts` folder contains blog posts that are still in draft and are not ready to be published
 
