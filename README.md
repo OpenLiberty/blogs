@@ -5,6 +5,7 @@ Create a pull request with the content of the blog post placed in the `drafts` f
 - categories: blog
 - author_picture: `secure url to author picture`
      - If a picture cannot be found, the openliberty.io logo can be used instead https://avatars3.githubusercontent.com/u/28316667
+- author_github: `secure url to author github`
 - blog_description: `Description of blog post used in the preview card on openliberty.io/blog`
      - Please keep your `blog_description` to around 60 words
 - seo-title: `Blog Title used in search results and on social media - OpenLiberty.io`
