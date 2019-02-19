@@ -1,0 +1,165 @@
+---
+layout: post
+title: "A better way to use MongoDB with Open Liberty"
+date:   2019-02-18 11:30:00 -0000
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/u/21284019
+seo-title: A better way to use MongoDB with Open Liberty - OpenLiberty.io
+seo-description: Use a CDI producer to make accessing MongoDB easy, with CDI and MicroProfile Config.
+blog_description: "Use a CDI producer to make accessing MongoDB easy, with CDI and MicroProfile Config."
+---
+
+= A better way to use MongoDB with Open Liberty
+Mark Swatosh <https://github.com/mswatosh>
+
+Using MongoDB with Open Liberty previously meant enabling the `mongodb-2.0` feature and configuring several elements in `server.xml`, but was limited to certain versions of MongoDB.
+Now, with improvements in CDI and the introduction of MicroProfile Config, you can easily configure access to any version of MongoDB with a CDI producer. 
+
+== A CDI producer for MongoDB
+With a CDI producer, you are no longer restricted to MongoDB 2.X versions, and can easily provide a MongoDatabase to your application.
+This example demonstrates how to create a CDI producer to inject a MongoDatabase:
+
+[source, java]
+----
+@ApplicationScoped
+public class MongoProducer {
+	
+    @Produces
+    public MongoClient createMongo() {
+        return new MongoClient(new ServerAddress(), new MongoClientOptions.Builder().build());
+    }
+
+    @Produces
+    public MongoDatabase createDB(MongoClient client) {
+        return client.getDatabase("testdb");
+    }
+
+    public void close(@Disposes MongoClient toClose) {
+        toClose.close();
+    }
+}
+----
+
+Here is an example of using the CDI producer to inject a MongoDatabase in a JAX-RS application:
+[source, java]
+----
+@Inject
+MongoDatabase db;
+
+@POST
+@Path("/add") 
+@Consumes(MediaType.APPLICATION_JSON)
+public void add(CrewMember crewMember) {
+    MongoCollection<Document> crew = db.getCollection("Crew");
+    Document newCrewMember = new Document();
+    newCrewMember.put("Name",crewMember.getName());
+    newCrewMember.put("Rank",crewMember.getRank());
+    newCrewMember.put("CrewID",crewMember.getCrewID());
+    crew.insertOne(newCrewMember);
+}
+----
+
+== Enhancing the CDI producer
+
+One of the advantages of using a CDI producer is it can be tailored to your needs. 
+For improved security, the createMongo method could be enhanced to include authentication
+with a username and an encoded password:
+
+[source, java]
+----
+@Produces
+public MongoClient createMongo() {
+    String password = PasswordUtil.passwordDecode(encodedPass);
+    MongoCredential creds = MongoCredential.createCredential(user, dbName, password.toCharArray());
+    return new MongoClient(new ServerAddress(), creds, new MongoClientOptions.Builder().build());
+}
+----
+
+Note: this will require `passwordUtilities-1.0`, available as a maven dependency:
+[source, xml]
+----
+<dependency>
+    <groupId>io.openliberty.features</groupId>
+    <artifactId>passwordUtilities-1.0</artifactId>
+    <version>18.0.0.4</version>
+</dependency>
+----
+
+You will also need to enable the feature in `server.xml`:
+
+[source, xml]
+----
+<feature>passwordUtilities-1.0</feature>
+----
+
+You can go further and enable link:https://openliberty.io/config/ssl.html[SSL], changing the createMongo method to look something like this:
+
+[source, java]
+----
+@Produces
+public MongoClient createMongo() throws SSLException {
+    String password = PasswordUtil.passwordDecode(encodedPass);
+    MongoCredential creds = MongoCredential.createCredential(user, dbName, password.toCharArray());
+    SSLContext sslContext = JSSEHelper.getInstance().getSSLContext("defaultSSLConfig", Collections.emptyMap(), null);
+    return new MongoClient(new ServerAddress(hostname, port), creds, new MongoClientOptions.Builder()
+                           .sslEnabled(true)
+                           .sslContext(sslContext)
+                           .build());
+}
+----
+
+== Configure with MicroProfile Config
+Now that you have a more advanced CDI producer, it would be nice to add configurability to some of the variables, like the user and password.
+Using link:https://openliberty.io/guides/microprofile-config-intro.html[MicroProfile Config] makes configuring the MongoDB Driver simple.
+You can add the following to your CDI producer to add configuration:
+[source, java]
+----
+@Inject
+@ConfigProperty(name = "mongo.hostname", defaultValue = "localhost")
+String hostname;
+
+@Inject
+@ConfigProperty(name = "mongo.port", defaultValue = "27017")
+int port;
+
+@Inject
+@ConfigProperty(name = "mongo.dbname", defaultValue = "testdb")
+String dbName;
+
+@Inject
+@ConfigProperty(name = "mongo.user")
+String user;
+
+@Inject
+@ConfigProperty(name = "mongo.pass.encoded")
+String encodedPass;
+----
+
+Now, by placing the following in your `microprofile-config.properties` or `server.env` file, the values for
+user and encodedPass will be pulled into the MongoProducer class.
+
+
+[source, text]
+----
+mongo.user=sampleUser
+mongo.pass.encoded={aes}APtt+/vYxxPa0jE1rhmZue9wBm3JGqFK3JR4oJdSDGWM1wLr1ckvqkqKjSB2Voty8g==
+----
+
+== No need for a mongo feature
+Previously, using MongoDB required enabling the `mongodb-2.0` feature, which was limited to certain
+MongoDB 2.X versions. By using a CDI producer, any version of MongoDB can be used, with no need for a mongo feature. 
+Even if the MongoDB Java Driver API changes, simple updates to your CDI producer will allow it to continue to work.
+You should remove the `mongodb-2.0` feature from your `server.xml` when using newer versions of MongoDB with a CDI producer.
+
+The MongoDB driver needs to be bundled in your application. To do this with Maven you can use a dependency like the following:
+[source, xml]
+----
+<dependency>
+    <groupId>org.mongodb</groupId>
+    <artifactId>mongo-java-driver</artifactId>
+    <version>X.X.X</version>
+</dependency>
+----
+
+This illustrates how easy it is to create a CDI producer for MongoDB, configure it with MicroProfile Config, 
+and use it to access a MongoDatabase in your application. The full sample is available on GitHub here: link:https://github.com/OpenLiberty/sample-mongodb[https://github.com/OpenLiberty/sample-mongodb] 
