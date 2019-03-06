@@ -19,7 +19,7 @@ Create a pull request with the content of the blog post placed in the `drafts` f
 
 `img/blog` folder contains images used in the blog `adoc` files
 
-Once approved, the blog post will be moved from `drafts` to `publish`.
+Once approved (ask `lauracowen`, or `NottyCode` as backup, to review/approve your PR), the blog post will be moved from `drafts` to `publish`.
 
 ### Contributing a third party blog post
 
