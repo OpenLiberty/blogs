@@ -1,10 +1,10 @@
 ---
 layout: post
-title: MicroProfile 2.2: Improving the developer experience of writing cloud-native Java microservices on Open Liberty 19.0.0.3
+title: MicroProfile 2.2 - Improving the developer experience of writing cloud-native Java microservices on Open Liberty 19.0.0.3
 categories: blog
 author_picture: https://avatars3.githubusercontent.com/u/3322532
 author_github: https://github.com/lauracowen
-seo-title: MicroProfile 2.2: Improving the developer experience of writing cloud-native Java microservices on Open Liberty 19.0.0.3 - OpenLiberty.io.
+seo-title: MicroProfile 2.2 - Improving the developer experience of writing cloud-native Java microservices on Open Liberty 19.0.0.3 - OpenLiberty.io.
 seo-description: A full implementation of MicroProfile 2.2. Focuses on improving the developer experience of writing cloud-native Java microservices with MicroProfile. Includes updates to the MicroProfile Rest Client, Fault Tolerance, OpenAPI, and Open Tracing features. Based on Java EE 8 technologies.
 blog_description: "A full implementation of MicroProfile 2.2. Focuses on improving the developer experience of writing cloud-native Java microservices with MicroProfile. Includes updates to the MicroProfile Rest Client, Fault Tolerance, OpenAPI, and Open Tracing features. Based on Java EE 8 technologies."
 ---
@@ -19,9 +19,12 @@ In the third of https://openliberty.io/blog/2019/02/01/new-4-weekly-release-sche
 **  <<mpft,MicroProfile Fault Tolerance 2.0: Improved developer experience and control over interceptor priorities>>
 **  <<mpopenapi,MicroProfile OpenAPI 1.1: Easier to generate and filter documentation for your app's APIs>>
 **  <<mpopentracing,MicroProfile Open Tracing 1.3: Tracing support in MicroProfile REST clients>>
+* Other updates:
+** <<configvar,Config variable improvements>>
+** <<docker,Non-root Docker images and more>>
+** <<pkcs,PKCS12 as the default keystore>>
 * <<previews,Previews of early implementations available in the latest development builds>>
 ** <<mpconcurrency,MicroProfile Concurrency 1.0>>
-
 
 
 If you're using https://www.openliberty.io/guides/maven-intro.html[Maven], here are the coordinates:
@@ -96,7 +99,7 @@ To enable the MicroProfile Rest Client feature in your `server.xml`:
 </featureManager>
 ----
 
-//To try it out, take a look at URL[Andy's blog post on using MicroProfile Rest Client 1.2]. 
+To try it out, take a look at https://openliberty.io/blog/2019/03/28/developer-experience-microprofile-rest-client.html[Andy's blog post on using MicroProfile Rest Client 1.2]. 
 
 For more details, take a look at the https://openliberty.io/docs/ref/microprofile/[MicroProfile Javadoc].
 
@@ -194,9 +197,74 @@ For more details, take a look at the https://openliberty.io/docs/ref/microprofil
 
 To learn to use MicroProfile Open Tracing, see the https://openliberty.io/guides/microprofile-opentracing.html[Enabling distributed tracing in microservices] guide.
 
+//
+
+[#configvar]
+=== Config variable improvements
+
+As Docker has become a more and more important deployment platform, the importance of being able to integrate configuration variables from the environment into the Liberty configuration has become more and more important.
+It was always possible to reference configuration variables by prefixing the variable name with `env.`, but it means you have to design your configuration to receive this configuration from the environment and the value has to be provided in the environment for the server to receive configuration.
+
+To simplify these things 19.0.0.3 has three important new capabilities:
+
+1. It is now possible to directly reference environment variables without the prefix. The Liberty variable resolution order means that this won't affect existing configurations (a variable from any other source overrides the environment), but it means that when you go from local development environments to Docker containers, you do not need to rewrite your server configuration file just to specify it from the environment.
+
+2. With the environment being overridden by everything else it isn't possible to specify defaults from the environment. This means that when you go to Docker you have to specify everything in `docker -e` or in Kubernetes even if you can sensibly define a default most of the time. Now you can just define a default value in `server.xml` that will only be used if the value is not provided by any other source. This greatly simplifies docker configuration. To implement this simply specify the default value like this:
++
+[source,xml]
+----
+<variable name="my.variable" defaultValue="some default" />
+----
+
+3. When writing configuration in `server.xml` most people use Java property name conventions: all lowercase with periods as separators. If the server config has been written with Java-style property names, the property can't be specified in an environment variable because period isn't valid in an environment variable name. To work around this when resolving variable names, Liberty configuration uses the same algorithm as MicroProfile Config by mapping non-alphanum characters to `_` and, if that doesn't match, upper-casing everything. This means if your `server.xml` has `http.port` then this can be read from the environment as `http_port` or `HTTP_PORT`.
+
+//
+
+[#docker]
+=== Non-root Docker images and more
+
+Following industry's best practices we have updated all of Open Liberty's Docker images to run as non-root (user:group set as 1001:0).  We have taken care of ensuring all of the needed directories have the correct permissions, but if you find that your application's Dockerfile is failing, see the https://hub.docker.com/_/open-liberty[updated documentation] for the different options you have.
+
+With this update the Open Liberty Docker images can natively run on OpenShift and any other Kubernetes platform that requires the image to run as non-root.
+
+We also now have Open Liberty Docker images based on Java 11 + OpenJ9 in our community repository of Docker Hub.  This is in addition to the Java 8 + OpenJ9 images we already had. Check it out today at: https://hub.docker.com/r/openliberty/open-liberty
+
+Finally, https://hub.docker.com/r/openliberty/daily[daily Open Liberty Docker images] are now available.  These images pickup the daily Open Liberty binaries.
+
+//
+
+[#pkcs]
+=== PKCS12 as the default keystore
+
+PKCS12 is now used as the default keystore instead of JKS. PKCS12 has a number of advantages:
+
+* It is more extensible.
+* It supports stronger cryptographic algorithms.
+* It is widely adopted.  PKCS12 is frequently the format provided by certificate authorities when issuing certificates.
+
+This change means that any new keystores are created in the PKCS12 format if the configuration uses the default configuration.  It should not, however, affect existing applications that rely upon the original JKS keystore type.  Backwards compatibility is maintained to allow existing applications to continue operating unmodified.
+                                                        
+Usage scenarios:
+
+1.  With no keystore config at all in `server.xml`, a PKCS12 keystore is created on server start-up.
+2.  With no keystore config at all in `server.xml`, and with a `key.jks` keystore that exists in the default `/resource/security` location, the existing `key.jks` is used and no PKCS12 keystore is created.
+3.  With a minimal SSL configuration, e.g., `<keyStore id="defaultKeyStore" password="Liberty">`, and a `key.jks` keystore file that exists in the default `/resources/security` location, the default `key.jks` keystore is used and no PKCS12 keystore is created.
+4.  With a minimal SSL configuration, e.g., `<keyStore id="defaultKeyStore" password="Liberty">`, and a `key.p12` keystore file that exists in the default `/resources/security` location, the default `key.p12` keystore is used 
+5.  A new JKS keystore is created if there is a minimal SSL configuration where a type is specified and the type is `JKS` e.g., `<keyStore id="defaultKeyStore" type="JKS" password="liberty" />`
+6.  A new PKCS12 keystore is created if there is a minimal SSL configuration where a type is specified and the type is `PKCS12` e.g., `<keyStore id="defaultKeyStore" type="PKCS12" password="liberty" />`  
+7.  When a keystore is specified in `server.xml` and it is not the default keystore, and the type is not specified, but the location of the JKS keystore is specified, that JKS keystore is used. e.g., `<keyStore id="myKeyStore" location="c:/temp/myKeyStore.jks" password="liberty">`
+8.  When a keystore is specified in `server.xml` and it is not the default keystore, and the type is not specified, but the location of the PKCS12 keystore is specified, that PKCS12 keystore is used. e.g., `<keyStore id="myKeyStore" location="c:/temp/myKeyStore.p12" password="liberty">`
+  
+
+When using the ORACLE v7 JDK, ensure that upgrade 101 or higher is used, which provides the support to add trusted certificates to a PKCS12 keystore.
+
+When using the createSSLCertificateTask of the SecurityUtility tool, a PKCS12 file is created.                                                 
 
 
 
+
+
+//
 
 ## Ready to give it a try?
 
