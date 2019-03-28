@@ -1,0 +1,317 @@
+---
+layout: post
+title: MicroProfile 2.2: Improving the developer experience of writing cloud-native Java microservices on Open Liberty 19.0.0.3
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/u/3322532
+author_github: https://github.com/lauracowen
+seo-title: MicroProfile 2.2: Improving the developer experience of writing cloud-native Java microservices on Open Liberty 19.0.0.3 - OpenLiberty.io.
+seo-description: A full implementation of MicroProfile 2.2. Focuses on improving the developer experience of writing cloud-native Java microservices with MicroProfile. Includes updates to the MicroProfile Rest Client, Fault Tolerance, OpenAPI, and Open Tracing features. Based on Java EE 8 technologies.
+blog_description: "A full implementation of MicroProfile 2.2. Focuses on improving the developer experience of writing cloud-native Java microservices with MicroProfile. Includes updates to the MicroProfile Rest Client, Fault Tolerance, OpenAPI, and Open Tracing features. Based on Java EE 8 technologies."
+---
+= MicroProfile 2.2: Improving the developer experience of writing cloud-native Java microservices on Open Liberty 19.0.0.3
+Laura Cowen <https://github.com/lauracowen>
+
+In the third of https://openliberty.io/blog/2019/02/01/new-4-weekly-release-schedule.html[our new 4-weekly Open Liberty releases], we have a full implementation of MicroProfile 2.2. MicroProfile 2.2 focuses on improving the developer experience of writing cloud-native Java microservices with MicroProfile. It includes updates to the MicroProfile Rest Client, Fault Tolerance, OpenAPI, and Open Tracing features, and is based on Java EE 8 technologies.
+
+
+*  <<mp22,MicroProfile 2.2: Improving the developer experience of writing cloud-native Java microservices>>
+**  <<mprestclient,MicroProfile Rest Client 1.2: Improved developer experience and improved integration with other features>>
+**  <<mpft,MicroProfile Fault Tolerance 2.0: Improved developer experience and control over interceptor priorities>>
+**  <<mpopenapi,MicroProfile OpenAPI 1.1: Easier to generate and filter documentation for your app's APIs>>
+**  <<mpopentracing,MicroProfile Open Tracing 1.3: Tracing support in MicroProfile REST clients>>
+* <<previews,Previews of early implementations available in the latest development builds>>
+** <<mpconcurrency,MicroProfile Concurrency 1.0>>
+
+
+
+If you're using https://www.openliberty.io/guides/maven-intro.html[Maven], here are the coordinates:
+
+[source,xml]
+----
+<dependency>
+    <groupId>io.openliberty</groupId>
+    <artifactId>openliberty-runtime</artifactId>
+    <version>19.0.0.3</version>
+    <type>zip</type>
+</dependency>
+----
+
+Or for https://openliberty.io/guides/gradle-intro.html[Gradle]:
+
+[source,json]
+----
+dependencies {
+    libertyRuntime group: 'io.openliberty', name: 'openliberty-runtime', version: '[19.0.0.3,)'
+}
+----
+
+Or if you're using Docker:
+
+[source]
+----
+docker pull open-liberty
+----
+
+Or take a look at our https://openliberty.io/downloads/[Downloads page].
+
+[link=https://stackoverflow.com/tags/open-liberty]
+image::/img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="center"]
+
+
+//
+
+[#mp22]
+== MicroProfile 2.2: Improving the developer experience of writing cloud-native Java microservices
+
+Open Liberty 19.0.0.3 provides a full implementation of MicroProfile 2.2, which focuses on improving the developer experience of writing cloud-native Java microservices with MicroProfile. MicroProfile 2.2 includes updates to the MicroProfile Rest Client, Fault Tolerance, OpenAPI, and Open Tracing features, and is based on Java EE 8 technologies (depending on JAX-RS 2.1, CDI 2.0, and JSON-P 1.1).
+
+Open Liberty provides a MicroProfile 2.2 convenience feature which enables all four of the updated features in your server: `mpFaultTolerance-2.0`, `mpOpenAPI-1.1`, `mpOpenTracing-1.3`, and `mpRestClient-1.2`.
+
+To enable the MicroProfile 2.2 convenience feature in your `server.xml`:
+
+[source,xml]
+----
+<featureManager>
+  <feature>microProfile-2.2</feature>
+</featureManager>
+----
+
+
+
+//
+
+[#mprestclient]
+=== MicroProfile Rest Client 1.2: Improved developer experience and improved integration with other features
+
+MicroProfile Rest Client is a type-safe client API for invoking RESTful services.  Version 1.2 improves the developer experience and enhances integration with other MicroProfile technologies such as CDI, Fault Tolerance, OpenTracing, etc.
+
+Previous releases of MicroProfile Rest Client lacked integration with CDI, Fault Tolerance, OpenTracing, etc. making it difficult to add things like timeouts, retries, circuit breakers, etc. to client interfaces.  MicroProfile Rest Client 1.2 improves integration with other MicroProfile technologies but also improves the developer experience so that you can specify the base URL directly in the `@RegisterRestClient` annotation in the interface and specify connect and read timeouts in a portable fashion.
+
+To enable the MicroProfile Rest Client feature in your `server.xml`:
+
+[source,xml]
+----
+<featureManager>
+  <feature>mpRestClient-1.2</feature>
+</featureManager>
+----
+
+//To try it out, take a look at URL[Andy's blog post on using MicroProfile Rest Client 1.2]. 
+
+For more details, take a look at the https://openliberty.io/docs/ref/microprofile/[MicroProfile Javadoc].
+
+To learn to use MicroProfile Rest Client, see the https://openliberty.io/guides/microprofile-rest-client.html[Consuming RESTful services with template interfaces] guide.
+
+//
+
+[#mpft]
+=== MicroProfile Fault Tolerance 2.0: Improved developer experience and control over interceptor priorities
+
+MicroProfile Fault Tolerance allows developers to easily apply strategies for mitigating failure to their code. It provides annotations which developers can add to methods to use bulkhead, circuit breaker, retry, timeout and fallback strategies. In addition, it provides an annotation which causes a method to be run asynchronously.
+
+Version 2.0 adds several new features:
+
+* Asynchronous methods can now return a `CompletionStage`, making it easier to compose asynchronous operations and use fault tolerance with existing asynchronous technologies.
+* The user can now configure the priority of the CDI interceptors added by Fault Tolerance, giving them control over how Fault Tolerance interacts with any other interceptors which have been applied.
+
+To enable the MicroProfile Fault Tolerance in your `server.xml`:
+
+[source,xml]
+----
+<featureManager>
+  <feature>mpFaultTolerance-2.0</feature>
+</featureManager>
+----
+
+Add any of the Fault Tolerance annotations to a business method of a CDI bean:
+
+[source,java]
+----
+  @Retry(5)
+  public User lookupUserFromRegistry(String name) {
+    return registry.getUser(name);
+  }
+----
+
+When that method is called as a a CDI business method, the fault tolerance strategy will be used. In this example, if `lookupUserFromRegistry()` would throw an exception, it will instead be retried up to five times.
+
+
+For more details, take a look at the https://openliberty.io/docs/ref/microprofile/[MicroProfile Javadoc].
+
+To learn to use MicroProfile Fault Tolerance, see the guides:
+
+* https://openliberty.io/guides/retry-timeout.html[Failing fast and recovering from errors]
+* https://openliberty.io/guides/bulkhead.html[Limiting the number of concurrent requests to microservices]
+* https://openliberty.io/guides/microprofile-fallback.html[Building fault-tolerant microserivces with the @Fallback annotation]
+* https://openliberty.io/guides/circuit-breaker.html[Preventing repeated failed calls to microservices]
+
+//
+
+[#mpopenapi]
+=== MicroProfile OpenAPI 1.1: Easier to generate and filter documentation for your app's APIs
+
+The MicroProfile OpenAPI feature enables generation of OpenAPI 3.0 documentation from Java annotations in your JAX-RS REST applications.
+
+MicroProfile OpenAPI 1.1 improves the OpenAPI model interfaces by adding convenience setters, add and remove methods, which make it easier to use to generate documentation or to filter the generated document.
+
+To enable the MicroProfile OpenAPI feature in your `server.xml`:
+
+[source,xml]
+----
+<featureManager>
+  <feature>mpOpenAPI-1.1</feature>
+</featureManager>
+----
+
+
+No other configuration is required to generate documentation for your application's API. The application documentation will be available at `/openapi` endpoint. The UI to render and try out REST APIs is available at  `openapi/ui` endpoint.
+
+For more details, take a look at the https://openliberty.io/docs/ref/microprofile/[MicroProfile Javadoc].
+
+To learn to use MicroProfile OpenAPI, see the https://openliberty.io/guides/microprofile-openapi.html[Documenting RESTful APIs] guide.
+
+
+//
+
+[#mpopentracing]
+=== MicroProfile Open Tracing 1.3: Tracing support in MicroProfile REST clients
+
+In MicroProfile Open Tracing 1.3, tracing of client/server calls can be done with JAX-RS clients and MicroProfile REST clients.  Client/server calls become a single trace with multiple spans. In the previous version of MicroProfile Open Tracing, tracing of client/server calls could be done with JAX-RS clients only.  MicroProfile REST client calls were broken down into two separate traces: one trace for the first service (i.e. caller) and another trace for the second service.
+
+To enable the MicroProfile Open Tracing feature for REST clients in your `server.xml`:
+
+[source,xml]
+----
+<featureManager>
+  <feature>mpOpenTracing-1.3</feature>
+  <feature>mpRestClient-1.2</feature>
+</featureManager>
+----
+
+No other configuration is required. Tracing for MicroProfile REST clients is enabled globally by default if the features are specified in the server configuration. You can turn tracing off on specific classes or methods by specifying `@Traced(false)` on the REST client interface class level or method.
+
+For more details, take a look at the https://openliberty.io/docs/ref/microprofile/[MicroProfile Javadoc].
+
+To learn to use MicroProfile Open Tracing, see the https://openliberty.io/guides/microprofile-opentracing.html[Enabling distributed tracing in microservices] guide.
+
+
+
+
+
+## Ready to give it a try?
+
+Get the Maven or Gradle coordinates (and other download options) from the top of this post.
+
+[link=https://stackoverflow.com/tags/open-liberty]
+image::/img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="center"]
+
+
+
+
+
+[#previews]
+== Previews of early implementations available in the latest development builds
+
+You can now also try out early implementations of some new capabilities in the https://openliberty.io/downloads/#development_builds[latest Open Liberty development builds]:
+
+*  <<mpconcurrency,MicroProfile Concurrency 1.0>>
+
+
+This early implementation is not available in 19.0.0.3 but you can try it out by downloading the https://openliberty.io/downloads/#development_builds[latest Open Liberty development build]. Let us know what you think!
+
+
+[#mpconcurrency]
+=== MicroProfile Concurrency 1.0
+
+MicroProfile Concurrency allows you to create completion stages that run with predictable thread context regardless of which thread the completion stage action ends up running on.
+
+MicroProfile Concurrency provides completion stages that run with predictable thread context that also benefit from being backed by the automatically-tuned Liberty global thread pool. Configuration of concurrency constraints and context propagation is possible programmatically with builders as well as by CDI annotations which can be overriden via MicroProfile Config.
+
+It should be noted that this implementation does not yet include thread context capture & propagation for CDI context, but other context types should be working.
+
+
+To enable the MicroProfile Concurrency 1.0 feature in your `server.xml`:
+
+[source,xml]
+----
+<featureManager>
+    <feature>mpConcurrency-1.0</feature>
+    <feature>cdi-2.0</feature> <!-- If CDI injection is desired -->
+    <feature>jndi-1.0</feature> <!-- used in example -->
+    ... other features
+  </featureManager>
+----
+
+
+Example usage of programmatic builders:
+
+[source,java]
+----
+ManagedExecutor executor = ManagedExecutor.builder()
+    .maxAsync(5)
+    .propagated(ThreadContext.APPLICATION, ThreadContext.SECURITY)
+    .build();
+
+CompletableFuture<Integer> stage1 = executor.newIncompleteFuture();
+stage1.thenApply(function1).thenAccept(value -> {
+    try {
+        // access resource reference in application's java:comp namespace,
+        DataSource ds = InitialContext.doLookup("java:comp/env/jdbc/ds1");
+        ...
+    } catch (Exception x) {
+        throw new CompletionException(x);
+    }
+};
+...
+stage1.complete(result);
+----
+
+
+Example usage in a CDI bean:
+
+[source,java]
+----
+// CDI qualifier which is used to identify the executor instance
+@Qualifier
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ ElementType.FIELD, ElementType.METHOD, ElementType.PARAMETER })
+public @interface AppContext {}
+
+// Example producer field, defined in a CDI bean,
+@Produces @ApplicationScoped @AppContext
+ManagedExecutor appContextExecutor = ManagedExecutor.builder()
+    .propagated(ThreadContext.APPLICATION)
+    .build();
+
+// Example disposer method, also defined in the CDI bean,
+void disposeExecutor(@Disposes @AppContext exec) {
+    exec.shutdownNow();
+}
+
+// Example injection point, defined in a CDI bean,
+@Inject @AppContext
+ManagedExecutor executor;
+
+...
+
+CompletableFuture<Integer> stage = executor
+    .supplyAsync(supplier1)
+    .thenApply(function1)
+    .thenApplyAsync(value -> {
+        try {
+            // access resource reference in application's java:comp namespace,
+            DataSource ds = InitialContext.doLookup("java:comp/env/jdbc/ds1");
+            ...
+            return result;
+        } catch (Exception x) {
+            throw new CompletionException(x);
+        }
+    });
+----
+
+
+For more information:
+
+* https://openliberty.io/blog/2019/03/01/microprofile-concurrency.html[Nathan's blog post on MicroProfile Concurrency 1.0]
+* https://github.com/eclipse/microprofile-concurrency[MicroProfile Concurrency 1.0 spec]
+
