@@ -1,34 +1,34 @@
 ---
 layout: post
-title: JAX-RS 2.1 Reactive Extensions with RxJava Backpressure
+title: JAX-RS 2.1 reactive extensions with RxJava Backpressure
 categories: blog
 author_picture: https://avatars3.githubusercontent.com/u/28316667
 author_github: https://github.com/jkoehler22
-seo-title: JAX-RS 2.1 Reactive Extensions with RxJava Backpressure - OpenLiberty.io. 
+seo-title: JAX-RS 2.1 reactive extensions with RxJava Backpressure - OpenLiberty.io. 
 seo-description: Combining reactive programming with JAX-RS 2.1 reactive extensions make for a powerful asynchronous processing that avoids overwhelming the consumer.
 blog_description: "Combining reactive programming with JAX-RS 2.1 reactive extensions make for a powerful asynchronous processing that avoids overwhelming the consumer."
 ---
-= JAX-RS 2.1 Reactive Extensions with RxJava Backpressure
+= JAX-RS 2.1 reactive extensions with RxJava Backpressure
 John Koehler <https://github.com/jkoehler22>
 
-Combining reactive programming with JAX-RS 2.1 reactive extensions make for a powerful asynchronous processing that avoids overwhelming the consumer.   Before we jump into a sample, let's define some of the basic concepts.
-----
-Reactive programming is an asynchronous programming paradigm that deals with data streams and the propagation of change. 
-RxJava is a reactive programming API library that enables users to write event-based, asynchronous applications.  
-Backpressure is the strategy a consumer employs when a producer emits items so fast that the consumer can’t keep up with the flow leading to the existence of emitted but unconsumed items.  There are several types of backpressure strategies. 
+Combining reactive programming with JAX-RS 2.1 reactive extensions make for a powerful asynchronous processing that avoids overwhelming the consumer.   Before we jump into a sample, let's define some of the basic concepts:
 
-BUFFER- Buffers all onNext values until the downstream consumes it.
-DROP- Drops the most recent onNext value if the downstream can't keep up.
-ERROR- Signals a MissingBackpressureException in case the downstream can't keep up.
-LATEST- Keeps only the latest onNext value, overwriting any previous value if the downstream can't keep up.
-MISSING- OnNext events are written without any buffering or dropping.
-----  
+Reactive programming:: An asynchronous programming paradigm that deals with data streams and the propagation of change. 
+RxJava:: A reactive programming API library that enables users to write event-based, asynchronous applications.  
+Backpressure:: The strategy a consumer employs when a producer emits items so fast that the consumer can’t keep up with the flow and there is a build-up of emitted but unconsumed items.  There are several types of backpressure strategies: 
+** BUFFER Buffers all onNext values until the downstream consumes it.
+** DROP Drops the most recent onNext value if the downstream can't keep up.
+** ERROR Signals a MissingBackpressureException in case the downstream can't keep up.
+** LATEST Keeps only the latest onNext value, overwriting any previous value if the downstream can't keep up.
+** MISSING OnNext events are written without any buffering or dropping.
+  
 Let's see how all of these concepts work together.  
 We'll follow a sample data collection and retrieval application at:
 https://github.com/OpenLiberty/sample-reactive-extensions
 The application data collection is accomplished with a simple loop emitting `Integer` items.  The application data retrieval is accomplished with a reactive extension asynchronous `get`.  The application makes use of RxJava's `Flowable` with `backpressure` to control the maximum amount of data collected for a given customer.  Flowable is an emitter of items that implements a backpressure protocol.  Flowable was introduced in RxJava2.  Flowable comes into play when huge numbers of items are emitted that can not be handled by the consumer.  
 
-== RxJava onBackpressureBuffer onNext retryWhen(onError)
+== Controlling the maximum amount of data collected using Flowable with backpressure
+
 The following code shows how Flowable with backpressure is used to control the maximum amount of data to collect.
 The `onBackpressureBuffer` method is used to specify the maximum number of data points. 
 The `onNext` method in the `ResourceSubscriber` inner class is used to store the collected data.
@@ -90,16 +90,13 @@ The lambda in the `retryWhen` method is used to delay the data collection when t
                  });
    }
 ----
-So what does this actually do? First, notice that we create a `FlowableOnSubscribe` inner class in the `Flowable.create` method.
-It's `subscribe` method loops to simulate data collection and the BackpressureStrategy is set to BUFFER, which will buffer the 
-`onNext` values until they are consumed.  
-We will be using a full buffer to determine the maximum amount of data to collect to prevent overloading the back-end resource,
-a simulated database in this case.
-Next, notice that the `observeOn` method specifies true to delay onError notifications.  
+So what does this actually do? First, notice that we create a `FlowableOnSubscribe` inner class in the `Flowable.create` method. Its `subscribe` method loops to simulate data collection and the `BackpressureStrategy` is set to `BUFFER`, which buffers the `onNext` values until they are consumed. We will be using a full buffer to determine the maximum amount of data to collect to prevent overloading the back-end resource, a simulated database in this case.
+Next, notice that the `observeOn` method specifies `true` to delay onError notifications.  
 This allows the threads to continue processing until all the treads in the buffer are completed.
 Lastly, notice that the `onNext` method in the `ResourceSubscriber` is used to update the simulated database with the data points.
 
-== JAX-RS 2.1 Reactive Extensions
+== Retrieving the collected data in a remote client using JAX-RS 2.1 Reactive Extensions
+
 Let's say that you want to retrieve the collected data in a remote client.  We can use reactive extensions from JAX-RS 2.1.
 The following code shows how register, and `rx` is used to asynchronously retrieve the collected data.
 [source,java]
@@ -173,8 +170,6 @@ Next, notice that the `FlowableRxInvoker` class is used to access the non-defaul
 Lastly, notice that generics are used to return the list of collected data.  
 
 == Summary
-It's getting easier to do things asynchronously with REST and Java. JAX-RS 2.1 reactive extensions and
-RxJava give you some powerful tools in this space. Hopefully now you are
-more prepared to write and consumer RESTful services with RxJava asynchronously.
-If you've got any questions or run into any problems, please let us know.
-Thanks!
+It's getting easier to do things asynchronously with REST and Java. JAX-RS 2.1 reactive extensions and RxJava give you some powerful tools in this space. Hopefully now you are more prepared to write and consumer RESTful services with RxJava asynchronously.
+
+If you've got any questions or run into any problems, please let us know. Thanks!
