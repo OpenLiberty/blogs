@@ -1,0 +1,259 @@
+---
+layout: post
+title: Reactive programming in microservices with MicroProfile on Open Liberty 19.0.0.4
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/u/3322532
+author_github: https://github.com/lauracowen
+seo-title: Reactive programming in microservices with MicroProfile on Open Liberty 19.0.0.4 - OpenLiberty.io.
+seo-description: TODO
+blog_description: "TODO"
+---
+= Reactive programming in microservices with MicroProfile on Open Liberty 19.0.0.4
+Laura Cowen <https://github.com/lauracowen>
+
+INTRO TODO
+
+
+* <<mpreactive,Reactive programming in microservices (MicroProfile Reactive Streams Operators 1.0)>>
+* <<oracle,Support for Oracle Universal Connection Pool (UCP)>>
+* <<previews,Previews of early implementations available in the latest development builds>>
+** <<mpconcurrency,MicroProfile Context Propagation 1.0 (formerly MicroProfile Concurrency 1.0)>>
+
+
+If you're using link:/guides/maven-intro.html[Maven], here are the coordinates:
+
+[source,xml]
+----
+<dependency>
+    <groupId>io.openliberty</groupId>
+    <artifactId>openliberty-runtime</artifactId>
+    <version>19.0.0.4</version>
+    <type>zip</type>
+</dependency>
+----
+
+Or for link:/guides/gradle-intro.html[Gradle]:
+
+[source,json]
+----
+dependencies {
+    libertyRuntime group: 'io.openliberty', name: 'openliberty-runtime', version: '[19.0.0.4,)'
+}
+----
+
+Or if you're using Docker:
+
+[source]
+----
+docker pull open-liberty
+----
+
+Or take a look at our link:/downloads/[Downloads page].
+
+[link=https://stackoverflow.com/tags/open-liberty]
+image::/img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="center"]
+
+
+//
+
+[#mpreactive]
+== Reactive programming in microservices (MicroProfile Reactive Streams Operators 1.0)
+
+Reactive streams provide a method to implement publish subscribe ('pub-sub') pipelines that handle flow-control and error handling in an elegant manner. MicroProfile Reactive Streams Operators bundles a reactive streams API together with a set of standard operators that can be applied to streams. For example, you could write a reactive streams publisher that sends events that capture sensor data from an 'internet of things' (IOT) device, such as temperature or pressure, and then subscribes to these events in a way that enables the client to control how frequently the events are sent without have to 'block' the event processing to slow things down. Additionally, it would be easy to apply reactive streams operators, such as filters or mappings, to the events that are received by the subscribing client.
+
+Reactive streams provide for a powerful abstraction that can handle, perhaps infinite,
+streams of events in a manner that prevents downstream clients being overwhelmed. Provided operators can filter, combine or map events, handle errors, and so on, all without breaking the stream processing pipeline. Additionally, streams are generic over application domain types and allow developers to compose multiple technologies using a common succinct approach enabling them to concentrate more on application domain problems.
+
+Non-reactive approaches often control the flow of data inadvertantly by simply getting slower at processing it, thus blocking the thread of control from being used to send further work while doing so. If we attempt to improve on this approach, by using asynchronous techniques to free up the thread, it can often lead to a problem where the rate of data arriving at a component exceeds the rate that it can be processed. Buffering can help to smooth arrival rates but, long term, it does not help throttle the incoming work to an rate that is sustainable. The reactive approach uses a system of ticketing whereby the sender reacts to requests for data. This ticketing approach creates 'back pressure' between the publisher and subscriber which limits the amount of data that can be sent to levels that can be handled successfully and contributes towards protecting the system from overload.
+
+As well as the benefits of back pressure, reactive streams provides an abstraction that can be used to glue together different technologies in an efficient manner. For example, a publisher of `CustomerOrder` can be directly connected to a subscriber of `CustomerOrder` using very concise Java code that is the same regardless of which underlying technology the `CustomerOrder` is being sourced from or sent to. It is possible to chain together publishers, subscribers and intermediate processor classes, as well as operators from a standard library, to compose applications without detailed use of a particular technology's API. Reactive streams-based drivers for different enterprise Java technologies can be constructed and subsequently shared by applications using the fluent builder APIs of this feature.
+
+To enable the MicroProfile Reactive Streams Operators feature in your `server.xml`:
+
+[source,xml]
+----
+<featureManager>
+        <feature>mpReactiveStreams-1.0</feature>
+</featureManager>
+----
+
+You can then use code in your application like this:
+
+[source,java]
+----
+import org.eclipse.microprofile.reactive.streams.operators.ReactiveStreams;
+...
+assertEquals(
+                ReactiveStreams.of("1", "2", "3")
+                        .collect(Collectors.joining(", ")).run().toCompletableFuture().get(),
+                "1, 2, 3");
+----
+
+
+See also: link:https://github.com/eclipse/microprofile-reactive-streams-operators/releases/download/1.0/microprofile-reactive-streams-operators-spec-1.0.pdf[MicroProfile Reactive Streams Operators specification]
+
+
+
+//
+
+[#oracle]
+== Support for Oracle Universal Connection Pool (UCP)
+
+Oracle Universal Connection Pool (UCP) is a standalone JDBC connection pool. When using Oracle UCP with Open Liberty you are using the Oracle UCP connection pool instead of using Open Liberty's built-in connection pooling functionality. Some of Oracle's high availability database functionality requires the use of Oracle UCP. Support for Oracle UCP was added in Open Liberty version 19.0.0.4.
+
+To enable Oracle UCP in your server configuration:
+
+Ensure that one of the JDBC features is enabled in server configuration. Oracle UCP can be used with any version of JDBC supported by Open Liberty, but support for any specific specification functionality is limited to what is supported by Oracle UCP.
+
+[source,xml]
+----
+<featureManager>
+    <feature>jdbc-4.2</feature>
+    <feature>jndi-1.0</feature> <!-- Required only if JNDI is desired to look up resources -->
+</featureManager>
+----
+
+Configure the datasource and library in the server config. The UCP driver and Oracle JDBC driver can be obtained from Oracle.
+
+[source,xml]
+----
+<dataSource id="oracleUCPDS" jndiName="jdbc/oracleUCPDS" >
+    <jdbcDriver libraryRef="OracleUCPLib" />
+    <properties.oracle.ucp URL="jdbc:oracle:thin:@//localhost:1521/SAMPLEDB" />
+</dataSource>
+
+<library id="OracleUCPLib">
+    <fileset dir="C:/Oracle/Drivers" includes="ojdbcx.jar ucp.jar"/>
+</library>
+----
+
+Oracle UCP might require some properties to be set in the link:https://openliberty.io/docs/ref/config/dataSource.html#dataSource/properties.oracle.ucp[`properties.oracle.ucp` element], such as the user and password, depending on the version used.
+
+Because the Liberty connection pool is disabled, some of the Open Liberty link:https://openliberty.io/docs/ref/config/dataSource.html[datasource] and link:https://openliberty.io/docs/ref/config/#dataSource.html#connectionManager[connection manager] configuration values are ignored and overridden. The following connection manager properties cannot be used with Oracle UCP: `agedTimeout`, `connectionTimeout`, `maxIdleTime`, `maxPoolSize`, `minPoolSize`, `purgePolicy`, `reapTime`, `maxConnectionsPerThread`, `maxConnectionsPerThreadLocal`. Additionally, the `datasource` properties `statementCacheSize` and `validationTimeout` cannot be used when using UCP with Open Liberty, as Open Liberty's statement caching and connection validation are disabled.
+
+For most of those datasource and connection manager properties, Oracle UCP provides equivalent functionality. See Oracle's documentation for more details; some default property values differ between Open Liberty's connection manager and Oracle UCP. The Oracle UCP properties can be applied to the `properties.oracle.ucp` properties element. The `dataSource` types of `ConnectionPoolDataSource` and `Driver` are not supported with Oracle UCP since the UCP driver does not provide an implementation of those interfaces.
+
+The data source can be accessed and used by the application using the standard JDBC APIs.
+
+
+
+
+//
+
+## Ready to give it a try?
+
+Get the Maven or Gradle coordinates (and other download options) from the top of this post.
+
+[link=https://stackoverflow.com/tags/open-liberty]
+image::/img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="center"]
+
+
+
+
+
+[#previews]
+== Previews of early implementations available in the latest development builds
+
+You can now also try out early implementations of some new capabilities in the link:/downloads/#development_builds[latest Open Liberty development builds]:
+
+*  <<mpconcurrency,MicroProfile Context Propagation 1.0>>
+
+
+This early implementation is not available in 19.0.0.4 but you can try it out by downloading the link:/downloads/#development_builds[latest Open Liberty development build]. Let us know what you think!
+
+
+[#mpconcurrency]
+=== MicroProfile Context Propagation 1.0 (formerly MicroProfile Concurrency 1.0)
+
+MicroProfile Context Propagation (formerly MicroProfile Concurrency) allows you to create completion stages that run with predictable thread context regardless of which thread the completion stage action ends up running on.
+
+MicroProfile Context Propagation provides completion stages that run with predictable thread context that also benefit from being backed by the automatically-tuned Liberty global thread pool. Configuration of concurrency constraints and context propagation is possible programmatically with builders as well as by CDI annotations which can be overriden via MicroProfile Config.
+
+It should be noted that this implementation does not yet include thread context capture & propagation for CDI context, but other context types should be working.
+
+
+To enable the MicroProfile Context Propagation 1.0 feature in your `server.xml`:
+
+[source,xml]
+----
+<featureManager>
+    <feature>mpContextPropagation-1.0</feature>
+    <feature>cdi-2.0</feature> <!-- used in example -->
+    <feature>jndi-1.0</feature> <!-- used in example -->
+    ... other features
+</featureManager>
+----
+
+
+Example usage of programmatic builders:
+
+[source,java]
+----
+ManagedExecutor executor = ManagedExecutor.builder()
+    .maxAsync(5)
+    .propagated(ThreadContext.APPLICATION, ThreadContext.SECURITY)
+    .build();
+
+CompletableFuture<Integer> stage1 = executor.newIncompleteFuture();
+stage1.thenApply(function1).thenAccept(value -> {
+    try {
+        // access resource reference in application's java:comp namespace,
+        DataSource ds = InitialContext.doLookup("java:comp/env/jdbc/ds1");
+        ...
+    } catch (Exception x) {
+        throw new CompletionException(x);
+    }
+};
+...
+stage1.complete(result);
+----
+
+
+Example usage in a CDI bean:
+
+[source,java]
+----
+// CDI qualifier which is used to identify the executor instance
+@Qualifier
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ ElementType.FIELD, ElementType.METHOD, ElementType.PARAMETER })
+public @interface AppContext {}
+
+// Example producer field, defined in a CDI bean,
+@Produces @ApplicationScoped @AppContext
+ManagedExecutor appContextExecutor = ManagedExecutor.builder()
+    .propagated(ThreadContext.APPLICATION)
+    .build();
+
+// Example disposer method, also defined in the CDI bean,
+void disposeExecutor(@Disposes @AppContext exec) {
+    exec.shutdownNow();
+}
+
+// Example injection point, defined in a CDI bean,
+@Inject @AppContext
+ManagedExecutor executor;
+
+...
+
+CompletableFuture<Integer> stage = executor
+    .supplyAsync(supplier1)
+    .thenApply(function1)
+    .thenApplyAsync(value -> {
+        try {
+            // access resource reference in application's java:comp namespace,
+            DataSource ds = InitialContext.doLookup("java:comp/env/jdbc/ds1");
+            ...
+            return result;
+        } catch (Exception x) {
+            throw new CompletionException(x);
+        }
+    });
+----
+
+
+For more information:
+
+* link:/blog/2019/03/01/microprofile-concurrency.html[Nathan's blog post on MicroProfile Context Propagation 1.0]
+* https://github.com/eclipse/microprofile-concurrency[MicroProfile Context Propagation 1.0 spec]
+* https://github.com/eclipse/microprofile-context-propagation/releases[Information about the latest release candidate] (including the specification, the Javadoc API, and Maven coordinates for the spec jar)
