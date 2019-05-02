@@ -21,6 +21,19 @@ Create a pull request with the content of the blog post placed in the `drafts` f
 
 Once approved (ask `lauracowen`, or `NottyCode` as backup, to review/approve your PR), the blog post will be moved from `drafts` to `publish`.
 
+### Blog posts with multiple authors
+
+If you would like to publish a blog post with more than 1 author, you can add the ```additional_authors``` attribute to the liquid front matter. Any number of additional authors can be specified using the following format:
+```
+additional_authors: 
+ - name: author 2 first and last name
+   github: secure url to author 2 github
+   image: secure url to author 2 picture
+ - name:  author 3 first and last name
+   github: secure url to author 3 github
+   image: secure url to author 3 picture
+```
+
 ### Contributing a third party blog post
 
 If you would like to add a blog post that is actually a link to an existing third party blog post, you can follow the normal steps described above for creating a blog post. You simply need to add the following attributes to the liquid front matter: 
