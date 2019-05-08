@@ -1,0 +1,34 @@
+---
+layout: post
+title: Jakarta EE and the great naming debate
+categories: blog
+author_picture: https://avatars0.githubusercontent.com/u/1906689
+author_github: https://github.com/nottycode
+seo-title: A proposal for free migration from Java EE to Jakarta EE
+blog_description: Last week it was announced that Jakarta EE would not be able to evolve using the old Java EE package names. This resulted in a lot of fear and concern about the future, but here is a plan for how the community can ensure that the cost of moving forward is free.
+---
+= Jakarta EE and the great naming debate
+Alasdair Nottingham <https://github.com/nottycode>
+
+At JavaOne 2017 Oracle announced that they would start the difficult process of moving Java EE to the Eclipse Software Foundation. This has been a massive effort on behalf of Eclipse, Oracle and many others and we are getting close to having a specification process and a Jakarta EE 8 platform. We are looking forward to being able to certify Open Liberty to it soon. While that is excellent news, on Friday last week Mike Milinkovich from Eclipse https://eclipse-foundation.blog/2019/05/03/jakarta-ee-java-trademarks/[informed the community] that Eclipse and Oracle could not come to an agreement that would allow Jakarta EE to evolve using the existing `javax` package prefix. This has caused a flurry of discussion on Twitter, from panic, confusion, and in some cases outright FUD.
+
+To say that everyone is disappointed with this outcome would be a massive understatement of how people feel.  Yes this is disappointing, but this is not the end of the world. First of all, despite what some people are implying, Java EE applications are not suddenly broken today, when they were working a week ago. Similarly, your Spring apps are not going to be broken (yes, the https://twitter.com/phillip_webb/status/1124384920925655040[Spring Framework has 2545 Java EE imports], let alone all the upstream dependencies). It just means that we will have a constraint on how Jakarta EE evolves to add new function.
+
+We have got a lot of experience with managing migration in the Open Liberty team. We have a zero migration promise for Open Liberty which is why we are the only application server that supports Java EE 7 and 8 in the same release stream. This means that if you are on Open Liberty, your existing applications are totally shielded from any class name changes in Jakarta EE 9. We do this through our versioned feature which provide the exact API and runtime required by the specification as it was originally defined. We are optimistic about for the future because we have been doing this with Liberty since it was created in 2012.
+
+The question for the community is "how we should move forward from here?" It seems that many in the Jakarta EE spec group at Eclipse are leaning towards quickly renaming everything in a Jakarta EE 9 release. There are advantages and disadvantages to this approach, but it appears favoured by https://www.tomitribe.com/blog/jakarta-ee-a-new-hope/[David Blevins], https://developer.ibm.com/announcements/jakarta-ee-has-landed/[Ian Robinson, Kevin Sutter], https://blog.payara.fish/jakarta-ee-8-and-beyond[Steve Millidge]. While I can see the value of just doing a rename now (after all, it is better pull a band aid off fast than slow), I think it would be a mistake if at the same time we do not invest in making the migration from Java EE package names to Jakarta EE package names cost nothing. Something in Liberty we call "zero migration".
+
+Jakarta EE will only succeed if developers have a seamless transition from Java EE to Jakarta EE. I think there are four aspects to pulling off zero migration with a rename:
+
+1. Existing application binaries need to continue to work without change.
+1. Existing application source needs to continue to work without change.
+1. Tools must be provided to quickly and easily change the import statements for Java source.
+1. Applications that are making use of the new APIs must be able to call binaries that have not been updated.
+
+The first two are trivial to do: Java class files have a constant pool that contains all the referenced class and method references. Updating the constant pool when the class is loaded will be technically easy, cheap at runtime, and safe. We are literally talking about changing `javax.servlet` to `jakarta.servlet`, no method changes.
+
+The third one is also relatively simple; as long as class names do not change switching import statements from `+++javax.servlet.*+++` to `+++jakarta.servlet.*+++` is easy to automate.
+
+The last one is the most difficult because you have existing binaries using the `javax.servlet` package and new source using the  `jakarta.servlet` package. Normally this would produce a compilation error because you cannot pass a `jakarta.servlet` class somewhere that takes a `javax.servlet` class. In theory we could reuse the approach used to support existing apps and apply it at compile time to the downstream dependencies, but this will depend on the build tools being able to support this behaviour. You could add something to the Maven build to run prior to compilation to make sure this works, but that might be too much work for some users to contemplate, and perhaps is not close enough to zero migration.
+
+I think if the Jakarta EE community pulls together to deliver this kind of zero migration approach prior to making any break, the future will be bright for Jakarta EE. The discussion has already started on the jakarta-platform-dev mail list kicked off by https://www.eclipse.org/lists/jakartaee-platform-dev/msg00029.html[David Blevins]. If you are not a member you can join now on https://accounts.eclipse.org/mailing-list/jakartaee-platform-dev[eclipse.org]. I am also happy to hear your thought via https://twitter.com/nottycode[twitter].
