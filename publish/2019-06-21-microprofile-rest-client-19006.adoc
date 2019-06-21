@@ -1,0 +1,278 @@
+---
+layout: post
+title: Hostname verification with SSL on Open Liberty 19.0.0.6 and MicroProfile Rest Client 1.3 preview
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/u/3322532
+author_github: https://github.com/lauracowen
+seo-title: Hostname verification with SSL on Open Liberty 19.0.0.6 and MicroProfile Rest Client 1.3 preview - OpenLiberty.io.
+seo-description: Hostname verification should be used to help protect against man-in-the-middle security vulnerability attacks. You can now enable this on an SSL configuration. Also preview MicroProfile Rest Client 1.3.
+blog_description: "Hostname verification should be used to help protect against man-in-the-middle security vulnerability attacks. You can now enable this on an SSL configuration. Also preview MicroProfile Rest Client 1.3."
+---
+= Hostname verification with SSL on Open Liberty 19.0.0.6 and MicroProfile Rest Client 1.3 preview
+Laura Cowen <https://github.com/lauracowen>
+
+Enhance the security of your app communications by enabling hostname verification on your SSL configurations. SSL ensures that data being transferred between apps is protected and only the intended applications can read it. The new hostname verification attribute provides additional protection by enabling the recipient of the data to verify the source of the data. Give it a try in link:/about/[Open Liberty] 19.0.0.6.
+
+If you're curious about what's coming in future Open Liberty releases, take a look at our previews in the latest development builds. In particular, we have an early implementation of MicroProfile Rest Client 1.3, which is part of the new MicroProfile 3.0 spec.
+
+* <<ssl,Hostname verification on SSL configuration>>
+* Previews of early implementations available in the latest development builds:
+** <<mprest,Improved portability and developer experience (MicroProfile Rest Client 1.3)>>
+** <<postgresql,Support for PostgreSQL relational database>>
+** <<testingdb,Testing database connections in Liberty apps wtih REST APIs>>
+** <<mpconcurrency,MicroProfile Context Propagation 1.0 (formerly MicroProfile Concurrency 1.0)>>
+
+== Run your apps using 19.0.0.6
+
+If you're using link:/guides/maven-intro.html[Maven], here are the coordinates:
+
+[source,xml]
+----
+<dependency>
+    <groupId>io.openliberty</groupId>
+    <artifactId>openliberty-runtime</artifactId>
+    <version>19.0.0.6</version>
+    <type>zip</type>
+</dependency>
+----
+
+Or for link:/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+dependencies {
+    libertyRuntime group: 'io.openliberty', name: 'openliberty-runtime', version: '[19.0.0.6,)'
+}
+----
+
+Or if you're using Docker:
+
+[source]
+----
+docker pull open-liberty
+----
+
+Or take a look at our link:/downloads/[Downloads page].
+
+[link=https://stackoverflow.com/tags/open-liberty]
+image::/img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="center"]
+
+
+//
+
+[#ssl]
+== Hostname verification on SSL configuration
+Hostname verification is a server identity check that is used to ensure that a client is talking to the correct server. The check is performed on the client side of an SSL communication and involves looking at the server's certificate Subject Alternative Name (or the SubjectDN) to see if it matches the host part of the URL that was used to make the outbound request.
+
+Hostname verification should be used to help protect against man-in-the-middle security vulnerability attacks. With Open Liberty, you can enable this on an SSL configuration.
+
+Enable hostname verification on an SSL configuration by adding the `verifyHostname` attribute to a SSL configuration:
+
+[source,xml]
+----
+<ssl id="defaultSSLConfig" keyStoreRef="keyStore" verifyHostname="true" />
+<keyStore id="keyStore" location="${server.config.dir}/key.p12" type="PKCS12" password="liberty" />
+----
+
+With this configuration, any outbound SSL connection using `defaultSSLConfig` undergoes a hostname verification check by the JDK. The check takes place in the trust manager by looking at the server certificate's Subject Alternative Name information to get valid hostnames and then looking for a match to the hostname in the URL used to make the outbound connection. If there is no hostname match the SSL handshake fails. The hostname can be acquired from the server certificate's SubjectDN if the Subject Alternative Name is missing.
+
+See also:
+link:/docs/ref/feature/#transportSecurity-1.0.html[transportSecurity-1.0 doc]
+
+//
+
+[#previews]
+== Previews of early implementations available in beta status
+
+You can now also try out early implementations of some new capabilities in the link:/downloads/#development_builds[latest Open Liberty development builds]:
+
+* <<mprest,Improved portability and developer experience (MicroProfile Rest Client 1.3)>>
+* <<postgresql,Support for PostgreSQL relational database>>
+* <<testingdb,Testing database connections in Liberty apps with REST APIs>>
+*  <<mpconcurrency,MicroProfile Context Propagation 1.0>>
+
+
+These early implementations are not available in 19.0.0.6 but you can try them out by downloading the link:/downloads/#development_builds[latest Open Liberty development build]. Let us know what you think!
+
+//
+
+
+[#mprest]
+=== Improved portability and developer experience (MicroProfile Rest Client 1.3)
+
+MicroProfile Rest Client 1.3 improves portability and developer experience:
+
+* HTTPS configuration is now part of the spec, so SSL stores and certificate-based authentication are now portable across multiple MicroProfile Rest Client vendors.
+* Rest Client interface instances now implement `AutoCloseable` allowing developers to better control resource utilization.
+* Config Keys simplify configuration of multiple client interfaces. For example, suppose you have three client interfaces that all use the same base URI:
++
+[source,java]
+----
+@RegisterRestClient(configKey="myKey")
+@Path("/path1")
+public interface ClientInterface1 { ... }
+
+@RegisterRestClient(configKey="myKey")
+@Path("/path2")
+public interface ClientInterface2 { ... }
+
+@RegisterRestClient(configKey="myKey")
+@Path("/path3")
+public interface ClientInterface3 { ... }
+----
++
+All it takes to set the base URI for all three clients is this MicroProfile Config property:
+`myKey/mp-rest/uri=http://somehost:9080/contextRoot`
++
+* MicroProfile Rest Client 1.3 defaults the MIME type to `application/json` if it is left unspecified; in previous releases, it was undefined which MIME type would be used. If you are not using JSON, it might be a good idea to ensure your client interfaces specify the MIME types for request/response using the `@Consumes`/`@Produces` annotations respectively.
+
+Learn more about link:https://github.com/eclipse/microprofile-rest-client/releases/tag/1.3[MP Rest Client 1.3].
+
+//
+
+[#postgresql]
+=== Support for PostgreSQL relational database
+
+PostgreSQL is a very popular open source relational database that has a wide amount of adoption in the community. Now there is a first-class configuration support for using it with Open Liberty.
+
+To use PostgreSQL with Open Liberty, first make sure one of the JDBC features is enabled:
+
+[source,xml]
+----
+<featureManager>
+    <feature>jdbc-4.2</feature>
+    <feature>jndi-1.0</feature> <!-- Required only if JNDI is desired to look up resources -->
+</featureManager>
+----
+
+Then, configure a data source as follows:
+
+[source,xml]
+----
+<dataSource jndiName="jdbc/postgresql">
+  <jdbcDriver libraryRef="PostgresLib" />
+  <properties.postgresql serverName="localhost" portNumber="5432" databaseName="SAMPLEDB" 
+                         user="bob" password="secret"/>
+</dataSource>
+
+<library id="PostgresLib">
+    <fileset dir="${server.config.dir}/jdbc"/>
+</library>
+----
+
+Get the JDBC driver for PostgreSQL https://mvnrepository.com/artifact/org.postgresql/postgresql[from Maven Central].
+
+Get the Postgres Docker images https://hub.docker.com/_/postgres[from DockerHub].
+
+For more about PostgreSQL, see https://www.postgresql.org/[PostgreSQL website].
+
+//
+
+[#testingdb]
+=== Testing database connections in Liberty apps with REST APIs
+
+How many times have you had to write a server-side test that gets a connection just to check if your configuration is valid and your app can connect to your database? Now by utilizing the REST API provided by the configValidator-1.0 beta feature, you can validate supported elements of your configuration via REST endpoints.
+
+To enable these REST endpoints, add the configValidator-1.0 beta feature to any server using JDBC, JCA, or JMS technologies. For more information checkout this link:/blog/2019/05/24/testing-database-connections-REST-APIs.html[blog post].
+
+[source,xml]
+----
+<featureManager>
+    <feature>configValidator-1.0</feature>
+</featureManager>
+----
+
+//
+
+[#mpconcurrency]
+=== MicroProfile Context Propagation 1.0 (formerly MicroProfile Concurrency 1.0)
+
+MicroProfile Context Propagation (formerly MicroProfile Concurrency) allows you to create completion stages that run with predictable thread context regardless of which thread the completion stage action ends up running on.
+
+MicroProfile Context Propagation provides completion stages that run with predictable thread context that also benefit from being backed by the automatically-tuned Liberty global thread pool. Configuration of concurrency constraints and context propagation is possible programmatically with fluent builder API where defaults can be established using MicroProfile Config.
+
+To enable the MicroProfile Context Propagation 1.0 feature in your `server.xml`:
+
+[source,xml]
+----
+<featureManager>
+    <feature>mpContextPropagation-1.0</feature>
+    <feature>cdi-2.0</feature> <!-- used in example -->
+    <feature>jndi-1.0</feature> <!-- used in example -->
+    ... other features
+</featureManager>
+----
+
+
+Example usage of programmatic builders:
+
+[source,java]
+----
+ManagedExecutor executor = ManagedExecutor.builder()
+    .maxAsync(5)
+    .propagated(ThreadContext.APPLICATION, ThreadContext.SECURITY)
+    .build();
+
+CompletableFuture<Integer> stage1 = executor.newIncompleteFuture();
+stage1.thenApply(function1).thenAccept(value -> {
+    try {
+        // access resource reference in application's java:comp namespace,
+        DataSource ds = InitialContext.doLookup("java:comp/env/jdbc/ds1");
+        ...
+    } catch (Exception x) {
+        throw new CompletionException(x);
+    }
+};
+...
+stage1.complete(result);
+----
+
+
+Example usage in a CDI bean:
+
+[source,java]
+----
+// CDI qualifier which is used to identify the executor instance
+@Qualifier
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ ElementType.FIELD, ElementType.METHOD, ElementType.PARAMETER })
+public @interface AppContext {}
+
+// Example producer field, defined in a CDI bean,
+@Produces @ApplicationScoped @AppContext
+ManagedExecutor appContextExecutor = ManagedExecutor.builder()
+    .propagated(ThreadContext.APPLICATION)
+    .build();
+
+// Example disposer method, also defined in the CDI bean,
+void disposeExecutor(@Disposes @AppContext exec) {
+    exec.shutdownNow();
+}
+
+// Example injection point, defined in a CDI bean,
+@Inject @AppContext
+ManagedExecutor executor;
+
+...
+
+CompletableFuture<Integer> stage = executor
+    .supplyAsync(supplier1)
+    .thenApply(function1)
+    .thenApplyAsync(value -> {
+        try {
+            // access resource reference in application's java:comp namespace,
+            DataSource ds = InitialContext.doLookup("java:comp/env/jdbc/ds1");
+            ...
+            return result;
+        } catch (Exception x) {
+            throw new CompletionException(x);
+        }
+    });
+----
+
+
+For more information:
+
+* link:/blog/2019/03/01/microprofile-concurrency.html[Nathan's blog post on MicroProfile Context Propagation 1.0]
+* https://github.com/eclipse/microprofile-concurrency[MicroProfile Context Propagation 1.0 spec]
+* https://github.com/eclipse/microprofile-context-propagation/releases[Information about the latest release candidate] (including the specification, the Javadoc API, and Maven coordinates for the spec jar)
