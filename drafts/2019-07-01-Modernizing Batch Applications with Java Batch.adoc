@@ -1,0 +1,43 @@
+---
+layout: post
+title: Modernizing Batch Applications with Java Batch
+categories: blog
+author_picture: https://avatars0.githubusercontent.com/u/12501570
+author_github: https://github.com/follis
+blog_description: Using Java Batch (JSR-352) to modernize traditional batch applications
+seo-title: Modernizing Batch Applications with Java Batch - OpenLiberty.io
+seo-description: Using Java Batch (JSR-352) to modernize traditional batch applications
+tags:
+---
+= Modernizing Batch Applications with Java Batch
+David Follis <https://github.com/follis>
+
+
+
+We hear from a lot of customers that are interested in modernizing their batch applications.  Nobody is quite sure what that means, though.  To me, modernizing batch means making it easier to maintain.  That might be accomplished by re-writing it into another programming language (like Java).  It might mean refactoring the application to put the business logic into a rules engine.  It almost certainly means trying to get the application code separated from infrastructure plumbing that supports checkpoint/restart processing.  It might mean trying to find ways to cut the elapsed time to execute the jobs.  The Java Batch specification (JSR-352) might be an answer to a lot of this.
+
+A “typical” batch job consists of a bunch of steps.  Some steps are traditional read/process/write steps that work their way through some input data source (a file, records in some table, whatever), perform some business logic on that data, and produce some output.  Some steps are less complicated.  They just make a copy of a file or test for the existence of something (an existing account, a file already present, etc).  These sorts of steps influence the flow through the job.  If the file doesn’t exist, go create it, else do some processing with the existing file, or something like that.  Some steps clearly depend on prior steps, but some just have to run at some point in the job.  And some steps run for a long time and if bad things happen, we don’t want to start from the beginning.  
+
+Your jobs may be a big complicated set of steps that runs an assortment of COBOL programs, maybe some REXX or other sorts of things mixed in.  Possibly some utilities are called along the way to do “sort” processing or other things.  
+
+The tempting thing to do to “convert” this to Java is to pick some step and just re-write the COBOL into Java.  That step of the job is changed to launch a JVM and run the Java code instead of the COBOL code.  Right away you have some advantages from this.  The JVM’s JIT compiler will optimize the Java code to take advantage of the hardware you have.  Unless you’ve recompiled your COBOL code with options to take advantage of your current hardware, that’s an easy benefit.  And if you buy new Z hardware in the future, the JIT will automatically take advantage of it without needing to do anything.  
+
+This is all good, but as a long-term strategy it has some problems.  If you convert every step of your job into Java to run under a separately started JVM you’re going to be starting and stopping a lot of JVMs which seems excessive.  It would be nice to just start a JVM (or use one that is already up) and run all your Java steps in there.   And if you’re just rewriting COBOL into Java “line for line” you’re going to miss out on a lot of advantages to be found in a Java Batch framework.
+
+There are a few different frameworks available, but we’re going to focus here on the open standard that is JSR-352.  An implementation of JSR-352 can run inside an already running JVM or a JVM could be started to run a specific batch job.
+
+A JSR-352 batch job, like a traditional JCL batch job, is defined as a series of steps.  This is formalized in Job Specification Language (JSL) which is really just an XML file with a job element containing step elements.  
+
+There are two different types of steps.  The batchlet step is just a simple Java program that runs when the step is executed.  A batchlet can be used to copy a file or call a SORT utility or do the sort of condition-checking discussed above.  After any step completes it has a state (called an Exit Status) that can be used with special flow-control elements in the JSL to determine which step should be executed next.
+
+The other step type is a chunk step.  A chunk step consists of a container-managed loop that drives implementations of a reader, a processor, and a writer within a transaction.  This separation allows application development to keep the business logic in the processor apart from the reading of the data or the writing of the results.  The business logic can be right there in the processor implementation or it can just be a call out to processing somewhere else.  That might be a rules engine or a stored procedure or a CICS transaction, etc.  
+
+The transactional nature of the chunk step allows it to take periodic checkpoints, committing checkpoint data from the reader and writer into a hardened Job Repository.  This checkpoint data can be used to restart the job in case of a failure, avoiding the need to start processing from the beginning again.  The JSL definition of a chunk step also allows for the recognition of exceptions caused by badly formed input data so those records can be skipped without failing the entire step.  
+
+To help reduce elapsed execution time, JSR-352 also supports two different approaches to concurrent processing within the job.  The first is called partitioning.  In this case multiple concurrent copies of the same step are run.  Each copy of the step is given a different range of input data (a partition) to process.  If the step is a chunk step, each partition checkpoints independently of the others and so can be restarted separately.  
+
+The second approach to concurrency is called a split/flow.  A set of one or more steps can be defined as a flow.  Multiple flows can be defined to run concurrently.  Thus, when job execution reaches a split element in the JSL separate threads are used to concurrently run the flows contained within the split.  This allows steps which are not dependent on each other to run at the same time.  
+
+There is a lot more to JSR-352 itself, and various implementations of it may have extensions that might be of interest.  You can learn more about the WebSphere Liberty implementation of JSR-352 starting at the IBM Techdocs entry “WP102544”.  You might also want to take a look at my blog about Java Batch hosted at the IBM Middleware Community (start here:  https://community.ibm.com/community/user/imwuc/blogs/david-follis/2018/06/15/batch-jobs-in-java-yes)
+
+
