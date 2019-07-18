@@ -161,7 +161,6 @@ public class AppReadyCheck implements HealthCheck {
 ----
 
 See also:
-link:/docs/ref/feature/#transportSecurity-1.0.html[transportSecurity-1.0 doc]
 link:http://download.eclipse.org/microprofile/microprofile-health-2.0.1/apidocs/[Javadoc]
 //Documentation topic
 
@@ -172,17 +171,42 @@ link:http://download.eclipse.org/microprofile/microprofile-health-2.0.1/apidocs/
 [#mpmetrics]
 === Instrument metrics in microservices for easy monitoring (MicroProfile Metrics 2.0)
 
-MicroProfile Metrics 2.0 introduces multi-dimensional metrics through the use of metric tags. This is an evolution from Metrics 1.x which only allowed a metric name to be used with only one set of tags. Now multiple related metrics can be easily queried and monitored by name through a monitoring tool.
+MicroProfile Metrics 2.0 introduces multi-dimensional metrics through the use of metric tags. This is an evolution from Metrics 1.x which only allowed a metric name to be used with only one set of tags. Now multiple related metrics can be easily queried and monitored by name through a monitoring tool. This allows for the related metrics to be easily queried and monitored by name through a monitoring tool.
 
-Additionally in MicroProfile Metrics 2.0 the _Counter_ metric type has been simplified. Counters now only count up. A new metric type _ConcurrentGauge_ has been introduced which inherits the the non-monotonic behavior of the Counter from MicroProfile Metric 1.x. This change simplifies the usage of the MicroProfile Metrics API.
+Additionally in MicroProfile Metrics 2.0 the _Counter_ metric type has been simplified. Counters now only count up. A new metric type _ConcurrentGauge_ has been introduced which inherits the non-monotonic behavior of the Counter from MicroProfile Metric 1.x. The new concurrent gauge metric also keeps a high and low water mark. This change simplifies the usage of the MicroProfile Metrics API.
+
+Lastly, Microprofile Metrics 2.0 uses the new multi-dimensional metric capability by auto-tagging metrics with an `pass:[_]app` tag with the value retrieved from the `pass:[_]mp.metrics.appName_ mpConfig` value, if defined. This is especially useful if multiple apps are running because it tags each individual application's metrics with the name of the application.
 
 To use the MicroProfile Metrics 2.0 feature in your app, add the feature to the `server.xml`:
 
 [source,xml]
 ----
 <featureManager>
-   <feature>mpHealth-2.0</feature>
+   <feature>mpMetrics-2.0</feature>
 </featureManager>
+----
+
+The annotated Counter (`@Counted`) no longer has the monotonic parameter. It is inherently monotonic and only counts up sequentially. To use the concurrent gauge, annotate with `@ConcurrentGauge`:
+
+[source,java]
+----
+@Counted(name = "colorCount", absolute = true, tags= {"color=blue"})
+	public String  countBlueShapes() {
+		...
+	}
+	
+	
+	@Counted(name = "colorCount", absolute = true, tags= {"color=red"})
+	public String  countRedShapes() {
+		...
+	}
+	
+
+	@ConcurrentGauge(name = "myConcurrentGauge", absolute = true)
+	public String  countConcurrently() throws InterruptedException {
+		...
+	}
+
 ----
 
 //Documentation topic
@@ -250,7 +274,7 @@ These early implementations are not available in 19.0.0.7 but you can try them o
 == Reactive messaging in microservices (MicroProfile Reactive Messaging)
 An application using reactive messaging is composed of CDI beans consuming, producing, and processing messages passing along reactive streams. These messages can be internal to the application or can be sent and received via different message brokers.
 
-Reactive Messaging provides a very easy to use way to send, receive, and process messages. With MicroProfile Reactive Messaging, you can annotate application beans' methods to have messages on a particular channel (@incoming, @Outgoing, or both) and Liberty drives those methods appropriately as reactive streams publishers, subscribers, or processors.
+Reactive Messaging provides a very easy to use way to send, receive, and process messages. With MicroProfile Reactive Messaging, you can annotate application beans' methods to have messages on a particular channel (@Incoming, @Outgoing, or both) and Liberty drives those methods appropriately as reactive streams publishers, subscribers, or processors.
 
 To enable the feature include it in your `server.xml` feature list:
 
@@ -301,16 +325,19 @@ So, for example, a full set of properties to access IBM Public Cloud Event Strea
 
 [source,text]
 ----
-mp.messaging.connector.io.openliberty.**kafka.bootstrap.servers**=broker-1-eventstreams.cloud.ibm.com:9093,broker-2-eventstreams.cloud.ibm.com:9093
-mp.messaging.connector.io.openliberty.kafka.**sasl.jaas.config**=org.apache.kafka.common.security.plain.PlainLoginModule required username="token" password="my-apikey";
-mp.messaging.connector.io.openliberty.kafka.**sasl.mechanism**=PLAIN
-mp.messaging.connector.io.openliberty.kafka.**security.protocol**=SASL_SSL
-mp.messaging.connector.io.openliberty.kafka.**ssl.protocol**=TLSv1.2
+mp.messaging.connector.io.openliberty.kafka.bootstrap.servers=broker-1-eventstreams.cloud.ibm.com:9093,broker-2-eventstreams.cloud.ibm.com:9093
+mp.messaging.connector.io.openliberty.kafka.sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="token" password="my-apikey";
+mp.messaging.connector.io.openliberty.kafka.sasl.mechanism=PLAIN
+mp.messaging.connector.io.openliberty.kafka.security.protocol=SASL_SSL
+mp.messaging.connector.io.openliberty.kafka.ssl.protocol=TLSv1.2
 ----
+
+When using Kafka-based channels, Open Liberty Reactive Messaging 1.0 loads the Kafka client classes using the application classloader. If you are using the `io.openliberty.kafka` connector to
+read or write Kafka messages, include in your application a Kafka client API jar that is compatible with your Kafka server. For example, the `/WEB-INF/lib/` folder would be a suitable place to place a Kafka client JAR when building the application's `.war` file.
 
 This is an early release of the Open Liberty Reactive Messaging Kafka connector. We will look to provide more support for sensible defaults and cloud binding information such as Cloud Foundry's `VCAP_SERVICES` environment variable in the 1.0 release.
 
-
+Find out more in the link:https://download.eclipse.org/microprofile/microprofile-reactive-messaging-1.0/microprofile-reactive-messaging-spec.pdf[MicroProfile Reactive Messaging spec].
 
 
 //
@@ -421,5 +448,6 @@ CompletableFuture<Integer> stage = executor
 For more information:
 
 * link:/blog/2019/03/01/microprofile-concurrency.html[Nathan's blog post on MicroProfile Context Propagation 1.0]
-* https://github.com/eclipse/microprofile-concurrency[MicroProfile Context Propagation 1.0 spec]
-* https://github.com/eclipse/microprofile-context-propagation/releases[Information about the latest release candidate] (including the specification, the Javadoc API, and Maven coordinates for the spec jar)
+* link:https://download.eclipse.org/microprofile/microprofile-context-propagation-1.0/microprofile-context-propagation.html[MicroProfile Context Propagation 1.0 spec]
+* link:https://download.eclipse.org/microprofile/microprofile-context-propagation-1.0/apidocs/[MicroProfile Context Propagation 1.0 Javadoc]
+* https://github.com/eclipse/microprofile-context-propagation/releases[Information about the 1.0 release] (including the specification, the Javadoc API, and Maven coordinates for the spec jar)
