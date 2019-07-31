@@ -1,21 +1,21 @@
 ---
 layout: post
-title: "MicroProfile Context Propagation in Open Liberty development builds"
+title: "MicroProfile Context Propagation in Open Liberty"
 categories: blog
 author_picture: https://avatars2.githubusercontent.com/u/13710803
-seo-title: MicroProfile Context Propagation in Open Liberty development builds - OpenLiberty.io
+seo-title: MicroProfile Context Propagation in Open Liberty - OpenLiberty.io
 seo-description: MicroProfile Context Propagation provides a ManagedExecutor and ThreadContext API that enables you to make better use of completion stages. An implementation of the MicroProfile Context Propagation specification is now available.
 blog_description: "MicroProfile Context Propagation provides a ManagedExecutor and ThreadContext API that enables you to make better use of completion stages. An implementation of the MicroProfile Context Propagation specification is now available."
 ---
 
-= MicroProfile Context Propagation in Open Liberty development builds
+= MicroProfile Context Propagation in Open Liberty
 Nathan Rauh <https://github.com/njr-11>
 
-Completion stages and completable futures (introduced in Java SE 8) enable you to chain together pipelines of dependent actions with the ability to run sequentially or in parallel, depending on how the API is used. Execution of a dependent stage is triggered by the completion of the stage (or stages) upon which it depends. While this capability provided by completion stages can be extremely useful in enabling applications to implement a model where they react to events as they happen, the built-in implementation (completable future) neglects several important areas: consistency and reliability of thread context and defaulting asynchronous dependent stage actions to run on the Liberty global thread pool. MicroProfile Context Propagation introduces the `ManagedExecutor` and `ThreadContext` API to address these problems. An implementation of the MicroProfile Context Propagation specification is now available in the https://openliberty.io/downloads/[Open Liberty development builds].
+CompletionStage and CompletableFuture (first introduced in Java SE 8) enable you to chain together pipelines of dependent actions, where execution of each dependent stage is triggered by the completion of the stage(s) upon which that stage depends. MicroProfile Context Propagation builds upon this model, giving dependent stage actions consistent and reliable thread context and defaulting asynchronous dependent stage actions to run on the Liberty global thread pool. MicroProfile Context Propagation introduces the https://openliberty.io/docs/ref/javadocs/microprofile-3.0-javadoc/org/eclipse/microprofile/context/ManagedExecutor.html[ManagedExecutor] and https://openliberty.io/docs/ref/javadocs/microprofile-3.0-javadoc/org/eclipse/microprofile/context/ThreadContext.html[ThreadContext] API to accomplish this. An implementation of the MicroProfile Context Propagation specification is now available in https://openliberty.io/downloads[Open Liberty 19.0.0.8].
 
 Managed executors in MicroProfile Context Propagation allow you to use completion stages that run with predictable thread context regardless of which thread the action ends up running on. Without this feature, thread context of a completion stage action depends on whether the action runs on the requesting thread, the thread of a stage upon which it depends, a thread that is requesting the result, or a thread that forcibly completes the prior stage. There is no guarantee under which context the action will run.  However, with MicroProfile Context Propagation, the thread context is completely deterministic because context is always captured from the thread that creates the completion stage and applied when running the action. 
 
-Alternatively, you can configure to clear certain context types rather than capturing context.  For example, clearing the security context means that no user is associated with the thread while the completion stage action runs. When a completion stage is created by a managed executor, the managed executor remains associated with the completion stage and determines thread context propagation and for dependent stages that are requested to run asynchronously without designating a specific executor. The managed executor remains associated with each dependent stage created, and each dependent stage created from those, and so forth, allowing for predictable thread context propagation at every stage in the pipeline.
+Alternatively, you can configure to clear certain context types rather than capturing context.  For example, clearing the security context means that no user is associated with the thread while the completion stage action runs. When a completion stage is created by a managed executor, the managed executor remains associated with the completion stage and determines thread context propagation for dependent stages that are requested to run asynchronously without designating a specific executor. The managed executor remains associated with each dependent stage created, and each dependent stage created from those, and so forth, allowing for predictable thread context propagation at every stage in the pipeline.
 
 Here is an example of a managed executor that is used to propagate the application's namespace to an asynchronous action,
 
@@ -35,9 +35,9 @@ CompletableFuture<Integer> stage = executor.supplyAsync(supplier1)
     });
 ----
 
-Managed executors in MicroProfile Context Propagation are fully compatible with `ManagedExecutorService` in Java EE Concurrency, leaving open the possibility that the programming models could one day be merged.  Notably, the `org.eclipse.microprofile.concurrent.ManagedExecutor` interface inherits from `java.util.concurrent.ExecutorService`, and thus allows the same execute/submit/invoke operations as `ManagedExecutorService`.
+Managed executors in MicroProfile Context Propagation are fully compatible with https://openliberty.io/docs/ref/javadocs/liberty-javaee8-javadoc/javax/enterprise/concurrent/ManagedExecutorService.html[ManagedExecutorService] in Jakarta/Java EE Concurrency, leaving open the possibility that the programming models could one day be merged.  Notably, the https://openliberty.io/docs/ref/javadocs/microprofile-3.0-javadoc/org/eclipse/microprofile/context/ManagedExecutor.html[org.eclipse.microprofile.context.ManagedExecutor] interface inherits from https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/concurrent/ExecutorService.html[java.util.concurrent.ExecutorService], and thus allows the same execute/submit/invoke operations as https://openliberty.io/docs/ref/javadocs/liberty-javaee8-javadoc/javax/enterprise/concurrent/ManagedExecutorService.html[ManagedExecutorService].
 
-MicroProfile Context Propagation provides the `org.eclipse.microprofile.concurrent.ThreadContext` interface to facilitate the use of unmanaged completion stages. When you have a completion stage that isn't created by a managed executor, it can still run with predictable thread context if you pre-contextualize its action with the corresponding method of MicroProfile Context Propagation `ThreadContext`.  For example,
+MicroProfile Context Propagation provides the https://openliberty.io/docs/ref/javadocs/microprofile-3.0-javadoc/org/eclipse/microprofile/context/ThreadContext.html[org.eclipse.microprofile.concurrent.ThreadContext] interface to pre-contextualize completion stage actions. This is useful if you have an umanaged completion stage that is not thread-context aware. When you have a completion stage that isn't created by a managed executor, it can still run with predictable thread context if you pre-contextualize its action with the corresponding method of MicroProfile Context Propagation https://openliberty.io/docs/ref/javadocs/microprofile-3.0-javadoc/org/eclipse/microprofile/context/ThreadContext.html[ThreadContext].  For example,
 
 [source, java]
 ----
@@ -45,6 +45,8 @@ CompletableFuture<Long> stage = CompletableFuture.supplyAsync(supplier1)
     .thenApplyAsync(function1)
     .thenApply(threadContext.contextualFunction(function2));
 ----
+
+In the example above, `supplier1` and `function1` run with non-deterministic thread context. However, the pre-contextualized action, `function2`, always runs with the context of the thread that invoked the `contextualFunction` operation.
 
 == How to obtain ManagedExecutor and ThreadContext instances
 
@@ -61,7 +63,7 @@ ManagedExecutor executor = ManagedExecutor.builder()
     .build();
 ----
 +
-Applications should take care to shut down executor instances that they build, once the executor instance is no longer needed.
+Applications must take care to shut down executor instances that they build, once the executor instance is no longer needed.
 
 * If you are using Java EE Concurrency, you can cast your existing `ManagedExecutorService` to `ManagedExecutor`.
 
@@ -109,8 +111,6 @@ CompletableFuture<Integer> stage = executor
     });
 ----
 
-
-
-
+== Conclusion
 
 MicroProfile Context Propagation builds upon Java SE CompletableFuture and builds out the necessary infrastructure around it, empowering you to build robust applications that react to events as they happen, under a dependable thread context and backed by the performance of Liberty threading.
