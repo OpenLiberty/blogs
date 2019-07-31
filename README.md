@@ -51,7 +51,7 @@ docker run --name website -it -p 4000:4000 -v /Users/kueng/work/sandboxes/openli
 ```
 
 ### Update the running container with edits
-If you make changes to blog Asciidoc files and images, you can run the commands below to update the container with your latest changes.  Below are instructions on how to know when the container renders your new changes.
+If you clone this blog repository and make changes to blog Asciidoc files and images, you can run the commands below to update the container with your latest changes.  Below are instructions on how to know when the container renders your new changes. Run these commands from where you cloned this blogs repository on your local machine.
 
 ```
 docker exec -it website rm -rf /home/jekyll/src/main/content/_drafts /home/jekyll/src/main/content/_posts /home/jekyll/src/main/content/img/blog
