@@ -1,5 +1,5 @@
 # Contributing to the blog
-Create a pull request with the content of the blog post placed in the `drafts` folder using the following file naming scheme: `YYYY-MM-DD-post-title.extension`.  Blogs are written in [AsciiDoc](https://asciidoctor.org/docs/asciidoc-writers-guide/) format with a file extension of `.adoc`. In the blog post file the following front matter variables must be set:
+Fork this repository and write your blog post. Create a pull request with the content of the blog post placed in the `drafts` folder using the following file naming scheme: `YYYY-MM-DD-post-title.extension`.  Blogs are written in [AsciiDoc](https://asciidoctor.org/docs/asciidoc-writers-guide/) format with a file extension of `.adoc`. In the blog post file the following front matter variables must be set:
 - layout: post
 - title: `title of the blog post`
 - categories: blog
@@ -47,11 +47,19 @@ If you would like to add a blog post that is actually a link to an existing thir
 git clone https://github.com/OpenLiberty/blogs.git
 git clone https://github.com/OpenLiberty/openliberty.io.git
 docker pull kinueng/openliberty.io
-docker run --name website -it -p 4000:4000 -v /Users/kueng/work/sandboxes/openliberty.io:/home/jekyll kinueng/openliberty.io
+```
+Replace "currentFolder" in the following command with the full path to the folder you are in. 
+```
+docker run --name website -it -p 4000:4000 -v currentFolder/openliberty.io:/home/jekyll kinueng/openliberty.io
+
+# example when current directory is /Users/bruce/projects/blog/website:
+# docker run --name website -it -p 4000:4000 -v /Users/bruce/projects/blog/website/openliberty.io:/home/jekyll kinueng/openliberty.io
 ```
 
-### Update the running container with edits
-If you clone this blog repository and make changes to blog Asciidoc files and images, you can run the commands below to update the container with your latest changes.  Below are instructions on how to know when the container renders your new changes. Run these commands from where you cloned this blogs repository on your local machine.
+### Update the running container with your edits
+Before your new or updated blog entry will appear on the website, you will need to run the commands below to update the container with your latest changes, then wait for the container to finish processing them.  Then you can see your changes at http://localhost:4000/blog/
+
+Note that blogs named with dates in the future, e.g. 2099-01-05, will not be shown, so don't do that. 
 
 ```
 docker exec -it website rm -rf /home/jekyll/src/main/content/_drafts /home/jekyll/src/main/content/_posts /home/jekyll/src/main/content/img/blog
@@ -72,13 +80,15 @@ You will see `Jekyll` detect your new files and regenerate the blog files.  You 
 ```
 
 ### Restarting the container
-If you try to run the `docker run....` command above when the container already exists, you'll get an error like this:
+If you try to run the `docker run....` command above when the container already exists or has been stopped, you'll get an error like this:
 
 ```
 docker: Error response from daemon: Conflict. The container name "/website" is already in use by container "ddc88f127404e8df53ad149245f636a54f6d5b501ac93477985c27a12b061a94". You have to remove (or rename) that container to be able to reuse that name.
 ```
 
-Instead, run `docker start website`.
+Instead, run `docker start website`. 
+
+If the container's been stopped (you pressed control-c, didn't you?) you can run `docker ps -a` to get it's container id, then run `docker rm [containerid]` to remove it. Then issue the docker run command again. 
 
 There's no feedback about what it's doing. If you run `docker ps`, you can see that the `website` container is now running. However, it takes a few mins for the whole site to come back up so that you can access it from `0.0.0.0:4000` in your browser. So be patient.
 
