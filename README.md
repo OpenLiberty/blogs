@@ -88,7 +88,7 @@ docker: Error response from daemon: Conflict. The container name "/website" is a
 
 Instead, run `docker start website`. 
 
-If the container's been stopped (you pressed control-c, didn't you?) you can run ```docker ps -a`` to get it's container id, then run ``docker rm [containerid]``` to remove it. Then issue that docker run command again. 
+If the container's been stopped (you pressed control-c, didn't you?) you can run `docker ps -a` to get it's container id, then run `docker rm [containerid]` to remove it. Then issue the docker run command again. 
 
 There's no feedback about what it's doing. If you run `docker ps`, you can see that the `website` container is now running. However, it takes a few mins for the whole site to come back up so that you can access it from `0.0.0.0:4000` in your browser. So be patient.
 
