@@ -11,49 +11,42 @@ blog_description: "A look at the OpenID Connect, SAML and Json Web Token securit
 = Securing Open Liberty apps and microservices with OpenID Connect and JWT
 Bruce Tiffany <https://github.com/brutif>
 
-Open Liberty now includes more features for securing apps with external security providers.  
-Let's take a quick look at why and how to use some of these features, focusing on using OpenID Connect to secure microservices.
+Open Liberty now includes more open source security features to enable you to secure your apps with external security providers. Let's take a quick look at why and how to use some of these features.
 
-== Concepts:
-* SAML and OpenID Connect are standards-based technologies for using an external security provider to secure your applications. 
-+
-* Json Web Tokens (JWT) are identity credentials with a standardized format that can be exchanged between processes. They're secured against tampering by use of digital signatures.
+== Authenticating microservices on Open Liberty
+Open Liberty provides support for writing apps that authenticate users with social media logins using Open ID standards-based technologies. You can present users of your web app with the options to log in using their existing Facebook, GitHub, Google, LinkedIn, or Twitter IDs. You can also write your own integrations with other social media platforms if you need to.  Alternatively, you can enable your app users to use single sign-on by authenticating with a SAML identity provider.
 
-== Advantages of using OpenID Connect or SAML to secure apps:
-* User accounts are managed by the OpenID Connect or SAML provider, relieving administrators and developers of this effort.
-+
-* The secured app never sees the user's password.
-+
-* A user of multiple apps secured by the same provider can have a "single sign on" experience where they only need to log in once for all the secured apps.
-+
-* OpenID Connect providers can issue Json Web Token (JWT) credentials.  These tokens can be submitted to downstream secured microservices to propagate identity in an efficient, self-contained way.  Microservices don't need to contact the identity provider again.
+Using Open ID Connect or SAML providers ensures that the secured app never sees the user's password, and relieves developers and administrators of the effort of managing user accounts. In addition, providing a single sign-on experience to users enables them to log in once for all secured apps that they use.
 
-== Some of the security features Open Liberty includes are:
-* socialLogin-1.0 - An OAuth and OpenID Connect client that offers pre-defined configurations for authenticating with social media providers such as Facebook, Twitter, Github, LinkedIn and Google, and generic configurations for use with others.  Register your app with one or more of these providers and add a few lines to server.xml to secure your apps by logging in with them. 
+Open Liberty also supports (JWT), which are identity credentials with a standardized format that can be exchanged between processes. They're secured against tampering by use of digital signatures. So your microservices can securely exchange requested information on behalf of users. OpenID Connect providers can issue Json Web Token (JWT) credentials.  These tokens can be submitted to downstream secured microservices to propagate identity in an efficient, self-contained way.  Microservices don't need to contact the identity provider again.
+
+== Some of the security features provided by Open Liberty
+
+`socialLogin-1.0`:: An OAuth and OpenID Connect client that offers pre-defined configurations for authenticating with social media providers such as Facebook, Twitter, Github, LinkedIn and Google, and generic configurations for use with others.  Register your app with one or more of these providers and add a few lines to server.xml to secure your apps by logging in with them. 
 +
-* openidConnectClient-1.0 - A general purpose OpenID Connect client for use with an OpenID Connect provider.  A wide range of configuration options allows this to work with many common providers.
+`openidConnectClient-1.0`:: A general purpose OpenID Connect client for use with an OpenID Connect provider.  A wide range of configuration options allows this to work with many common providers.
 +
-* openidConnectServer-1.0 - An OpenID Connect provider.  Configure this with a database and user registry and it can manage user authentication and issue JWTs for use by OpenID Connect clients and microservices.
+`openidConnectServer-1.0`:: An OpenID Connect provider.  Configure this with a database and user registry and it can manage user authentication and issue JWTs for use by OpenID Connect clients and microservices.
 +
-* mpJwt-1.1 - Secures apps / microservices by requiring a JWT in an HTTP header for authentication. It implements the MicroProfile JWT 1.1 specification.
+`mpJwt-1.1`:: Secures apps / microservices by requiring a JWT in an HTTP header for authentication. It implements the MicroProfile JWT 1.1 specification.
 +
-* jwt-1.0 - Provides an API for building and consuming Json Web Tokens.  If you don't want to use an OpenID Connect provider, you can use this to easily build your own JWT's for use with microservices.
+`jwt-1.0`:: Provides an API for building and consuming Json Web Tokens.  If you don't want to use an OpenID Connect provider, you can use this to easily build your own JWT's for use with microservices.
 +
-* samlWeb-2.0 - A SAML client for use with a SAML identity provider.
+`samlWeb-2.0`:: A SAML client for use with a SAML identity provider.
 
 == Example: Using OpenID Connect and JWTs to authenticate users and secure microservices:
 
 The following sample code and configurations use three servers to demonstrate authenticating a user and accessing a secured microservice using a JWT. The three pieces of this are:
 
-* A server called "oidc_client" with openIdConnectClient-1.0 hosts a servlet app secured with OpenID Connect.  
+* A server called `oidc_client` with the OpenID Connect Client feature (`openIdConnectClient-1.0`) hosts a servlet app secured with OpenID Connect.  
 +
-* A server called "microservice" with mpJwt-1.1 hosts a JAX-RS microservice that is secured with MicroProfile JWT.
+* A server called `microservice` with the MicroProfile JWT feature (`mpJwt-1.1`) hosts a JAX-RS microservice that is secured with MicroProfile JWT.
 +
-* A server called "oidc_provider" with openIdConnectProvider-1.0 provides user authentication for the OpenID Connect client.
+* A server called `oidc_provider` with the OpenID Connect Provider (`openIdConnectProvider-1.0`) provides user authentication for the OpenID Connect client.
 
-When a user attempts to access the servlet, their browser would be redirected to the OpenID Connect Provider for them to enter their id and password.  Upon success, the browser gets redirected back to the client with an authorization code.  The client then contacts the provider, obtains a JWT, and uses it to create an authenticated user on the client, which then gets access to the servlet.
-The servlet then makes a REST call to the microservice.  REST clients can be configured to automatically propagate a JWT token if they have one, so the JWT gets sent along in the request.
-The microservice server is configured to trust JWTs issued by the provider, so it grants access to the JAX-RS service.
+When a user attempts to access the servlet, their browser would be redirected to the OpenID Connect Provider for them to enter their ID and password.  Upon success, the browser gets redirected back to the client with an authorization code.  The client then contacts the provider, obtains a JWT, and uses it to create an authenticated user on the client, which then gets access to the servlet.
+
+The servlet then makes a REST call to the microservice.  REST clients can be configured to automatically propagate a JWT token if they have one, so the JWT gets sent along in the request. The microservice server is configured to trust JWTs issued by the provider, so it grants access to the JAX-RS service.
 
 Requesting servlet (note the JAX-RS client property to propagate the JWT):
 [source,java]
@@ -89,12 +82,14 @@ public class MyServlet extends HttpServlet {
   }
 }
 ----
+
 The JAX-RS microservice:
 [source,java]
 ----
 @ApplicationPath("/")
 public class JaxrsHelloApp extends Application {}
 ----
+
 [source,java]
 ----
 @RolesAllowed("users")  // <=== Specify the group claim from the JWT as the role here.
