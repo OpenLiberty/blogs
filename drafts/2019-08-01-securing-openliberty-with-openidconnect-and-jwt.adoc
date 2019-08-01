@@ -1,0 +1,312 @@
+---
+layout: post
+title: "Securing Open Liberty apps and microservices with OpenID Connect and JWT"
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/u/28316667
+author_github: https://github.com/brutif
+seo-title: Securing Open Liberty apps and microservices with OpenID Connect and JWT - OpenLiberty.io
+seo-description: A look at the OpenID Connect, SAML and Json Web Token security features in Open Liberty, and an example of using some of them to secure microservices.
+blog_description: "A look at the OpenID Connect, SAML and Json Web Token security features in Open Liberty, and an example of using some of them to secure microservices."
+---
+= Securing Open Liberty apps and microservices with OpenID Connect and JWT
+Bruce Tiffany <https://github.com/brutif>
+
+Open Liberty now includes more features for securing apps with external security providers.  
+Let's take a quick look at why and how to use some of these features, focusing on using OpenID Connect to secure microservices.
+
+== Concepts:
+* SAML and OpenID Connect are standards-based technologies for using an external security provider to secure your applications. 
++
+* Json Web Tokens (JWT) are identity credentials with a standardized format that can be exchanged between processes. They're secured against tampering by use of digital signatures.
+
+== Advantages of using OpenID Connect or SAML to secure apps:
+* User accounts are managed by the OpenID Connect or SAML provider, relieving administrators and developers of this effort.
++
+* The secured app never sees the user's password.
++
+* A user of multiple apps secured by the same provider can have a "single sign on" experience where they only need to log in once for all the secured apps.
++
+* OpenID Connect providers can issue Json Web Token (JWT) credentials.  These tokens can be submitted to downstream secured microservices to propagate identity in an efficient, self-contained way.  Microservices don't need to contact the identity provider again.
+
+== Some of the security features Open Liberty includes are:
+* socialLogin-1.0 - An OAuth and OpenID Connect client that offers pre-defined configurations for authenticating with social media providers such as Facebook, Twitter, Github, LinkedIn and Google, and generic configurations for use with others.  Register your app with one or more of these providers and add a few lines to server.xml to secure your apps by logging in with them. 
++
+* openidConnectClient-1.0 - A general purpose OpenID Connect client for use with an OpenID Connect provider.  A wide range of configuration options allows this to work with many common providers.
++
+* openidConnectServer-1.0 - An OpenID Connect provider.  Configure this with a database and user registry and it can manage user authentication and issue JWTs for use by OpenID Connect clients and microservices.
++
+* mpJwt-1.1 - Secures apps / microservices by requiring a JWT in an HTTP header for authentication. It implements the MicroProfile JWT 1.1 specification.
++
+* jwt-1.0 - Provides an API for building and consuming Json Web Tokens.  If you don't want to use an OpenID Connect provider, you can use this to easily build your own JWT's for use with microservices.
++
+* samlWeb-2.0 - A SAML client for use with a SAML identity provider.
+
+== Example: Using OpenID Connect and JWTs to authenticate users and secure microservices:
+
+The following sample code and configurations use three servers to demonstrate authenticating a user and accessing a secured microservice using a JWT. The three pieces of this are:
+
+* A server called "oidc_client" with openIdConnectClient-1.0 hosts a servlet app secured with OpenID Connect.  
++
+* A server called "microservice" with mpJwt-1.1 hosts a JAX-RS microservice that is secured with MicroProfile JWT.
++
+* A server called "oidc_provider" with openIdConnectProvider-1.0 provides user authentication for the OpenID Connect client.
+
+When a user attempts to access the servlet, their browser would be redirected to the OpenID Connect Provider for them to enter their id and password.  Upon success, the browser gets redirected back to the client with an authorization code.  The client then contacts the provider, obtains a JWT, and uses it to create an authenticated user on the client, which then gets access to the servlet.
+The servlet then makes a REST call to the microservice.  REST clients can be configured to automatically propagate a JWT token if they have one, so the JWT gets sent along in the request.
+The microservice server is configured to trust JWTs issued by the provider, so it grants access to the JAX-RS service.
+
+Requesting servlet (note the JAX-RS client property to propagate the JWT):
+[source,java]
+----
+@WebServlet("/")
+@ServletSecurity(value = @HttpConstraint(rolesAllowed= {"All Role"}))
+public class MyServlet extends HttpServlet {
+  private static final long serialVersionUID = 1L;
+    public MyServlet() {
+        super();       
+    }
+  protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+    javax.ws.rs.client.ClientBuilder cb = ClientBuilder.newBuilder();
+    PrintWriter pw = response.getWriter();
+        pw.append("Calling the jaxrs service...\n");
+        javax.ws.rs.client.Client c = cb.build();
+        String res = null;
+        try {
+          res = c.target("https://localhost:39443/jaxrshello")
+            .property("com.ibm.ws.jaxrs.client.oauth.sendToken","true")  // <=== propagates the JWT
+            .path("/hello").request().get(String.class);
+        } catch (Exception e) {
+            res = "[Error]:" + e.toString();
+        } finally {
+             c.close();        
+        }  
+    pw.append("The jaxrs service response is: "+ res);
+    pw.append("\n");
+    pw.flush();
+  }
+  protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {  
+    doGet(request, response);
+  }
+}
+----
+The JAX-RS microservice:
+[source,java]
+----
+@ApplicationPath("/")
+public class JaxrsHelloApp extends Application {}
+----
+[source,java]
+----
+@RolesAllowed("users")  // Specify the group claim from the JWT as the role here.
+@Path("/hello")
+public class HelloService { 
+    @Context
+    HttpServletRequest request;
+  
+    @GET    
+    public String hello() {
+      DateFormat dateFormat = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
+      Date date = new Date();     
+      String principalName = request.getUserPrincipal() == null ?  "null" : request.getUserPrincipal().getName();
+      return "Jax-Rs app is accessed.  The current time is: "+ dateFormat.format(date) 
+         + " and the authenticated user is: "+ principalName;
+    }
+}
+----
+
+The oidc_client server configuration:
+[source,xml]
+----
+<server description="oidc_client">
+    <featureManager>
+        <feature>jaxrs-2.1</feature>
+        <feature>jsp-2.3</feature>
+        <feature>localConnector-1.0</feature>
+        <feature>openidConnectClient-1.0</feature>
+        <feature>transportSecurity-1.0</feature>
+    </featureManager>
+    <httpEndpoint host="*" httpPort="19080" httpsPort="19443" id="defaultHttpEndpoint"/>
+    <keyStore id="defaultKeyStore" password="keyspass"/>  
+    <!-- configure OpenId connect to communicate with the OpenId Connect provider --> 
+    <openidConnectClient clientId="RP" clientSecret="thesecret" discoveryEndpointUrl="https://localhost:29443/oidc/endpoint/OP/.well-known/openid-configuration" id="RP" scope="openid profile email">
+    </openidConnectClient> 
+    <!-- "All Role" is used in the ServletSecurity annotation -->
+    <webApplication id="myservlet" location="myservlet.war" name="myservlet" type="war">
+        <application-bnd>
+            <security-role name="All Role">
+                <special-subject type="ALL_AUTHENTICATED_USERS"/>
+            </security-role>
+        </application-bnd>
+    </webApplication>
+    
+    <applicationManager autoExpand="true"/>
+    <applicationMonitor updateTrigger="mbean"/>
+</server>
+----
+
+The mservice server configuration:
+[source,xml]
+----
+<server description="microservice">
+    
+    <featureManager>        
+        <feature>transportSecurity-1.0</feature>
+        <feature>jaxrs-2.1</feature>
+        <feature>localConnector-1.0</feature>
+        <feature>mpjwt-1.1</feature>
+    </featureManager>
+    
+    <!-- configure mpJwt to trust the OpenId Connect provider --> 
+    <mpJwt id="mympjwt" issuer="https://localhost:29443/oidc/endpoint/OP" 
+        jwksUri="https://localhost:29443/oidc/endpoint/OP/jwk"/>
+    <keyStore id="defaultKeyStore" password="keyspass"/>
+    
+    <httpEndpoint httpPort="39080" httpsPort="39443" id="defaultHttpEndpoint"/>
+     
+    <applicationMonitor updateTrigger="mbean"/>
+    <applicationManager autoExpand="true"/>
+    <webApplication id="jaxrshello" location="jaxrshello.war" name="jaxrshello"/>
+</server>
+----
+
+The oidc_provider server configuration:
+[source,xml]
+----
+<server description="oidc_provider">     
+   
+    <featureManager>      
+      <feature>openidConnectServer-1.0</feature> 
+      <!-- if this server will delegate authentication to another
+           provider, then one of the following features
+           could be needed:
+      -->
+      <!-- <feature>ldapRegistry-3.0</feature>-->
+      <!-- <feature>socialLogin-1.0</feature>-->
+      <!-- <feature>openidConectClient-1.0</feature> -->
+      <!-- <feature>samlWeb-2.0</feature> -->
+    </featureManager>
+    <httpEndpoint id="defaultHttpEndpoint"
+                  host="*"
+                  httpPort="29080"
+                  httpsPort="29443" />
+    <keyStore id="defaultKeyStore" password="keyspass" />  
+    <!-- Basic registry for test / development use.  
+         Comment this out if using LDAP or delegating to another 
+         Oauth or SAML provider. 
+    -->   
+    <basicRegistry id="basic" realm="customRealm">
+        <user
+          name="demouser"
+          password="demopassword" />
+        <user
+          name="demouser2"
+          password="demopassword2" />
+         <group name="users">
+             <member name="demouser"/>
+             <member name="demouser2" />
+        </group>
+    </basicRegistry>
+    <!-- LDAP example.  Customize and uncomment to use LDAP user authentication.
+         Comment out basic registry. 
+    -->
+    <!--
+    <ldapRegistry
+      id="ldap"
+      realm="SampleLdapIDSRealm"
+      host="oidcldap1.some.where.ibm.com"
+      port="389"
+      ignoreCase="true"
+      baseDN="o=ibm,c=us"
+      bindDN="cn=root"
+      bindPassword="rootpwd"
+      ldapType="IBM Tivoli Directory Server"
+      searchTimeout="8m" >
+      <idsFilters groupFilter="(&amp;(cn=%v)(|(objectclass=groupOfNames)(objectclass=groupOfUniqueNames)))"
+        groupIdMap="*:cn"
+        groupMemberIdMap="ibm-allGroups:member;ibm-allGroups:uniqueMember;groupOfNames:member;groupOfUniqueNames:uniqueMember"
+        id="TestLdap"
+        userFilter="(&amp;(uid=%v)(objectclass=ePerson))"
+        userIdMap="*:mail"/>
+      <failoverServers name="failoverLdapServers">
+        <server
+          host="nc049244.some.where.ibm.com"
+          port="389" />
+      </failoverServers>
+    </ldapRegistry>
+    -->   
+    
+    <openidConnectProvider id="OP" 
+        oauthProviderRef="OAuth" 
+        signatureAlgorithm="RS256" keyStoreRef="defaultKeyStore" 
+        jwkEnabled="false"
+    >
+    </openidConnectProvider>
+    
+    <oauthProvider id="OAuth" tokenFormat="mpjwt" >
+         <!-- 
+         localStore is for test / development use. 
+         When localStore is used, all client data and token status is held
+         in memory.  This server can only be a singleton when this is
+         used.  Reconfiguring the server may clear the localStore.
+         Comment out localStore when using a database. 
+         --> 
+        <localStore>
+          <!-- When using a database, clients are not specified in server.xml.
+               Instead they are added to the database through the registration endpoint.
+          -->
+          <client displayname="RP" enabled="true"
+                name="RP" secret="thesecret" 
+                scope="openid profile email"
+                preAuthorizedScope="openid profile email"
+          >      
+                <redirect>https://localhost:19443/oidcclient/redirect/RP</redirect>
+          </client>    
+        </localStore>
+    <!-- uncomment below line when using a database -->
+    <!-- <databaseStore dataSourceRef="OIDC_DBDS4" /> -->
+    </oauthProvider>
+     
+    <!-- Users in the clientManager role can add/modify clients when using a
+         database by accessing the registration endpoint. 
+         When using a localStore, clients are added by editing server.xml,
+         and this can be commented out.
+    -->      
+    <oauth-roles>
+        <authenticated>
+            <special-subject type="ALL_AUTHENTICATED_USERS" />  
+        </authenticated>
+        <!--        
+        <clientManager>            
+            <user name="testuser" />
+            <group name="oidcadmin" />            
+        </clientManager>  
+        -->       
+    </oauth-roles>
+    <!-- sample database configuration -->
+    <!--
+    <dataSource id="OIDC_DBDS4" jdbcDriverRef="db2Driver" jndiName="jdbc/oauthProvider" containerAuthDataRef="OIDC_DBAuth4" >
+        <properties databaseName="oidcdb4" driverType="4" portNumber="60006" serverName="somedb.somedomain.ibm.com" />
+        <connectionManager maxPoolSize="250" minPoolSize="10" connectionTimeout="60s" />
+    </dataSource>
+    <jdbcDriver id="db2Driver">
+       <library>
+       <fileset dir="${wlp.user.dir}/shared/resources/db2jars/" includes="db2jcc4.jar db2jcc_license_cu.jar"/>
+       </library>
+    </jdbcDriver>
+    <authData id="OIDC_DBAuth4" user="dbuser" password="dbpassword" />
+    -->
+</server>
+----
+
+== Useful references: 
+* https://github.com/eclipse/microprofile-metrics/releases[socialLogin-1.0]
++
+* https://github.com/eclipse/microprofile-metrics/releases[openidConnectClient-1.0]
++
+* https://github.com/eclipse/microprofile-metrics/releases[openidConnectServer-1.0]
++
+* https://github.com/eclipse/microprofile-metrics/releases[mpJwt-1.1]
++
+* https://github.com/eclipse/microprofile-metrics/releases[samlWeb-2.0]
++
+* https://github.com/eclipse/microprofile-metrics/releases[jwt-1.0]
