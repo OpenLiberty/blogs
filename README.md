@@ -42,6 +42,9 @@ If you would like to add a blog post that is actually a link to an existing thir
 
 # Docker container for development
 
+Github.com does a pretty good job of rendering asciidoc so you can preview your file there, but to see exactly what it will
+look like you'll need to install the website software and run it. 
+
 ### Running the website on your local machine
 ```
 git clone https://github.com/OpenLiberty/blogs.git
@@ -93,3 +96,5 @@ If the container's been stopped (you pressed control-c, didn't you?) you can run
 There's no feedback about what it's doing. If you run `docker ps`, you can see that the `website` container is now running. However, it takes a few mins for the whole site to come back up so that you can access it from `0.0.0.0:4000` in your browser. So be patient.
 
 When you can access `0.0.0.0:4000`, run the four commands above to update the running container with your new edits (starting with the `docker exec....` command).
+
+
