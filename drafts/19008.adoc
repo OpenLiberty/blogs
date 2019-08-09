@@ -1,6 +1,6 @@
 ---
 layout: post
-title: MicroProfile 3.0 with improved developer experience on Open Liberty 19.0.0.7
+title: MicroProfile 3.0 with improved developer experience on Open Liberty 19.0.0.8
 categories: blog
 author_picture: https://avatars1.githubusercontent.com/u/52958137
 author_github: https://github.com/yasmin-aumeeruddy
@@ -17,11 +17,13 @@ Yasmin Aumeeruddy <https://github.com/yasmin-aumeeruddy>
 
 In Open Liberty 19.0.0.8:
 
+
+
 * <<mcp1,MicroProfile Context Propagation 1.0>>
 * <<ocs,OpenID Connect Server>>
-* <<int, IBM WebSphere Open Liberty Introspection>>
-** <<over, The Overlay Cache Introspctor>>
-** <<zip, The Zip Cache Introspector>>
+* <<int, IBM Open Liberty Introspection>>
+** <<over, The Overlay Cache Introspector>>
+** <<zip, The zip Cache Introspector>>
 
 If you're curious about what's coming in future Open Liberty releases, take a look at our <<previews,previews in the latest development builds>>. In particular, get an early insight into MicroProfile Reactive Messaging.
 
@@ -66,9 +68,9 @@ image::/img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="cen
 
 MicroProfile Context Propagation allows you to create pipelines of dependent stages that run with predictable thread context regardless of which thread the completion stage action ends up running on.
 
-MicroProfile Context Propagation provides completion stages that run with predictable thread context and also benefit from being backed by the automatically-tuned Liberty global thread pool. Configuration of concurrency constraints and context propagation is possible programmatically with a fluent builder pattern where configuration defaults can be specified via MicroProfile Config.
+MicroProfile Context Propagation provides completion stages that run with predictable thread context and also benefit from being backed by the link:https://openliberty.io/blog/2019/04/03/liberty-threadpool-autotuning.html[automatically-tuned Liberty global thread pool]. Configuration of concurrency constraints and context propagation is possible programmatically with a fluent builder pattern where configuration defaults can be specified via MicroProfile Config.
 
-Example in server.xml:
+Example in `server.xml`:
 [source,xml]
 ----
   <featureManager>
@@ -162,11 +164,11 @@ For more information:
 
 OpenID Connect is a technology that allows delegation of user authentication to an external security provider.
 
-Liberty's OpenID Connect Server feature now includes support for long lived application passwords and application tokens, for use by non browser applications. Users can acquire these and submit them to a non-browser application, which can then use them to access secured resources on servers configured to accept OAuth access tokens from the OpenID Connect server. The user's password is never exposed to the non-browser app, and the tokens can be revoked independently if needed. App-passwords are exchanged repetitively by the non-browser app for short lived access tokens using a standard OAuth ROPC flow, so if an access token is ever compromised, it is not valid for long. App-tokens are long lived access tokens.
+Liberty's OpenID Connect Server feature now includes support for long-lived application passwords and application tokens, for use by non browser applications. Users can acquire these and submit them to a non-browser application, which can then use them to access secured resources on servers configured to accept OAuth access tokens from the OpenID Connect server. The user's password is never exposed to the non-browser app, and the tokens can be revoked independently if needed. App-passwords are exchanged repetitively by the non-browser app for short lived access tokens using a standard OAuth ROPC flow, so if an access token is ever compromised, it is not valid for long. App-tokens are long-lived access tokens.
 
 Web and REST interfaces for users and administrators are added to administer these tokens.
 
-Create a new Liberty server and use this server.xml. Comments in server.xml explain the new configuration attributes. This server doesn't have a backing database so is for demo purposes only.
+Create a new Liberty server and use this `server.xml`. Comments in `server.xml` explain the new configuration attributes. This server doesn't have a backing database so is for demo purposes only.
 
 Example in xml: 
 [source,xml]
@@ -247,95 +249,109 @@ Example in xml:
 
 
 Now users can request and manage their own tokens at
-`https://host:port/(provider id)/personalTokenManagement`. Token admins can administer the tokens of other users at `https://host:port/(provider id)/usersTokenManagement.`
+`pass:[]https://host:port/(provider id)/personalTokenManagement`. Token admins can administer the tokens of other users at `pass:[]https://host:port/(provider id)/usersTokenManagement.`
 
-To try it out, start the server and log in as admin, adminpwd at
-`https://localhost:29443/oidc/endpoint/OP/personalTokenManagement`
+To try it out, start the server and log in as `admin`, `adminpwd` at
+`pass:[]https://localhost:29443/oidc/endpoint/OP/personalTokenManagement`
 
 These tokens can be submitted to non-browser applications, which can in turn use them when accessing secured resources on servers configured to accept access tokens from the OpenID Connect server.
 
 [#int]
-== IBM WebSphere Open Liberty Introspection: 
+== Open Liberty Introspection
  
-IBM WebSphere Open Liberty version 19.0.0.8 adds new introspectors called the Overlay Cache Introspector and the Zip Cache Introspector.
+When diagnosing problems with a server, the link:https://openliberty.io/docs/ref/command/#server-dump.html[server dump] command can be run to obtain information about server configuration, log information, and deployed applications. The command generates a zip archive and Open Liberty 19.0.0.8 introduces two new introspectors to display the data of active root containers on an Open Liberty server process.
+
+Although the `server dump` command can run on servers that have been stopped or are running, introspector output is produced as a step of running a `server dump` on a running server only. 
 
 [#over]
-=== The Overlay Cache Introspector
+=== Overlay Cache Introspector
 
 The new overlay cache introspector is used to display the active root containers and to display the particular data which has been associated with each container. The viewing archive activity is useful for these purposes:
 
 1. To see what root containers are active within the Open Liberty process.
-
 2. To see the on-disk locations of each of the containers.
-
 3. To obtain a better understanding of typical data which is generated by Open Liberty when starting an application module.
 
-Open Liberty manages application content by creating an "Overlay container" for each of the root locations of the application.  An "Overlay Cache" is associated with each of the root containers.
+Open Liberty manages application content by creating an overlay container for each of the root locations of the application.  An overlay cache is associated with each of the root containers.
 
-The associated overlay cache is a two layer dictionary which is used to associate data with the container.  Keys for the first tier are relative paths while keys for the second tier are type names. The overlay cache is used as a mechanism to simplify sharing application related data within the Liberty Application Server.  Sharing a single overlay container replaces sharing many different data items.
+The associated overlay cache is a two layer dictionary. Keys for the first tier are relative paths while keys for the second tier are type names. The overlay cache is used as a mechanism to simplify sharing application related data within the Liberty Application Server.  Sharing a single overlay container replaces sharing many different data items.
 
-The overlay cache introspector runs automatically when using the server dump command and use of the server dump command requires a running Open Liberty server. The overlay container introspector output is written to the standard server dump archive as entry to "OverlayContainerIntrospector.txt".
+The overlay container introspector output is written to the standard server dump archive as entry to `OverlayContainerIntrospector.txt`. To create the output, use the following commands:
 
-To create the output, use the following commands:
+Start the server:
 [source]
 ----
->> server start <serverName>
->> Starting server <serverName>
->> Server <serverName> started.
-
->> server dump <serverName>
->> Dumping server <serverName>
->> Server <serverName> dump complete in <serverHome>\<serverName>.dump-<timestamp>.zip.
-
+server start <serverName>
+----
+When the server has started, create the dump file:
+[source]
+----
+server dump <serverName>
 ----
 
-Each use of the server dump command creates a server dump zip file which has a name based on the server name and which includes a timestamp in the name.
+Each use of the `server dump` command creates a server dump ZIP file which has a name based on the server name and which includes a timestamp in the name.
 
 The overlay cache introspector output has three sections.
 
-1. Title and Timestamp
-2. Listing of Overlay Containers
-3. Cache Data for Each Overlay Container 
+1. Title and timestamp
++
+The descripton of the introspector and overlay container diagnostics are displayed.
++
+2. Listing of overlay containers
++
+The currently active overlay containers and two containers for each of them, both displayed with a list of URL's. The two containers and referred to as "Base" and "File" which provide the main and additional storage for the overlay container respectively. 
++
+3. Cache Data for each overlay container 
++
+The list of active overlay containers and the contents of their overlay cache is displayed. 
++
 
 
 [#zip]
-=== The Zip Cache Introspctor
+=== Zip Cache Introspector
 
-The new zip cache introspector is used primarily to obtain a view of archive activity within an Open Liberty server process. The viewing archive activity is useful for a number of purposes:
+The new zip cache introspector is used primarily to obtain a view of archive activity within an Open Liberty server process which is useful for a number of purposes:
 
-1. To understand the basic flow of archive file activity within a Libery server.
-
+1. To understand the basic flow of archive file activity within a Liberty server.
 2. To detect exceptional archive activity, for example, a pattern of frequent opens and closes of archives, or, when an extremely large number of archives are being opened.
-
 3. To tell if application archives are held open by the Open Liberty process.  This is useful for cases where dynamic updates to application files are blocked because the files are locked.
-
 4. To verify the health of the zip cache layer.  For example, to make sure the zip reaper thread (see below) is running and has been closing zip files at scheduled times.
-
 5. To diagnose the effectiveness of particular zip cache settings.
 
-The Zip Cache introspector is run automatically when using the server dump command and use of the server dump command requires a running Open Liberty server:
-
-Introspector output is written to the standard server dump archive as entry to "ZipCachingIntrospector.txt".
+Introspector output is written to the standard server dump archive as entry to `ZipCachingIntrospector.txt`.
 
 Use the following commands to create the output:
+Start the server:
 [source]
 ----
->> server start <serverName>
->> Starting server <serverName>
->> Server <serverName> started.
-
->> server dump <serverName>
->> Dumping server <serverName>
->> Server <serverName> dump complete in <serverHome>\<serverName>.dump-<timestamp>.zip.
+server start <serverName>
 ----
-Each use of the server dump command creates a server dump zip file which has a name based on the server name and which includes a timestamp in the name.
+When the server has started, create the dump file:
+[source]
+----
+server dump <serverName>
+----
+Each use of the `server dump` command creates a `server dump` ZIP file which has a name based on the server name and timestamp.
 
 The zip cache introspector output contains the following five sections:
 
 1. Title and time stamp
++
+The introspector description is displayed with the time and date that the output was created.
++
 2. List of properties used to configure the zip caching layer
++
+These properties are configuarable as JVM options and in most cases, should be set to their default values.
++
 3. List of active and recently used zip file handles
++
+The key value for the zip file handles is the full absolute path to an archive file. Information about the cached entries is displayed for each of the file handles.
++
 4. Top level state of the zip file cache layer
++
+The main function of the cache layer is to delay closing zip files so re-opening zip files that have recently been opened is prevented. The reaper is the thread which eventually closes the zip files and the top level state shows whether the reaper is active, shows the initial, final, and current times of the reaper and includes information about the two threads used by the reaper.
++
 5. Data for all managed zip files
-* https://github.com/eclipse/microprofile-context-propagation/releases[Context Propagation 1.0 specification]
-
++
+This data is displayed in four listings: all active and pending zip files, pending zip files which have a short expiration, pending zip files which have a long expiration and lastly, zip files which were recently closed but which have not yet been removed from the cache.
++
