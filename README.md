@@ -21,6 +21,14 @@ Fork this repository and write your blog post. Create a pull request with the co
 
 Once approved (ask `lauracowen`, or `NottyCode` as backup, to review/approve your PR), the blog post will be moved from `drafts` to `publish`.
 
+### Adding tags to your blog post
+
+If you would like to add tags to your post, please open a pull request with your edits to [blog_tags.json](https://github.com/OpenLiberty/openliberty.io/blob/master/src/main/content/blog_tags.json). You simply need to add the title of your post (without the date and file extension) to the `posts` array under the tags you want to use. (For example, if the file name is 2019-08-15-blog-post.adoc, you would just add `"blog-post"`).
+
+You can request a review from `ellenwyllie` or `steven1046` if you are unsure who to ask.
+
+
+
 ### Blog posts with multiple authors
 
 If you would like to publish a blog post with more than 1 author, you can add the ```additional_authors``` attribute to the liquid front matter. Any number of additional authors can be specified using the following format:
