@@ -11,7 +11,7 @@ blog_description:
 = MicroProfile Context Propogation on Open Liberty 19.0.0.8
 Yasmin Aumeeruddy <https://github.com/yasmin-aumeeruddy>
 
-Open Liberty 19.0.0.8 introduces MicroProfile Context Propagation which allows creation of completion stages that run with predictable thread context regardless of which thread the completion stage action ends up running on. Open Liberty 19.0.0.8 also provides the feature, OpenID Connect Server, to delegate user authentication to an external security provider. Two new introspectors have also been introduced along with support for encryption of connectionProperties SSL passwords.
+MicroProfile Context Propagation enhances the concurrency capabilities of Java SE and Java EE by providing context awareness between concurrent tasks, which improves consistency and visibility across an application. Open Liberty 19.0.0.8 also provides the feature, OpenID Connect Server, to delegate user authentication to an external security provider. Two new introspectors have also been introduced along with support for encryption of connectionProperties SSL passwords.
  
 Give it a try in link:/about/[Open Liberty] 19.0.0.8.
 
@@ -20,11 +20,11 @@ In Open Liberty 19.0.0.8:
 
 
 * <<mcp1, MicroProfile Context Propagation 1.0>>
-* <<ocs, OpenID Connect Server>>
-* <<int, Open Liberty introspection>>
-** <<over, The Overlay Cache introspector>>
-** <<zip, The zip Cache introspector>>
+* <<int, Obtaining server information from server dumps>>
+** <<over, Overlay cache introspector>>
+** <<zip, Zip cache introspector>>
 * <<ssl, Oracle SSL properties encryption support>>
+* <<ocs, OpenID Connect Server>>
 
 If you're curious about what's coming in future Open Liberty releases, take a look at our <<previews,previews in the latest development builds>>. In particular, get an early insight into MicroProfile Reactive Messaging.
 
@@ -67,7 +67,7 @@ image::/img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="cen
 [#mcp1]
 == MicroProfile Context Propagation 1.0
 
-MicroProfile Context Propagation allows you to create pipelines of dependent stages that run with predictable thread context regardless of which thread the completion stage action ends up running on.
+MicroProfile Context Propagation enhances the concurrency capabilities of Java SE and Java EE by providing context awareness between concurrent tasks, which improves consistency and visibility across an application. It allows you to create pipelines of dependent stages that run with predictable thread context regardless of which thread the completion stage action ends up running on.
 
 MicroProfile Context Propagation provides completion stages that run with predictable thread context and also benefit from being backed by the link:https://openliberty.io/blog/2019/04/03/liberty-threadpool-autotuning.html[automatically-tuned Liberty global thread pool]. Configuration of concurrency constraints and context propagation is possible programmatically with a fluent builder pattern where configuration defaults can be specified via MicroProfile Config.
 
@@ -84,7 +84,6 @@ Example in `server.xml`:
 
 Example usage of programmatic builders:
 [source,java]
-
 ----
 import org.eclipse.microprofile.context.ManagedExecutor;
 import org.eclipse.microprofile.context.ThreadContext;
@@ -154,11 +153,99 @@ CompletableFuture<Integer> stage = executor
         }
     });
 ----
+
 For more information:
 
+//* Add link to doc topic when published.
 * link:https://openliberty.io/docs/ref/microprofile/3.0/#package=org/eclipse/microprofile/context/package-frame.html&class=org/eclipse/microprofile/context/package-summary.html[JavaDoc API]
 * link:https://github.com/eclipse/microprofile-context-propagation/releases/tag/1.0[Spec binaries and Maven coordinates]
 * https://github.com/eclipse/microprofile-context-propagation/releases[Context Propagation 1.0 specification]
+
+
+//
+
+[#int]
+== Obtaining server information from server dumps
+ 
+When diagnosing problems with a server, the link:https://openliberty.io/docs/ref/command/#server-dump.html[server dump] command can be run to obtain information about server configuration, log information, and deployed applications. The command generates a zip archive and Open Liberty 19.0.0.8 introduces two new introspectors to display the data of active root containers on an Open Liberty server process.
+
+Although the `server dump` command can run on servers that have been stopped or are running, introspector output is produced as a step of running a `server dump` on a running server only. 
+
+To create the output, start the server:
+
+[source]
+----
+server start <serverName>
+----
+
+When the server has started, create the dump file:
+
+[source]
+----
+server dump <serverName>
+----
+
+Each use of the `server dump` command creates a server dump `.zip` file which has a name based on the server name and a timestamp. The overlay cache introspector output is written to the standard server dump archive in `OverlayContainerIntrospector.txt`. The zip cache introspector output is written to the standard server dump archive in `ZipCachingIntrospector.txt`.
+
+[#over]
+=== Overlay cache introspector
+
+The new overlay cache introspector is used to display the active root containers and to display the particular data which has been associated with each container. The viewing archive activity is useful for these purposes:
+
+1. To see what root containers are active within the Open Liberty process.
+2. To see the on-disk locations of each of the containers.
+3. To obtain a better understanding of typical data which is generated by Open Liberty when starting an application module.
+
+Open Liberty manages application content by creating an overlay container for each of the root locations of the application.  An overlay cache is associated with each of the root containers.
+
+The associated overlay cache is a two-layer dictionary. Keys for the first tier are relative paths while keys for the second tier are type names. The overlay cache is used as a mechanism to simplify sharing application related data within the Liberty Application Server.  Sharing a single overlay container replaces sharing many different data items.
+
+The Liberty server process constructs overlay containers for the archives and root directories of applications currently in use by the server. The overlay container introspector displays information about these overlay containers. For each overlay container, the introspector outputs two lists of URLs of the container and outputs a list of data associated with the container. Overlay container URLs are presented in two lists: a first list, labelled `Base`, shows the original on-disk locations which are mapped to the container; a second list, labelled `File`, shows the on-disk locations of files added to the container.
+
+
+[#zip]
+=== Zip cache introspector
+
+The new zip cache introspector is used primarily to obtain a view of archive activity within an Open Liberty server process which is useful for a number of purposes:
+
+1. To understand the basic flow of archive file activity within a Liberty server.
+2. To detect exceptional archive activity, for example, a pattern of frequent opens and closes of archives, or, when an extremely large number of archives are being opened.
+3. To tell if application archives are held open by the Open Liberty process.  This is useful for cases where dynamic updates to application files are blocked because the files are locked.
+4. To verify the health of the zip cache layer.  For example, to make sure the zip reaper thread (see below) is running and has been closing zip files at scheduled times.
+5. To diagnose the effectiveness of particular zip cache settings.
+
+The zip cache introspector output has several sections. Key sections are a listing of the properties which were used to configure the zip caching layer, a listing of all active and recently used zip file handles and listing of detailed state information. This includes details on whether the zip file which underlies the handle is open, open but pending close, or closed.
+​
+
+The "open but pending close" state is a new state used by the zip caching layer to delay requests to close zip files by a short interval.  The delay decreases the chance of repeatedly closing and re-opening the same zip file in a short period of time. A zip file handle in this state has an expiration time, after which the zip file is allowed to close if there is no new activity on the zip file handle.
+
+
+
+//
+
+[#ssl]
+== Oracle SSL properties encryption support
+
+Oracle users can set JDBC driver connection properties in the `connectionProperties` configuration element of `server.xml`. Those connection properties include `javax.net.sslKeyStorePassword` and `javax.net.sslTrustStorePassword` whose values are passwords. Until now, unlike many other config elements containing passwords, you could not encrypt these values and they had to be in clear text. From 19.0.0.8, you can encrypt those values and Open Liberty decrypts them before sending them to the Oracle JDBC driver. Passwords can be encrypted using the `encode` option of the Open Liberty `securityUtility` script in the `${wlp.install.dir}/bin` directory.
+
+Example prior to 19.0.0.8:
+[source]
+----
+<properties.oracle URL="jdbc:oracle:thin:@//...” connectionProperties="oracle.net.ssl_version=1.2;javax.net.ssl.keyStore=path-to-keystore/keystore.p12;javax.net.ssl.keyStorePassword=WooHoo; javax.net.ssl.trustStore= path-to-keystore/keystore.p12;javax.net.ssl.trustStorePassword=password”/>
+----
+
+Example after 19.0.0.8:
+[source]
+----
+<properties.oracle URL="jdbc:oracle:thin:@//...” connectionProperties="oracle.net.ssl_version=1.2;javax.net.ssl.keyStore=path-to-keystore/keystore.p12;javax.net.ssl.keyStorePassword={xor}CDAwFzAw; javax.net.ssl.trustStore= path-to-keystore/keystore.p12;javax.net.ssl.trustStorePassword={aes}AAbk9iEIjV06JSZMTpsW+6B+TjN+XjB2bs8hii2uZuMu"/>
+----
+
+No more clear text SSL keystone passwords! We added this SSL encryption support because link:https//www.ibm.com/developerworks/rfe/execute?use_case=viewChangeRequest&CR_ID=133168[you requested it].
+
+For more details about encrypting passwords for Liberty, see this link:https://www.ibm.com/support/knowledgecenter/en/SSD28V_liberty/com.ibm.websphere.wlp.core.doc/ae/rwlp_command_securityutil.html[Knowledge Center doc].
+
+
+//
 
 [#ocs]
 == OpenID Connect Server
@@ -257,95 +344,8 @@ To try it out, start the server and log in as `admin`, `adminpwd` at
 
 These tokens can be submitted to non-browser applications, which can in turn use them when accessing secured resources on servers configured to accept access tokens from the OpenID Connect server.
 
-[#int]
-== Open Liberty Introspection
- 
-When diagnosing problems with a server, the link:https://openliberty.io/docs/ref/command/#server-dump.html[server dump] command can be run to obtain information about server configuration, log information, and deployed applications. The command generates a zip archive and Open Liberty 19.0.0.8 introduces two new introspectors to display the data of active root containers on an Open Liberty server process.
+//
 
-Although the `server dump` command can run on servers that have been stopped or are running, introspector output is produced as a step of running a `server dump` on a running server only. 
-
-[#over]
-=== Overlay Cache Introspector
-
-The new overlay cache introspector is used to display the active root containers and to display the particular data which has been associated with each container. The viewing archive activity is useful for these purposes:
-
-1. To see what root containers are active within the Open Liberty process.
-2. To see the on-disk locations of each of the containers.
-3. To obtain a better understanding of typical data which is generated by Open Liberty when starting an application module.
-
-Open Liberty manages application content by creating an overlay container for each of the root locations of the application.  An overlay cache is associated with each of the root containers.
-
-The associated overlay cache is a two layer dictionary. Keys for the first tier are relative paths while keys for the second tier are type names. The overlay cache is used as a mechanism to simplify sharing application related data within the Liberty Application Server.  Sharing a single overlay container replaces sharing many different data items.
-
-The overlay container introspector output is written to the standard server dump archive as entry to `OverlayContainerIntrospector.txt`. To create the output, use the following commands:
-
-Start the server:
-[source]
-----
-server start <serverName>
-----
-When the server has started, create the dump file:
-[source]
-----
-server dump <serverName>
-----
-
-Each use of the `server dump` command creates a server dump .zip file which has a name based on the server name and which includes a timestamp in the name.
-
-The Liberty Server process constructs overlay containers for the archives and root directories of applications currently in use by the server and the overlay Container Introspector displays information about these overlay containers. For each overlay container, the introspector outputs two lists of URLs of the container and outputs a list of data associated with the container. Overlay container URLs are presented in two lists: A first list, labelled "Base", shows the original on-disk locations which are mapped to the container; A second list, labelled "File", shows the on-disk locations of files added to the container.
-
-
-[#zip]
-=== Zip Cache Introspector
-
-The new zip cache introspector is used primarily to obtain a view of archive activity within an Open Liberty server process which is useful for a number of purposes:
-
-1. To understand the basic flow of archive file activity within a Liberty server.
-2. To detect exceptional archive activity, for example, a pattern of frequent opens and closes of archives, or, when an extremely large number of archives are being opened.
-3. To tell if application archives are held open by the Open Liberty process.  This is useful for cases where dynamic updates to application files are blocked because the files are locked.
-4. To verify the health of the zip cache layer.  For example, to make sure the zip reaper thread (see below) is running and has been closing zip files at scheduled times.
-5. To diagnose the effectiveness of particular zip cache settings.
-
-Introspector output is written to the standard server dump archive as entry to `ZipCachingIntrospector.txt`.
-
-Use the following commands to create the output:
-Start the server:
-[source]
-----
-server start <serverName>
-----
-When the server has started, create the dump file:
-[source]
-----
-server dump <serverName>
-----
-Each use of the `server dump` command creates a `server dump` ZIP file which has a name based on the server name and timestamp.
-
-The zip cache introspector output has several sections. Key sections are a listing of the properties which were used to configure the zip caching layer, a listing of all active and recently used zip file handles and listing of detailed state information. This includes details on whether the zip file which underlies the handle is open, open but pending close, or closed.
-​
-
-The "open but pending close" is a new state used by the zip caching layer to delay requests to close zip files by a short interval.  The delay decreases the chance of repeatedly closing and re-opening the same zip file in a short period of time. A zip file handle in this state has an expiration time, after which the zip file is allowed to close if there is no new activity on the zip file handle.
-
-[#ssl]
-== Oracle SSL properties encryption support
-
-Oracle users can set JDBC driver connection properties in the `connectionProperties` configuration element of `server.xml`. Those connection properties include `javax.net.sslKeyStorePassword` and `javax.net.sslTrustStorePassword` whose values are passwords. Until now, unlike many other config elements containing passwords, you could not encrypt these values and they had to be in clear text. From 19.0.0.8, you can encrypt those values and Open Liberty decrypts them before sending them to the Oracle JDBC driver. Passwords can be encrypted using the `encode` option of the Open Liberty `securityUtility` script in the `${wlp.install.dir}/bin` directory.
-
-Example prior to 19.0.0.8:
-[source]
-----
-<properties.oracle URL="jdbc:oracle:thin:@//...” connectionProperties="oracle.net.ssl_version=1.2;javax.net.ssl.keyStore=path-to-keystore/keystore.p12;javax.net.ssl.keyStorePassword=WooHoo; javax.net.ssl.trustStore= path-to-keystore/keystore.p12;javax.net.ssl.trustStorePassword=password”/>
-----
-
-Example after 19.0.0.8:
-[source]
-----
-<properties.oracle URL="jdbc:oracle:thin:@//...” connectionProperties="oracle.net.ssl_version=1.2;javax.net.ssl.keyStore=path-to-keystore/keystore.p12;javax.net.ssl.keyStorePassword={xor}CDAwFzAw; javax.net.ssl.trustStore= path-to-keystore/keystore.p12;javax.net.ssl.trustStorePassword={aes}AAbk9iEIjV06JSZMTpsW+6B+TjN+XjB2bs8hii2uZuMu"/>
-----
-
-No more clear text SSL keystone passwords! We added this SSL encryption support because link:https//www.ibm.com/developerworks/rfe/execute?use_case=viewChangeRequest&CR_ID=133168[you requested it].
-
-For more details about encrypting passwords for Liberty, see this link:https://www.ibm.com/support/knowledgecenter/en/SSD28V_liberty/com.ibm.websphere.wlp.core.doc/ae/rwlp_command_securityutil.html[Knowledge Center doc].
 
 - - -
 
