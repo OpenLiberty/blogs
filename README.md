@@ -28,7 +28,6 @@ If you would like to add tags to your post, please open a pull request with your
 You can request a review from `ellenwyllie` or `steven1046` if you are unsure who to ask.
 
 
-
 ### Blog posts with multiple authors
 
 If you would like to publish a blog post with more than 1 author, you can add the ```additional_authors``` attribute to the liquid front matter. Any number of additional authors can be specified using the following format:
