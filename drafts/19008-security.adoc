@@ -1,46 +1,89 @@
 ---
 layout: post
-title: "Securing Open Liberty apps and microservices with OpenID Connect and JWT"
+title: "Securing Open Liberty apps and microservices"
 categories: blog
 author_picture: https://avatars3.githubusercontent.com/u/28316667
 author_github: https://github.com/brutif
-seo-title: Securing Open Liberty apps and microservices with OpenID Connect and JWT - OpenLiberty.io
-seo-description: A look at the OpenID Connect, SAML and Json Web Token security features in Open Liberty, and an example of using some of them to secure microservices.
-blog_description: "A look at the OpenID Connect, SAML and Json Web Token security features in Open Liberty, and an example of using some of them to secure microservices."
+seo-title: Securing Open Liberty apps and microservices - OpenLiberty.io
+seo-description: A look at some of the Open Liberty features for securing microservices.
+blog_description: "A look at some of the Open Liberty features for securing microservices."
 ---
-== preamble (to be removed)
-Laura, this looks pretty good.  I want to explain a few edits here.  Later on, I'll update the example and 
-remove this section.
+== preamble (to be removed )
+Hi Laura,  your edits look pretty good, I'd like to explain a few changes here,
+then later on I'll update the sample configs and delete this.
+
+* Delegating authen and authorization - removed authorization.
+
+Authorization decisions aren't delegated, they're still performed locally.  The remote provider
+authenticates the user (this is bruce not laura), and might return some notion of group membership
+(bruce is a dev, laura is a dev and an admin), but any decision about what group memberships mean
+to access a secured app (i.e. admins can update, devs can't)  is still a local decision.  Most of the social
+media logins can't convey group membership at all,  all they can do is say "you're bruce".
+
+* Users can log in to the applications  --> users can log in
+
+While application-level login security can be done, it's complex and uncommon. 
+Usually login security is at the server level, and the authenticated user's id and groups are
+used for all apps across the server.  It is possible though, to do something like "app a logs
+in with facebook, b with github, c with ldap"  but that's far off the happy path. 
+
+* Open Liberty provides the Social Login... even --> also  
+
+making them write their own integration isn't something to be excited about.  I pondered replacing
+integration with configuration, since all they're doing is tweaking server.xml, but left it for now.
+
+based --> largely based  - Based suggests that it contains all the 
+capabilities of openidconnect client, which it does not. But they do share a common core.
+
+* Consuming Json Web Tokens 
+
+Removed: After the user has logged in (e.g. using their social media credentials), the JWT provider (e.g. Facebook) builds a token that the application can pass in an HTTP header to other microservices to authorize requests. The MicroProfile JWT feature implements the MicroProfile JWT 1.1 specification.
+
+Added: Authenticating with an OpenID Connect provider such as Google provides a JWT that can be used in this way. 
+
+Most social media providers use Oauth.  They don't produce a JWT. We should chat about how OAuth works sometime.
+Only OpenID Connect providers produce a jwt.  I think I can 
+do the example with Google though, which is the one social media provider using OpenID.
+
+* Configuring Open Liberty as a provider
+
+Removed: or to configure a database.  It doesn't configure the database, it requires a database to be configured for it.
+That's an impl detail we can probably just leave out of the blog.
+
+or other security provider  --> or delegate authentication to another security provider.  A security nit here, delegation is 
+a formal term and it needs to be said that this is what is being done. 
+
+Developers can also configure applications  --> they're configuring the server, not the apps. I moved this up to "delegating..."
 
 
--- end preamble
+== end preamble
 
-= Securing Open Liberty apps and microservices with OpenID Connect and JWT
+
+
+
+= Securing Open Liberty apps and microservices
 Bruce Tiffany <https://github.com/brutif>
 
 Open Liberty now includes more security features to enable you to secure your apps with external security providers. Let's take a quick look at why and how to use some of these features.
 
-== Options for securing apps and microservices on Open Liberty
-Using any of the features that delegate user authentication to an external security provider can offer several advantages. 
-It ensures that the secured app never sees the user's password. It relieves developers and administrators of the effort of managing user accounts. In addition, it can provide a single sign-on experience to users that enables them to log in once for all secured apps that they use.
+== Delegating authentication
+Delegating user authentication to an external security provider can offer several advantages: it ensures that the secured app never sees the user's password; it relieves developers and administrators of the effort of managing user accounts; it can provide a single sign-on experience to users that enables them to log in once for all secured apps that they use.
 
-Open Liberty also supports Json Web Tokens (JWT), which are identity credentials with a standardized format that can be exchanged between processes. They're secured against tampering by use of digital signatures.  These tokens can be submitted to downstream secured microservices to propagate identity in an efficient, self-contained way.  
+Open Liberty provides the Social Login (`socialLogin-1.0`) feature which developers can use to delegate authentication of their applications to external providers. Users can log in using their existing social media credentials from providers such as Facebook, Twitter, GitHub, and others. Developers can also write integrations for other social media providers that are not included by default. App developers just need to register the app with one or more of these providers and add a few lines to `server.xml` to secure the app. The Social Login feature is an OpenID Connect client (largely based on the `openidConnectClient-1.0` feature which can alternatively be used), and is certified by the OpenID Foundation as a Basic RP (Relying Party).
 
-== Some of the security features provided by Open Liberty
+Open Liberty also supplies the `samlWeb-2.0` feature for authenticating with a SAML security provider, and the `spnego-1.0` feature
+for authenticating with Microsoft Active Directory. 
 
-`socialLogin-1.0`:: An OAuth and OpenID Connect client that offers pre-defined configurations for authenticating with social media providers such as Facebook, Twitter, Github, LinkedIn and Google, and generic configurations for use with others.  Register your app with one or more of these providers and add a few lines to server.xml to secure your apps by logging in with them.  Certified by the OpenID Foundation as a Basic RP (Relying Party). 
-+
-`openidConnectClient-1.0`:: A general purpose OpenID Connect client for use with an OpenID Connect provider.  A wide range of configuration options allows this to work with many common providers. Certified by the OpenID Foundation as a Basic RP (Relying Party).
-+
-`openidConnectServer-1.0`:: An OpenID Connect provider.  Configure this to work with a directly with a user registry such as LDAP, or configure it for delegating to some other security provider, and configure a database. Then it can manage user authentication and issue JWTs for use by OpenID Connect clients and microservices.
-+
-`mpJwt-1.1`:: Secures apps / microservices by requiring a JWT in an HTTP header for authentication. It implements the MicroProfile JWT 1.1 specification.
-+
-`jwt-1.0`:: Provides an API for building and consuming Json Web Tokens.  If you don't want to use an OpenID Connect provider, you can use this to easily build your own JWT's for use with microservices.
-+
-`samlWeb-2.0`:: A SAML client for use with a SAML identity provider.
-+
-`spnego-1.0`:: A Spnego client for use with Microsoft domain controllers.
+== Consuming Json Web Tokens (JWT)
+Developers can use the MicroProfile JWT (`mpjwt-1.1`) feature to consume JWT tokens so that apps and individual microservices can make requests to other microservices on behalf of the logged in user. JWTs are identity credentials with a standardized format that can be exchanged between processes. They're secured against tampering by use of digital signatures.  These tokens can be submitted to downstream secured microservices to propagate identity in an efficient, self-contained way.  Authenticating with an OpenID Connect provider such as Google provides a JWT that can be used in this way. 
+
+Developers can also build and consume their own JWTs using an API with the JWT (`jwt-1.0`) feature. This enables them to build JWTs for use with microservices without using an OpenID Connect provider.
+
+
+== Configuring Open Liberty as a provider
+It is also possible to configure Open Liberty as a provider for some or all of these services. The OpenID Connect Server (`openidConnectServer-1.0`) feature can be configured to manage user authentication and to issue JWTs for use by OpenID Connect clients and microservices. The OpenID Connect Server can work directly with a user registry such as LDAP or to delegate to another security provider.
+
+//
 
 == Example: Using OpenID Connect and JWTs to authenticate users and secure microservices:
 
