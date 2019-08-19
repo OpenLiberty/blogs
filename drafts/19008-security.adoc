@@ -8,57 +8,6 @@ seo-title: Securing Open Liberty apps and microservices - OpenLiberty.io
 seo-description: A look at some of the Open Liberty features for securing microservices.
 blog_description: "A look at some of the Open Liberty features for securing microservices."
 ---
-== preamble (to be removed )
-Your edits look pretty good, I'd like to explain a few changes here,
-then later on I'll update the sample configs and delete this.
-
-* Delegating authen and authorization - removed authorization.
-
-Authorization decisions aren't delegated, they're still performed locally.  The remote provider
-authenticates the user (this is bruce not laura), and might return some notion of group membership
-(bruce is a dev, laura is a dev and an admin), but any decision about what group memberships mean
-to access a secured app (i.e. admins can update, devs can't)  is still a local decision.  Most of the social
-media logins can't convey group membership at all,  all they can do is say "you're bruce".
-
-* Users can log in to the applications  --> users can log in
-
-While application-level login security can be done, it's complex and uncommon. 
-Usually login security is at the server level, and the authenticated user's id and groups are
-used for all apps across the server.  It is possible though, to do something like "app a logs
-in with facebook, b with github, c with ldap"  but that's far off the happy path. 
-
-* Open Liberty provides the Social Login... even --> also  
-
-making them write their own integration isn't something to be excited about.  I pondered replacing
-integration with configuration, since all they're doing is tweaking server.xml, but left it for now.
-
-based --> largely based  - Based suggests that it contains all the 
-capabilities of openidconnect client, which it does not. But they do share a common core.
-
-* Consuming Json Web Tokens 
-
-Removed: After the user has logged in (e.g. using their social media credentials), the JWT provider (e.g. Facebook) builds a token that the application can pass in an HTTP header to other microservices to authorize requests. The MicroProfile JWT feature implements the MicroProfile JWT 1.1 specification.
-
-Added: Authenticating with an OpenID Connect provider such as Google provides a JWT that can be used in this way. 
-
-Most social media providers use Oauth.  They don't produce a JWT. We should chat about how OAuth works sometime.
-Only OpenID Connect providers produce a jwt.  I think I can 
-do the example with Google though, which is the one social media provider using OpenID.
-
-* Configuring Open Liberty as a provider
-
-Removed: or to configure a database.  It doesn't configure the database, it requires a database to be configured for it.
-That's an impl detail we can probably just leave out of the blog.
-
-or other security provider  --> or delegate authentication to another security provider.  A security nit here, delegation is 
-a formal term and it needs to be said that this is what is being done. 
-
-Developers can also configure applications  --> they're configuring the server, not the apps. I moved this up to "delegating..."
-
-
-== end preamble
-
-
 
 
 = Securing Open Liberty apps and microservices
@@ -69,68 +18,93 @@ Open Liberty now includes more security features to enable you to secure your ap
 == Delegating authentication
 Delegating user authentication to an external security provider can offer several advantages: it ensures that the secured app never sees the user's password; it relieves developers and administrators of the effort of managing user accounts; it can provide a single sign-on experience to users that enables them to log in once for all secured apps that they use.
 
-Open Liberty provides the Social Login (`socialLogin-1.0`) feature which developers can use to delegate authentication  to external providers. Users can log in using their existing social media credentials from providers such as Facebook, Twitter, GitHub, and others. Developers can also write integrations for other social media providers that are not included by default. App developers just need to register the app with one or more of these providers and add a few lines to `server.xml` to secure the app. The Social Login feature is an OpenID Connect client (largely based on the `openidConnectClient-1.0` feature which can alternatively be used), and is certified by the OpenID Foundation as a Basic RP (Relying Party).
+Open Liberty provides the Social Login (`socialLogin-1.0`) feature which developers can use to delegate authentication to external providers. Users can log in using their existing social media credentials from providers such as Facebook, Twitter, GitHub, and others. Developers can also customize configurations for other social media providers that are not included by default. App developers just need to register the app with one or more of these providers and add a few lines to `server.xml` to secure the app. The Social Login feature is an OpenID Connect client (largely based on the `openidConnectClient-1.0` feature which can alternatively be used), and is certified by the OpenID Foundation as a Basic RP (Relying Party).
 
 Open Liberty also supplies the `samlWeb-2.0` feature for authenticating with a SAML security provider, and the `spnego-1.0` feature
 for authenticating with Microsoft Active Directory. 
 
 == Consuming Json Web Tokens (JWT)
-Developers can use the MicroProfile JWT (`mpjwt-1.1`) feature to consume JWT tokens so that apps and individual microservices can make requests to other microservices on behalf of the logged in user. JWTs are identity credentials with a standardized format that can be exchanged between processes. They're secured against tampering by use of digital signatures.  These tokens can be submitted to downstream secured microservices to propagate identity in an efficient, self-contained way.  Authenticating with an OpenID Connect provider such as Google provides a JWT that can be used in this way. 
+Developers can use the MicroProfile JWT (`mpjwt-1.1`) feature to consume JWT tokens so that apps and individual microservices can make requests to other microservices on behalf of the logged in user. JWTs are identity credentials with a standardized format that can be exchanged between processes. They're secured against tampering by use of digital signatures.  These tokens can be submitted to downstream secured microservices to propagate identity in an efficient, self-contained way.  
 
-Developers can also build and consume their own JWTs using an API with the JWT (`jwt-1.0`) feature. This enables them to build JWTs for use with microservices without using an OpenID Connect provider.
-
+Developers can build and consume their own JWTs using an API with the JWT (`jwt-1.0`) feature. This enables them to build JWTs for use with microservices. 
 
 == Configuring Open Liberty as a provider
-It is also possible to configure Open Liberty as a provider for some or all of these services. The OpenID Connect Server (`openidConnectServer-1.0`) feature can be configured to manage user authentication and to issue JWTs for use by OpenID Connect clients and microservices. The OpenID Connect Server can work directly with a user registry such as LDAP or to delegate to another security provider.
+It is also possible to configure Open Liberty as an OpenID Connect provider. The OpenID Connect Server (`openidConnectServer-1.0`) feature can be configured to manage user authentication and to issue JWTs for use by OpenID Connect clients and microservices. The OpenID Connect Server can work directly with a user registry such as LDAP or delegate to another security provider.
 
 //
 
 == Example: Using OpenID Connect and JWTs to authenticate users and secure microservices:
 
-The following sample code and configurations use three servers to demonstrate authenticating a user and accessing a secured microservice using a JWT. The three pieces of this are:
+The following sample code and configurations use two servers to demonstrate authenticating a user, building a JWT and accessing a secured microservice using that JWT. The pieces of this are:
 
-* A server called `oidc_client` with the OpenID Connect Client feature (`openIdConnectClient-1.0`) hosts a servlet app secured with OpenID Connect.  
+* A server called `oidc_client` with the Social Login feature (`socialLogin-1.0`) hosts a servlet app secured with OpenID Connect. Google is the designated security provider.  
 +
 * A server called `microservice` with the MicroProfile JWT feature (`mpJwt-1.1`) hosts a JAX-RS microservice that is secured with MicroProfile JWT.
-+
-* A server called `oidc_provider` with the OpenID Connect Server feature (`openidConnectServer-1.0`) provides user authentication for the OpenID Connect client.
 
-When a user attempts to access the servlet, their browser is redirected to the OpenID Connect Provider for them to enter their ID and password.  Upon success, the browser gets redirected back to the client with an authorization code.  The client then contacts the provider, obtains a JWT access token, then uses it to create an authenticated user on the client, which then gets access to the servlet.
+An application was first registered with Google, which then supplied the client ID and client secret used in server.xml.
+(Registration instructions are [here](https://developers.google.com/identity/protocols/OAuth2)).
 
-The servlet then makes a REST call to the microservice.  REST clients can be configured to automatically propagate an access token if they have one, so the JWT access token gets sent along in the request. The microservice server is configured to trust JWTs issued by the provider, so it grants access to the JAX-RS service.
+The public certificates from Google were added to the client, and exchanged between client and microservice as described [here](https://www.ibm.com/support/knowledgecenter/SSEQTP_liberty/com.ibm.websphere.wlp.doc/ae/twlp_add_trust_cert.html) 
 
-Requesting servlet (note the JAX-RS client property to propagate the JWT):
+When a user attempts to access the servlet, their browser is redirected to Google for them to enter their ID and password.  Upon success, the browser gets redirected back to the client with an authorization code.  The client then contacts the provider (Google) on a back channel, obtains an access token, then uses it to create an authenticated user on the client, which then gets access to the servlet.
+
+The servlet then creates a JWT and makes a REST call to the microservice.  The JWT gets sent along in an HTTP header. The microservice server is configured to trust JWTs issued by oidc_client, so it grants access to the JAX-RS service.
+
+Requesting servlet:
 [source,java]
 ----
 @WebServlet("/")
-@ServletSecurity(value = @HttpConstraint(rolesAllowed= {"All Role"})) // <=== matches role defined in server.xml
+@ServletSecurity(value = @HttpConstraint(rolesAllowed= {"users"}))
 public class MyServlet extends HttpServlet {
-  private static final long serialVersionUID = 1L;
+    
     public MyServlet() {
         super();       
     }
-  protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-    javax.ws.rs.client.ClientBuilder cb = ClientBuilder.newBuilder();
-    PrintWriter pw = response.getWriter();
-    pw.append("Calling the jaxrs service...\n");
-    javax.ws.rs.client.Client c = cb.build();
-    String res = null;
-    try {
-      res = c.target("https://localhost:39443/jaxrshello")
-        .property("com.ibm.ws.jaxrs.client.oauth.sendToken","true")  // <=== propagates the JWT
-        .path("/hello").request().get(String.class);
-    } catch (Exception e) {
-        res = "[Error]:" + e.toString();
-    } finally {
-         c.close();        
-    }  
-    pw.append("The jaxrs service response is: "+ res);
-    pw.append("\n");
-    pw.flush();
-  }
-  protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {  
-    doGet(request, response);
-  }
+
+    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        PrintWriter pw = response.getWriter();
+        Principal principal = request.getUserPrincipal();
+        String jwt = null;
+         if (principal != null && principal.getName() != null) {
+             try {
+                jwt = buildJwt(principal.getName());
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+         }      
+        javax.ws.rs.client.ClientBuilder cb = ClientBuilder.newBuilder();
+        pw.append("Calling the jaxrs service and sending jwt...\n");
+        javax.ws.rs.client.Client c = cb.build();
+        String res = null;
+        try {
+            res = c.target("https://localhost:39443/jaxrshello")          
+            .path("/hello").request().header("Authorization", "Bearer " + jwt)
+            .get(String.class);
+        } catch (Exception e) {
+            res = "[Error]:" + e.toString();
+        } finally {
+            c.close();        
+        }  
+        pw.append("The jaxrs service response is: "+ res);
+        pw.append("\n");
+        pw.flush();
+    
+    }
+    
+    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {  
+        doGet(request, response);
+    }
+
+    // use jwt-1.0 feature to build jwt
+    private String buildJwt(String userName) throws Exception {
+        JwtBuilder builder = JwtBuilder.create("myBuilder")
+                .jwtId(true)
+                .claim(Claims.SUBJECT, userName)
+                .claim("upn", userName)
+                .claim("groups","users");
+               
+        return builder.buildJwt().compact();      
+    }
 }
 ----
 
@@ -143,7 +117,7 @@ public class JaxrsHelloApp extends Application {}
 
 [source,java]
 ----
-@RolesAllowed("users")  // <=== Specify the group claim from the JWT as the role here.
+@RolesAllowed("users")  // <=== A JWT group can be specified here, or a JEE security role.
 @Path("/hello")
 public class HelloService { 
     @Context
@@ -165,26 +139,31 @@ The oidc_client server configuration:
 ----
 <server description="oidc_client">
     <featureManager>
-        <feature>jaxrs-2.1</feature>
-        <feature>jsp-2.3</feature>
-        <feature>localConnector-1.0</feature>
-        <feature>openidConnectClient-1.0</feature>
-        <feature>transportSecurity-1.0</feature>
+        <feature>jaxrs-2.1</feature>       
+        <feature>localConnector-1.0</feature>        
+        <feature>appSecurity-2.0</feature>
+        <feature>socialLogin-1.0</feature>
+        <feature>jwt-1.0</feature>
     </featureManager>
+
     <httpEndpoint host="*" httpPort="19080" httpsPort="19443" id="defaultHttpEndpoint"/>
-    <keyStore id="defaultKeyStore" password="keyspass"/>  
-    <!-- configure OpenID connect to communicate with the OpenID Connect provider --> 
-    <openidConnectClient clientId="RP" clientSecret="thesecret" discoveryEndpointUrl="https://localhost:29443/oidc/endpoint/OP/.well-known/openid-configuration" id="RP" scope="openid profile email">
-    </openidConnectClient> 
-    <!-- "All Role" is used in the ServletSecurity annotation -->
+
+    <keyStore id="defaultKeyStore" password="keyspass"/>
+
+    <!-- add your client ID and secret from Google --> 
+    <googleLogin clientId="your_client_id_from_Google_goes_here" 
+        clientSecret="your_client_secret_from_Google_goes_here"/>
+
+    <jwtBuilder expiresInSeconds="600" id="myBuilder" issuer="https://example.com" keyAlias="default"/>
+
     <webApplication id="myservlet" location="myservlet.war" name="myservlet" type="war">
         <application-bnd>
-            <security-role name="All Role">
+            <security-role name="users">  
                 <special-subject type="ALL_AUTHENTICATED_USERS"/>
             </security-role>
         </application-bnd>
-    </webApplication>
-    
+    </webApplication>   
+   
     <applicationManager autoExpand="true"/>
     <applicationMonitor updateTrigger="mbean"/>
 </server>
@@ -193,8 +172,9 @@ The oidc_client server configuration:
 The mservice server configuration:
 [source,xml]
 ----
-<server description="microservice">
-    
+<server description="oidc demo mservice">
+
+    <!-- Enable features -->
     <featureManager>        
         <feature>transportSecurity-1.0</feature>
         <feature>jaxrs-2.1</feature>
@@ -202,144 +182,18 @@ The mservice server configuration:
         <feature>mpjwt-1.1</feature>
     </featureManager>
     
-    <!-- configure mpJwt to trust the OpenID Connect provider --> 
-    <mpJwt id="mympjwt" issuer="https://localhost:29443/oidc/endpoint/OP" 
-        jwksUri="https://localhost:29443/oidc/endpoint/OP/jwk"/>
-    <keyStore id="defaultKeyStore" password="keyspass"/>
+    <!-- configure mpjwt feature to trust jwts from oidc client --> 
+    <mpJwt id="mympjwt" issuer="https://example.com" 
+        jwksUri="https://localhost:19443/jwt/ibm/api/myBuilder/jwk"/>
+
+    <keyStore id="defaultKeyStore" password="keyspass"/>  
     
     <httpEndpoint httpPort="39080" httpsPort="39443" id="defaultHttpEndpoint"/>
      
     <applicationMonitor updateTrigger="mbean"/>
     <applicationManager autoExpand="true"/>
-    <webApplication id="jaxrshello" location="jaxrshello.war" name="jaxrshello"/>
-</server>
-----
 
-The oidc_provider server configuration:
-[source,xml]
-----
-<server description="oidc_provider">     
-   
-    <featureManager>      
-      <feature>openidConnectServer-1.0</feature> 
-      <!-- if this server will delegate authentication to another
-           provider, then one of the following features
-           could be needed:
-      -->
-      <!-- <feature>ldapRegistry-3.0</feature>-->
-      <!-- <feature>socialLogin-1.0</feature>-->
-      <!-- <feature>openidConectClient-1.0</feature> -->
-      <!-- <feature>samlWeb-2.0</feature> -->
-    </featureManager>
-    <httpEndpoint id="defaultHttpEndpoint"
-                  host="*"
-                  httpPort="29080"
-                  httpsPort="29443" />
-    <keyStore id="defaultKeyStore" password="keyspass" />  
-    <!-- Basic registry for test / development use.  
-         Comment this out if using LDAP or delegating to another 
-         Oauth or SAML provider. 
-    -->   
-    <basicRegistry id="basic" realm="customRealm">
-        <user
-          name="demouser"
-          password="demopassword" />
-        <user
-          name="demouser2"
-          password="demopassword2" />
-         <group name="users">
-             <member name="demouser"/>
-             <member name="demouser2" />
-        </group>
-    </basicRegistry>
-    <!-- LDAP example.  Customize and uncomment to use LDAP user authentication.
-         Comment out basic registry. 
-    -->
-    <!--
-    <ldapRegistry
-      id="ldap"
-      realm="SampleLdapIDSRealm"
-      host="oidcldap1.some.where.ibm.com"
-      port="389"
-      ignoreCase="true"
-      baseDN="o=ibm,c=us"
-      bindDN="cn=root"
-      bindPassword="rootpwd"
-      ldapType="IBM Tivoli Directory Server"
-      searchTimeout="8m" >
-      <idsFilters groupFilter="(&amp;(cn=%v)(|(objectclass=groupOfNames)(objectclass=groupOfUniqueNames)))"
-        groupIdMap="*:cn"
-        groupMemberIdMap="ibm-allGroups:member;ibm-allGroups:uniqueMember;groupOfNames:member;groupOfUniqueNames:uniqueMember"
-        id="TestLdap"
-        userFilter="(&amp;(uid=%v)(objectclass=ePerson))"
-        userIdMap="*:mail"/>
-      <failoverServers name="failoverLdapServers">
-        <server
-          host="nc049244.some.where.ibm.com"
-          port="389" />
-      </failoverServers>
-    </ldapRegistry>
-    -->   
-    
-    <openidConnectProvider id="OP" 
-        oauthProviderRef="OAuth" 
-        signatureAlgorithm="RS256" keyStoreRef="defaultKeyStore" 
-        jwkEnabled="false"
-    >
-    </openidConnectProvider>
-    
-    <oauthProvider id="OAuth" tokenFormat="mpjwt" >
-         <!-- 
-         localStore is for test / development use. 
-         When localStore is used, all client data and token status is held
-         in memory.  This server can only be a singleton when this is
-         used. Comment out localStore when using a database. 
-         --> 
-        <localStore>
-          <!-- When using a database, clients are not specified in server.xml.
-               Instead they are added to the database through the registration endpoint.
-          -->
-          <client displayname="RP" enabled="true"
-                name="RP" secret="thesecret" 
-                scope="openid profile email"
-                preAuthorizedScope="openid profile email"
-          >      
-                <redirect>https://localhost:19443/oidcclient/redirect/RP</redirect>
-          </client>    
-        </localStore>
-    <!-- uncomment below line when using a database -->
-    <!-- <databaseStore dataSourceRef="OIDC_DBDS4" /> -->
-    </oauthProvider>
-     
-    <!-- Users in the clientManager role can add/modify clients when using a
-         database by accessing the registration endpoint. 
-         When using a localStore, clients are added by editing server.xml,
-         and this can be commented out.
-    -->      
-    <oauth-roles>
-        <authenticated>
-            <special-subject type="ALL_AUTHENTICATED_USERS" />  
-        </authenticated>
-        <!--        
-        <clientManager>            
-            <user name="testuser" />
-            <group name="oidcadmin" />            
-        </clientManager>  
-        -->       
-    </oauth-roles>
-    <!-- sample database configuration -->
-    <!--
-    <dataSource id="OIDC_DBDS4" jdbcDriverRef="db2Driver" jndiName="jdbc/oauthProvider" containerAuthDataRef="OIDC_DBAuth4" >
-        <properties databaseName="oidcdb4" driverType="4" portNumber="60006" serverName="somedb.somedomain.ibm.com" />
-        <connectionManager maxPoolSize="250" minPoolSize="10" connectionTimeout="60s" />
-    </dataSource>
-    <jdbcDriver id="db2Driver">
-       <library>
-       <fileset dir="${wlp.user.dir}/shared/resources/db2jars/" includes="db2jcc4.jar db2jcc_license_cu.jar"/>
-       </library>
-    </jdbcDriver>
-    <authData id="OIDC_DBAuth4" user="dbuser" password="dbpassword" />
-    -->
+    <webApplication id="jaxrshello" location="jaxrshello.war" name="jaxrshello"/>
 </server>
 ----
 
