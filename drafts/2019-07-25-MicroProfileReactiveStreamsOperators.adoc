@@ -1,0 +1,214 @@
+---
+layout: post
+title: "Using MicroProfile Reactive Streams Operators in OpenLiberty"
+categories: blog
+author_picture: https://avatars1.githubusercontent.com/u/2861921
+
+author_github: https://github.com/hutchig
+seo-title: Title - OpenLiberty.io MicroProfile Reactive Streams Operators
+seo-description: A short article with simple code examples that introduces MicroProfile Reactive Streams Operators, a simpler to use application programming interface for programming reactive streams.
+blog_description: A short article with simple code examples that introduces MicroProfile Reactive Streams Operators, a simpler to use application programming interface for programming reactive streams.
+additional_authors: 
+- name: Gordon Hutchison
+  github: https://github.com/hutchig
+  image: https://avatars1.githubusercontent.com/u/2861921
+---
+= Using MicroProfile Reactive Streams
+Gordon Hutchison https://twitter.com/gordhut
+
+// Following process here: https://github.com/OpenLiberty/blogs 
+// 
+// Article topic is approved in following WAD:
+// https://ibm.ent.box.com/file/353522943402 (page 3)
+// 
+// "An article showing the simple wiring together of two different Java EE technologies with very little 
+// application code using the fluent, functional composition that reactive streams enables along with 
+// simple operator use. The aim is to introduce streams, operators and show the expressive 
+// power/productivity of stream use." 
+
+== What is MicroProfile Reactive Streams Operators?
+
+MicroProfile Reactive Streams Operators is a specification that allows for easier development
+of https://www.reactive-streams.org/[Reactive Streams] handling code. 
+Reactive Streams are a mechanism for setting up publish subscribe relationships for passing data between software components. As well as passing data, reactive streams interfaces define conventions for dealing with errors and handling flow control. 
+The https://docs.oracle.com/javase/9/docs/api/java/util/concurrent/Flow.html[java.util.concurrent.Flow] 
+interface of JDK 9 is an embodiment of the same underlying reactive streams interface.
+
+By design, reactive streams interfaces are not primarily intended
+to be implemented directly by application code. 
+The reactive streams methods that handle 
+subscriptions, errors, and flow control can be tricky to implement
+correctly and implementing them adds little business value. 
+Fortunately, the reactive streams interfaces 
+are generic with regard to the application domain types
+so they can be provided in a shared library.
+
+For local streams that don't make much use of back pressure or
+asynchronous execution the java.util.stream API
+provides a simpler mechanism for stream processing.
+
+Reactive stream applications usually involve 
+more than just connecting publishers to subscribers. 
+Applications typically involve filtering, mapping
+and other such operations. 
+The base reactive streams interfaces lack any standard set of 
+these utility functions to support common operations.
+
+In order to get these missing 'operators' and to 
+avoid having to re-write code that can be shared, 
+Java developers have typically made use 
+of third party reactive stream libraries such as RxJava, Reactor
+or Akka Streams to manipulate reactive streams. 
+
+These third party reactive streams implementations are controlled 
+by disparate communities and offer different application interfaces. 
+This makes it difficult to create and implement higher level specifications that 
+use reactive streams concepts over and above the core interfaces.
+ 
+MicroProfile Reactive Streams Operators is the MicroProfile
+common foundation for reactive streams upon which other higher 
+level specifications and utility libraries can be built. 
+For example the https://projects.eclipse.org/projects/technology.microprofile/releases/reactive-messaging-1.0[MicroProfile Reactive Messaging Specification] which provides
+an easy to use annotation based system for using reactive streams as
+message channels is built on top of MicroProfile Reactive Streams Operators.
+
+If you want to explore using MicroProfile Reactive Streams Operators
+as a programming API then the rest of this article
+provides an introduction.
+
+== Stream Construction Using a Fluent Builder Based API
+
+Similar to the java.util.stream interface MicroProfile reactive streams
+are built using a builder style fluent interface that makes stream
+controlling code easy to read.
+Builder classes are provided for reactive stream 
+Publishers, Processors and Subscribers that
+can be used to build stream processing elements. These elements
+can subsequently be plumbed together with `via()` and `to()` to create 
+a runnable reactive stream that can be run after being assembled
+from component parts. The basic pattern is: 
+
+ myPublisher.via(myProcessor).to(mySubscriber).run(); 
+
+== A Stream is Represented as Data Structure Prior to Running
+
+While MicroProfile reactive streams are being assembled they are represented
+as a graph of stream processing nodes that can be inspected and manipulated as a data structure
+prior to being run. A reactive streams `Graph` object holds a collection of `Stages` 
+and all builder classes for `Publishers`, `Processors` and `Subscribers` implement 
+the `toGraph()` method that returns objects that can assembled into a 
+runnable reactive stream represented as a graph of stream stages. 
+A graph that is terminated by a Subscriber
+is deemed to be closed and can be 'run' to produce a result.
+The result from running the stream will be available asynchronously and is represented
+using a `CompletionStage` object that is returned from the streams
+run method. This approach whereby users code is represented as functions
+that are treated as objects and combined with others in a 
+data structure is sometimes called a 'lifted' approach. It allows for
+users code and frameworks to inspect and alter a reactive stream's graph prior to
+running it.
+
+== A Core Set of Operators
+
+Familiarity with the operators that are present in a reactive streams
+framework is an important part of using it efficiently so if you plan
+to use MicroProfile Reactive Streams directly it is worth familiarising
+yourself with the operators that are included.
+The operators can be divided into
+six types:
+
+* Peeking - `peek`, `onError`, `onTerminate`, `onComplete`
+* Transforming - `map` and `flatMap`
+* Filtering - `filter`, `distinct`, `limit`, `skip`, `takeWhile` and `dropWhile`
+* Error Handling - `onErrorResume` (with function, Publisher or PublisherBuilder variants)
+* Connecting - `to` and `via`
+* Consuming - `forEach`, `toList`, `collect`, `reduce`, `findFirst`, `cancel`, `ignore` 
+
+It is possible to combine these basic operators using Java code, such as
+the `Collectors`, to achieve most common operations. 
+For example, max() can be achieved by .collect(Collectors.maxBy(...) ) 
+and so on.
+
+== Support for Asynchronous Results
+
+MicroProfile Reactive Streams runs produce an immediate result of 'CompletionStage<T>'
+rather than the base generic type 'T' used by java.util.stream.
+This enables an asynchronous approach to collecting the result of the
+stream.
+
+== Relationship to the java.util.concurrent.Flow API.
+
+MicroProfile Reactive Streams interfaces are currently based on the
+https://github.com/reactive-streams/reactive-streams-jvm[Reactive Streams] interfaces. 
+Using reactive streams `Publisher`,`Processor` and `Subscriber` classes 
+allows for interoperabiliy with common third party libraries, 
+all of which support these types.
+
+The specification does not currently include support for `java.util.concurrent.Flow`. 
+This is because the Flow interface was introduced in Java JDK 9.0 and MicroProfile
+specifications are required to be runnable on Java runtimes earlier than this. 
+When MicroProfile runtimes specify JDK 9.0 as the minimum JDK level then
+Java JDK Flow supporting methods will be added to the specification.
+
+Current methods that explicitly include Reactive Streams types have "Rs" in the method
+names to allow for the base names to be used for the JDK Flow based equivalents.  
+
+== Getting Started With Reactive Streams
+
+If you do want to hack with MicroProfile reactive streams where do you start?
+// Familiarity is key to building fluency, so in this example we will build a simple stream
+// publisher, apply some operators, do some additional processing and feed it into a
+// subscriber.
+
+Implementing a base reactive streams Publisher can be tiresome due to the need for
+handling subscriptions robustly. One of the value adds of MicroProfile reactive
+streams is the ability to wrap various data sources to transform them into
+reactive streams Publishers.
+
+The place to start is the static methods of the ReactiveStreams class.
+Take your favourite IDE and place the MicroProfile Reactive Streams
+API into your project's classpath. 
+
+One way you can do this is to use Eclipse: 
+
+.Ordered
+. Download a recent Liberty (if choosing a package from https://openlibert.io[OpenLiberty] go for "All GA Features")
+. Install a recent Eclipse IDE
+. Install the Liberty Development Tools from the Eclipse Marketplace menu in Eclipse, as part of the install configure the tooling with the directory path (to 'wlp' folder) of the Liberty you just downloaded.
+. Create a new "Dynamic Web Project"
+. Set server for the dynamic web project to be a Liberty server.
+. Eclipse will add the Libery APIs, including MicroProfile Reactive Streams API, to the classpath of the project
+. Right click on the Dynamic WebProject and create a new servlet.
+. Go into the servlet's Java class and type "import org.eclipse.microprofile." <Ctrl-Space> and select the `reactive.streams.operators.*` option.
+. To see the javadoc in Eclipse you can download it from https://repo1.maven.org/maven2/org/eclipse/microprofile/reactive-streams-operators/microprofile-reactive-streams-operators-api/1.0/microprofile-reactive-streams-operators-api-1.0-javadoc.jar[maven] and then set it via the Eclipse project's
+Properties; Java Build Path; Libraries; Liberty Runtime; `com.ibm.websphere.org.eclipse.microprofile.reactive.streams.operators.1.0.<#liberty-release-number>.jar`; javadoc.
+
+Alternatively, if your IDE supports Maven projects you can use the following coordinates in your
+pom to link to the API interfaces independently of a Liberty server: 
+
+[source, xml]
+----
+<dependency>
+    <groupId>org.eclipse.microprofile.reactive-streams-operators</groupId>
+    <artifactId>microprofile-reactive-streams-operators-api</artifactId>
+    <version>1.0</version>
+</dependency>
+----
+
+Once your IDE can resolve the MicroProfile Reactive Streams classes, go to your code
+and type `ReactiveSteams.from` or `ReactiveStreams.of` and ask
+the IDE to suggest the possible completions. The methods suggested are factory methods
+for reactive streams PublisherBuilders that will handle the tedious job of subscription
+and cancellation management without additional code from you. Your code just supplies
+the data that passes down the stream.
+
+You can see the MicroProfile Reactive Streams Operators API documentation at the Eclipse
+https://download.eclipse.org/microprofile/microprofile-reactive-streams-operators-1.0/apidocs/?d[download site.] Have a look at the API documentation for the https://download.eclipse.org/microprofile/microprofile-reactive-streams-operators-1.0/apidocs/org/eclipse/microprofile/reactive/streams/operators/ReactiveStreams.html[`ReactiveStreams`] class. You will see that there are a number
+of ways to connect data sources and create a PublisherBuilder object.
+A stream can have zero (`ReactiveStreams.empty()`, `ReactiveStreams.failed()`), one
+( `of()`, `ofNullable()`, `fromCompletionStage()`) or many ( 
+data elements flowing down it.
+
+
+Unicasts to the next processing element in the stream.
+
