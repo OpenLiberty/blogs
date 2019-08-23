@@ -37,7 +37,7 @@ additional_authors:
 ### Contributing a third party blog post
 
 If you would like to add a blog post that is actually a link to an existing third party blog post, you can follow the normal steps described above for creating a blog post. You simply need to add the following attributes to the liquid front matter: 
-- redirect_link: 'link'
+- redirect_link: `secure url to 3rd party post`
 - permalink: /blog/redirected.html
 
 # Docker container for development
