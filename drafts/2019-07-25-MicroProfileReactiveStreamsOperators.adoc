@@ -30,7 +30,8 @@ Gordon Hutchison https://twitter.com/gordhut
 
 MicroProfile Reactive Streams Operators is a specification that allows for easier development
 of https://www.reactive-streams.org/[Reactive Streams] handling code. 
-Reactive Streams are a mechanism for setting up publish subscribe relationships for passing data between software components. As well as passing data, reactive streams interfaces define conventions for dealing with errors and handling flow control. 
+Reactive Streams are an approach for handling publish subscribe relationships for passing data between software components. As well as handling data, reactive streams interfaces define conventions for dealing with subscriptions, errors and handling flow control. As well as connecting `Publishers` to `Subscribers`, any number of `Processors` can be chained into the middle of the streams configuration. A `Processor` is just an object that acts like a `Publisher` and a `Subscriber` and can thus provide `pass-thru' processing of data.
+
 The https://docs.oracle.com/javase/9/docs/api/java/util/concurrent/Flow.html[java.util.concurrent.Flow] 
 interface of JDK 9 is an embodiment of the same underlying reactive streams interface.
 
@@ -41,10 +42,10 @@ subscriptions, errors, and flow control can be tricky to implement
 correctly and implementing them adds little business value. 
 Fortunately, the reactive streams interfaces 
 are generic with regard to the application domain types
-so they can be provided in a shared library.
+so they can be provided by a shared library.
 
 For local streams that don't make much use of back pressure or
-asynchronous execution the java.util.stream API
+asynchronous execution, the `java.util.stream` API
 provides a simpler mechanism for stream processing.
 
 Reactive stream applications usually involve 
@@ -53,7 +54,6 @@ Applications typically involve filtering, mapping
 and other such operations. 
 The base reactive streams interfaces lack any standard set of 
 these utility functions to support common operations.
-
 In order to get these missing 'operators' and to 
 avoid having to re-write code that can be shared, 
 Java developers have typically made use 
@@ -66,11 +66,10 @@ This makes it difficult to create and implement higher level specifications that
 use reactive streams concepts over and above the core interfaces.
  
 MicroProfile Reactive Streams Operators is the MicroProfile
-common foundation for reactive streams upon which other higher 
+common foundation for reactive streams, upon which other higher 
 level specifications and utility libraries can be built. 
-For example the https://projects.eclipse.org/projects/technology.microprofile/releases/reactive-messaging-1.0[MicroProfile Reactive Messaging Specification] which provides
-an easy to use annotation based system for using reactive streams as
-message channels is built on top of MicroProfile Reactive Streams Operators.
+For example the https://projects.eclipse.org/projects/technology.microprofile/releases/reactive-messaging-1.0[MicroProfile Reactive Messaging Specification] which provides an easy to use, annotation based, system for using reactive streams as message channels is built on top of MicroProfile Reactive Streams Operators.
+OpenLiberty also implements the MicroProfile Reactive Messaging Specification.
 
 If you want to explore using MicroProfile Reactive Streams Operators
 as a programming API then the rest of this article
@@ -79,50 +78,54 @@ provides an introduction.
 == Stream Construction Using a Fluent Builder Based API
 
 Similar to the java.util.stream interface MicroProfile reactive streams
-are built using a builder style fluent interface that makes stream
+are built using a builder style, fluent interface that makes stream
 controlling code easy to read.
 Builder classes are provided for reactive stream 
-Publishers, Processors and Subscribers that
+`Publishers`, `Processors` and `Subscribers` that
 can be used to build stream processing elements. These elements
 can subsequently be plumbed together with `via()` and `to()` to create 
-a runnable reactive stream that can be run after being assembled
+a runnable reactive stream that can be `run()` after being assembled
 from component parts. The basic pattern is: 
 
- myPublisher.via(myProcessor).to(mySubscriber).run(); 
+ CompletionStage cs = myPublisher.via(myProcessor).to(mySubscriber).run(); 
 
-== A Stream is Represented as Data Structure Prior to Running
+== A Stream is Built as Data Structure Prior to Running
 
-While MicroProfile reactive streams are being assembled they are represented
-as a graph of stream processing nodes that can be inspected and manipulated as a data structure
-prior to being run. A reactive streams `Graph` object holds a collection of `Stages` 
-and all builder classes for `Publishers`, `Processors` and `Subscribers` implement 
-the `toGraph()` method that returns objects that can assembled into a 
-runnable reactive stream represented as a graph of stream stages. 
-A graph that is terminated by a Subscriber
-is deemed to be closed and can be 'run' to produce a result.
-The result from running the stream will be available asynchronously and is represented
-using a `CompletionStage` object that is returned from the streams
-run method. This approach whereby users code is represented as functions
+While MicroProfile reactive streams are being assembled, they are represented
+as a graph of stream processing nodes that can be inspected and manipulated as a data structure prior to being run. 
+A reactive streams `Graph` object holds a collection of `Stages` 
+and all the builder classes for `Publishers`, `Processors` and `Subscribers` implement 
+the `toGraph()` method that returns objects that can be assembled into a 
+runnable reactive stream graph of stages.
+ 
+A graph that is terminated by a `Subscriber`
+is deemed to be closed and can be `run()` to produce a result.
+The result from running the stream will be available asynchronously and is represented using a `CompletionStage` object that is returned from the streams
+run method. 
+
+This approach, whereby users code is represented as functions
 that are treated as objects and combined with others in a 
-data structure is sometimes called a 'lifted' approach. It allows for
-users code and frameworks to inspect and alter a reactive stream's graph prior to
-running it.
+data structure, is sometimes called a 'lifted' approach. 
+It allows for users code and frameworks to inspect and alter 
+a reactive stream's graph prior to running it.
 
 == A Core Set of Operators
 
 Familiarity with the operators that are present in a reactive streams
-framework is an important part of using it efficiently so if you plan
+framework is an important part of using it efficiently. If you plan
 to use MicroProfile Reactive Streams directly it is worth familiarising
 yourself with the operators that are included.
-The operators can be divided into
-six types:
 
-* Peeking - `peek`, `onError`, `onTerminate`, `onComplete`
-* Transforming - `map` and `flatMap`
-* Filtering - `filter`, `distinct`, `limit`, `skip`, `takeWhile` and `dropWhile`
-* Error Handling - `onErrorResume` (with function, Publisher or PublisherBuilder variants)
-* Connecting - `to` and `via`
-* Consuming - `forEach`, `toList`, `collect`, `reduce`, `findFirst`, `cancel`, `ignore` 
+The operators can be divided into six types:
+
+* Peeking, these do not alter the data in the stream - `peek`, `onError`, `onTerminate`, `onComplete`
+* Transforming, these can change the stream's data - `map` and `flatMap`
+* Filtering, these can drop data elements - `filter`, `distinct`, `limit`, `skip`, `takeWhile` and `dropWhile`
+* Error Handling, used to repond to `onError()` situations - `onErrorResume` (with function, Publisher or PublisherBuilder variants)
+* Connecting, used to wire together `Publishers`, `Processors` and `Subscribers` - `to` and `via`
+* Consuming, used to collect the results of the stream - `forEach`, `toList`, `collect`, `reduce`, `findFirst`, `cancel`, `ignore` 
+
+These operator types will be covered in a little more detail below.
 
 It is possible to combine these basic operators using Java code, such as
 the `Collectors`, to achieve most common operations. 
@@ -131,12 +134,14 @@ and so on.
 
 == Support for Asynchronous Results
 
-MicroProfile Reactive Streams runs produce an immediate result of 'CompletionStage<T>'
-rather than the base generic type 'T' used by java.util.stream.
+MicroProfile Reactive Streams runs produce an immediate result of 'CompletionStage<T>' rather than the actual result of the stream
+such as the base generic type 'T' used by java.util.stream. 
 This enables an asynchronous approach to collecting the result of the
-stream.
+stream to enable long running streams.
 
 == Relationship to the java.util.concurrent.Flow API.
+
+TODO GDH Continue review form here.
 
 MicroProfile Reactive Streams interfaces are currently based on the
 https://github.com/reactive-streams/reactive-streams-jvm[Reactive Streams] interfaces. 
@@ -166,10 +171,12 @@ streams is the ability to wrap various data sources to transform them into
 reactive streams Publishers.
 
 The place to start is the static methods of the ReactiveStreams class.
-Take your favourite IDE and place the MicroProfile Reactive Streams
-API into your project's classpath. 
+You can see the MicroProfile Reactive Streams Operators API documentation at the Eclipse
+https://download.eclipse.org/microprofile/microprofile-reactive-streams-operators-1.0/apidocs/?d[download site.] Have a look at the API documentation for the https://download.eclipse.org/microprofile/microprofile-reactive-streams-operators-1.0/apidocs/org/eclipse/microprofile/reactive/streams/operators/ReactiveStreams.html[`ReactiveStreams`] class. You will see that there are a number
+of ways to connect data sources and create a PublisherBuilder object.
 
-One way you can do this is to use Eclipse: 
+A good way to browse these methods is from inside an IDE.
+For example, you can do this in Eclipse: 
 
 .Ordered
 . Download a recent Liberty (if choosing a package from https://openlibert.io[OpenLiberty] go for "All GA Features")
@@ -181,7 +188,12 @@ One way you can do this is to use Eclipse:
 . Right click on the Dynamic WebProject and create a new servlet.
 . Go into the servlet's Java class and type "import org.eclipse.microprofile." <Ctrl-Space> and select the `reactive.streams.operators.*` option.
 . To see the javadoc in Eclipse you can download it from https://repo1.maven.org/maven2/org/eclipse/microprofile/reactive-streams-operators/microprofile-reactive-streams-operators-api/1.0/microprofile-reactive-streams-operators-api-1.0-javadoc.jar[maven] and then set it via the Eclipse project's
-Properties; Java Build Path; Libraries; Liberty Runtime; `com.ibm.websphere.org.eclipse.microprofile.reactive.streams.operators.1.0.<#liberty-release-number>.jar`; javadoc.
+Properties; Java Build Path; Libraries; Liberty Runtime; `com.ibm.websphere.org.eclipse.microprofile.reactive.streams.operators.1.0.<#liberty-release-number>.jar`; javadoc. 
+Once you have done this you can type `ReactiveStreams.` in your java and press <Ctrl-Space> to
+see the variety of factory methods that can be used to create a `PublusherBuilder`. 
+Pressing `TAB` here will show the javadoc for the currently selected method.
+Methods that return a `PublisherBuilder` can be used as the starting point of a reactive
+stream.
 
 Alternatively, if your IDE supports Maven projects you can use the following coordinates in your
 pom to link to the API interfaces independently of a Liberty server: 
@@ -195,20 +207,75 @@ pom to link to the API interfaces independently of a Liberty server:
 </dependency>
 ----
 
-Once your IDE can resolve the MicroProfile Reactive Streams classes, go to your code
-and type `ReactiveSteams.from` or `ReactiveStreams.of` and ask
-the IDE to suggest the possible completions. The methods suggested are factory methods
-for reactive streams PublisherBuilders that will handle the tedious job of subscription
-and cancellation management without additional code from you. Your code just supplies
-the data that passes down the stream.
+Once your IDE can resolve the MicroProfile Reactive Streams classes,
+look particularly at the `ReactiveSteams.from` and `ReactiveStreams.of` methods. 
+These are factory methods for reactive streams PublisherBuilders that will handle the tedious job of subscription and cancellation management without code from you, 
+your code just supplies the data. When talking about reactive streams
+generally we might use the terms publisher, processor, or subscriber
+but typically in a MicroProfile Reactive Streams context these will
+appear in the users code as `PublisherBuilders`, `ProcessorBuilders` and `SubscriberBuilders`
+in the construction of the stream.
 
-You can see the MicroProfile Reactive Streams Operators API documentation at the Eclipse
-https://download.eclipse.org/microprofile/microprofile-reactive-streams-operators-1.0/apidocs/?d[download site.] Have a look at the API documentation for the https://download.eclipse.org/microprofile/microprofile-reactive-streams-operators-1.0/apidocs/org/eclipse/microprofile/reactive/streams/operators/ReactiveStreams.html[`ReactiveStreams`] class. You will see that there are a number
-of ways to connect data sources and create a PublisherBuilder object.
-A stream can have zero (`ReactiveStreams.empty()`, `ReactiveStreams.failed()`), one
-( `of()`, `ofNullable()`, `fromCompletionStage()`) or many ( 
-data elements flowing down it.
+A stream can have zero data elements ( created easily using `ReactiveStreams.empty()` or `ReactiveStreams.failed()`), one data element
+(initiated easily using `ReactiveStreams.of()`, `ofNullable()`, `fromCompletionStage()`) or many 
+data elements flowing down it. For a multi-element stream, 
+as well as importing data from
+a standard Reactive Streams `Publisher`, data can be provided using an
+`Iterable`, by calling a function repeatedly on the previous
+data element started from a seed, from a `Supplier` function, 
+or from just a list of varargs parameters passed into `from()`.
 
+However they are supplied, the data items will normally be unicasted
+from the Publisher down the processing elements in the stream, either a subsequent `Processor` 
+connected using the `via()` method or a final `Subscriber` connected using the 
+`to()` method. 
 
-Unicasts to the next processing element in the stream.
+As well as `Processors` and `Subscribers`, another way to process data elements
+in the stream is via the provided operators. Operators can be attached
+to any `Processor` or `Subscriber`. 
 
+Some of the operators can be used to drop data elements from travelling
+down the stream. For example: `filter`, `distinct`, `limit`, `skip`, `takeWhile` and `dropWhile`
+can all affect whether a piece of data reaches the next stream stage.
+Of course, the user provided `Predicates` that are passed to `filter`, 
+`takewhile` and `dropwhile` can perform any processing desired before returning
+their boolean result. 
+
+As well as just selecting which elements are passed on elements can be
+altered using the `map` or `flatMap` operations. `Flatmap` can be used to map a
+data element into list of multiple elements. Instead of this list being
+a single data element, the list is 'flattened' and its elements are 
+emitted along the stream individually. 
+Of course as we are in the reactive streams universe this list of generated
+elements is represented by a reactive streams Publisher which emits
+the data elements in the list.
+
+Some streams emit a potentially infinite set of values, for example
+readings from a digital thermometer, stock prices etc.
+ 
+=== Error Handling
+Of course errors can result in particular data items not travelling down
+the stream. In classic reactive streams, when a `Publisher` or `Processor` encounters
+an error it would call the subscriber's `onError` method passing a `Throwable`.
+`onErrorResume` provides a means to keep the stream from completing.
+
+=== Collecting a Result
+Collection of a streams processing of data into an overall 'result' for the whole stream
+can be done using `forEach`, `toList`, `collect`, `reduce`, `findFirst`, `cancel`, and even `ignore`.  
+Remember that the the methods that construct MicroProfile reactive streams 
+all work to build up a graph that represents the stream's operations, during
+stream construction no data is flowing down the stream and no user code is called.
+This applies even for the collection operators above, each of which either
+returns a `CompletionRunner` which can be run or a `SubscriberBuilder` that will emit the
+result as data to any subscriber.
+
+=== Debugging
+Given the facts that assembling the elements of a reactive stream does not actually run
+data down the stream, that stream operations are not specified to 
+occur on the same thread that initiates the running of the stream,
+that reactive streams data flow can be halted by any element in the stream
+- both as a failure to emit data or in requesting it, 
+debugging reactive streams can be challenging. The `peek`, `onError`, `onTerminate`
+and `onComplete` operators can be used to provide some extra insertion points
+to get debugging hooks into, even though they don't change the fundamental
+operation of the stream. 
