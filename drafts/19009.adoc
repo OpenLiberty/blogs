@@ -1,14 +1,14 @@
----
+◊---
 layout: post
 title: "Release Blog 19.0.0.9"
 categories: blog
-author_picture: https://avatars3.githubusercontent.com/u/28316667
+author_picture: https://avatars3.githubusercontent.com/tomjenningss
 author_github: https://github.com/tomjenningss
 seo-title: Securing Open Liberty apps and microservices with MicroProfile JWT and Social Media login - OpenLiberty.io
 seo-description: Take a look at some of the Open Liberty features for securing microservices. Includes an example configuration for securing microservices with MicroProfile JWT and Social Media Login.
 blog_description: "Release Blog 19.0.0.9."
 ---
-= Added feature: openidConnectServer-1 on Open Liberty 19.0.0.9 Tom Smells
+= Added feature: openidConnectServer-1 on Open Liberty 19.0.0.9
 Tom Jennings <https://github.com/tomjenningss>
 
 OpenID Connect is technology that allows delegation of user authentication to an external security provider. 
@@ -16,12 +16,13 @@ Give it a try in link:/about/[Open Liberty] 19.0.0.9.
 
 In Open Liberty 19.0.0.9:
 
-TODO: CHANGE THE LINKS
 
 * <<oidc, OpenID Connect>>
-* <<ssl, Oracle SSL properties encryption support>>
+* <<#seOCsaOt, Support encrypting OAuth 2.0 clients secrets and OAuth 2.0 tokens>>
+* <<SPiLOS, Support PKCE in liberty oidc server>>
+* <<mpreactive,MicroProfile Reactive Messaging>>
+* <<testingdb,Testing database connections in Liberty apps with REST APIs>>
 
----------------------------
 
 
 If you're curious about what's coming in future Open Liberty releases, take a look at our <<previews,previews in the latest development builds>>. TODO -> UPDATE SENTENCE -> In particular, get an early insight into MicroProfile Reactive Messaging.
@@ -60,6 +61,7 @@ Or take a look at our link:/downloads/[Downloads page].
 
 [link=https://stackoverflow.com/tags/open-liberty]
 image::/img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="center"]
+
 
 [#oidc]
 == OpenID Connect Server 
@@ -162,32 +164,167 @@ https://user-images.githubusercontent.com/26486297/63465347-a9517500-c426-11e9-8
 
 These tokens can be submitted to non-browser applications, which can in turn use them when accessing secured resources on servers configured to accept access tokens from the OpenID Connect server.
 
-* Guide: link:<possible link>
+---
+[#seOCsaOt]
+=== Support encrypting OAuth 2.0 clients secrets and OAuth 2.0 tokens
 
-[]
-== New title 
+OpenID Connect is an interoperable single-sign on protocol based on the OAuth 2.0 specifications,
+and it lets users to sign on to multiple websites without having to provide password to website.
 
-- - - 
-//This displays a hard rule / line across the page
+Liberty OpenID Connect Provider used to require database/volume encryption to protect the OAuth access_token and clients secrets. With this update, Liberty OpenID Connect provider can be configured to secure both access_token and client secret in the same way as user password, and store them as password hashes based on PBKDF2WithHmacSHA512 algorithm in addition to security.
 
-[#previews]
-== Previews of early implementations available in development builds
+[source,xml]
+<server>
+	<featureManager>
+		<feature>oauth-2.0</feature>
+		<feature>ssl-1.0</feature>
+		<feature>jdbc-4.0</feature>
+		<feature>jndi-1.0</feature>
+	</featureManager>
 
-You can now also try out early implementations of some new capabilities in the link:/downloads/#development_builds[latest Open Liberty development builds]:
+	<basicRegistry
+		id="basic"
+		realm="BasicRealm"
+	>
+		<user
+			name="testuser"
+			password="testuserpwd" />
+	</basicRegistry>
+
+	<keyStore
+		id="defaultKeyStore"
+		password="keyspass" />
+
+	<oauth-roles>
+		<authenticated>
+			<user name="testuser" />
+			
+		</authenticated>
+		<clientManager>
+			<user name="testuser" />
+			<group name="group1" />
+		</clientManager>
+	</oauth-roles>
 
 
-//
-* <<mpreactive,MicroProfile Reactive Messaging>>
-* <<testingdb,Testing database connections in Liberty apps with REST APIs>>
+	
+	<jdbcDriver id="DerbyEmbedded">
+		<library>
+			<fileset
+				dir="${server.config.dir}/derby"
+				includes="derby.jar" />
+		</library>
+	</jdbcDriver>
+
+	<dataSource
+		id="OAuthFvtDataSource"
+		jndiName="jdbc/OAuth2DB"
+		jdbcDriverRef="DerbyEmbedded"
+	>
+       
+	<oauthProvider
+		id="OAuthConfigDerby"
+		filter="request-url%=ssodemo"
+		oauthOnly="false" clientSecretEncoding="PBKDF2WithHmacSHA512" accessTokenEncoding="PBKDF2WithHmacSHA512"
+	>
+		<databaseStore
+			dataSourceRef="OAuthFvtDataSource"
+			user="bob"
+			password="bob"
+			schema="testSchema1" />
+		<autoAuthorizeClient>dclient01</autoAuthorizeClient>
+		<autoAuthorizeClient>dclient02</autoAuthorizeClient>
+	</oauthProvider>
+
+	<webAppSecurity
+		httpOnlyCookies="false"
+		allowFailOverToBasicAuth="true" />
+
+	<httpSession cookieHttpOnly="false" />
+
+	<javaPermission
+		className="java.net.SocketPermission"
+		name="" [ToDO: there is an asterisk sign in the quotation marks]
+		actions="connect,resolve" 
+    />
+	<javaPermission
+		codebase="${server.config.dir}/derby/derby.jar"
+		className="java.security.AllPermission"
+		name="*"
+		actions="*" />
+</server>
+
+---
+[#SPiLOS]
+=== Support PKCE in liberty oidc server
+
+This  feature is related to openidConnectServer-1.0
 
 
-These early implementations are not available in 19.0.0.8 but you can try them out in our daily Docker image by running `docker pull openliberty/daily`. Let us know what you think!
+OpenID Connect is an interoperable single-sign on protocol based on the OAuth 2.0 specifications,
+and it lets users to sign on multiple websites without having to provide password to website.
 
-//
 
+Open Liberty feature OpenID Connect provider now supports the OAuth 2.0 Authorization Code Flow with the Proof Key for Code Exchange (PKCE), which is defined in OAuth 2.0 RFC 7636. Before this support, the OAuth 2.0 public clients utilizing the Authorization Code Grant are susceptible to the authorization code interception attack. The Proof Key for Code Exchange (PKCE, pronounced pixie) is a technique for public clients to mitigate the threat of code interception. The technique allows the client first creating a secret called code verifier when requesting authorization code, and then using that secret again when exchanging the authorization code for an access token. Additionally, the secret is sent to authorization server as hash called the code_challenge when requesting authorization code. An attacker who intercepts the Authorization Code is now unable to redeem it for an access token, as they are not in possession of the code_verifier secret.
+
+
+[source,xml]
+<server>
+    <featureManager>      
+      <feature>openidConnectServer-1.0</feature>     
+    </featureManager>
+
+    <openidConnectProvider id="OP" oauthProviderRef="OAuth" 
+        signatureAlgorithm="RS256" keyStoreRef="defaultKeyStore" 
+        jwkEnabled="true"
+    >
+    </openidConnectProvider>
+    
+    <!-- 
+    --> 
+    <oauthProvider id="OAuth" ....
+      >
+        <!-- 
+         localStore for demo use, a backing database is used in production. 
+         When localStore is used, all client data and token status is held
+         in memory only. 
+        --> 
+        <localStore>
+         
+          <!-- This client is public client and enabled the Proof Key For Code Exchange. The provider expects the client to send code_challenge in the authorization code request and corresponding code_verifier in the token request -->
+          <client displayname="RP" enabled="true"
+                name="RP" secret="thesecretisoptional" 
+                scope="openid profile email"
+                preAuthorizedScope="openid profile email"
+                publicClient="true"
+                proofKeyForCodeExchange="true"
+          >                  
+                <redirect>https://localhost:19443/oidcclient/redirect/RP</redirect>
+          </client>    
+        </localStore>
+    </oauthProvider>
+     
+    <oauth-roles>
+        <authenticated>
+            <special-subject type="ALL_AUTHENTICATED_USERS" />  
+        </authenticated> 
+    </oauth-roles>
+
+    <!-- Basic registry for test / development use. -->   
+    <basicRegistry id="basic" realm="customRealm">
+        ..
+    </basicRegistry>
+
+    <httpEndpoint id="defaultHttpEndpoint" host="*" httpPort="29080" httpsPort="29443" />
+    <keyStore id="defaultKeyStore" password="keyspass" />  
+</server>
+
+---
 [#mpreactive]
 === Reactive messaging in microservices (MicroProfile Reactive Messaging)
+
 An application using reactive messaging is composed of CDI beans consuming, producing, and processing messages passing along reactive streams. These messages can be internal to the application or can be sent and received via different message brokers.
+
 
 Reactive Messaging provides a very easy to use way to send, receive, and process messages. With MicroProfile Reactive Messaging, you can annotate application beans' methods to have messages on a particular channel (@Incoming, @Outgoing, or both) and Liberty drives those methods appropriately as reactive streams publishers, subscribers, or processors.
 
@@ -223,6 +360,7 @@ mp.messaging.incoming.greetings.connector=io.openliberty.kafka
 The `io.openliberty.kafka` connector operates according to the reactive messaging specification. For example the `consume` method above is, by default, set to consume messages from a Kafka topic queue. Further Kafka client properties can be set for the channel by setting properties that are picked up by the MicroProfile Config specification. For example, System properties via OpenLiberty's `bootstrap.properties` file or environment variables from OpenLiberty's `server.env` file. As per the reactive messaging specification the following configuration properties are passed
 to the Kafka client:
 
+
 [source,text]
 ----
 mp.messaging.incoming.greetings.[PROPERTY-NAME]=value1
@@ -257,7 +395,7 @@ This is an early release of the Open Liberty Reactive Messaging Kafka connector.
 Find out more in the link:https://download.eclipse.org/microprofile/microprofile-reactive-messaging-1.0/microprofile-reactive-messaging-spec.pdf[MicroProfile Reactive Messaging spec].
 
 
-//
+---
 
 [#testingdb]
 === Testing database connections in Liberty apps with REST APIs
@@ -272,4 +410,4 @@ To enable these REST endpoints, add the configValidator-1.0 beta feature to any 
     <feature>configValidator-1.0</feature>
 </featureManager>
 ----
-//
+
