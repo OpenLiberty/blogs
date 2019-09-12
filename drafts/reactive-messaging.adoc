@@ -15,7 +15,7 @@ additional_authors:
 = MicroProfile Reactive Messaging
 Andrew Rouse <https://github.com/Azquelt>
 
-MicroProfile Reactive Messaging provides a very easy to use way to send, receive, and process messages and is well suited to writing applications which process streams of events. With MicroProfile Reactive Messaging, you annotate application beans' methods and under the covers Liberty converts these to http://www.reactive-streams.org/[Reactive Streams] compatible Publishers, Subscribers and Processors and connects them up to each other. It also provides a Connector API to allow your methods to be connected to external messaging systems.
+MicroProfile Reactive Messaging provides a very easy-to-use way to send, receive, and process messages and is well-suited to writing applications that process streams of events. With MicroProfile Reactive Messaging, you annotate application beans' methods and, under the covers, Liberty converts these to http://www.reactive-streams.org/[reactive streams]-compatible publishers, subscribers and processors and connects them up to each other. It also provides a Connector API to allow your methods to be connected to external messaging systems.
 
 To enable the feature include it in your `server.xml` feature list:
 
@@ -33,6 +33,8 @@ image::/img/blog/mprm-channels.png[Diagram showing MethodA connected to MethodB 
 
 Let's give some examples of what these methods could look like.
 
+The following method functions as a publisher which generates new messages. The method is called every time the next thing in the stream requests another message:
+
 [source,java]
 ----
 @Outgoing("foo")
@@ -41,7 +43,7 @@ public String methodA() {
 }
 ----
 
-This method functions as a publisher which generates new messages. The method will be called every time the next thing in the stream requests another message.
+The following method functions as a processor, applying the same operation to each message in the stream. It is called once for each message in the stream:
 
 [source,java]
 ----
@@ -52,7 +54,7 @@ public String methodB(String input) {
 }
 ----
 
-This method functions as a processor, applying the same operation to each message in the stream. It will be called once for each message in the stream.
+The following method functions as a subscriber, performing processing for each message in the stream, but not producing any output of its own as it has no `@Outgoing` channel:
 
 [source,java]
 ----
@@ -62,18 +64,16 @@ public void methodC(String input) {
 }
 ----
 
-This method functions as a subscriber, performing processing for each message in the stream, but not producing any output of its own as it has no `@Outgoing` channel.
-
-I've only outlined the basic cases for producing, processing and consuming messages within your application. There are other supported method signatures for each of these cases which allow for asynchronous processing, advanced message acknowledgement and integration with other Reactive Streams libraries https://download.eclipse.org/microprofile/microprofile-reactive-messaging-1.0/microprofile-reactive-messaging-spec.html#_supported_method_signatures[in the Reactive Messaging specification].
+I've only outlined the basic cases for producing, processing, and consuming messages within your application. There are other supported method signatures for each of these cases which allow for asynchronous processing, advanced message acknowledgement, and integration with other reactive streams libraries https://download.eclipse.org/microprofile/microprofile-reactive-messaging-1.0/microprofile-reactive-messaging-spec.html#_supported_method_signatures[in the Reactive Messaging specification].
 
 
-== Using Connectors
+== Sending and receiving messages between applications using connectors
 
-Although sending messages within our application is nice, it's more useful to be able to send and receive messages from other systems. For this, Reactive Messaging uses _connectors_. _Connectors_ can be attached to one end of a _channel_ in place of a method and are configured using MicroProfile Config.
+Although sending messages within our application is nice, it's more useful to be able to send and receive messages from other systems. For this, reactive messaging uses _connectors_. Connectors can be attached to one end of a _channel_ in place of a method and are configured using MicroProfile Config.
 
-OpenLiberty includes the `liberty-kafka` connector for sending and receiving messages from an Apache Kafka broker.
+Open Liberty includes the `liberty-kafka` connector for sending and receiving messages from an Apache Kafka broker.
 
-We could remove `methodA` from our example above and instead receive messages from the `foo` topic on a Kafka broker by adding the following configuration to our application.
+We could remove `methodA` from our example above and instead receive messages from the `foo` topic on a Kafka broker by adding the following configuration to our application:
 
 [source,text]
 ----
@@ -84,11 +84,11 @@ mp.messaging.incoming.foo.key.deserializer=org.apache.kafka.common.serialization
 mp.messaging.incoming.foo.value.deserializer=org.apache.kafka.common.serialization.StringDeserializer
 ----
 
-Here, `connector` is a special property in Reactive Messaging which defines which connector to use. `bootstrap.servers`, `group.id`, `key.deserializer` and `value.deserializer` are properties understood by the https://kafka.apache.org/documentation/#consumerconfigs[Kafka client API]. This set of properties is the minimum that must be defined to recieve messages from a Kafka topic.
+Here, `connector` is a special property in reactive messaging which defines which connector to use. `bootstrap.servers`, `group.id`, `key.deserializer`, and `value.deserializer` are properties understood by the https://kafka.apache.org/documentation/#consumerconfigs[Kafka client API]. This set of properties is the minimum that must be defined to receive messages from a Kafka topic.
 
-Now, rather than recieving the same message over and over again from `methodA`, we will receive messages from the `foo` topic on the kafka broker.
+Now, rather than receiving the same message over and over again from `methodA`, we will receive messages from the `foo` topic on the Kafka broker.
 
-Similarly, we could replace `methodC` with an output to a kafka broker with the following config.
+Similarly, we could replace `methodC` with an output to a Kafka broker with the following config:
 
 [source,text]
 ----
@@ -98,11 +98,11 @@ mp.messaging.outgoing.bar.key.serializer=org.apache.kafka.common.serialization.S
 mp.messaging.outgoing.bar.value.serializer=org.apache.kafka.common.serialization.StringSerializer
 ----
 
-Now, our messages will be output to the `bar` topic on the kafka broker, rather than being consumed and logged by `methodC`.
+Now, our messages are outputted to the `bar` topic on the Kafka broker, rather than being consumed and logged by `methodC`.
 
-=== Defining configuration
+=== Configuring a connector
 
-These properties can be set anywhere that's read by MicroProfile Config, for example as system properties via OpenLiberty's `bootstrap.properties` file or environment variables from OpenLiberty's `server.env` file. If you're unfamiliar with MicroProfile Config, https://www.openliberty.io/guides/microprofile-config-intro.html[check out our tutorial guide].
+The configuration properties can be set anywhere that's read by MicroProfile Config, for example as system properties in Open Liberty's `bootstrap.properties` file, or environment variables in Open Liberty's `server.env` file. If you're unfamiliar with MicroProfile Config, https://www.openliberty.io/guides/microprofile-config-intro.html[check out our tutorial guide].
 
 The Reactive Messaging specification defines two ways to set configuration properties for a connector:
 
@@ -115,23 +115,25 @@ mp.messaging.incoming.foo.[PROPERTY-NAME]=value1
 mp.messaging.connector.liberty-kafka.[PROPERTY-NAME]=value2
 ----
 
-Properties supported by the `liberty-kafka` connector for incoming channels
+Properties supported by the `liberty-kafka` connector for incoming channels:
+
 [options="header",cols="1,2"]
 |===
 |Property Name  |Description   
 //-------------
 |`topic`   |The name of the topic to subscribe to. Defaults to the name of the channel.
 |`unacked.limit` | The number outstanding unacknowledged messages. If this limit is reached, the connector will stop retrieving records from Kafka until some messages have been acknowledged. Defaults to the value of `max.poll.records` if set, or to `500`.
-|<any other property>   |All other properties are passed directly as config parameters to the `KafkaConsumer` API. A list of required and optional properties can be found http://kafka.apache.org/documentation.html#consumerconfigs[in the kafka documentation].
+|<any other property>   |All other properties are passed directly as config parameters to the `KafkaConsumer` API. A list of required and optional properties can be found http://kafka.apache.org/documentation.html#consumerconfigs[in the Kafka documentation].
 |===
 
-Properties supported by the `liberty-kafka` connector for outgoing channels
+Properties supported by the `liberty-kafka` connector for outgoing channels:
+
 [options="header",cols="1,2"]
 |===
 |Property Name  |Description   
 //-------------
 |`topic`   |The name of the topic to send messages to. Defaults to the name of the channel.
-|<any other property>   |All other properties are passed directly as config parameters to the `KafkaProducer` API. A list of required and optional properties can be found http://kafka.apache.org/documentation.html#producerconfigs[in the kafka documentation].
+|<any other property>   |All other properties are passed directly as config parameters to the `KafkaProducer` API. A list of required and optional properties can be found http://kafka.apache.org/documentation.html#producerconfigs[in the Kafka documentation].
 |===
 
 So, for example, a full set of properties to connect several channels to topics in IBM Public Cloud Event Streams (which requires encryption and authentication) might look like this:
@@ -171,9 +173,9 @@ public String toUpperCase(String input) {
 ----
 
 
-== Application packaging
+== Packaging applications that use the Kafka connector
 
-When using the Kafka Connector included in OpenLiberty, you must include the the Kafka client API jar in your application or include it via a shared library.
+When using the Kafka connector included in Open Liberty, you must include the the Kafka client API jar in your application or include it using a shared library.
 
 If you're building your application with Maven, you do this by adding these dependencies:
 
@@ -186,7 +188,8 @@ If you're building your application with Maven, you do this by adding these depe
 </dependency>
 ----
 
-== Messages and Acknowledgement
+
+== Messages and acknowledgement
 
 To ensure that no messages are lost in the event of system failure, most messaging systems differentiate between a message being delivered to a system and the processing of that message by that system being complete. If the system goes down, any messages which have been sent but not completed can then be sent again.
 
@@ -196,29 +199,27 @@ Let's look at some examples of how acknowledgements work.
 
 === Acknowledging incoming messages
 
-Here's how the OpenLiberty Kafka connector handles acknowledgements.
+Here's how the Open Liberty Kafka connector handles acknowledgements:
 
-* A message is received from Kafka
-* The message is sent into the channel
-* When the message is acknowledged, the kafka partition offset for the consumer group is committed up to the id of the message
+* A message is received from Kafka.
+* The message is sent into the channel.
+* When the message is acknowledged, the Kafka partition offset for the consumer group is committed up to the ID of the message.
 
-After the message has been acknowledged and the offset committed, if our application crashes or is restarted, we won't process this message again.
-
-NOTE: This is a slight simplification, the connector does some further tracking to ensure that all prior messages from that partition have also been acknowledged before committing the partition offset, in case messages are acknowledged out of order.
+After the message has been acknowledged and the offset committed, if our application crashes or is restarted, we won't process this message again. (This is a slight simplification, the connector does some further tracking to ensure that all prior messages from that partition have also been acknowledged before committing the partition offset, in case messages are acknowledged out of order.)
 
 === Acknowledging outgoing messages
 
-Here's how the OpenLiberty Kafka connector handles acknowledgements.
+Here's how the Open Liberty Kafka connector handles acknowledgements:
 
-* A message is received from the channel
-* The message is sent to the kafka broker
-* When the kafka broker confirms that the message has been received, the message recieved from the channel is acknowledged
+* A message is received from the channel.
+* The message is sent to the Kafka broker.
+* When the Kafka broker confirms that the message has been received, the message received from the channel is acknowledged.
 
 Here, we make sure that the message isn't acknowledged until its been safely stored in the target topic.
 
 === Processing and acknowledgements
 
-Methods which process messages (i.e. they're annotated with both `@Incoming` and `@Outgoing`) often recieve one message, do some transformation on it and create a new message.
+Methods that process messages (i.e. they're annotated with both `@Incoming` and `@Outgoing`) often receive one message, do some transformation on it, and create a new message.
 
 In this case, the processor needs to ensure that when the new message is acknowledged, the received message is then acknowledged as well.
 
@@ -226,17 +227,17 @@ If this happens, a message can be received into the system, go through any numbe
 
 image::/img/blog/mprm-acks.png[Diagram showing a Message passing from a Connector to ChannelB and a Message passing from ChannelB to another Connector. Underneath, Acks are passed the other way, from the second connector to the second message, from the second message to the first message, from the first message to the first connector.]
 
-=== Manual vs. Automatic acknowledgement
+=== Manual vs. automatic acknowledgement
 
-In simple cases, where there's a 1:1 correlation between incoming and outgoing messages, OpenLiberty will handle linking up the acknowledgements like this for you. However, where it can't be sure this is the case it will default to acknowledging messages _before_ they're processed. The default acknowledgement policy for each method signature is listed https://download.eclipse.org/microprofile/microprofile-reactive-messaging-1.0/microprofile-reactive-messaging-spec.html#_message_acknowledgement[in the specification].
+In simple cases, where there's a 1:1 correlation between incoming and outgoing messages, Open Liberty handles linking up the acknowledgements like this for you. However, where it can't be sure that this is the case, it defaults to acknowledging messages _before_ they're processed. The default acknowledgement policy for each method signature is listed https://download.eclipse.org/microprofile/microprofile-reactive-messaging-1.0/microprofile-reactive-messaging-spec.html#_message_acknowledgement[in the specification].
 
-This default ensures that all messages will be acknowledged, however acknowledging messages before they're fully processed means that if the system fails, the processing for that message won't be retried, possibly resulting in lost messages.
+This default ensures that all messages are acknowledged, however acknowledging messages before they're fully processed means that if the system fails, the processing for that message isn't retried, possibly resulting in lost messages.
 
 To ensure that messages are not lost, you must:
 
-1. https://download.eclipse.org/microprofile/microprofile-reactive-messaging-1.0/microprofile-reactive-messaging-spec.html#_message_acknowledgement[Check the specification] to see whether reactive messaging will do message acknowledgements before (Pre-process) or after (post-process) the message processing, for your methods.
-1. If it will do pre-processing, either:
-  * change your method signature so that it will do post-processing
+1. https://download.eclipse.org/microprofile/microprofile-reactive-messaging-1.0/microprofile-reactive-messaging-spec.html#_message_acknowledgement[Check the specification] to see whether reactive messaging does message acknowledgements before (pre-process) or after (post-process) the message processing, for your methods.
+1. If it does pre-processing, either:
+  * change your method signature so that it does post-processing
   * use manual acknowledgement instead
 
 === Using manual acknowledgement
@@ -298,7 +299,7 @@ You can enable debug logging of the reactive messaging feature by setting the tr
 <logging traceSpecification="REACTIVEMESSAGE=all"/>
 ----
 
-If you're using the Kafka connector, you might find it helpful to control logging from the Kafka client. The Kafka client uses slf4j for logging and to integrate this with OpenLiberty's logging, you need to include the slf4j-jdk14 library alongside the Kafka client library. You can include this maven depedency:
+If you're using the Kafka connector, you might find it helpful to control logging from the Kafka client. The Kafka client uses slf4j for logging and to integrate this with OpenLiberty's logging, you need to include the slf4j-jdk14 library alongside the Kafka client library. You can include this Maven depedency:
 
 [source,xml]
 ----
@@ -318,13 +319,13 @@ After doing this, you can enable trace logging for both the reactive messaging f
 
 == Relationship to other specifications
 
-MicroProfile Reactive Messaging makes use of and interoperates with two other specifications.
+MicroProfile Reactive Messaging makes use of and interoperates with two other specifications:
 
 * http://www.reactive-streams.org/[Reactive Streams] is a specification for doing asynchronous stream processing with back pressure. It defines a minimal set of interfaces to allow components which do this sort of stream processing to be connected together.
 
 * https://github.com/eclipse/microprofile-reactive-streams-operators/releases[MicroProfile Reactive Streams Operators] is a MicroProfile specification which builds on Reactive Streams to provide a set of basic operators to link different reactive components together and to perform processing on the data which passes between them.
 
-When you use the MicroProfile Reactive Messaging `@Incoming` and `@Outgoing` annotations, OpenLiberty creates a Reactive Streams component for each method and joins them up by matching the channel names.
+When you use the MicroProfile Reactive Messaging `@Incoming` and `@Outgoing` annotations, Open Liberty creates a Reactive Streams component for each method and joins them up by matching the channel names.
 
 In addition, MicroProfile Reactive Messaging supports annotated method which return types from Reactive Streams and Reactive Streams Operators, allowing the user to implement their logic with other libraries which can create these types. For example, they could use the `ProcessorBuilder<I, O> method()` method signature and return a `ProcessorBuilder` created using the Reactive Streams Operators API. The full list of supported method signatures can be found https://download.eclipse.org/microprofile/microprofile-reactive-messaging-1.0/microprofile-reactive-messaging-spec.html#_supported_method_signatures[in the specification].
 
