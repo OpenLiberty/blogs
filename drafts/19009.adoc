@@ -22,8 +22,8 @@ In Open Liberty 19.0.0.9:
 * <<mpreactive,Reactive messaging in microservices (MicroProfile Reactive Messaging 1.0)>>
 * <<testingdb,Testing database connections in Liberty apps with REST APIs (REST Connector 2.0)>>
 * <<oidc, OpenID Connect>>
-* <<#seOCsaOt, Support encrypting OAuth 2.0 clients secrets and OAuth 2.0 tokens>>
-* <<SPiLOS, Support PKCE in liberty oidc server>>
+* <<encryptoauth, Support encrypting OAuth 2.0 clients secrets and OAuth 2.0 tokens>>
+* <<pkce, Support PKCE in liberty oidc server>>
 
 
 //If you're curious about what's coming in future Open Liberty releases, take a look at our <<previews,previews in the latest development builds>>. In particular, get an early insight into MicroProfile Reactive Messaging. [None in 19009]
@@ -63,13 +63,14 @@ Or take a look at our link:/downloads/[Downloads page].
 [link=https://stackoverflow.com/tags/open-liberty]
 image::/img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="center"]
 
+//
 
 [#mpreactive]
 === Reactive messaging in microservices (MicroProfile Reactive Messaging)
 
 An application using reactive messaging is composed of CDI beans consuming, producing, and processing messages passing along reactive streams. These messages can be internal to the application or can be sent and received via different message brokers.
 
-Reactive Messaging provides a very easy to use way to send, receive, and process messages. With MicroProfile Reactive Messaging, you can annotate application beans' methods to have messages on a particular channel (@Incoming, @Outgoing, or both) and Liberty drives those methods appropriately as reactive streams publishers, subscribers, or processors.
+Reactive Messaging provides a very easy to use way to send, receive, and process messages. With MicroProfile Reactive Messaging, you can annotate application beans' methods to have messages on a particular channel (`@Incoming`, `@Outgoing`, or both) and Liberty drives those methods appropriately as reactive streams publishers, subscribers, or processors.
 
 To enable the feature include it in your `server.xml` feature list:
 
@@ -138,7 +139,7 @@ This is an early release of the Open Liberty Reactive Messaging Kafka connector.
 Find out more in the link:https://download.eclipse.org/microprofile/microprofile-reactive-messaging-1.0/microprofile-reactive-messaging-spec.pdf[MicroProfile Reactive Messaging spec].
 
 
----
+//
 
 [#testingdb]
 === Testing database connections in Liberty apps with REST APIs
@@ -173,16 +174,13 @@ To find out more, check out this link:/blog/2019/05/24/testing-database-connecti
 
 
 [#oidc]
-== OpenID Connect Server 
+== Managing tokens on a Liberty Open ID Connect provider (OpenID Connect Server)
 
-OpenID Connect is a technology that allows delegation of user authentication to an external security provider.
+OpenID Connect is a technology that allows delegation of user authentication to an external security provider. Liberty's OpenID Connect Server feature now includes support for long-lived application passwords and application tokens that can be used by non-browser applications. The non-browser applications can then use them to access secured resources on servers that are configured to accept OAuth access tokens from the OpenID Connect server. The user's password is never exposed to the non-browser app, and the tokens can be revoked independently if needed. App-passwords are exchanged repetitively by the non-browser app for short-lived access tokens using a standard OAuth ROPC flow. So if an access token is ever compromised, it is not valid for long. App-tokens are long-lived access tokens.
 
-Liberty's OpenID Connect Server feature now includes support for long lived application passwords and application tokens, for use by non browser applications. Users can acquire these and submit them to a non-browser application, which can then use them to access secured resources on servers configured to accept OAuth access tokens from the OpenID Connect server. The user's password is never exposed to the non-browser app, and the tokens can be revoked independently if needed. App-passwords are exchanged repetitively by the non-browser app for short lived access tokens using a standard OAuth ROPC flow, so if an access token is ever compromised, it is not valid for long. App-tokens are long lived access tokens.
+Web and REST interfaces for users and administrators are added to administer these tokens. The Admin UI can be used for managing client registration.
 
-Web and REST interfaces for users and administrators are added to administer these tokens.
-A new UI for managing client registration is also added.
-
-To give it a go, create a new Liberty server and use this `server.xml`. Comments in server.xml explain the new configuration attributes. This server doesn't have a backing database so is for demo purposes only.
+To give it a go, create a new Liberty server and use this `server.xml`. Comments in `server.xml` explain the new configuration attributes. This server doesn't have a backing database because it is for demo purposes only.
 
 [source,xml]
 ----
@@ -261,26 +259,33 @@ To give it a go, create a new Liberty server and use this `server.xml`. Comments
 ----
 
 Now users can request and manage their own tokens at
-https://host:port/oidc/endpoint/(provider id)/personalTokenManagement. Token admins can administer the tokens of other users at https://host:port/oidc/endpoint/(provider id)/usersTokenManagement. Servers using a database (not this demo) can now manage client registration at https://host:port/oidc/endpoint/(provider id)/clientManagement.
+`https://host:port/oidc/endpoint/(provider id)/personalTokenManagement`:
 
-To try it out, start the server and log in as admin, adminpwd at
+image::/img/blog/sec-adminui-tokens2.png[Manage personal tokens in Admin UI]
+
+Token admins can administer the tokens of other users at `https://host:port/oidc/endpoint/(provider id)/usersTokenManagement`:
+
+image::/img/blog/sec-adminui-tokens3.png[Delete tokens in Admin UI]
+
+Servers using a database (not this example) can now manage client registration at `https://host:port/oidc/endpoint/(provider id)/clientManagement`:
+
+image::/img/blog/sec-adminui-tokens4.png[Manage OAuth clients in Admin UI]
+
+
+To try it out, start the server and log in as `admin`, `adminpwd` at
 https://localhost:29443/oidc/endpoint/OP/personalTokenManagement
 
-Your app-passwords and tokens might look something like this:
+These tokens can be submitted to non-browser applications, which can in turn use them when accessing secured resources on servers that are configured to accept access tokens from the OpenID Connect server.
 
-https://user-images.githubusercontent.com/26486297/63465347-a9517500-c426-11e9-8a4a-b7356072617d.png
+//
 
-
-These tokens can be submitted to non-browser applications, which can in turn use them when accessing secured resources on servers configured to accept access tokens from the OpenID Connect server.
-
----
-[#seOCsaOt]
+[#encryptoauth]
 === Support encrypting OAuth 2.0 clients secrets and OAuth 2.0 tokens
 
 OpenID Connect is an interoperable single-sign on protocol based on the OAuth 2.0 specifications,
-and it lets users to sign on to multiple websites without having to provide password to website.
+and it lets users to sign on to multiple websites without having to provide password to website. Liberty's OpenID Connect Provider used to require database/volume encryption to protect the OAuth access token and client secrets. With this update, Liberty's OpenID Connect provider can be configured to secure both access token and client secret in the same way as user password, and store them as password hashes based on PBKDF2WithHmacSHA512 algorithm in addition to security.
 
-Liberty OpenID Connect Provider used to require database/volume encryption to protect the OAuth access_token and clients secrets. With this update, Liberty OpenID Connect provider can be configured to secure both access_token and client secret in the same way as user password, and store them as password hashes based on PBKDF2WithHmacSHA512 algorithm in addition to security.
+To configure the server, edit the `server.xml`
 
 [source,xml]
 <server>
@@ -315,8 +320,6 @@ Liberty OpenID Connect Provider used to require database/volume encryption to pr
 		</clientManager>
 	</oauth-roles>
 
-
-	
 	<jdbcDriver id="DerbyEmbedded">
 		<library>
 			<fileset
@@ -364,7 +367,9 @@ Liberty OpenID Connect Provider used to require database/volume encryption to pr
 </server>
 
 ---
-[#SPiLOS]
+
+
+[#pkce]
 === Support PKCE in liberty oidc server
 
 This  feature is related to openidConnectServer-1.0
