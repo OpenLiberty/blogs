@@ -1,5 +1,13 @@
 # Contributing to the blog
-Fork this repository and write your blog post. Create a pull request with the content of the blog post placed in the `drafts` folder using the following file naming scheme: `YYYY-MM-DD-post-title.extension`.  Blogs are written in [AsciiDoc](https://asciidoctor.org/docs/asciidoc-writers-guide/) format with a file extension of `.adoc`. In the blog post file the following front matter variables must be set:
+
+1. Fork this repository and clone.
+2. Create a new blog post file in the `drafts` folder with the file name `post-title.adoc`.
+3. Write your blog post in there then create a pull request with @lauracowen and anyone else as reviewer.
+4. After resolving any problems and making any edits, the post will be published by moving it to the `publish` folder and renaming the file to `YYYY-MM-DD-post-title.adoc`.
+
+Blogs are written in [AsciiDoc](https://asciidoctor.org/docs/asciidoc-writers-guide/) format with a file extension of `.adoc`.
+
+In the blog post file the following front matter variables must be set:
 - layout: post
 - title: `title of the blog post`
 - categories: blog
@@ -20,6 +28,13 @@ Fork this repository and write your blog post. Create a pull request with the co
 `img/blog` folder contains images used in the blog `adoc` files
 
 Once approved (ask `lauracowen`, or `NottyCode` as backup, to review/approve your PR), the blog post will be moved from `drafts` to `publish`.
+
+### Adding tags to your blog post
+
+To add tags to your post, please open a pull request with your edits to [blog_tags.json](https://github.com/OpenLiberty/openliberty.io/blob/master/src/main/content/blog_tags.json). You simply need to add the title of your post (without the date and file extension) to the `posts` array under the tags you want to use. (For example, if the file name is 2019-08-15-blog-post.adoc, you would just add `"blog-post"`).
+
+You can request a review from `ellenwyllie` or `steven1046` if you are unsure who to ask.
+
 
 ### Blog posts with multiple authors
 
