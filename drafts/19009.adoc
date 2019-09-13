@@ -21,9 +21,9 @@ In Open Liberty 19.0.0.9:
 
 * <<mpreactive,Reactive messaging in microservices (MicroProfile Reactive Messaging 1.0)>>
 * <<testingdb,Testing database connections in Liberty apps with REST APIs (REST Connector 2.0)>>
-* <<oidc, OpenID Connect>>
-* <<encryptoauth, Support encrypting OAuth 2.0 clients secrets and OAuth 2.0 tokens>>
-* <<pkce, Support PKCE in liberty oidc server>>
+* <<oidc,Managing tokens on a Liberty Open ID Connect provider (OpenID Connect Server 1.0)>>
+* <<encryptoauth,Support OAuth 2.0 client secret and access token hashing (OpenID Connect Server 1.0)>>
+* <<pkce,Support for PKCE in Liberty OpenID Connect providers (OpenID Connect Server 1.0)>>
 
 
 //If you're curious about what's coming in future Open Liberty releases, take a look at our <<previews,previews in the latest development builds>>. In particular, get an early insight into MicroProfile Reactive Messaging. [None in 19009]
@@ -175,16 +175,19 @@ To find out more, check out this link:/blog/2019/05/24/testing-database-connecti
 
 
 [#oidc]
-== Managing tokens on a Liberty Open ID Connect provider (OpenID Connect Server)
+== Managing tokens on a Liberty Open ID Connect provider (OpenID Connect Server 1.0)
 
-OpenID Connect is a technology that allows delegation of user authentication to an external security provider. Liberty's OpenID Connect Server feature now includes support for long-lived application passwords and application tokens that can be used by non-browser applications. The non-browser applications can then use them to access secured resources on servers that are configured to accept OAuth access tokens from the OpenID Connect server. The user's password is never exposed to the non-browser app, and the tokens can be revoked independently if needed. App-passwords are exchanged repetitively by the non-browser app for short-lived access tokens using a standard OAuth ROPC flow. So if an access token is ever compromised, it is not valid for long. App-tokens are long-lived access tokens.
+The Liberty OpenID Connect Server feature can now generate application passwords and application tokens for non-interactive (e.g. non-browser) clients to authenticate into OAuth protected resource services. The application password is an alternative password that you can use like a normal password in OAuth resource owner password grant type. The application token is a long-lived OAuth access token that is used like a normal OAuth access token.
 
-Web and REST interfaces for users and administrators are added to administer these tokens. The Admin UI can be used for managing client registration.
+The applications can then use them to access secured resources on servers that are configured to accept OAuth access tokens from the OpenID Connect server. The user's password is never exposed to the app, and the tokens can be revoked independently if needed. App-passwords are exchanged repetitively by the non-browser app for short-lived access tokens using a standard OAuth ROPC flow. So if an access token is ever compromised, it is not valid for long. App-tokens are long-lived access tokens.
+
+The tokens can be administered using REST interfaces and the Admin Center.
 
 To give it a go, create a new Liberty server and use this `server.xml`. Comments in `server.xml` explain the new configuration attributes. This server doesn't have a backing database because it is for demo purposes only.
 
-[source,xml]
-----
++++ <div class="listingblock"> +++
++++ <div class="content"> +++
++++<pre style="height: 50vh; overflow-y:auto; overflow-x:auto;" class="CodeRay highlight"><code data-lang="xml">
 <server>
     <featureManager>      
       <feature>openidConnectServer-1.0</feature>     
@@ -256,35 +259,36 @@ To give it a go, create a new Liberty server and use this `server.xml`. Comments
     <httpEndpoint id="defaultHttpEndpoint" host="*" httpPort="29080" httpsPort="29443" />
     <keyStore id="defaultKeyStore" password="keyspass" />  
 
-</server>
-----
+</server>+++
++++ </code></pre> +++
++++ </div> +++
++++ </div> +++
+
 
 Now users can request and manage their own tokens at
-`https://host:port/oidc/endpoint/(provider id)/personalTokenManagement`:
+`\https://host:port/oidc/endpoint/(provider id)/personalTokenManagement`:
 
 image::/img/blog/sec-adminui-tokens2.png[Manage personal tokens in Admin UI]
 
-Token admins can administer the tokens of other users at `https://host:port/oidc/endpoint/(provider id)/usersTokenManagement`:
+Token admins can administer the tokens of other users at `\https://host:port/oidc/endpoint/(provider id)/usersTokenManagement`:
 
 image::/img/blog/sec-adminui-tokens3.png[Delete tokens in Admin UI]
 
-Servers using a database (not this example) can now manage client registration at `https://host:port/oidc/endpoint/(provider id)/clientManagement`:
+Servers using a database (not this example) can now manage client registration at `\https://host:port/oidc/endpoint/(provider id)/clientManagement`:
 
 image::/img/blog/sec-adminui-tokens4.png[Manage OAuth clients in Admin UI]
 
 
 To try it out, start the server and log in as `admin`, `adminpwd` at
-`https://localhost:29443/oidc/endpoint/OP/personalTokenManagement`
+`\https://localhost:29443/oidc/endpoint/OP/personalTokenManagement`
 
-These tokens can be submitted to non-browser applications, which can in turn use them when accessing secured resources on servers that are configured to accept access tokens from the OpenID Connect server.
 
 //
 
 [#encryptoauth]
-== Support encrypting OAuth 2.0 clients secrets and OAuth 2.0 tokens (OpenID Connect Server 1.0)
+== Support OAuth 2.0 client secret and access token hashing (OpenID Connect Server 1.0)
 
-OpenID Connect is an interoperable single-sign on protocol based on the OAuth 2.0 specifications,
-and it lets users to sign on to multiple websites without having to provide password to website. Liberty's OpenID Connect Provider used to require database/volume encryption to protect the OAuth access token and client secrets. With this update, Liberty's OpenID Connect provider can be configured to secure both access token and client secret in the same way as user password, and store them as password hashes based on PBKDF2WithHmacSHA512 algorithm in addition to security.
+In Openid Connect Server, you can now store OAuth client secret and access token in cryptographic hash forms like password hash to mitigate data breach if database is compromised. Liberty's OpenID Connect Provider used to require database/volume encryption to protect the OAuth access token and client secrets. With this update, Liberty's OpenID Connect provider can be configured to secure both access token and client secret in the same way as the user password, and store them as password hashes based on PBKDF2WithHmacSHA512 algorithm in addition to security.
 
 To configure the server, edit the `server.xml`
 
@@ -292,11 +296,16 @@ To configure the server, edit the `server.xml`
 ----
 <server>
 	<featureManager>
-		<feature>oauth-2.0</feature>
+		<feature>openidConnectServer-1.0</feature>
 		<feature>ssl-1.0</feature>
 		<feature>jdbc-4.0</feature>
 		<feature>jndi-1.0</feature>
 	</featureManager>
+
+        <openidConnectProvider id="OP" oauthProviderRef="OAuthConfigDerby"
+               signatureAlgorithm="RS256" keyStoreRef="defaultKeyStore"   
+               jwkEnabled="true"  >
+        </openidConnectProvider>
 
 	<basicRegistry
 		id="basic"
@@ -314,7 +323,7 @@ To configure the server, edit the `server.xml`
 	<oauth-roles>
 		<authenticated>
 			<user name="testuser" />
-			
+
 		</authenticated>
 		<clientManager>
 			<user name="testuser" />
@@ -335,7 +344,7 @@ To configure the server, edit the `server.xml`
 		jndiName="jdbc/OAuth2DB"
 		jdbcDriverRef="DerbyEmbedded"
 	>
-       
+
 	<oauthProvider
 		id="OAuthConfigDerby"
 		filter="request-url%=ssodemo"
@@ -359,7 +368,7 @@ To configure the server, edit the `server.xml`
 	<javaPermission
 		className="java.net.SocketPermission"
 		name="" [ToDO: there is an asterisk sign in the quotation marks]
-		actions="connect,resolve" 
+		actions="connect,resolve"
     />
 	<javaPermission
 		codebase="${server.config.dir}/derby/derby.jar"
@@ -374,10 +383,7 @@ To configure the server, edit the `server.xml`
 [#pkce]
 == Support for PKCE in Liberty OpenID Connect providers (OpenID Connect Server 1.0)
 
-OpenID Connect is an interoperable single-sign on protocol based on the OAuth 2.0 specifications,
-and it lets users to sign on multiple websites without having to provide password to website. The Open Liberty feature OpenID Connect provider now supports the OAuth 2.0 Authorization Code Flow with the Proof Key for Code Exchange (PKCE), which is defined in OAuth 2.0 RFC 7636.
-
-Before this support, the OAuth 2.0 public clients using the Authorization Code Grant are susceptible to the authorization code interception attack. The Proof Key for Code Exchange (PKCE, pronounced pixie) is a technique for public clients to mitigate the threat of code interception. The technique allows the client first creating a secret called `code_verifier` when requesting an authorization code, and then using that secret again when exchanging the authorization code for an access token. Additionally, the secret is sent to the authorization server as a hash called the `code_challenge` when requesting an authorization code. An attacker who intercepts the Authorization Code is now unable to redeem it for an access token, as they are not in possession of the `code_verifier` secret.
+Liberty Openid Connect Server now automatically enables the support of Proof Key for Code Exchange (PKCE) specification (OAuth 2.0 RFC 7636) to prevent interception of the OAuth authorization code. The Proof Key for Code Exchange (PKCE, pronounced pixie) is a technique for public clients to mitigate the threat of code interception. The technique allows the client first creating a secret called `code_verifier` when requesting an authorization code, and then using that secret again when exchanging the authorization code for an access token. Additionally, the secret is sent to the authorization server as a hash called the `code_challenge` when requesting an authorization code. An attacker who intercepts the authorization code is now unable to redeem it for an access token, as they are not in possession of the `code_verifier` secret.
 
 
 [source,xml]
