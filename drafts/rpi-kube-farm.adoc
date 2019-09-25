@@ -1,0 +1,345 @@
+---
+layout: post
+title: "Building a Kubernetes Cluster on a Raspberry Pi Official Way"
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/tomjenningss
+author_github: https://github.com/tomjenningss
+seo-title: Reactive messaging between microservices with MicroProfile on Open Liberty 19.0.0.9 - OpenLiberty.io
+seo-description: MicroProfile Reactive Messaging provides an easy way to send and receive messages within and between microservices using Kafka message brokers. Also introduces easier testing of your data source connections in Liberty apps with REST APIs, and some updates to OpenID Connect Server.
+blog_description: "MicroProfile Reactive Messaging provides an easy way to send and receive messages within and between microservices using Kafka message brokers. Also introduces easier testing of your data source connections in Liberty apps with REST APIs, and some updates to OpenID Connect Server."
+---
+= Building a Kubernetes Cluster on a Raspberry Pi: Official Way in 20 Steps
+Tom Jennings <https://github.com/tomjenningss>
+
+
+A concise blog on how to create a Kubernetes cluster in the correct order. If the Kubernetes documentation is confusing, follow this guide.
+It tells you what you need, the commands, and what they are doing..
+
+ ---
+
+== Contents:
+
+
+
+* <<prereq,Prerequisites>>
+* <<KandC,Understanding Kubernetes and Concepts>>
+* <<KCoRPI,Creating a Kubernetes cluster on a Raspberry Pi>>
+
+
+[#prereq]
+== Prerequesits
+
+==== Hardware:
+
+* Four link:/https://www.amazon.co.uk/Raspberry-Pi-3-Model-B/dp/B07BDR5PDW/ref=sr_1_3?keywords=raspberry+pi+3b%2B&qid=1568804412&s=gateway&sr=8-3[ Raspberry Pi 3 Model B+]
+
+
+* Two link:/https://www.amazon.co.uk/Anker-PowerCore-20100-20000mAh-Technology-Black/dp/B00VJSGT2A/ref=sr_1_5?crid=37HTN71P9O4DJ&keywords=anker+power+bank&qid=1568804550&s=gateway&sprefix=Anker+%2Caps%2C144&sr=8-5[Anker Ultra High Capacity Power Bank]
+
+
+* Four link:/https://www.amazon.co.uk/Anker-PowerCore-20100-20000mAh-Technology-Black/dp/B00VJSGT2A/ref=sr_1_5?crid=37HTN71P9O4DJ&keywords=anker+power+bank&qid=1568804550&s=gateway&sprefix=Anker+%2Caps%2C144&sr=8-5[32GB MicroSD Cards]
+
+* Four link:/https://www.amazon.co.uk/CABEPOW-Braided-Android-Charging-Motorola-3Pack-3M/dp/B07L1HDW4P/ref=sr_1_3?keywords=4+pack+red+cables+Micro+USB+cabepow&qid=1568807361&s=gateway&sr=8-3[Micro USB Cables]
+
+* Router
+
+==== Software:
+
+* link:/https://www.balena.io/etcher/[BalenaEtcher]
+
+* link:/https://www.docker.com/[Docker]
+
+* link:/https://https://www.raspberrypi.org/downloads/raspbian/[
+Raspbian Buster with desktop and recommended software]
+
+[#KandC]
+== Understanding Kubernetes
+
+Kubernetes is an <<os, open source>> system, <<co,container orchestration>> tool to manage, scale and automate the deployment of <<ca, containerised applications>>.
+
+Key Terminology:
+[#os]
+* Open Source 
+
+Open Source refers to a computer program in which the source code is available to the general public, for commercial use, study and modification.
+
+* Cluster
+
+A cluster is a set of computers (Raspberry Pi's) that run containerised applications, managed by Kubernetes. A Kubernetes cluster can have a minimum of one worker node and one master node.
+
+[#po]
+* Pods
+
+A pod represents a set of containers running in your cluster.
+ This is not to be confused with nodes. A pod runs inside of a node. 
+
+
+* Replica Set
+
+ReplicaSet ensures that the specified number of pod replicas wanted are running at one time. 
+
+* Images
+
+The instance of a container that holds a set of software needed to run an application.
+
+* Containers
+
+A container is an executable image that contains the software to run the application.
+
+[#co]
+* Container Orchestration
+
+Management of containers,  and removing containers to spread application load evenly across host infrastructure. 
+
+* Docker 
+
+Docker is open source software that containerises your applications for you, so you can run it on a Kubernetes cluster. This is what the application sits on. 
+
+* Kubernetes Master
+
+When you want to control the Kubernetes cluster, everything is done through the Master. 
+
+
+
+
+[#KCoRPI]
+== Creating a Kubernetes Cluster on a Raspberry Pi
+
+Run all commands on all RPI's. 
+Easiest way to do this is to SSH into all the Pi's, open up four terminal windows and run each command simultaiously.
+
+.1. Flashing OS onto Micro SD cards 
+Open balena etcher select the image, click select target image to check whether it is the right MicroSD card, and click flash. Do that four times for each Node.
+
+.2. Configure all Four Raspberry Pi's 
+
+Set up the configuration for the Raspberry Pi, plug the RPI into a monitor and follow the on screen set up instructions, and configure WIFI connection and when naming the Raspberry Pi's call them Master, Node1, Node2, Node3, as when you SSH into them from your laptop they will be called Master, Node1, Node2, Node3.
+
+
+.3. SSH into the Raspberry Pi. Enable SSH on the RPI Desktop by going to:
+* `Preferences` and select `Raspberry Pi Configuration` 
+
+* `Interfaces` and select `Enabled` next to SSH
+
+.4. Display IP Addresses
+
+Open the Terminal, and type `ifconfig` (InterFace CONFIGurator). It will display the IP address needed to SSH into the Raspberry Pi.
+
+.5. Validating WIFI Network on Raspberry Pi:
+
+Ensure you are on the same WIFI network as the Raspberry Pi, by clicking the WIFI symbol on the rapberry pi OS, and ensure it matches to the WIFI of PC.
+
+.7. SSH into the Pi:
+`ssh pi@<ip_address>`
+
+`example: ssh pi@192.168.0.1`
+
+.8. Very Important: Set static IP address' 
+
+When the RPI shuts down the Router will give the RPI a different IP address, and it will not work.
+
+To set static IP on Raspbian Buster:
+
+`sudo nano /etc/dhcpcd.conf` 
+
+`interface eth0 static ip_address=192.168.1.XX/24 static routers=192.168.1.1 static domain_name_servers=192.168.1.1.`
+
+`sudo reboot`
+
+=== Installing Container Runtime Interface (CRI)
+
+In later versions of Kubernetes, v1.6.0 (+), they can automatically detect the Container Runtime Interfaces (CRI) by scanning through a list of well known ports.
+
+.9. Docker
+
+There is a script to install Docker on ARM, for convenience which installs all the dependencies.
+
+`$ curl -fsSL get.docker.com | sudo bash`
+
+If you would like to know what the flag -fsSL is click link:/https://explainshell.com/explain?cmd=curl+-fsSLp[here]
+
+.10. Disable swapoff
+Swapoff disables devices and files for paging and swapping. Kubernetes needs to disable swapoff primarily for performance. if you do not disable swapoff, it will fail the pre-flight checks, and you will not be able to create the Kube-cluster.
+
+`sudo dphys-swapfile swapoff`
+
+`sudo swapon summary`
+
+
+.11. Edit the boot file
+
+`sudo nano /boot/cmdline.txt`
+
+Add: `cgroup_enable=cpuset cgroup_memory=1 cgroup_enable=memory`
+
+Add to the end of the line in the file. Do not create a new line.
+
+.12. Restart Raspberry Pi
+
+This restarts the Raspberry Pi, with it configured properly.
+
+`sudo reboot`
+
+.13. SSH Back into the Raspberry Pi
+
+`ssh pi@<ip_address>`
+
+=== Installing Kubernetes
+
+==== What does Kubeadm, Kubelet and Kubectl do?
+
+*  Kubeadm: Command to bootstrap the cluster. 
+
+This refers to the initial cluster. Bootstrapping means that you are defining which nodes, that should synchronise, and also makes a minimum viable Kubernetes cluster.
+
+* Kubelet: This tool starts pods, containers and runs on all machines.
+
+* Kubectl: This is what you will use most. It is the command to talk to your cluster, such as debugging and retrieving logs.
+
+`apt-get update && apt-get install -y apt-transport-https curl`
+
+.14. Adding the key
+
+This is pulling a key down from a Google Repository and applying it. If it works, and is applied, the output will be `ok`.
+
+`curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -`
+
+-s means silent. This means it will not show progress bar, or error messages. 
+
+
+.15. Adding the key to a file
+
+This opens up the file
+
+`cat <<EOF >/etc/apt/sources.list.d/kubernetes.list
+deb https://apt.kubernetes.io/ kubernetes-xenial main
+EOF`
+
+.16. Retrieve updates
+
+`apt-get update`
+
+.17. Installing kubelet kubeadm kubelet
+
+`apt-get install -y kubelet kubeadm kubectl`
+
+.18. Run command 
+
+`apt-mark hold kubelet kubeadm kubectl`
+
+If you are unsure about what 'apt-mark' and 'hold' does this is a useful webpage link:/http://manpages.ubuntu.com/manpages/bionic/man8/apt-mark.8.html[here]
+
+== Master Node Setup
+
+=== Pod Network add on 
+
+A Pod network add on means that the pods can communicate with eachother. Click here to see definition of <<po,pods>>
+
+This is confusing, and lots of people use different thrid party add-ons. We are going to use Calico. 
+
+.19. Pull down file for Calico
+`kubectl apply -f https://docs.projectcalico.org/v3.8/manifests/calico.yaml`
+
+=== Initialize Kubernetes on master node
+
+
+.20. This creates the Master node, and starts the Kubernetes cluster
+
+`kubeadm init --pod-network-cidr=192.168.0.0/16`
+
+Do not pass through `--token-ttl=0` as the argument as this is bad practice. Ensure that the Pod Network add on has been installed first. 
+
+The output looks like:
+
+[source, xml]
+
+[init] Using Kubernetes version: vX.Y.Z
+[preflight] Running pre-flight checks
+[preflight] Pulling images required for setting up a Kubernetes cluster
+[preflight] This might take a minute or two, depending on the speed of your internet connection
+[preflight] You can also perform this action in beforehand using 'kubeadm config images pull'
+[kubelet-start] Writing kubelet environment file with flags to file "/var/lib/kubelet/kubeadm-flags.env"
+[kubelet-start] Writing kubelet configuration to file "/var/lib/kubelet/config.yaml"
+[kubelet-start] Activating the kubelet service
+[certs] Using certificateDir folder "/etc/kubernetes/pki"
+[certs] Generating "etcd/ca" certificate and key
+[certs] Generating "etcd/server" certificate and key
+[certs] etcd/server serving cert is signed for DNS names [kubeadm-cp localhost] and IPs [10.138.0.4 127.0.0.1 ::1]
+[certs] Generating "etcd/healthcheck-client" certificate and key
+[certs] Generating "etcd/peer" certificate and key
+[certs] etcd/peer serving cert is signed for DNS names [kubeadm-cp localhost] and IPs [10.138.0.4 127.0.0.1 ::1]
+[certs] Generating "apiserver-etcd-client" certificate and key
+[certs] Generating "ca" certificate and key
+[certs] Generating "apiserver" certificate and key
+[certs] apiserver serving cert is signed for DNS names [kubeadm-cp kubernetes kubernetes.default kubernetes.default.svc kubernetes.default.svc.cluster.local] and IPs [10.96.0.1 10.138.0.4]
+[certs] Generating "apiserver-kubelet-client" certificate and key
+[certs] Generating "front-proxy-ca" certificate and key
+[certs] Generating "front-proxy-client" certificate and key
+[certs] Generating "sa" key and public key
+[kubeconfig] Using kubeconfig folder "/etc/kubernetes"
+[kubeconfig] Writing "admin.conf" kubeconfig file
+[kubeconfig] Writing "kubelet.conf" kubeconfig file
+[kubeconfig] Writing "controller-manager.conf" kubeconfig file
+[kubeconfig] Writing "scheduler.conf" kubeconfig file
+[control-plane] Using manifest folder "/etc/kubernetes/manifests"
+[control-plane] Creating static Pod manifest for "kube-apiserver"
+[control-plane] Creating static Pod manifest for "kube-controller-manager"
+[control-plane] Creating static Pod manifest for "kube-scheduler"
+[etcd] Creating static Pod manifest for local etcd in "/etc/kubernetes/manifests"
+[wait-control-plane] Waiting for the kubelet to boot up the control plane as static Pods from directory "/etc/kubernetes/manifests". This can take up to 4m0s
+[apiclient] All control plane components are healthy after 31.501735 seconds
+[uploadconfig] storing the configuration used in ConfigMap "kubeadm-config" in the "kube-system" Namespace
+[kubelet] Creating a ConfigMap "kubelet-config-X.Y" in namespace kube-system with the configuration for the kubelets in the cluster
+[patchnode] Uploading the CRI Socket information "/var/run/dockershim.sock" to the Node API object "kubeadm-cp" as an annotation
+[mark-control-plane] Marking the node kubeadm-cp as control-plane by adding the label "node-role.kubernetes.io/master=''"
+[mark-control-plane] Marking the node kubeadm-cp as control-plane by adding the taints [node-role.kubernetes.io/master:NoSchedule]
+[bootstrap-token] Using token: <token>
+[bootstrap-token] Configuring bootstrap tokens, cluster-info ConfigMap, RBAC Roles
+[bootstraptoken] configured RBAC rules to allow Node Bootstrap tokens to post CSRs in order for nodes to get long term certificate credentials
+[bootstraptoken] configured RBAC rules to allow the csrapprover controller automatically approve CSRs from a Node Bootstrap Token
+[bootstraptoken] configured RBAC rules to allow certificate rotation for all node client certificates in the cluster
+[bootstraptoken] creating the "cluster-info" ConfigMap in the "kube-public" namespace
+[addons] Applied essential addon: CoreDNS
+[addons] Applied essential addon: kube-proxy
+
+    Your Kubernetes control-plane has initialized successfully!
+
+    To start using your cluster, you need to run the following as a regular user:
+
+  mkdir -p $HOME/.kube
+  sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+  sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+    You should now deploy a pod network to the cluster.
+    Run "kubectl apply -f [podnetwork].yaml" with one of the options listed at:
+  /docs/concepts/cluster-administration/addons/
+
+    You can now join any number of machines by running the following on each node
+as root:
+
+  kubeadm join <control-plane-host>:<control-plane-port> --token <token> --discovery-token-ca-cert-hash sha256:<hash>
+
+
+Kubectl needs to work for non root users. This means not as a super user: 
+
+`mkdir -p $HOME/.kube` 
+
+`sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config`
+
+`sudo chown $(id -u):$(id -g) $HOME/.kube/config`
+
+=== On the Worker node, joing them to the master node by running the 
+
+`kubeadm join <control-plane-host>:<control-plane-port> --token <token> --discovery-token-ca-cert-hash sha256:<hash>`
+
+.19. kubectl get nodes. This will get the connected nodes and the master node. 
+
+NAME{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}STATUS{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}ROLES{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}AGE{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}VERSION
+
+Master{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}Ready{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}master{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}<age>{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}<v_Number>
+
+Node1 {nbsp}{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}Ready{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}worker{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}<age>{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}<v_Number>
+
+Node2 {nbsp}{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}Ready{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}worker{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}<age>{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}<v_Number>
+
+Node3 {nbsp}{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}Ready{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}worker{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}<age>{nbsp}{nbsp}{nbsp}{nbsp}{nbsp}<v_Number>
