@@ -1,0 +1,247 @@
+---
+layout: post
+title: "191000"
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/yasmin-aumeeruddy
+author_github: https://github.com/yasmin-aumeeruddy
+additional_authors: 
+ - name: Thomas Jennings
+   github: https://github.com/tomjenningss
+   image: https://avatars3.githubusercontent.com/tomjenningss
+seo-title: Configurable JSON log field names in Open Liberty 19.0.0.10
+seo-description: Open Liberty 19.0.0.10 provides the useful option to configure `JSON` field names so they can best match with other data and can all be viewed in the same visualisation in the logs.
+blog_description: "Open Liberty 19.0.0.10 provides the useful option to configure `JSON` field names so they can best match with other data and can all be viewed in the same visualisation in the logs."
+---
+= 19.10.0.0 Blog release
+Yasmin Aumeeruddy <https://github.com/yasmin-aumeeruddy>
+
+Open Liberty 19.0.0.10 provides the useful option to configure `JSON` field names so they can best match with other data and can all be viewed in the same visualisation in the logs. The update also allows custom login modules for JCA and JMS connection factories. Give it a try in link:/about/[Open Liberty] 19.0.0.10.
+
+In Open Liberty 19.0.0.10:
+
+* <<jlog,Configurable JSON log field names>>
+* <<jca, Custom login modules for JCA and JMS connection factories>>
+
+If you're curious about what's coming in future Open Liberty releases, take a look at our <<previews,previews in the latest development builds>>. In particular, get an early insight into  <<hm21,support for the MicroProfile Metrics 2.1 specification.>>
+
+[#run]
+== Run your apps using 19.0.0.10
+
+If you're using link:/guides/maven-intro.html[Maven], here are the coordinates:
+
+[source,xml]
+----
+<dependency>
+    <groupId>io.openliberty</groupId>
+    <artifactId>openliberty-runtime</artifactId>
+    <version>19.0.0.10</version>
+    <type>zip</type>
+</dependency>
+----
+
+Or for link:/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+dependencies {
+    libertyRuntime group: 'io.openliberty', name: 'openliberty-runtime', version: '[19.0.0.10,)'
+}
+----
+
+Or if you're using Docker:
+
+[source]
+----
+docker pull open-liberty
+----
+
+Or take a look at our link:/downloads/[Downloads page].
+
+[link=https://stackoverflow.com/tags/open-liberty]
+image::/img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="center"]
+
+[#jlog]
+== Configurable JSON log field names
+
+Logging configuration in Open Liberty has been updated. Server logs can now be formatted in `basic` or `JSON` format. When logs are in `JSON` format, the sources (message, trace, accessLog, ffdc, audit) to send to `messages.log` or `console.log`/`standard-out` must be specified.
+
+The option to configure `JSON` field names in Open Liberty is extremely useful, since Open Liberty field names may differ from other container field names. For example, an Open Liberty message is referred to by the field name "message", while another container's message ends up in a field called "log". Previously, two different visualisations of the messages would show in the logs on a dashboard; however, you can now modify the Open Liberty output field names. This means that they can best match with other data and can all be viewed in the same visualisation.
+
+When logs are in `JSON` format, you can use the `jsonFieldMappings` attribute to replace default field names with new field names. To configure the new field name for all sources, use the following format: 
+[source]
+defaultFieldName:newFieldName
+
+To configure the new field name for a specific source, use the following format:
+[source]
+source:defaultFieldName:newFieldName 
+
+where `source` is the source you want to specify (such as message, trace, accessLog, ffdc, audit).
+
+An example of configuring JSON field name by adding the following to bootstrap.properties:
+[source]
+com.ibm.ws.logging.json.field.mappings=trace:message:log,ibm_datetime:datetime
+
+For more information on logging:
+
+* link:https://openliberty.io/docs/ref/config/#logging.html[References]
+* link:https://www.ibm.com/support/knowledgecenter/en/SSEQTP_liberty/com.ibm.websphere.wlp.doc/ae/rwlp_logging.html[Configuration]
+
+[#jca]
+== Custom login modules for JCA and JMS connection factories (jca-1.7 and jms-2.0)
+
+An update to the Java Connector Architecture (JCA) and Java Message Service (JMS) features allows you to specify, within the server configuration, a default JAAS custom login module to use for container managed authentication to JCA and JMS connection factories.
+
+Prior to this release, a JAAS custom login module could only be specified within the application itself for JCA and JMS connection factories. With this release, the following server configuration elements have added the ability to specify a default JAAS custom login module:
+
+* `connectionFactory`
+* `jmsConnectionFactory`
+* `jmsQueueConnectionFactory`
+* `jmsTopicConnectionFactory`
+
+Beside these, `dataSource` element already had this capability prior to this release.
+
+To enable the feature in the `server.xml` file:
+[source,xml]
+  <featureManager>
+    <feature>appSecurity-2.0</feature>
+    <feature>jca-1.7</feature>
+    ... other features
+  </featureManager>
+  <resourceAdapter id="myAdapter" location="${server.config.dir}/resourceadapters/example-adapter.rar"/>
+  <connectionFactory jndiName="eis/cf" jaasLoginContextEntryRef="customLoginEntry">
+    <properties.myAdapter hostName="myhost.openliberty.io" portNumber="8765"/>
+  </connectionFactory>
+  <jaasLoginContextEntry id="customLoginEntry" name="customLoginEntry" loginModuleRef="customLoginModule"/>
+  <jaasLoginModule id="customLoginModule" className="org.example.MyLoginModule" controlFlag="REQUIRED">
+    <library>
+      <file name="${server.config.dir}/myCustomLoginModule.jar"/>
+    </library>
+  </jaasLoginModule>
+
+For more information:
+
+* link:https://www.ibm.com/support/knowledgecenter/en/SSEQTP_liberty/com.ibm.websphere.wlp.doc/ae/twlp_config_jaas_db_auth.html[Configuring JAAS for database authentication]
+
+[#previews]
+
+== Previews of early implementations available in development builds
+
+* <<JMOT,Jaeger for Microprofile OpenTracing>>
+* <<hc21,MicroProfile Health Check 2.1>>
+* <<hm21,MicroProfile Metrics 2.1>>
+
+[#JMOT]
+== Jaeger for MicroProfile OpenTracing (jaeger-1.0)
+
+Open Liberty has the support of MicroProfile OpenTracing. A sample tracer was provided link:https://github.com/WASdev/sample.opentracing.zipkintracer[here] for using Zipkin as a tracing backend. With the introduction of `jaeger-1.0`, developers can also use Jaeger as a tracing backend.
+
+You will need to download the Jaeger client version 0.34.0 library and its dependencies from the link:/https://mvnrepository.com/artifact/io.jaegertracing/jaeger-client/0.34.0[Maven repository.]
+
+To enable the feature in the `server.xml` file:
+
+* Add `<feature>jaeger-1.0</feature>` under the `<featureManager>` section.
+
+* Add the following snippet:
+
+[source, xml]
+
+<library id="jaegerLib" apiTypeVisibility="api,ibm-api,spec,stable,third-party" >
+        <file name="<path>/jaegerLib_0.34/gson-2.8.2.jar" />
+        <file name="<path>/jaegerLib_0.34/jaeger-client-0.34.0.jar" />
+        <file name="<path>/jaegerLib_0.34/jaeger-core-0.34.0.jar" />
+        <file name="<path>/jaegerLib_0.34/jaeger-thrift-0.34.0.jar" />
+        <file name="<path>/jaegerLib_0.34/jaeger-tracerresolver-0.34.0.jar" />
+        <file name="<path>/jaegerLib_0.34/libthrift-0.12.0.jar" />
+        <file name="<path>/jaegerLib_0.34/slf4j-api-1.7.25.jar" />
+        <file name="<path>/jaegerLib_0.34/slf4j-jdk14-1.7.25.jar" />
+        <file name="<path>/jaegerLib_0.34/opentracing-util-0.31.0.jar" />
+        <file name="<path>/jaegerLib_0.34/opentracing-noop-0.31.0.jar" />
+    </library>
+
+* Define your application:
+
+[source, xml]
+
+ <webApplication location="yourapp.war" contextRoot="/yourapp">
+        <!-- enable visibility to third party apis -->
+        <classloader commonLibraryRef="jaegerLib"
+            apiTypeVisibility="api,ibm-api,spec,stable,third-party" />
+    </webApplication>
+
+For the `JAEGER_PASSWORD`, the password can be encoded using the `securityUtility` command.
+
+Depending on Jaeger's sampling settings `JAEGER_SAMPLER_TYPE` and `JAEGER_SAMPLER_PARAM`, Jaeger may not report every span created by the applications.
+
+For more information:
+
+* link:/https://github.com/jaegertracing/jaeger-client-java/blob/10c641f8df6316f1eac4d5b1715513275bcd724e/jaeger-core/README.md[Set up Jaeger settings using environment variables]
+
+[#hc21]
+== MicroProfile Health Check 2.1 (mpHealth-2.1)
+
+MicroProfile Health Check 2.1 enables you to provide your own health check procedures to be invoked by Liberty, to verify the health of your microservice.
+
+`HealthCheckResponse.up("myCheck");`
+
+In previous versions, to define a simple successful/failed named health check response, the application level code is always expected to use several static methods together from the HealthCheckResponse API, to retrieve a HealthCheckResponseBuilder used to construct a HealthCheck response.
+
+In mpHealth-2.1 feature for OpenLiberty, you can now use convenient and simpler methods from standard Java APIs, to construct UP/DOWN named health check responses, in your applications, such as;
+
+`HealthCheckResponse.named(“myCheck”).up().build();`
+
+To make it work include the following in the `server.xml` file:
+
+[source, xml]
+<feature>mpHealth-2.1</feature>
+
+Applications are expected to provide health check procedures, by implementing the HealthCheck interface with the @Liveness or @readiness annotations, which will be used by Liberty to verify the Liveness or Readiness of the application, respectively. Add the logic of your health check in the call() method, and return the HealthCheckResponse object, by constructing using the simple up()/down() methods from the API. To view the status of each health check, access the either the `+http://<hostname>:<port>/health/live+` or `+http://<hostname>:<port>/health/ready+` endpoints.
+
+[source, xml]
+
+**Liveness Check**
+@Liveness
+@ApplicationScoped
+public class AppLiveCheck implements HealthCheck {
+...
+    @Override
+     public HealthCheckResponse call() {
+       ...
+       HealthCheckResponse.up("myCheck");
+       ...
+     }
+}
+
+For more information:
+
+* link:https://github.com/eclipse/microprofile-health/releases/tag/2.1[MicroProfile Health Check 2.1 Release Page]
+* link:http://download.eclipse.org/microprofile/microprofile-health-2.1/apidocs/[Javadocs]
+* link:https://download.eclipse.org/microprofile/microprofile-health-2.1/microprofile-health-spec.html[Specification document]
+
+
+[#hm21]
+== MicroProfile Metrics 2.1 (mpMetrics-2.1)
+
+MicroProfile Metrics 2.1 allows you to instrument metrics in microservice applications for easy monitoring. Previously, the Gauge metric was intended to sample numerical values only, but users could sample non-numeric values (such as String). MicroProfile Metrics 2.1 restricts the scope such that Gauge can only sample numbers now.
+
+Previously, the MetadataBuilder API had `reusable()` and `notReusable()` method to set the reusable field to true or false. The MetadataBuilder API has been changed to include a new setter method for the reusable attribute. This change is implemented so the MetadataBuilder API follows the builder pattern.
+
+To enable the feature in the `server.xml` file:
+[source]
+<feature>mpMetrics-2.1</feature>
+
+
+The following is an example of how to set the reusable field with the MetadataBuilder API:
+[source]
+MetadataBuilder mdb = Metadata.builder();
+
+[source]
+mdb = mdb.withName("metricName").withType(MetricType.COUNTER)
+  .reusable(resolveIsReusable());
+
+For more information: 
+
+* link:https://github.com/eclipse/microprofile-metrics/releases/tag/2.1.0[Changes to MicroProfile metrics]
+
+== Get Liberty 19.10.0.0 now
+
+Available through <<run,Maven, Gradle, Docker, and as a downloadable archive>>.
