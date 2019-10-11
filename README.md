@@ -29,6 +29,7 @@ In the blog post file the following front matter variables must be set:
 
 Once approved (ask `lauracowen`, or `NottyCode` as backup, to review/approve your PR), the blog post will be moved from `drafts` to `publish`.
 
+
 ### Adding tags to your blog post
 
 To add tags to your post, please open a pull request with your edits to [blog_tags.json](https://github.com/OpenLiberty/openliberty.io/blob/master/src/main/content/blog_tags.json). You simply need to add the title of your post (without the date and file extension) to the `posts` array under the tags you want to use. (For example, if the file name is 2019-08-15-blog-post.adoc, you would just add `"blog-post"`).
@@ -54,6 +55,15 @@ additional_authors:
 If you would like to add a blog post that is actually a link to an existing third party blog post, you can follow the normal steps described above for creating a blog post. You simply need to add the following attributes to the liquid front matter: 
 - redirect_link: secure_url_to_3rd_party_post
 - permalink: /blog/redirected.html
+
+Also provide a level 1 heading eg:
+
+`= Creating a cool app with MicroProfile`
+
+### Troubleshooting
+
+Certain characters (eg apostrophe ' ) in the main heading are displayed incorrectly. To fix, escape with a backslash (`\`).
+eg `= Minimise turnaround times with Open Liberty\'s dev mode`
 
 # Docker container for development
 
