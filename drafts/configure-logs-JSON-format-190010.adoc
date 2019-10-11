@@ -1,6 +1,6 @@
 ---
 layout: post
-title: "190010"
+title: "Configure server logs in JSON format to simplify dashboards on Open Liberty 19.0.0.10"
 categories: blog
 author_picture: https://avatars3.githubusercontent.com/yasmin-aumeeruddy
 author_github: https://github.com/yasmin-aumeeruddy
@@ -8,11 +8,11 @@ additional_authors:
  - name: Thomas Jennings
    github: https://github.com/tomjenningss
    image: https://avatars3.githubusercontent.com/tomjenningss
-seo-title: Configurable JSON log field names in Open Liberty 19.0.0.10
+seo-title: Configure server logs in JSON format to simplify dashboards on Open Liberty 19.0.0.10
 seo-description: Open Liberty 19.0.0.10 provides the useful option to configure `JSON` field names so they can best match with other data and can all be viewed in the same visualisation in the logs.
 blog_description: "Open Liberty 19.0.0.10 provides the useful option to configure `JSON` field names so they can best match with other data and can all be viewed in the same visualisation in the logs."
 ---
-= 19.0.0.10 Blog release
+= Configure server logs in JSON format to simplify dashboards on Open Liberty 19.0.0.10
 
 Yasmin Aumeeruddy <https://github.com/yasmin-aumeeruddy>
 
@@ -62,29 +62,32 @@ Or take a look at our link:/downloads/[Downloads page].
 image::/img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="center"]
 
 [#jlog]
-== Configurable JSON log field names
+== Configurable JSON log field names (logging)
 
 Logging configuration in Open Liberty has been updated. Server logs can now be formatted in `basic` or `JSON` format. When logs are in `JSON` format, the sources (message, trace, accessLog, ffdc, audit) to send to `messages.log` or `console.log`/`standard-out` must be specified.
 
-The option to configure `JSON` field names in Open Liberty is extremely useful, since Open Liberty field names may differ from other container field names. For example, an Open Liberty message is referred to by the field name "message", while another container's message ends up in a field called "log". Previously, two different visualisations of the messages would show in the logs on a dashboard; however, you can now modify the Open Liberty output field names. This means that they can best match with other data and can all be viewed in the same visualisation.
+The option to configure `JSON` field names in Open Liberty is extremely useful, since Open Liberty field names may differ from other container field names. For example, an Open Liberty message is referred to by the field name `message`, while another container's message ends up in a field called `log`. Previously, two different visualisations of the messages would show in the logs on a dashboard; however, you can now modify the Open Liberty output field names. This means that they can best match with other data and can all be viewed in the same visualisation.
 
 When logs are in `JSON` format, you can use the `jsonFieldMappings` attribute to replace default field names with new field names. To configure the new field name for all sources, use the following format: 
 [source]
+----
 defaultFieldName:newFieldName
-
+----
 To configure the new field name for a specific source, use the following format:
 [source]
+----
 source:defaultFieldName:newFieldName 
-
+----
 where `source` is the source you want to specify (such as message, trace, accessLog, ffdc, audit).
 
 An example of configuring JSON field name by adding the following to bootstrap.properties:
 [source]
+----
 com.ibm.ws.logging.json.field.mappings=trace:message:log,ibm_datetime:datetime
-
+----
 For more information on logging:
 
-* link:https://openliberty.io/docs/ref/config/#logging.html[Logging and tracing]
+* link:https://openliberty.io//docs/ref/general/#logging.html[Logging and tracing]
 
 [#jca]
 == Custom login modules for JCA and JMS connection factories (jca-1.7 and jms-2.0)
@@ -102,6 +105,7 @@ Beside these, `dataSource` element already had this capability prior to this rel
 
 To enable the feature in the `server.xml` file:
 [source,xml]
+----
   <featureManager>
     <feature>appSecurity-2.0</feature>
     <feature>jca-1.7</feature>
@@ -117,7 +121,7 @@ To enable the feature in the `server.xml` file:
       <file name="${server.config.dir}/myCustomLoginModule.jar"/>
     </library>
   </jaasLoginModule>
-
+----
 For more information:
 
 * link:https://www.ibm.com/support/knowledgecenter/en/SSEQTP_liberty/com.ibm.websphere.wlp.doc/ae/twlp_config_jaas_db_auth.html[Configuring JAAS for database authentication]
@@ -128,32 +132,37 @@ For more information:
 
 You can now also try out early implementations of some new capabilities in the link:https://openliberty.io/downloads/#development_builds[latest Open Liberty development builds]:
 
-* <<hc21,MicroProfile Health Check 2.1>>
-* <<hm21,MicroProfile Metrics 2.1>>
+* <<hc21, Provide your own health check procedures>>
+* <<hm21,Monitor microservice applications easily wth metrics (mpMetrics-2.1)>>
 
-These early implementations are not available in 19.0.0.8 but you can try them out in our daily Docker image by running `docker pull openliberty/daily`. Let us know what you think!
+These early implementations are not available in 19.0.0.10 but you can try them out in our daily Docker image by running `docker pull openliberty/daily`. Let us know what you think!
 [#hc21]
-== MicroProfile Health Check 2.1 (mpHealth-2.1)
+== Provide your own health check procedures (mpHealth-2.1)
 
 MicroProfile Health Check 2.1 enables you to provide your own health check procedures to be invoked by Liberty, to verify the health of your microservice.
 
 [source,java]
+----
 HealthCheckResponse.up("myCheck");
+----
 
 In previous versions, to define a simple successful/failed named health check response, the application level code is always expected to use several static methods together from the HealthCheckResponse API, to retrieve a HealthCheckResponseBuilder used to construct a HealthCheck response.
 
-In mpHealth-2.1 feature for OpenLiberty, you can now use convenient and simpler methods from standard Java APIs, to construct UP/DOWN named health check responses, in your applications, such as;
+In `mpHealth-2.1` feature for OpenLiberty, you can now use convenient and simpler methods from standard Java APIs, to construct UP/DOWN named health check responses, in your applications, such as;
 
 `HealthCheckResponse.named(“myCheck”).up().build();`
 
 To make it work include the following in the `server.xml` file:
 
 [source, xml]
+----
 <feature>mpHealth-2.1</feature>
+-----
 
-Applications are expected to provide health check procedures, by implementing the HealthCheck interface with the `@Liveness` or `@Readiness` annotations, which will be used by Liberty to verify the Liveness or Readiness of the application, respectively. Add the logic of your health check in the call() method, and return the HealthCheckResponse object, by constructing using the simple up()/down() methods from the API. To view the status of each health check, access the either the `+http://<hostname>:<port>/health/live+` or `+http://<hostname>:<port>/health/ready+` endpoints.
+Applications are expected to provide health check procedures, by implementing the HealthCheck interface with the `@Liveness` or `@Readiness` annotations, which will be used by Liberty to verify the Liveness or Readiness of the application, respectively. Add the logic of your health check in the `call()` method, and return the HealthCheckResponse object, by constructing using the simple `up()`/`down()` methods from the API. To view the status of each health check, access the either the `+http://<hostname>:<port>/health/live+` or `+http://<hostname>:<port>/health/ready+` endpoints.
 
 [source, java]
+----
 **Liveness Check**
 @Liveness
 @ApplicationScoped
@@ -166,7 +175,7 @@ public class AppLiveCheck implements HealthCheck {
        ...
      }
 }
-
+----
 For more information:
 
 * link:https://github.com/eclipse/microprofile-health/releases/tag/2.1[MicroProfile Health Check 2.1 Release Page]
@@ -175,22 +184,24 @@ For more information:
 
 
 [#hm21]
-== MicroProfile Metrics 2.1 (mpMetrics-2.1)
+== Monitor microservice applications easily wth metrics (mpMetrics-2.1)
 
 MicroProfile Metrics 2.1 allows you to instrument metrics in microservice applications for easy monitoring. Previously, the Gauge metric was intended to sample numerical values only, but users could sample non-numeric values (such as String). MicroProfile Metrics 2.1 restricts the scope such that Gauge can only sample numbers now.
 
 Previously, the MetadataBuilder API had `reusable()` and `notReusable()` method to set the reusable field to true or false. The MetadataBuilder API has been changed to include a new setter method for the reusable attribute. This change is implemented so the MetadataBuilder API follows the builder pattern.
 
 To enable the feature in the `server.xml` file:
-[source]
+[source, xml]
+----
 <feature>mpMetrics-2.1</feature>
-
+----
 
 The following is an example of how to set the reusable field with the MetadataBuilder API:
-[source]
+[source, java]
+----
 MetadataBuilder mdb = Metadata.builder();
-
-[source]
+----
+[source, java]
 mdb = mdb.withName("metricName").withType(MetricType.COUNTER)
   .reusable(resolveIsReusable());
 
