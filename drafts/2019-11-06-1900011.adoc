@@ -1,0 +1,169 @@
+---
+layout: post
+title: "190011"
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/tomjenningss
+author_github: https://github.com/tomjenningss
+seo-title: Reactive messaging between microservices with MicroProfile on Open Liberty 19.0.0.11 - OpenLiberty.io
+seo-description: 
+---
+= Reactive messaging between microservices with MicroProfile on Open Liberty 19.0.0.9
+Tom Jennings <https://github.com/tomjenningss>
+
+
+
+Give it a try in link:/about/[Open Liberty] 19.0.0.11.
+
+In Open Liberty 19.0.0.11:
+
+* <<link,<links>>>
+
+[#run]
+== Run your apps using 19.0.0.11
+
+If you're using link:/guides/maven-intro.html[Maven], here are the coordinates:
+
+[source,xml]
+----
+<dependency>
+    <groupId>io.openliberty</groupId>
+    <artifactId>openliberty-runtime</artifactId>
+    <version>19.0.0.11</version>
+    <type>zip</type>
+</dependency>
+----
+
+Or for link:/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+dependencies {
+    libertyRuntime group: 'io.openliberty', name: 'openliberty-runtime', version: '[19.0.0.11,)'
+}
+----
+
+Or if you're using Docker:
+
+[source]
+----
+docker pull open-liberty
+----
+
+Or take a look at our link:/downloads/[Downloads page].
+
+[link=https://stackoverflow.com/tags/open-liberty]
+image::/img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="center"]
+
+== Printing elapsed time message on completion of slow request with Request Timing 1.0
+
+This feature provides a way of monitoring requests with respect to time. In particular, the feature will automatically detect slow and hung requests all while routing the information back to users to assist with diagnosing the cause of the slow or hung requests.
+
+Previously, the feature would only log that a request is detected to be slow and never log any information when the slow request completes. Now users will be able to view logged information about a slow request that completed with the request id and the amount of time it took for the request to complete.
+
+This upgrade to the Request Timing feature although it is simple it will be extremly helpful especially when it comes to diagnosing request that are detected to be slow. Users will now have a simple way of verifying that a slow request actually completed and also how long it took for the slow request to complete. Giving users this will make the monitoring of slow request more efficient and solve the issue of not knowing if a slow request completed or not.
+
+To enable the feature add it to the `server.xml`
+
+The detection of slow or hung request is done automatically. The logging of information when a slow request completes is also done automatically. To enable the feature simple include requestTiming-1.0 in the server.xml. You may also alter default parameters associated with the feature as descibed here https://developer.ibm.com/wasdev/docs/request-timing-diagnosing-slow-requests-liberty/ in the Configuring slow and hung request detection section.
+
+[source, xml]
+
+<featureManager>
+      ...
+      <feature>requestTiming-1.0</feature>
+      ...
+</featureManager>
+
+
+[#previews]
+
+== Previews of early implementations available in development builds
+
+You can now also try out early implementations of some new capabilities in the link:https://openliberty.io/downloads/#development_builds[latest Open Liberty development builds]:
+
+* <<hc21, Provide your own health check procedures>>
+* <<hm21,Monitor microservice applications easily wth metrics>>
+
+These early implementations are not available in 19.0.0.10 but you can try them out in our daily Docker image by running `docker pull openliberty/daily`. Let us know what you think!
+[#hc21]
+== Provide your own health check procedures (MicroProfile Health Check 2.1)
+
+MicroProfile Health Check 2.1 enables you to provide your own health check procedures to be invoked by Liberty, to verify the health of your microservice.
+
+[source,java]
+----
+HealthCheckResponse.up("myCheck");
+----
+
+In previous versions, to define a simple successful/failed named health check response, the application level code is always expected to use several static methods together from the HealthCheckResponse API, to retrieve a HealthCheckResponseBuilder used to construct a HealthCheck response.
+
+In `mpHealth-2.1` feature for OpenLiberty, you can now use convenient and simpler methods from standard Java APIs, to construct UP/DOWN named health check responses, in your applications, such as;
+
+`HealthCheckResponse.named(“myCheck”).up().build();`
+
+To make it work include the following in the `server.xml` file:
+
+[source, xml]
+----
+<feature>mpHealth-2.1</feature>
+----
+
+Applications are expected to provide health check procedures, by implementing the HealthCheck interface with the `@Liveness` or `@Readiness` annotations, which will be used by Liberty to verify the Liveness or Readiness of the application, respectively. Add the logic of your health check in the `call()` method, and return the HealthCheckResponse object, by constructing using the simple `up()`/`down()` methods from the API. To view the status of each health check, access the either the `+http://<hostname>:<port>/health/live+` or `+http://<hostname>:<port>/health/ready+` endpoints.
+
+[source, java]
+----
+**Liveness Check**
+@Liveness
+@ApplicationScoped
+public class AppLiveCheck implements HealthCheck {
+...
+    @Override
+     public HealthCheckResponse call() {
+       ...
+       HealthCheckResponse.up("myCheck");
+       ...
+     }
+}
+----
+
+For more information:
+
+* link:https://github.com/eclipse/microprofile-health/releases/tag/2.1[MicroProfile Health Check 2.1 Release Page]
+* link:http://download.eclipse.org/microprofile/microprofile-health-2.1/apidocs/[Javadocs]
+* link:https://download.eclipse.org/microprofile/microprofile-health-2.1/microprofile-health-spec.html[Specification document]
+
+
+[#hm21]
+== Monitor microservice applications easily wth metrics (MicroProfile Metrics 2.1 )
+
+MicroProfile Metrics 2.1 allows you to instrument metrics in microservice applications for easy monitoring. Previously, the Gauge metric was intended to sample numerical values only, but users could sample non-numeric values (such as String). MicroProfile Metrics 2.1 restricts the scope such that Gauge can only sample numbers now.
+
+Previously, the MetadataBuilder API had `reusable()` and `notReusable()` method to set the reusable field to true or false. The MetadataBuilder API has been changed to include a new setter method for the reusable attribute. This change is implemented so the MetadataBuilder API follows the builder pattern.
+
+To enable the feature in the `server.xml` file:
+[source, xml]
+----
+<feature>mpMetrics-2.1</feature>
+----
+
+The following is an example of how to set the reusable field with the MetadataBuilder API:
+[source, java]
+----
+MetadataBuilder mdb = Metadata.builder();
+----
+
+[source, java]
+----
+mdb = mdb.withName("metricName").withType(MetricType.COUNTER)
+  .reusable(resolveIsReusable());
+----
+
+For more information: 
+
+* link:https://github.com/eclipse/microprofile-metrics/releases/tag/2.1.0[Changes to MicroProfile metrics]
+
+== Get Liberty 19.0.0.11 now
+
+Available through <<run,Maven, Gradle, Docker, and as a downloadable archive>>.
+
+
