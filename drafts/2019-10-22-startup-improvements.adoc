@@ -1,0 +1,62 @@
+---
+layout: post
+title: "Open Liberty Startup Performance Improvements"
+categories: blog
+author_picture: https://avatars2.githubusercontent.com/u/22303775
+author_github: https://github.com/vijaysun-omr
+seo-title: Open Liberty Startup Improvements - OpenLiberty.io
+seo-description: Open Liberty server startup performance improvements that have happened in 2019.
+blog_description: "Open Liberty server startup performance improvements that have happened in 2019."
+---
+= Open Liberty Startup Performance Improvements
+Vijay Sundaresan <https://github.com/vijaysun-omr>
+
+Startup time is important to developer experience, as quick startup reduces the overhead of code and test cycles. In cloud production deployments, startup time dictates speed of scale-out and how quickly new server instances can handle requests. 
+
+In 2019, we have focused a lot of time and effort on Open Liberty startup time performance, resulting in huge improvements in a broad range of likely user scenarios. Startup time has been reduced by nearly 50% in some cases, with healthy double-digit percentage improvements pretty much across the board.
+
+Our goal was to start Open Liberty in one second or less for simple configurations on processors used in current laptops and servers. The configuration we chose to use is a simple REST application that sends a response to an http ping request (https://github.com/HotswapProjects/pingperf-quarkus).
+
+== Methodology
+
+To reach our goal, we analyzed Open Liberty startup work along two dimensions: 
+
+* Serial path-length: work required to initialize various components of the application server 
+* Parallel execution: how startup work can exploit the available CPUs to execute initialization work in the shortest wall-clock time. 
+
+Based on findings from this analysis, we optimized Open Liberty startup in three major ways: 
+
+* Parallelized tasks that do not have serial dependencies, to use all cores available 
+* Improved the algorithms and data structures used in some of the heavier tasks to reduce required startup work (path length)
+* Persisted startup work product to reduce processing required on the next startup when the server configuration does not change
+
+== Results
+
+Figure 1 provides a picture of what was done this year so far and how Open Liberty startup time improved over the past nine months or so. The graph starts in December 2018 when our startup time using Open Liberty with the OpenJ9 JVM was just under two seconds for a simple REST application that just responded to a ping. You can see that there were steady improvements done throughout the year and with the 19.0.0.9 version of Open Liberty and the current version of OpenJ9 JVM we managed to cut that startup time to our goal of almost exactly one second. The progression in startup times shown in Figure 1 used the shared classes cache feature in OpenJ9 (https://developer.ibm.com/tutorials/j-class-sharing-openj9/) and are showing the “warm” run results. When using the shared classes cache, the population of the cache happens in what is known as the “cold” run and the contents of the cache get used in the “warm” run(s) done subsequently.
+
+image::/img/blog/startup-figure1.png[Figure 1]
+*Figure 1*
+
+You can also see the approximate timeframe in which the most prominent of these improvements were delivered. From an OpenJ9 perspective, we improved the performance of AOT compiled substantially and also generated more AOT code this year. Additionally, we reduced GC overhead and class verification overhead during startup time. From an Open Liberty perspective, the most impactful change was to start some of the OSGi bundles in parallel, thereby cutting the time spent in the OSGi framework very substantially. Another focus area was annotation processing where we reduced the amount of work that was being done at run time by moving most of it to product build time instead. Finally we started caching OSGi metadata and feature manager metadata to help reduce the amount of processing that is done when the server configuration did not change.
+
+== Competitive Comparison
+
+As a result of these changes, Open Liberty startup time is better than all the other Java EE application servers that we experimented with. Since different application servers may report that the core framework has started when different stages of work have completed, it is better to measure startup time as the “time to respond to the first request” instead. This normalizes for differences where an application server might postpone some of the initialization activity until it needs to do the work associated with an actual request. Using this definition of startup time we show performance comparisons using both the OpenJ9 (Figure 2) and HotSpot (Figure 3) JVMs. For the OpenJ9 results, all application servers were configured to use the shared classes cache feature.
+
+image::/img/blog/startup-figure2.png[Figure 2]
+*Figure 2*
+
+
+image::/img/blog/startup-figure3.png[Figure 3]
+*Figure 3*
+
+== Other Scenarios
+
+Finally, the startup time related changes that were made as part of this effort were general enough to apply to several different applications and scenarios. In Figure 4, we show the relative improvements observed from these changes in several key out of the box configurations for Open Liberty as well as the Daytrader8 and Daytrader7 applications. Solid double digit improvements are seen in every case confirming the broad applicability of these changes to the customer base using Open Liberty.
+
+image::/img/blog/startup-figure4.png[Figure 4]
+*Figure 4*
+
+== Conclusion and Future Enhancements
+
+As a general rule of thumb, it is a good idea to consider upgrading to newer versions of Open Liberty to pick up performance enhancements that get released on an ongoing basis. Looking to the future, we intend to continue making improvements to Open Liberty startup time that will significantly benefit more complex applications with many classes and features being used. In particular, there is some work underway to start more OSGi bundles in parallel and to implement a new annotation scanning engine with caching capability that improves the startup time for applications that use the CDI feature. 
