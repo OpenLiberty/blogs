@@ -4,51 +4,52 @@ title: Open Liberty in Docker on Raspberry Pi
 categories: blog
 author_picture: https://avatars2.githubusercontent.com/u/52958137?s=460&v=4
 author_github: https://github.com/yasmin-aumeeruddy
-blog_description: 
+blog_description: Open Liberty is small and lightweight so it was never a problem to fit it on the original Raspberry Pi back in 2012. I set off on a mission to see how easy it is to get a Raspberry Pi-compatible Docker image of Open Liberty.
 seo-title: Open Liberty in Docker on Raspberry Pi
-seo-description: 
+seo-description: Open Liberty is small and lightweight so it was never a problem to fit it on the original Raspberry Pi back in 2012. I set off on a mission to see how easy it is to get a Raspberry Pi-compatible Docker image of Open Liberty.
 ---
-= Open Liberty in Docker on Raspberry Pi
+= Open Liberty in Docker on a Raspberry Pi
 
 Yasmin Aumeeruddy <https://github.com/yasmin-aumeeruddy>
 
-It is well known that Raspberry Pi's are useful pieces of technology with lots of potential so I set off on a mission to see how easy it is to get a Raspberry Pi-compatible Docker image of Open Liberty. Fortunately Open Liberty is small and lightweight so it was never a problem to fit it on the original Raspberry Pi back in 2012. Although,I have used Raspberry Pi 3's for this demonstration.
+Open Liberty is small and lightweight so it was never a problem to fit it on the original Raspberry Pi back in 2012. It is well known that they are useful pieces of technology with lots of potential so I set off on a mission to see how easy it is to get a Raspberry Pi-compatible Docker image of Open Liberty. I used a Raspberry Pi 3 for this demonstration. 
 
 The complication when moving to a Raspberry Pi is that it has an ARM CPU at its heart, meaning that machine code compiled for x86 or x86-64 CPUs (the standard CPUs you get in laptops/desktops today) won’t execute. Liberty is written in Java so it doesn’t have to worry about what the CPU architecture is: as long as there is a Java runtime it’s able to run (as the Java runtime itself interprets the Java code and executes it on the hardware). We do have official Open Liberty images on Docker Hub, but they are layered on top of the official IBM image, which is built on top of Ubuntu and doesn’t have a JVM that will run on ARM.
 
 This means you can’t take our Open Liberty Docker image from Docker Hub, which is designed for an x86 architecture, and run it on the Pi without any configuration to the Docker images. We need to edit the Dockerfiles that define how to build the x86 Liberty Docker image and modify them to build an image for the ARM Raspberry Pi.
 
-=== Open Liberty images
-To start, take a copy of the kernel Dockerfile for the link:https://github.com/OpenLiberty/ci.docker/tree/master/official/latest/kernel/java12/openj9[x86 Liberty Docker image]. This can be used as the basis for custom built images that contain only the features required for a specific application. 
-Edit the `FROM` target in the Dockerfile to base the Open Liberty image on an link:https://hub.docker.com/r/arm32v7/adoptopenjdk/[OpenJDK] image that is compatible with ARM. For example: 
+=== Creating the Open Liberty images
+To start, clone the OpenLiberty/ci.docker repo and navigate to the required directory: 
+
+`git clone https://github.com/OpenLiberty/ci.docker.git`
+`cd ci.docker/official/latest/kernel/java11/openj9`
+
+Edit the `FROM` target in the `Dockerfile` to base the Open Liberty image on an link:https://hub.docker.com/r/arm32v7/adoptopenjdk/[OpenJDK image] that is compatible with ARM. For example: 
 
 [source]
 ----
 FROM arm32v7/adoptopenjdk:latest
 ...
-CMD ["/opt/ol/wlp/bin/server", "run", "defaultServer"]
 ----
 
-Download the other folders and files in that directory to build this image so it is stored locally. You will now be able to use this image as a base for your applications. Instructions to build a Docker image that has your application and configuration pre-loaded can be found link:https://github.com/OpenLiberty/ci.docker#building-an-application-image[here]. 
+You can now be use this image as a base for your applications. Instructions to build a Docker image that has your application and configuration pre-loaded can be found link:https://github.com/OpenLiberty/ci.docker#building-an-application-image[here]. 
 
-[source]
-docker build -t OpenLibertyRaspberryPi .
+`docker build -t openliberty/raspberrypi .`
+
+Take note of the name you have given to this image so you can use it for future builds. 
 
 === Launch a sample application
 
 Try out your image with a sample application. To begin:
 
-[source]
-git clone https://github.com/OpenLiberty/sample-getting-started
-cd sample-getting-started 
+`git clone https://github.com/OpenLiberty/sample-getting-started`
+`cd sample-getting-started`
 
-Replace the contents of the `pom.xml` file in your working directory with the contents of link:https://github.com/OpenLiberty/guide-getting-started/blob/master/finish/pom.xml[this file] so it is configured to include the `liberty-maven-plugin`.
-
-Copy this link:https://github.com/OpenLiberty/guide-getting-started/blob/master/finish/Dockerfile[Dockerfile] in to your working directory and edit the first line so it has your Open Liberty image as its base: 
+Edit the `FROM` target in the `Dockerfile` so it uses your Open Liberty image as its base: 
 
 [source]
 ----
-FROM OpenLibertyRaspberry Pi
+FROM openliberty/raspberrypi
 
 LABEL maintainer="Graham Charters" vendor="IBM" github="https://github.com/WASdev/ci.maven"
 
@@ -56,18 +57,12 @@ COPY --chown=1001:0 src/main/liberty/config/ /config/
 COPY --chown=1001:0 target/*.war /config/apps/
 ----
 
-If maven is not already installed on your Raspberry Pi, execute the following command: 
-
-[source]
-----
-sudo apt install maven
-----
+If Maven is not already installed on your Raspberry Pi, run the following command: 
+`sudo apt install maven`
 
 To build the application that is provided and deploy it to Open Liberty: 
-
-[source]
-----
-mvn clean package liberty:run-server
-----
+`mvn clean package liberty:run-server`
 
 When the server is ready, go to http://localhost:9080
+
+You should see the sample application which uses a System Properties microservice to return the properties of the system you are running. You have successfully built a Raspberry Pi-compatible Docker image of Open Liberty! Find out how to build your own application image link:https://github.com/OpenLiberty/ci.docker[here]. 
