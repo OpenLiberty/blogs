@@ -3,7 +3,7 @@
 1. Fork this repository and clone.
 2. Create a new blog post file in the `drafts` folder with the file name `post-title.adoc`.
 3. Write your blog post in there then create a pull request with @lauracowen and anyone else as reviewer.
-4. After resolving any problems and making any edits, the post will be published by moving it to the `publish` folder and renaming the file to `YYYY-MM-DD-post-title.adoc`.
+4. After resolving any problems and making any edits, Laura will publish the post by moving it to the `publish` folder and renaming the file to `YYYY-MM-DD-post-title.adoc`.
 
 Blogs are written in [AsciiDoc](https://asciidoctor.org/docs/asciidoc-writers-guide/) format with a file extension of `.adoc`.
 
@@ -28,6 +28,7 @@ In the blog post file the following front matter variables must be set:
 `img/blog` folder contains images used in the blog `adoc` files
 
 Once approved (ask `lauracowen`, or `NottyCode` as backup, to review/approve your PR), the blog post will be moved from `drafts` to `publish`.
+
 
 ### Adding tags to your blog post
 
@@ -54,6 +55,15 @@ additional_authors:
 If you would like to add a blog post that is actually a link to an existing third party blog post, you can follow the normal steps described above for creating a blog post. You simply need to add the following attributes to the liquid front matter: 
 - redirect_link: secure_url_to_3rd_party_post
 - permalink: /blog/redirected.html
+
+Also provide a level 1 heading eg:
+
+`= Creating a cool app with MicroProfile`
+
+### Troubleshooting
+
+Certain characters (eg apostrophe ' ) in the main heading are displayed incorrectly. To fix, escape with a backslash (`\`).
+eg `= Minimise turnaround times with Open Liberty\'s dev mode`
 
 # Docker container for development
 
