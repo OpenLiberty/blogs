@@ -5,13 +5,14 @@ categories: blog
 author_picture: https://avatars3.githubusercontent.com/tomjenningss
 author_github: https://github.com/tomjenningss
 seo-title: Diagnose slow requests more easily with improved request logging in Open Liberty 19.0.0.11 - OpenLiberty.io
-seo-description: 
+seo-description: Open Liberty 19.0.0.11 provides a useful option to automatically detect slow requests and logs the information when the request is complete through the Request Timing 1.0 feature. Java SE 13 release from AdoptOpenJDK, OpenJDK, or Oracle works with Open Liberty.
+blog_description: "Open Liberty 19.0.0.11 provides a useful option to automatically detect slow requests and logs the information when the request is complete through the Request Timing 1.0 feature. Java SE 13 release from AdoptOpenJDK, OpenJDK, or Oracle works with Open Liberty."
 ---
 = Diagnose slow requests more easily with improved request logging in Open Liberty 19.0.0.11
 Tom Jennings <https://github.com/tomjenningss>
 
 
-Open Liberty 19.0.0.11 provides a useful option to automatically detect slow requests and logs the information when the request is complete through the Request Timing 1.0 feature.
+Open Liberty 19.0.0.11 provides a useful option to automatically detect slow requests and logs the information when the request is complete through the Request Timing 1.0 feature. Additionally, Java SE 13 release from AdoptOpenJDK, OpenJDK, or Oracle works with Open Liberty.
 
 Give it a try in link:/about/[Open Liberty] 19.0.0.11.
 
@@ -102,7 +103,6 @@ For more details, check the https://openjdk.java.net/projects/jdk/13/[Java 13 pr
 You can now also try out early implementations of some new capabilities in the link:https://openliberty.io/downloads/#development_builds[latest Open Liberty development builds]:
 
 * <<hc21, Provide your own health check procedures (MicroProfile Health Check 2.1)>>
-* <<hm21,Monitor microservice applications easily wth (MicroProfile Metrics 2.2) >>
 * <<JMO,Jaeger support added for tracing (MicroProfile OpenTracing 1.3)>>
 * <<LAC,Faster app startup with Liberty annotation caching>>
 * <<GraphQL,You are now free to use GraphQL with Open Liberty>>
@@ -156,30 +156,6 @@ For more information:
 * link:https://download.eclipse.org/microprofile/microprofile-health-2.1/microprofile-health-spec.html[Specification document]
 
 
-[#hm21]
-== Monitor microservice applications easily wth (MicroProfile Metrics 2.1) 
-
-MicroProfile Metrics 2.1 allows you to instrument metrics in microservice applications for easy monitoring. Previously, the Gauge metric was intended to sample numerical values only, but users could sample non-numeric values (such as String). MicroProfile Metrics 2.1 restricts the scope such that Gauge can only sample numbers now.
-
-Previously, the MetadataBuilder API had `reusable()` and `notReusable()` method to set the reusable field to true or false. The MetadataBuilder API has been changed to include a new setter method for the reusable attribute. This change is implemented so the MetadataBuilder API follows the builder pattern.
-
-To enable the feature in the `server.xml` file:
-[source, xml]
-----
-<feature>mpMetrics-2.1</feature>
-----
-
-The following is an example of how to set the reusable field with the MetadataBuilder API:
-[source, java]
-----
-MetadataBuilder mdb = Metadata.builder();
-----
-
-[source, java]
-----
-mdb = mdb.withName("metricName").withType(MetricType.COUNTER)
-  .reusable(resolveIsReusable());
-----
 [#JMO]
 == Jaeger support added for tracing (MicroProfile OpenTracing 1.3)
 
@@ -226,33 +202,21 @@ You can find out more about about Jaeger settings set up using environment varia
 == Faster app startup with Liberty annotation caching
 During application startup, application classes are scanned for class signature information and for annotations. Typically, all application classes are scanned, which is time consuming.
 
-For early access, annotation caching is enabled when the product edition is `EARLY_ACCESS`. For other product editions, annotation caching is disabled, but may be forced on by setting Java custom property `anno.beta` to `true`. When the product edition is `EARLY_ACCESS`, the caching function may be forced off by setting ava custom property `anno.beta` to `false`.
-The new scan engine may be enabled with cache function turned off by setting Java custom property `anno.cache.disabled` to `true`. The new scan engine may be prevented from writing new data by setting Java custom property `anno.cache.readOnly` to `true`.  Already generated cache data will still be read.  This may be necessary in
-certain deployment pipelines. When enabled, application class scan steps automatically write cache scan data, and automatically read cachedscan data.  Cache data is automatically regenerated when changes are detected in application classes.  No additional settings are necessary to use the new function, unless you are a pipeline developer see important note below.
+For early access, annotation caching is enabled when the product edition is `EARLY_ACCESS`. For other product editions,annotation caching is disabled.
+Annotation caching may be enabled (or disabled) by setting java custom property `anno.beta`.  Setting this property to `true` enables annotation caching, while setting this property to `false` disables annotation caching.  Setting the `anno.beta` property overrides enablement based on the product edition.
 
-Cache data is visible as a new, nested directory of server workarea named `anno`.  Cache data uses a binary
-format and is not human readable. Cache data is relocatable: Movement of a server image to a new location
-does not require that the application class scan cache data be regenerated.
-The cache of application class data is cleared when performing a clean server start (starting the server with
-the `--clean` option).  In normal operations, the clearing of cache data is not necessary, since the cache 
-automatically detects class changes and regenerates invalid cache data.  However, the cache function has no
-way to tell when cache data is obsolete.  If the same server is used with many different applications, a clean
-start should be performed occasionally to remove stale cache data.
+When annotation caching is enabled, a custom property is available for adjusting the caching function: Setting java custom property `anno.cache.readOnly` prevents the annotation engine from writing new cache data.  Already saved cache data will be read, but no new cache data will be written.  This setting may be necessary in certain deployment environments.
 
+Cache data is visible as a new, nested directory of server workarea named anno. Cache data uses a binary format and is not human readable. Cache data is relocatable: Movement of a server image to a new location does not require that annotation cache data be regenerated. Cache of application class data is cleared when performing a clean server start (starting the server with the `--clean` option). In normal operations, the clearing of cache data is not necessary, since the cache automatically regenerates cache data for changed application classes. However, the cache function has no way to tell when cache data is obsolete. If the same server is used with many different applications, annotation cache data will accumulate on disk, and a clean start should be performed occasionally to remove stale cache data.
 
-In a pipeline deployment environment, for caching to be effective, the server image must be
-"warmed" before packaging the deployment image, and application class cache data must be included in the
-deployment image. Warming the server means performing a single start of the server.  This causes cache data to be generated and available when packaging the server image.  A failure to generate the cache
-data or to include the cache data in the deployment image prevents the server deployment from obtaining the full value of the new caching function.
+In pipeline deployment environments, for example, Docker, for annotation caching to be effective, the server image must be "warmed" before packaging the deployment image, and application class cache data must be included in the deployment image. Warming the server means performing a single start of the server.  This will cause cache data to be generated and available when packaging the server image.  A failure to generate the cache data or to include the cache data in the deployment image will result in longer startup times, since a typical startup uses a fresh copy of the deployment image, which will not have any cached data.
 
-The following chart shows changes to server startup times comparing server startups which do not use the new caching function with server startups that use the the new caching function:  
+The following chart shows changes to server startups with annotation caching enabled, relative to server startup times for the same application and with annotation caching disabled. 
 
 image::/img/blog/190011-annotationcaching-graph.png[align="center"]
 
-Startups which use new caching function have cache data already generated.
-The case `huge-ejb` is an atypical case: An application that has 500 EJB jars, where each jar has four classes.
-Generally, performance improvements are larger for larger applications, and for applications which use CDI or
-WebService functionality.
+Startup times with annotation caching enabled
+have cache data already generated. Generally, performance improvements are larger for larger applications, and for applications which use CDI or web service functionality.
 
 For more information: 
 
