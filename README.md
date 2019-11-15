@@ -78,7 +78,7 @@ docker pull kinueng/openliberty.io
 ```
 Replace "currentFolder" in the following command with the full path to the folder you are in. 
 ```
-docker run --name website -it -p 4000:4000 -v currentFolder/openliberty.io:/home/jekyll kinueng/openliberty.io
+docker run --rm --name website -it -p 4000:4000 -v currentFolder/openliberty.io:/home/jekyll kinueng/openliberty.io
 
 # example when current directory is /Users/bruce/projects/blog/website:
 # docker run --name website -it -p 4000:4000 -v /Users/bruce/projects/blog/website/openliberty.io:/home/jekyll kinueng/openliberty.io
@@ -107,19 +107,5 @@ You will see `Jekyll` detect your new files and regenerate the blog files.  You 
             ...done in 121.8705398 seconds.
 ```
 
-### Restarting the container
-If you try to run the `docker run....` command above when the container already exists or has been stopped, you'll get an error like this:
-
-```
-docker: Error response from daemon: Conflict. The container name "/website" is already in use by container "ddc88f127404e8df53ad149245f636a54f6d5b501ac93477985c27a12b061a94". You have to remove (or rename) that container to be able to reuse that name.
-```
-
-Instead, run `docker start website`. 
-
-If the container's been stopped (you pressed control-c, didn't you?) you can run `docker ps -a` to get it's container id, then run `docker rm [containerid]` to remove it. Then issue the docker run command again. 
-
-There's no feedback about what it's doing. If you run `docker ps`, you can see that the `website` container is now running. However, it takes a few mins for the whole site to come back up so that you can access it from `0.0.0.0:4000` in your browser. So be patient.
-
-When you can access `0.0.0.0:4000`, run the four commands above to update the running container with your new edits (starting with the `docker exec....` command).
 
 
