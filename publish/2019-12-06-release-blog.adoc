@@ -1,0 +1,238 @@
+---
+layout: post
+title: PUT TITLE HERE
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/yasmin-aumeeruddy
+author_github: https://github.com/yasmin-aumeeruddy
+seo-title: PUT TITLE HERE
+seo-description: Open Liberty 19.0.0.12 DESCRIPTION HERE
+blog_description: "Open Liberty 19.0.0.12 DESCRIPTION HERE
+---
+= TITLE FOR Open Liberty 19.0.0.12
+Yasmin Aumeeruddy <https://github.com/yasmin-aumeeruddy>
+
+Open Liberty 19.0.0.12 DESCRIPTION link:https://openliberty.io/about/[Open Liberty] 19.0.0.12.
+
+In Open Liberty 19.0.0.12:
+
+* <<mp32, MicroProfile 3.2 support>>
+** <<hc21, Provide your own health check procedures (MicroProfile Health Check 2.1)>>
+** <<hm22, Monitor microservice applications easily wth metrics (MicroProfile Metrics 2.2)>>
+* <<jmo, Jaeger support in MicroProfile Open Tracing >>
+* <<ssl, Open Liberty SSL should pick up JDK cacerts when using SSL defaults>>
+* <<ser, Server package to store app in extracted form>>
+* <<rrs, Liberty reader role support>>
+
+If you're curious about what's coming in future Open Liberty releases, take a look at our <<previews,previews in the latest development builds>>. In particular, get an early insight into PREVIEWS
+
+[#run]
+== Run your apps using 19.0.0.12
+
+If you're using link:https://openliberty.io/guides/maven-intro.html[Maven], here are the coordinates:
+
+[source,xml]
+----
+<dependency>
+    <groupId>io.openliberty</groupId>
+    <artifactId>openliberty-runtime</artifactId>
+    <version>19.0.0.12</version>
+    <type>zip</type>
+</dependency>
+----
+
+Or for link:https://openliberty.io/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+dependencies {
+    libertyRuntime group: 'io.openliberty', name: 'openliberty-runtime', version: '[19.0.0.12,)'
+}
+----
+
+Or if you're using Docker:
+
+[source]
+----
+docker pull open-liberty
+----
+
+Or take a look at our link:https://openliberty.io/downloads/[Downloads page].
+
+[link=https://stackoverflow.com/tags/open-liberty]
+image::https://openliberty.io/img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="center"]
+
+[#mp32]
+== MicroProfile 3.2 support
+Add the whole of MicroProfile 3.2 to your application with this convenience feature in your `server.xml`:
+[source, xml]
+----
+<featureManager>
+  <feature>microProfile-3.2</feature>
+<featureManager>
+----
+The `microProfile-3.2` feature automatically includes the following features in your app: TO DO
+
+=== Provide your own health check procedures (MicroProfile Health Check 2.1)
+
+MicroProfile Health Check 2.1 enables you to provide your own health check procedures to be invoked by Liberty, to verify the health of your microservice.
+
+[source,java]
+----
+HealthCheckResponse.up("myCheck");
+----
+
+In previous versions, to define a simple successful/failed named health check response, the application level code is always expected to use several static methods together from the HealthCheckResponse API, to retrieve a HealthCheckResponseBuilder used to construct a HealthCheck response.
+
+In `mpHealth-2.1` feature for OpenLiberty, you can now use convenient and simpler methods from standard Java APIs, to construct UP/DOWN named health check responses, in your applications, such as;
+
+`HealthCheckResponse.named(“myCheck”).up().build();`
+
+To make it work include the following in the `server.xml` file:
+
+[source, xml]
+----
+<feature>mpHealth-2.1</feature>
+----
+
+Applications are expected to provide health check procedures, by implementing the HealthCheck interface with the `@Liveness` or `@Readiness` annotations, which will be used by Liberty to verify the Liveness or Readiness of the application, respectively. Add the logic of your health check in the `call()` method, and return the HealthCheckResponse object, by constructing using the simple `up()`/`down()` methods from the API. To view the status of each health check, access the either the `+http://<hostname>:<port>/health/live+` or `+http://<hostname>:<port>/health/ready+` endpoints.
+
+[source, java]
+----
+**Liveness Check**
+@Liveness
+@ApplicationScoped
+public class AppLiveCheck implements HealthCheck {
+...
+    @Override
+     public HealthCheckResponse call() {
+       ...
+       HealthCheckResponse.up("myCheck");
+       ...
+     }
+}
+----
+
+For more information:
+
+* link:https://github.com/eclipse/microprofile-health/releases/tag/2.1[MicroProfile Health Check 2.1 Release Page]
+* link:http://download.eclipse.org/microprofile/microprofile-health-2.1/apidocs/[Javadocs]
+* link:https://download.eclipse.org/microprofile/microprofile-health-2.1/microprofile-health-spec.html[Specification document]
+
+
+[#hm22]
+=== Monitor microservice applications easily wth metrics (MicroProfile Metrics 2.2 )
+
+MicroProfile Metrics 2.2 allows you to instrument metrics in microservice applications for easy monitoring. Previously, the Gauge metric was intended to sample numerical values only, but users could sample non-numeric values (such as String). MicroProfile Metrics 2.2 restricts the scope such that Gauge can only sample numbers now.
+
+Previously, the MetadataBuilder API had `reusable()` and `notReusable()` method to set the reusable field to true or false. The MetadataBuilder API has been changed to include a new setter method for the reusable attribute. This change is implemented so the MetadataBuilder API follows the builder pattern.
+
+To enable the feature in the `server.xml` file:
+[source, xml]
+----
+<feature>mpMetrics-2.2</feature>
+----
+
+The following is an example of how to set the reusable field with the MetadataBuilder API:
+[source, java]
+----
+MetadataBuilder mdb = Metadata.builder();
+----
+
+[source, java]
+----
+mdb = mdb.withName("metricName").withType(MetricType.COUNTER)
+  .reusable(resolveIsReusable());
+----
+
+For more information: 
+
+* link:https://github.com/eclipse/microprofile-metrics/releases/tag/2.2.0[Changes to MicroProfile metrics]
+
+[#JMO]
+== Jaeger support added for tracing (MicroProfile OpenTracing 1.3)
+
+Open Liberty has added support for Jaeger in MicroProfile OpenTracing. A sample tracer is available link:https://github.com/WASdev/sample.opentracing.zipkintracer[here] for using Zipkin as a tracing backend. With the addition of Jaeger support, developers can also use Jaeger as a tracing backend.
+
+You can download the Jaeger client version 0.34.0 library and its dependencies from link:https://mvnrepository.com/artifact/io.jaegertracing/jaeger-client/0.34.0[Maven repository].
+
+In the `server.xml:` 
+
+Add `<feature>mpOpenTracing-1.3</feature>` under `<featureManager>` section.
+
+[source, xml]
+----
+    <library id="jaegerLib" apiTypeVisibility="+third-party" >
+        <file name="<path>/jaegerLib_0.34/gson-2.8.2.jar" />
+        <file name="<path>/jaegerLib_0.34/jaeger-client-0.34.0.jar" />
+        <file name="<path>/jaegerLib_0.34/jaeger-core-0.34.0.jar" />
+        <file name="<path>/jaegerLib_0.34/jaeger-thrift-0.34.0.jar" />
+        <file name="<path>/jaegerLib_0.34/jaeger-tracerresolver-0.34.0.jar" />
+        <file name="<path>/jaegerLib_0.34/libthrift-0.12.0.jar" />
+        <file name="<path>/jaegerLib_0.34/slf4j-api-1.7.25.jar" />
+        <file name="<path>/jaegerLib_0.34/slf4j-jdk14-1.7.25.jar" />
+        <file name="<path>/jaegerLib_0.34/opentracing-util-0.31.0.jar" />
+        <file name="<path>/jaegerLib_0.34/opentracing-noop-0.31.0.jar" />
+    </library>
+----
+
+Define your appplication:
+
+[source, xml]
+
+  <webApplication location="yourapp.war" contextRoot="/yourapp">
+        <!-- enable visibility to third party apis -->
+        <classloader commonLibraryRef="jaegerLib"
+            apiTypeVisibility="+third-party" />
+  </webApplication>
+
+You can find out more about about Jaeger settings set up using environment variables by looking at link:https://github.com/jaegertracing/jaeger-client-java/blob/10c641f8df6316f1eac4d5b1715513275bcd724e/jaeger-core/README.md[jaeger-client-java readme.] 
+
+** For the `JAEGER_PASSWORD` environment variable, the password can be encoded using the `securityUtility command.`
+** Depending on Jaeger's sampling settings `JAEGER_SAMPLER_TYPE` and `JAEGER_SAMPLER_PARAM`, Jaeger may not report every spans created by the applications.
+
+
+[#previews]
+
+== Previews of early implementations available in development builds
+
+You can now also try out early implementations of some new capabilities in the link:https://openliberty.io/downloads/#development_builds[latest Open Liberty development builds]:
+
+* <<LAC,Faster app startup with Liberty annotation caching>>
+* <<GraphQL,You are now free to use GraphQL with Open Liberty>>
+
+These early implementations are not available in 19.0.0.12 but you can try them out in our daily Docker image by running `docker pull openliberty/daily`. Let us know what you think!
+
+[#LAC]
+== Faster app startup with Liberty annotation caching
+During application startup, application classes are scanned for class signature information and for annotations. Typically, all application classes are scanned, which is time consuming.
+
+For early access, annotation caching is enabled when the product edition is `EARLY_ACCESS`. For other product editions,annotation caching is disabled.
+Annotation caching may be enabled (or disabled) by setting java custom property `anno.beta`.  Setting this property to `true` enables annotation caching, while setting this property to `false` disables annotation caching.  Setting the `anno.beta` property overrides enablement based on the product edition.
+
+When annotation caching is enabled, a custom property is available for adjusting the caching function: Setting java custom property `anno.cache.readOnly` prevents the annotation engine from writing new cache data.  Already saved cache data will be read, but no new cache data will be written.  This setting may be necessary in certain deployment environments.
+
+Cache data is visible as a new, nested directory of server workarea named anno. Cache data uses a binary format and is not human readable. Cache data is relocatable: Movement of a server image to a new location does not require that annotation cache data be regenerated. Cache of application class data is cleared when performing a clean server start (starting the server with the `--clean` option). In normal operations, the clearing of cache data is not necessary, since the cache automatically regenerates cache data for changed application classes. However, the cache function has no way to tell when cache data is obsolete. If the same server is used with many different applications, annotation cache data will accumulate on disk, and a clean start should be performed occasionally to remove stale cache data.
+
+In pipeline deployment environments, for example, Docker, for annotation caching to be effective, the server image must be "warmed" before packaging the deployment image, and application class cache data must be included in the deployment image. Warming the server means performing a single start of the server.  This will cause cache data to be generated and available when packaging the server image.  A failure to generate the cache data or to include the cache data in the deployment image will result in longer startup times, since a typical startup uses a fresh copy of the deployment image, which will not have any cached data.
+
+The following chart shows changes to server startups with annotation caching enabled, relative to server startup times for the same application and with annotation caching disabled. 
+
+image::/img/blog/190011-annotationcaching-graph.png[align="center"]
+
+Startup times with annotation caching enabled
+have cache data already generated. Generally, performance improvements are larger for larger applications, and for applications which use CDI or web service functionality.
+
+For more information: 
+
+* link:https://github.com/eclipse/microprofile-metrics/releases/tag/2.1.0[Changes to MicroProfile metrics]
+
+[#GraphQL]
+== You are now free to use GraphQL with Open Liberty! 
+In our latest OpenLiberty development builds, users can now develop and deploy GraphQL applications.  GraphQL is a complement/alternative to REST that allows clients to fetch or modify remote data, but with fewer round-trips.  Liberty now supports the (still under development) MicroProfile GraphQL APIs (https://github.com/eclipse/microprofile-graphql[learn more]) that allow developers to create GraphQL apps using simple annotations - similar to how JAX-RS uses annotations to create a RESTful app.
+
+Developing and deploying a GraphQL app is cinch - take a look at this https://github.com/OpenLiberty/sample-mp-graphql[sample] to get started with these powerful APIs!
+
+
+== Get Liberty 19.0.0.12 now
+
+Available through <<run,Maven, Gradle, Docker, and as a downloadable archive>>.
