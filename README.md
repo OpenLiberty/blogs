@@ -34,7 +34,7 @@ Once approved (ask `lauracowen`, or `NottyCode` as backup, to review/approve you
 
 To add tags to your post, please open a pull request with your edits to [blog_tags.json](https://github.com/OpenLiberty/blogs/blob/master/blog_tags.json). You simply need to add the title of your post (without the date and file extension) to the `posts` array under the tags you want to use. (For example, if the file name is 2019-08-15-blog-post.adoc, you would just add `"blog-post"`).
 
-You can request a review from `ellenwyllie` or `steven1046` if you are unsure who to ask.
+You can request a review from `lauracowen` or `ellenwyllie` if you are unsure who to ask.
 
 
 ### Blog posts with multiple authors
