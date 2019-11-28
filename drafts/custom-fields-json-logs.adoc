@@ -1,0 +1,111 @@
+---
+layout: post
+title: "Adding custom fields to JSON logs in Open Liberty"
+categories: blog
+author_picture: https://avatars0.githubusercontent.com/u/31770221
+author_github: https://github.com/Yushan-Lin
+seo-title: Adding custom fields to JSON logs - OpenLiberty.io
+seo-description: Add custom fields to your application's JSON logs to assist diagnosis of problems. For example, detecting problems occurring in a series of requests from a single user in a session.
+blog_description: "Add custom fields to your application's JSON logs to assist diagnosis of problems. For example, detecting problems occurring in a series of requests from a single user in a session."
+---
+= Adding custom fields to JSON logs in Open Liberty
+Yushan Lin <https://github.com/Yushan-Lin>
+
+When monitoring applications in Open Liberty servers, you can view the logs to determine what is happening in your application. However, with many incoming logs, you may want want to sort and filter your logs in a certain way to better understand what is occurring in your application.
+
+In Liberty, you can configure your server to log in JSON format. You can send your logs to a log analysis solution that understands JSON such that it can consume the server's logs. When you want to analyze your server's application logs, being able to add extra fields to your JSON log records can be very useful.
+
+For example, most real-world applications handle traffic from multiple users.
+If you want to check the requests made from a specific user, it would be useful to have an extra field to filter application logs by the user's ID. Without the user ID field, it makes it much more difficult to determine which requests are made by which user, especially if you are trying to diagnose issues occurring with a specific user.
+Furthermore, it might be useful to have another field for session ID, so that you can analyze and filter application logs for a specific session. This means you can easily diagnose issues occurring with a specific session associated with the user. Extra fields in log records can be very useful in various use cases.
+
+But how do you add fields to log and trace records?
+
+Open Liberty has a little-known API, LogRecordContext.  LogRecordContext provides the ability to add extra fields to your log and trace records in Open Liberty. LogRecordContext provides a similar ability to Log4j MDC (Mapped Diagnostic Context).
+
+== Enabling JSON log format
+
+When the Liberty server is logging in JSON format, application logs include any fields specified in LogRecordContext.
+
+To enable Liberty to log in JSON format, add the following properties to your `bootstrap.properties` file:
+
+```
+com.ibm.ws.logging.console.format=json
+com.ibm.ws.logging.console.log.level=info
+com.ibm.ws.logging.console.source=message,trace,accessLog,ffdc,audit
+```
+
+== Adding extra log fields with LogRecordContext
+
+The following examples illustrate how you can add extra fields to your application's log and trace records.
+
+=== Enabling LogRecordContext
+
+To use LogRecordContext, import the `com.ibm.websphere.logging.hpel.LogRecordContext` class.
+
+=== Adding string extensions with LogRecordContext
+
+To add a string-valued extension (e.g. a field called `userName`) to your application logs, include the following line in your application:
+
+```
+LogRecordContext.addExtension("userName","bob");
+```
+
+=== Adding extensions of other data types with LogRecordContext
+
+To add other extensions with boolean, float, int, or long values, the extension name must include the suffixes `_bool`, `_float`, `_int`, `_long` so that the value is formatted correctly in the JSON output:
+
+```
+LogRecordContext.addExtension("extensionName_bool","true");
+LogRecordContext.addExtension("extensionName_int","112233");
+LogRecordContext.addExtension("extensionName_float","1.2");
+LogRecordContext.addExtension("extensionName_long","132");
+```
+
+== Trace and log output
+
+After including the extensions all logs and trace made on the same thread include the field extensions. Notice that only string-valued extensions have quotes around the JSON values:
+
+Trace statement:
+```
+logger.fine("Logging in Liberty");
+```
+
+Output:
+```
+{"type":"liberty_trace","host":"yushans-mbp-2.war.can.ibm.com","ibm_userDir":"\/Users\/yushan.lin@ibm.com\/Documents\/libertyGit\/open-liberty\/dev\/build.image\/wlp\/usr\/","ibm_serverName":"sampleServer","message":"Logging in Liberty","ibm_threadId":"00000047","ibm_datetime":"2019-11-19T13:15:53.254-0500","module":"com.ibm.sample.LoggingServiceJUL","loglevel":"FINE","ibm_sequence":"1574187353254_0000000000001","ext_extensionName_bool":true,"ext_extensionName_float":1.2,"ext_extensionName_int":112233,"ext_thread":"Default Executor-thread-21","ext_userName":"bob","ext_extensionName_long":132}
+```
+
+Log statement:
+```
+logger.info("Logging with LogRecordContext");
+```
+
+Output:
+```
+{"type":"liberty_message","host":"yushans-mbp-2.war.can.ibm.com","ibm_userDir":"\/Users\/yushan.lin@ibm.com\/Documents\/libertyGit\/open-liberty\/dev\/build.image\/wlp\/usr\/","ibm_serverName":"sampleServer","message":"Logging with LogRecordContext","ibm_threadId":"0000003e","ibm_datetime":"2019-11-19T13:15:53.517-0500","module":"com.ibm.sample.LoggingServiceJUL","loglevel":"INFO","ibm_sequence":"1574187353517_0000000000029","ext_extensionName_bool":true,"ext_extensionName_float":1.2,"ext_extensionName_int":112233,"ext_thread":"Default Executor-thread-15","ext_userName":"bob","ext_extensionName_long":132}
+```
+
+
+If using an ELK (ElasticSearch, Logstash, Kibana) stack to view logs, you can see the extension fields there as well. You might need to refresh the Kibana index so you can use the new fields in your visualizations:
+
+image::/img/blog/blog-LRC-kibana.png[]
+
+
+For more information about analyzing logs in ELK: https://www.ibm.com/support/knowledgecenter/en/SSEQTP_liberty/com.ibm.websphere.wlp.doc/ae/twlp_elk_stack.html.
+
+== Removing extensions
+
+Extensions can be removed using the following method:
+
+```
+LogRecordContext.removeExtension(extensionName);
+```
+
+After removing an extension, JSON output for subsequent logs and trace made on the same thread do not include that field.
+
+== Give it a go
+
+Overall, the LogRecordContext provides the useful ability to add additional fields to your log and trace records so you can organize, analyze, and filter logs more effectively.
+
+Try it out in https://www.openliberty.io/downloads/[Open Liberty].
