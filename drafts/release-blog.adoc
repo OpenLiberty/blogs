@@ -10,7 +10,7 @@ blog_description: "Open Liberty 19.0.0.12 DESCRIPTION HERE
 ---
 = TITLE FOR Open Liberty 19.0.0.12
 Yasmin Aumeeruddy <https://github.com/yasmin-aumeeruddy>
-
+// tag::intro[]
 Open Liberty 19.0.0.12 DESCRIPTION link:https://openliberty.io/about/[Open Liberty] 19.0.0.12.
 
 In Open Liberty 19.0.0.12:
@@ -23,9 +23,11 @@ In Open Liberty 19.0.0.12:
 * <<ser, Server package to store app in extracted form>>
 * <<rrs, Liberty reader role support>>
 
+// end::intro[]
 If you're curious about what's coming in future Open Liberty releases, take a look at our <<previews,previews in the latest development builds>>. In particular, get an early insight into PREVIEWS
-
+// tag::run[]
 [#run]
+
 == Run your apps using 19.0.0.12
 
 If you're using link:https://openliberty.io/guides/maven-intro.html[Maven], here are the coordinates:
@@ -55,12 +57,12 @@ Or if you're using Docker:
 ----
 docker pull open-liberty
 ----
-
+//end::run[]
 Or take a look at our link:https://openliberty.io/downloads/[Downloads page].
 
 [link=https://stackoverflow.com/tags/open-liberty]
 image::https://openliberty.io/img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="center"]
-
+//tag::features[]
 [#mp32]
 == MicroProfile 3.2 support
 Add the whole of MicroProfile 3.2 to your application with this convenience feature in your `server.xml`:
@@ -190,7 +192,51 @@ You can find out more about about Jaeger settings set up using environment varia
 ** For the `JAEGER_PASSWORD` environment variable, the password can be encoded using the `securityUtility command.`
 ** Depending on Jaeger's sampling settings `JAEGER_SAMPLER_TYPE` and `JAEGER_SAMPLER_PARAM`, Jaeger may not report every spans created by the applications.
 
+[#ssl]
 
+== Trusted certificate enhancements (Transport Security 1.0)
+Open Liberty now offers new options to help establish trust for SSL connections. An easy way to use the JDK's default truststore for trust and a way to pass the certificate needed to establish trust to a truststore through an environment variable is now provided. 
+
+=== Establishing trust using the JDK's default truststore
+
+By default, the JDK default truststore is the `cacerts` file. The default truststore may be set by the `javax.net.ssl.truststore` system property or the `jssecacerts` file if users have one configured. For Open Liberty to use what is configured as the JDK default truststore the `useDefaultCerts` attribute needs to be set to true on the `ssl` element. It is set to false by default. For example: 
+
+[source,xml]
+----
+<ssl id="defaultSSLConfig" keyStoreRef="defaultKeyStore" trustStoreRef="defaultTrustStore" trustDefaultCerts="true" />
+<keyStore id="defaultKeyStore" location="key.p12" type="PKCS12" password=<your password>  />
+<keyStore id="defaultTrustStore" location="trust.p12" type="PKCS12" password=<your password> />
+----
+
+With `trustDefaultCerts` set to `true`, the server will try to establish trust with the configured truststore, in this case `defaultTrustStore`, first. If trust is not establish with the configured truststore then it will try to use the JDK's default truststore to establish trust.
+
+=== Providing a certificate through an environment variable to establish trust
+
+Open Liberty will read a certificate from an environment variable and add it to a keystore or truststore so it can be used for trust. The certificate will be added to the runtime copy of the keystore or truststore and will not be stored to the file system. If the keystore configuration includes the `readOnly` attribute set to true then the certificate will not be included.
+
+The environment variable key must be in the format `cert_ + keystore id`. For example:
+
+[source,xml]
+----
+<keyStore id="myKeyStore" location="myKey.p12" type="PKCS12" password=<your password> />
+----
+
+The key of the environment variable should be `cert_myKeyStore` (it is case sensitive).
+
+The value of the environment variable can either be a certificate in the base 64-bit format or the path to a file containing a base 64-bit encode certificate or DER encoded certificate. If using the base 64-bit encode certificate directly on the environment variable, it must contain the `-----BEGIN CERTIFICATE-----` and `-----END CERTIFICATE-----` tags. For example:
+[source,xml]
+----
+cert_myKeyStore="-----BEGIN CERTIFICATE-----
+.... 
+-----END CERTIFICATE-----"
+----
+The environment variable for a file will look similar to:
+
+`cert_myKeyStore=/Users/me/servercert.crt`
+
+Any value not starting with the `-----BEGIN CERTIFICATE-----`` tag will be treated like a file.
+
+//end::features[]
 [#previews]
 
 == Previews of early implementations available in development builds
