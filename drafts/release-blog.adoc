@@ -1,17 +1,18 @@
 ---
 layout: post
-title: PUT TITLE HERE
+title: Trusted certificate enhancements on Open Liberty 19.0.0.12
 categories: blog
 author_picture: https://avatars3.githubusercontent.com/yasmin-aumeeruddy
 author_github: https://github.com/yasmin-aumeeruddy
-seo-title: PUT TITLE HERE
-seo-description: Open Liberty 19.0.0.12 DESCRIPTION HERE
-blog_description: "Open Liberty 19.0.0.12 DESCRIPTION HERE
+seo-title: Trusted certificate enhancements on Open Liberty 19.0.0.12
+seo-description: Open Liberty 19.0.0.12 allows trust to be established using the JDK's default truststore or a certificate through an environment variable. Support is provided for MicroProfile 3.2, allowing users to provide their own health check procedures and monitor microservice applications easily wth metrics.
+blog_description: Open Liberty 19.0.0.12 allows trust to be established using the JDK's default truststore or a certificate through an environment variable. Support is provided for MicroProfile 3.2, allowing users to provide their own health check procedures and monitor microservice applications easily wth metrics.
 ---
 = TITLE FOR Open Liberty 19.0.0.12
 Yasmin Aumeeruddy <https://github.com/yasmin-aumeeruddy>
 
-Open Liberty 19.0.0.12 DESCRIPTION link:https://openliberty.io/about/[Open Liberty] 19.0.0.12.
+// tag::intro[]
+Open Liberty 19.0.0.12 allows trust to be established using the JDK's default truststore or a certificate through an environment variable. Support is provided for MicroProfile 3.2, allowing users to provide their own health check procedures and monitor microservice applications easily wth metrics. link:https://openliberty.io/about/[Open Liberty] 19.0.0.12.
 
 In Open Liberty 19.0.0.12:
 
@@ -19,13 +20,16 @@ In Open Liberty 19.0.0.12:
 ** <<hc21, Provide your own health check procedures (MicroProfile Health Check 2.1)>>
 ** <<hm22, Monitor microservice applications easily wth metrics (MicroProfile Metrics 2.2)>>
 * <<jmo, Jaeger support in MicroProfile Open Tracing >>
-* <<ssl, Open Liberty SSL should pick up JDK cacerts when using SSL defaults>>
-* <<ser, Server package to store app in extracted form>>
+* <<ssl, Trusted certificate enhancements (Transport Security 1.0)>>
 * <<rrs, Liberty reader role support>>
 
-If you're curious about what's coming in future Open Liberty releases, take a look at our <<previews,previews in the latest development builds>>. In particular, get an early insight into PREVIEWS
+// end::intro[]
 
+If you're curious about what's coming in future Open Liberty releases, take a look at our <<previews,previews in the latest development builds>>. In particular, get an early insight into faster app startup with Liberty annotation caching.
+
+// tag::run[]
 [#run]
+
 == Run your apps using 19.0.0.12
 
 If you're using link:https://openliberty.io/guides/maven-intro.html[Maven], here are the coordinates:
@@ -55,12 +59,12 @@ Or if you're using Docker:
 ----
 docker pull open-liberty
 ----
-
+//end::run[]
 Or take a look at our link:https://openliberty.io/downloads/[Downloads page].
 
 [link=https://stackoverflow.com/tags/open-liberty]
 image::https://openliberty.io/img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="center"]
-
+//tag::features[]
 [#mp32]
 == MicroProfile 3.2 support
 Add the whole of MicroProfile 3.2 to your application with this convenience feature in your `server.xml`:
@@ -70,7 +74,8 @@ Add the whole of MicroProfile 3.2 to your application with this convenience feat
   <feature>microProfile-3.2</feature>
 <featureManager>
 ----
-The `microProfile-3.2` feature automatically includes the following features in your app: TO DO
+
+The `microProfile-3.2` feature automatically includes the following features in your app: `jaxrs-2.1`, `cdi-2.0`, `jsonp-1.1`, `jsonb-1.0`, `mpConfig-1.3`, `mpFaultTolerance-2.0`, `mpHealth-2.1`, `mpJwt-1.1`, `mpMetrics-2.2`, `mpOpenAPI-1.1`, `mpOpenTracing-1.3`, and `mpRestClient-1.3`.
 
 === Provide your own health check procedures (MicroProfile Health Check 2.1)
 
@@ -190,7 +195,77 @@ You can find out more about about Jaeger settings set up using environment varia
 ** For the `JAEGER_PASSWORD` environment variable, the password can be encoded using the `securityUtility command.`
 ** Depending on Jaeger's sampling settings `JAEGER_SAMPLER_TYPE` and `JAEGER_SAMPLER_PARAM`, Jaeger may not report every spans created by the applications.
 
+[#ssl]
 
+== Trusted certificate enhancements (Transport Security 1.0)
+Open Liberty now offers new options to help establish trust for SSL connections. An easy way to use the JDK's default truststore for trust and a way to pass the certificate needed to establish trust to a truststore through an environment variable is now provided. 
+
+=== Establishing trust using the JDK's default truststore
+
+By default, the JDK default truststore is the `cacerts` file. The default truststore may be set by the `javax.net.ssl.truststore` system property or the `jssecacerts` file if users have one configured. For Open Liberty to use what is configured as the JDK default truststore the `useDefaultCerts` attribute needs to be set to true on the `ssl` element. It is set to false by default. For example: 
+
+[source,xml]
+----
+<ssl id="defaultSSLConfig" keyStoreRef="defaultKeyStore" trustStoreRef="defaultTrustStore" trustDefaultCerts="true" />
+<keyStore id="defaultKeyStore" location="key.p12" type="PKCS12" password=<your password>  />
+<keyStore id="defaultTrustStore" location="trust.p12" type="PKCS12" password=<your password> />
+----
+
+With `trustDefaultCerts` set to `true`, the server will try to establish trust with the configured truststore, in this case `defaultTrustStore`, first. If trust is not establish with the configured truststore then it will try to use the JDK's default truststore to establish trust.
+
+=== Providing a certificate through an environment variable to establish trust
+
+Open Liberty will read a certificate from an environment variable and add it to a keystore or truststore so it can be used for trust. The certificate will be added to the runtime copy of the keystore or truststore and will not be stored to the file system. If the keystore configuration includes the `readOnly` attribute set to true then the certificate will not be included.
+
+The environment variable key must be in the format `cert_ + keystore id`. For example:
+
+[source,xml]
+----
+<keyStore id="myKeyStore" location="myKey.p12" type="PKCS12" password=<your password> />
+----
+
+The key of the environment variable should be `cert_myKeyStore` (it is case sensitive).
+
+The value of the environment variable can either be a certificate in the base 64-bit format or the path to a file containing a base 64-bit encode certificate or DER encoded certificate. If using the base 64-bit encode certificate directly on the environment variable, it must contain the `-----BEGIN CERTIFICATE-----` and `-----END CERTIFICATE-----` tags. For example:
+[source,xml]
+----
+cert_myKeyStore="-----BEGIN CERTIFICATE-----
+.... 
+-----END CERTIFICATE-----"
+----
+The environment variable for a file will look similar to:
+
+`cert_myKeyStore=/Users/me/servercert.crt`
+
+Any value not starting with the `-----BEGIN CERTIFICATE-----`` tag will be treated like a file.
+
+[#rrs]
+
+== Liberty reader role support (Application Security 2.0 and Application Security 3.0)
+
+The reader-role is a management role that allows read-only access to select administrative REST APIs as well as the Admin Center UI (feature: `adminCenter-1.0`).
+
+Prior to this release, the Administrator management role was the only management role within Open Liberty and it provided read and write access. The new Reader management role provides the ability to assign a read-only role to users and groups. This will allow those users and groups to monitor the server without granting those users the ability to modify the server in anyway.
+
+Using the new Reader management role is nearly identical to using the Administrator management role. In the `server.xml` include the `appSecurity-2.0` or `appSecurity-3.0` feature and also add the new `reader-role` configuration element, that specifies the group(s), user(s), and/or the access ID of the group(s) or user(s) that should be granted the Reader management role.
+
+[source, xml]
+----
+<server>
+    <featureManager>
+        <feature>appSecurity-3.0</feature>
+    </featureManager>
+
+    <reader-role>
+        <group>group</group>
+        <group-access-id>group:realmName/groupUniqueId</group-access-id>
+        <user>user</user>
+        <user-access-id>user:realmName/userUniqueId</user-access-id>
+    </reader-role>
+</server>
+----
+
+//end::features[]
 [#previews]
 
 == Previews of early implementations available in development builds
