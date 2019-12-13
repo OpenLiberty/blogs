@@ -1,0 +1,95 @@
+---
+layout: post
+title: "Configuring the Prometheus Alertmanager with Open Liberty"
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/u/34190173
+author_github: https://github.com/jennifer-c
+seo-title: Configuring the Prometheus Alertmanager with Open Liberty - OpenLiberty.io
+seo-description: Learn how to configure the Prometheus Alertmanager for Open Liberty and MicroProfile Metrics to send alerts via Slack. Alerts help quickly and automatically detect problems for better monitoring and maintenance of your application.
+blog_description: "Learn how to configure the Prometheus Alertmanager for Open Liberty and MicroProfile Metrics to send alerts via Slack. Alerts help quickly and automatically detect problems for better monitoring and maintenance of your application."
+---
+= Configuring Prometheus Alertmanager with Open Liberty
+Jennifer Cheng <https://github.com/jennifer-c>
+
+Every application needs a strong monitoring system to catch unexpected issues, whether it's an overloaded heap or a slow-responding servlet. MicroProfile Metrics provides the ability to expose metrics for your application. Used in conjunction with the open-source monitoring system link:https://prometheus.io/[Prometheus] and the link:https://prometheus.io/docs/alerting/overview/[Prometheus Alertmanager], we can build a strong foundation for monitoring your system and reacting quickly to issues.
+
+Before we start, you should have a Liberty server with the `mpMetrics-2.0` feature enabled to test your Alertmanager configuration.
+
+To learn more about MicroProfile Metrics, check out link:https://openliberty.io/guides/microprofile-metrics.html[this guide.]
+
+== Setting up Prometheus with Open Liberty
+. Download link:https://prometheus.io/download/#prometheus[Prometheus] and extract it. (By the way, since you're already there, go ahead and download the Alertmanager as well.)
+
+. Edit the `prometheus.yml` file. Under the `scrape_configs` section, there is already a job configured for Prometheus itself. We need to add one for Open Liberty, which should look something like this:
+```
+- job_name: 'openliberty'
+
+    scheme: 'https'
+
+    tls_config:
+      insecure_skip_verify: true
+
+    static_configs:
+      - targets: ['localhost:9443']
+```
+[start=3]
+. Run `./prometheus` (or `prometheus.exe` on Windows). When you see the message `Server is ready to receive web requests`, navigate over to `http://localhost:9090` to view the Prometheus web UI.
+. To verify that your setup is working, click on `Targets` under `Status` in the navigation bar. You should see your `openliberty` target with the status `UP`.
+
+image::/img/blog/prometheus_ui_status.png[Prometheus Status on UI, align="left"]
+
+== Creating Prometheus Alerting Rules
+. Make a file called `alert.yml`. Inside that file, you will be creating alerting rules.
+Here's an example:
+```
+groups:
+- name: libertyexample
+  rules:
+  - alert: heapUsageTooHigh
+    expr: base_memory_usedHeap_bytes / base_memory_maxHeap_bytes > 0.9
+    for: 1m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Heap usage is too high"
+      description: "{{ $labels.instance }} heap usage is too high"
+```
+This rule will send an alert called `heapUsageTooHigh` when the PromQL query `base_memory_usedHeap_bytes / base_memory_maxHeap_bytes` is greater than `0.9` (90%) for one minute. (For testing purposes, feel free to change the threshold to something smaller, like 0.05.)
+
+Check out the link:https://prometheus.io/docs/prometheus/latest/querying/basics/[Querying Prometheus] page to learn more about PromQL queries.
+[start=2]
+. In the `prometheus.yml` file, add the location of your `alert.yml` file under `rule_files`. If it's not in the same directory as Prometheus, make sure you supply the full path.
+. Restart Prometheus. Navigate to `http://localhost:9090` and click on `Alerts` on the navigation bar. You should be able to see your alert.
+
+image::/img/blog/prometheus_ui_alerts.png[Prometheus Alerts on UI, align="left"]
+
+== Configuring the Prometheus Alertmanager with Slack
+Note: you will need a Slack channel to send alerts to, as well as a link:https://api.slack.com/messaging/webhooks[Slack webhook] for that channel.
+
+. Now that Prometheus is set up with rules for our Liberty server, we can set up the Prometheus Alertmanager. If you haven't already downloaded it, you can do so link:https://prometheus.io/download/#prometheus[here.] Extract it.
+. Edit `alertmanager.yml` to add your Slack webhook under `global`. Then, under the `route`, you will see that there is a receiver called `web.hook`. We will be editing this receiver to work with Slack.
+. Right under `webhook_configs`, add another field (aligned with `webhook_configs`) called `slack_configs`. It'll look something like this:
+```
+slack_configs:
+- channel: 'prometheus-alertmanager-test'
+  title: "{{ range .Alerts }}{{ .Annotations.summary }}\n{{ end }}"
+  text: "*Description*: {{ .CommonAnnotations.description }}\n*Severity*: {{ .CommonLabels.severity }}""
+```
+The `CommonAnnotations` come from your `alert.yml` file. The text is written using the link:https://golang.org/pkg/text/template/[Go templating] system.
+
+[start=4]
+. Run `./alertmanager`. The Alertmanager is located at `http://localhost:9093` by default. Since we haven't generated any test data yet, you won't see any alert groups at the moment.
+
+== Receiving Alerts via the Alertmanager
+Now that the Alertmanager is set up, we need to configure Prometheus to talk to it.
+
+. In the `prometheus.yml` file inside your Prometheus folder, under `targets`, add `localhost:9093`.
+. Restart Prometheus.
+. Trigger the alert however you can - with the rule we're using, the easiest way is to change your threshold value to be very low and run your application a few times to use up some of your heap.
+. Head over to `http://localhost:9090` and click on Alerts. Your alert should be in the `Pending` or `Firing` state. (Once the alert is in the `Firing` state, you should also be able to see your alert at `http://localhost:9093`.)
+. Check your Slack channel to see your message.
+
+image::/img/blog/slack_alert.png[Alert on Slack, align="left"]
+
+== Next Steps
+Now that we have a basic configuration of the Prometheus Alertmanager set up, we can play with Prometheus rules to create a more comprehensive alerting system. We can also customize our messages to be more informative by using the Go templating system. Need some inspiration? Take a look at some sample configurations for Open Liberty link:https://github.com/jennifer-c/openliberty-alertmanager[here.]
