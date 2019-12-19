@@ -15,7 +15,7 @@ Every application needs a strong monitoring system to catch unexpected issues, w
 
 Before we start, you should have an Open Liberty server with the `mpMetrics-2.0` feature enabled to test your Alertmanager configuration.
 
-Already know how to set up Alertmanager? Check out link:https://github.com/jennifer-c/openliberty-alertmanager[some sample configurations], built specifically for Open Liberty.
+Already familiar with Alertmanager? Check out link:https://github.com/jennifer-c/openliberty-alertmanager[a sample configuration], built specifically for Open Liberty. The repository also contains the configuration used as an example in this blog post, if you get stuck along the way.
 
 To learn more about MicroProfile Metrics, check out link:https://openliberty.io/guides/microprofile-metrics.html[this guide.]
 
@@ -94,12 +94,12 @@ Now that the Alertmanager is set up, we need to configure Prometheus to talk to 
 image::/img/blog/prometheusAM_slack_alert.png[Alert on Slack, align="left"]
 
 == Using Groups, Routes, and Inhibition
-When creating larger alerting systems, it's messy and difficult to understand if we group all our alerts into one and have only one alerting location.
+When creating larger alerting systems, it's crucial to keep your alerts organized so that you can respond quickly to any problems. You can configure your Alertmanager to group certain alerts together using _groups_, to send alerts to different locations using _routes_, and to only send useful alerts (while not compromising coverage of your data) with _inhibition_.
 
-To your rule file, `alert.yml`, add the following rules:
+If you want to test these configurations out yourself, you'll need to have a couple of rules to play with. To your rule file, `alert.yml`, add the following rules:
 ```
 - alert: heapUsageAbove90%
-  expr: base_memory_usedHeap_bytes / base_memory_maxHeap_bytes > 0.1
+  expr: base_memory_usedHeap_bytes / base_memory_maxHeap_bytes > 0.9
   for: 30s
   labels:
     alerttype: heap
@@ -108,7 +108,7 @@ To your rule file, `alert.yml`, add the following rules:
     summary: "Heap usage is above 90%"
     description: "{{ $labels.instance }} heap usage above 90%"
 - alert: heapUsageAbove50%
-  expr: base_memory_usedHeap_bytes / base_memory_maxHeap_bytes > 0.01
+  expr: base_memory_usedHeap_bytes / base_memory_maxHeap_bytes > 0.5
   for: 30s
   labels:
     alerttype: heap
@@ -142,7 +142,7 @@ route:
 ```
 And set up a new receiver for PagerDuty by adding this to `receivers`:
 ```
-- name: team-pager
+- name: pager-receiver
   pagerduty_configs:
   - service_key: <your service key>
 ```
@@ -167,7 +167,7 @@ The alerts will be grouped by `alerttype`, and the group will only send one aler
 image::/img/blog/prometheusAM_alertmanager_grouping.png[Alerts grouped in Alertmanager UI, align="left"]
 
 === Inhibition
-For scenarios where you have multiple alerts that convey the same information, inhibiting your alerts can be useful. For example, if you have one alert that detects when 50% of your memory heap is used, and another alert for 90% of memory heap being used, there's no reason to send out alerts for the 50% problem. Let's try it out!
+For scenarios where you have multiple alerts that convey the same information, inhibiting your alerts can be useful. For example, if you have one alert that detects when 50% of your memory heap is used, and another alert for 90% of memory heap being used, there's no reason to send out alerts for the 50% problem.
 
 In your `alertmanager.yml`, add the following under `inhibition_rules`:
 ```
