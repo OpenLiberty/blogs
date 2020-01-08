@@ -69,8 +69,13 @@ image::/img/blog/prometheusAM_ui_alerts.png[Prometheus Alerts on UI, align="left
 Note: you will need a Slack channel to send alerts to, as well as a link:https://api.slack.com/messaging/webhooks[Slack webhook] for that channel.
 
 . Now that Prometheus is set up with rules for our Liberty server, we can set up the Prometheus Alertmanager. If you haven't already downloaded it, you can do so link:https://prometheus.io/download/#prometheus[here.] Extract it.
-. Edit `alertmanager.yml` to add your Slack webhook under `global`. Then, under the `route`, you will see that there is a receiver called `web.hook`. We will be editing this receiver to work with Slack.
-. Right under `webhook_configs`, add another field (aligned with `webhook_configs`) called `slack_configs`. It'll look something like this:
+. Edit `alertmanager.yml` to add your Slack webhook under `global`.
+```
+  global:
+    slack_api_url: <your api url>
+```
+[start=3]
+. Under the `route`, you will see that there is a receiver called `web.hook`. We will be editing this receiver to work with Slack. Right under `webhook_configs`, add another field (aligned with `webhook_configs`) called `slack_configs`. It'll look something like this:
 ```
 slack_configs:
 - channel: 'prometheus-alertmanager-test'
@@ -85,7 +90,16 @@ The `CommonAnnotations` come from your `alert.yml` file. The text is written usi
 == Receiving Alerts via the Alertmanager
 Now that the Alertmanager is set up, we need to configure Prometheus to talk to it.
 
-. In the `prometheus.yml` file inside your Prometheus folder, under `targets`, add `localhost:9093`.
+. In the `prometheus.yml` file inside your Prometheus folder, add `localhost:9093` to the targets under the Alertmanager configuration.
+```
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+  - static_configs:
+    - targets:
+        - localhost:9093
+```
+[start=2]
 . Restart Prometheus.
 . Trigger the alert however you can - with the rule we're using, the easiest way is to change your threshold value to be very low and run your application a few times to use up some of your heap.
 . Head over to `http://localhost:9090` and click on Alerts. Your alert should be in the `Pending` or `Firing` state. (Once the alert is in the `Firing` state, you should also be able to see your alert at `http://localhost:9093`.)
@@ -122,7 +136,7 @@ If your `alert.yml` file still has the old rule `heapUsageTooHigh`, you can dele
 === Routes
 There's a time and a place for everything, and that includes alerts. Routing your alerts allows you to use multiple different receivers based on the label assigned to each rule.
 
-For example, if you wanted to use PagerDuty to page critical alerts, and use Slack to send notifications of warning alerts, you can set the `route` to look like the following:
+For example, if you wanted to use PagerDuty to page critical alerts, and use Slack to send notifications of warning alerts, you can set the `route` to look like the following in `alertmanager.yml`:
 ```
 # The root route. This route is used as the default
 # if there are no matches in the child routes.
@@ -155,7 +169,7 @@ If you have a network of systems that goes down, you probably don't want to rece
 In your `alertmanager.yml`, under `route`, you can group your alerts by label name:
 ```
 route:
-  group_by: [ 'alerttype' ]
+  group_by: [ alerttype ]
   group_wait: 10s
   group_interval: 10s
   repeat_interval: 5m
