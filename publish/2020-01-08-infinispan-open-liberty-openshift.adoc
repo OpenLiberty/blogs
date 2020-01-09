@@ -1,0 +1,233 @@
+---
+layout: post
+title: "Infinispan 10 support for distributed in-memory HttpSession caching"
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/u/30153613
+author_github: https://github.com/nmittles
+seo-title: Infinispan support for distributed in-memory HttpSession caching - OpenLiberty.io
+seo-description: When paired with a JCache implementation, the sessionCache-1.0 feature provides distributed in-memory HttpSession caching. In this post we will cover how to configure Infinispan as this required JCache implementation. We will focus on running in a Kubernetes environment (OpenShift) in both embedded and client/server modes.
+blog_description: "When paired with a JCache implementation, the sessionCache-1.0 feature provides distributed in-memory HttpSession caching. In this post we will cover how to configure Infinispan as this required JCache implementation. We will focus on running in a Kubernetes environment (OpenShift) in both embedded and client/server modes."
+---
+= Infinispan 10 support for distributed in-memory HttpSession caching
+Nathan Mittlestat <https://github.com/nmittles>
+
+A key component of production-grade web applications is failover of non-persistent user session data (e.g. a shopping cart). In Open Liberty, the `sessionCache-1.0` feature enables this failover aspect of high availablility. The `sessionCache-1-0` feature uses a JCache provider under the covers to create a distributed in-memory cache. Don't worry, no direct usage of the link:https://www.jcp.org/en/jsr/detail?id=107[JCache (JSR 107)] API is required; Open Liberty handles all those details for you, but you do need to provide a JCache implementation.  That's where official support of link:https://infinispan.org/[Infinispan] as a JCache provider comes in.
+
+Open Liberty now has beta support for using Infinispan 10 with the `sessionCache-1.0` feature. We have tested the Infinispan 10.0.0.Final release in both client/server and embedded modes. This includes running Open Liberty in a Kubernetes environment such as OpenShift. For a broad overview of of the `sessionCache-1.0` feature, see Andy Guibert's blog post link:/blog/2018/03/22/distributed-in-memory-session-caching.html[JCache session persistence]. If you need help determining which Infinispan jars and corresponding prerequisite jars your environment needs, jump to the relevant section at the end of this post:
+
+- <<clientprereqs, Jars needed for running Infinispan 10 in client/server mode.>>
+- <<embeddedprereqs, Jars needed for running Infinispan 10 in embedded mode.>>
+
+Infinispan can be configured in client/server mode (running as a standalone Infinispan server to which your Open Liberty connects remotely) or in embedded mode (running in the same JVM as your Open Liberty server).
+
+== Configuring Infinispan in client/server mode with OpenShift
+Infinispan can be configured in link:https://infinispan.org/docs/stable/titles/overview/overview.html#using_client_server[client/server mode]. In this configuration, there is a standalone Infinispan server that houses all of the cache data. Each Open Liberty server then remotely connects to this Infinispan server to access an application's cached session data. Keep in mind that a cluster of Infinispan servers can be configured to share the workload and for failover purposes. This client/server mode can be beneficial in environments in which your Open Liberty servers are frequently starting and stopping because there is a cost associated with transferring the cache state to each Liberty server when running in embedded mode.
+
+For configuring client/server mode in Open Liberty, we'll start with a sample `server.xml`:
+
+```xml
+<server>
+    <featureManager>
+        <feature>servlet-4.0</feature>
+        <feature>sessionCache-1.0</feature>
+    </featureManager>
+
+    <httpEndpoint host="*"
+                  id="defaultHttpEndpoint"
+                  httpPort="9080"
+                  httpsPort="9443" />
+
+  <httpSessionCache libraryRef="InfinispanLib" enableBetaSupportForInfinispan="true">
+    <properties infinispan.client.hotrod.server_list="infinispan-server:11222"/>
+    <properties infinispan.client.hotrod.auth_username="sampleUser"/>
+    <properties infinispan.client.hotrod.auth_password="samplePassword"/>
+    <properties infinispan.client.hotrod.auth_realm="default"/>
+    <properties infinispan.client.hotrod.sasl_mechanism="PLAIN"/>
+  </httpSessionCache>
+
+    <library id="InfinispanLib">
+        <fileset dir="${shared.resource.dir}/infinispan" includes="*.jar"/>
+    </library>
+</server>
+```
+
+
+The key piece is the `<httpSessionCache>` tag. The `enableBetaSupportForInfinispan="true"` attribute enables the beta Infinispan support code in Open Liberty. The `libraryRef="InfinispanLib"` attribute references a shared library to load the Infinispan jars from. Finally, the embedded `<properties>` tags set the minimum configuration needed by the Infinispan Hot Rod client. This configuration uses PLAIN authentication, which you should use only for development purposes (see Infinispan's link:https://infinispan.org/docs/dev/titles/hotrod_java/hotrod_java.html#authentication[documentation on authentication] for more details). For a complete list of supported properties, see the link:https://docs.jboss.org/infinispan/10.0/apidocs/org/infinispan/client/hotrod/configuration/package-summary.html[Infinispan documentation]. Also, be sure to enable the `sessionCache-1.0` feature.
+
+Next, create a `jvm.options` file in your main Open Liberty server directory. This file sets `infinispan.deserialization.whitelist.regexps` to allow for the serialization/deserialization of java objects into Infinispan's caches. The following sample `jvm.options` file enables all class types:
+
+```xml
+-Dinfinispan.deserialization.whitelist.regexps=.*
+```
+
+Finally, start an Infinispan server in your OpenShift environment with the following command:
+
+```
+oc new-app --docker-image=infinispan/server --name=infinispan-server -e USER="sampleUser" -e PASS="samplePassword"
+```
+
+ In the example above `--name=infinispan-server` maps to `infinispan.client.hotrod.server_list="infinispan-server:11222"` in your Open Liberty server.xml (11222 is the default port). Additionally, `USER` and `PASS` map to `infinispan.client.hotrod.auth_username` and `infinispan.client.hotrod.auth_password` respectively.
+
+== Configuring Infinispan in embedded mode with OpenShift
+
+Infinispan can be configured in link:https://infinispan.org/docs/stable/titles/overview/overview.html#embedded_mode[embedded mode]. In this configuration, the Infinispan server resides in the same JVM as your Open Liberty server. Infinispan utilizes link:http://www.jgroups.org[JGroups] to allow multiple embedded servers to form a cluster. In our context of the `sessionCache-1.0` feature, this clustering provides high availablility of user session data. Embedded mode will generally perform faster per request than client/server mode. This is due to the network and serialization costs associated with the remote calls of client/server mode.
+
+To configure embedded mode in Open Liberty, we'll start with a sample `server.xml`:
+
+```xml
+<server>
+    <featureManager>
+        <feature>servlet-4.0</feature>
+        <feature>mpMetrics-2.0</feature> <!-- one of the Infinispan JARs has a hard dependency on MicroProfile Metrics API -->
+        <feature>mpReactiveStreams-1.0</feature> <!-- one of the Infinispan JARs has a hard dependency on Reactive Streams API -->
+        <feature>sessionCache-1.0</feature>
+    </featureManager>
+
+    <httpEndpoint host="*"
+                  id="defaultHttpEndpoint"
+                  httpPort="9080"
+                  httpsPort="9443" />
+
+    <httpSessionCache enableBetaSupportForInfinispan="true" libraryRef="InfinispanLib" uri="file:${shared.resource.dir}/infinispan/infinispan.xml"/>
+
+    <library id="InfinispanLib">
+        <fileset dir="${shared.resource.dir}/infinispan" includes="*.jar"/>
+    </library>
+</server>
+```
+
+
+The key piece is the `<httpSessionCache>` tag. The `enableBetaSupportForInfinispan="true"` attribute enables the beta Infinispan support code in Open Liberty. The `libraryRef="InfinispanLib"` attribute references a shared library to load the Infinispan jars from. Finally, the `uri="file:${shared.resource.dir}/infinispan/infinispan.xml"` attribute points to Infinispan's own configuration file. Be sure to enabled the `sessionCache-1.0`, `mpReactiveStreams-1.0`, and `mpMetrics-2.0` features. Currently `mpMetrics-2.0` and `mpReactiveStreams-1.0` are hard dependencies, but we're aiming to make these optional in the future.
+
+Next, you'll need to create the `infinispan.xml` referenced from the `server.xml` configuration:
+
+```xml
+<infinispan>
+  <jgroups>
+     <stack-file name="jgroups-kubernetes" path="/default-configs/default-jgroups-kubernetes.xml"/>
+  </jgroups>
+  
+  <cache-container>
+    <transport stack="jgroups-kubernetes" />
+  </cache-container>
+</infinispan>
+```
+
+The JGroups stack is what determines how your Infinispan servers forms a cluster.  We're using the default Kubernetes template because we're running in OpenShift. See link:https://infinispan.org/docs/dev/titles/configuring/configuring.html#cluster_transport[Configuring Infinispan 10] for Infinispan's complete documentation on setting up your cluster.
+
+Next, you'll need to create a headless Kubernetes service to enable the Kubernetes JGroups transport stack to form a cluster. The key here is for the `name` of the `selector` to match one of the labels associated with your Open Liberty applications running in OpenShift. For example, an application defined using the command `oc new-app --image-stream=ol-runtime-infinispan-embedded:1.0.0 --name=embedded-servera -l name=ol-runtime-infinispan-embedded` has a label of `name=ol-runtime-infinispan-embedded`. This label then matches the service defined below, and triggers the application to be a part of the service.
+
+```
+oc create -f service.yaml
+```
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: infinispan-embedded
+spec:
+  clusterIP: None
+  ports:
+  - name: discovery
+    port: 7800
+    protocol: TCP
+    targetPort: 7800
+  selector:
+    name: ol-runtime-infinispan-embedded
+  sessionAffinity: None
+  type: ClusterIP
+status:
+  loadBalancer: {}
+```
+
+Finally, you need to create a `jvm.options` file in your main Open Liberty server directory. This file sets `jgroups.dns.query` which points to the DNS record that should return all the members of your Infinispan cluster. If your environment doesn't support IPv6 then you also want to set `-Djava.net.preferIPv4Stack=true`. See the following sample `jvm.options` file:
+
+```xml
+# Set if IPv6 is not supported. 
+-Djava.net.preferIPv4Stack=true
+# This value matches the DNS lookup of the headless service defined in the previous step. Your domain might vary.
+-Djgroups.dns.query=infinispan-embedded.myproject.svc.cluster.local
+```
+
+For an OpenShift environment, `server.xml`, `infinispan.xml`, `service.yaml`, and `jvm.options` are the four files you'll need to configure to enable Infinispan in embedded mode. If you wish to run outside of an OpenShift environment, a `server.xml` with the proper features enabled, a shared library for Infinispan, and the following tag is all that is required:
+
+```xml
+<httpSessionCache enableBetaSupportForInfinispan="true" libraryRef="InfinispanLib"/>
+```
+
+
+== Collecting the JAR files need to run Infinispan 10
+
+If you're not sure which Infinispan and prerequisite JAR files you need in your environment, see the following sections for guidance on how to obtain the relevant JAR files using Maven.
+
+[#clientprereqs]
+=== Jars needed for running Infinispan 10 in client/server mode
+
+An easy way to collect the jars needed for running Infinispan 10 in client/server mode is to use Maven with the following `pom.xml`:
+
+```xml
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>io.openliberty</groupId>
+  <artifactId>openliberty-infinispan-client</artifactId>
+  <version>1.0</version>
+  <!-- https://mvnrepository.com/artifact/org.infinispan/infinispan-jcache -->
+  <dependencies>
+    <dependency>
+      <groupId>org.infinispan</groupId>
+      <artifactId>infinispan-jcache-remote</artifactId>
+      <version>10.0.0.Final</version>
+    </dependency>
+  </dependencies>
+</project>
+```
+
+Then run the following commands to download and cleanup the jars:
+
+```code
+mvn dependency:copy-dependencies -DoutputDirectory=infinispan
+rm -f infinispan/jboss-transaction-api*.jar
+rm -f infinispan/reactive-streams-*.jar
+rm -f infinispan/rxjava-*.jar
+```
+
+
+[#embeddedprereqs]
+=== Jars needed for running Infinispan 10 in embedded mode
+
+An easy way to collect the jars needed for running Infinispan 10 in embedded mode is to use Maven with the following `pom.xml`:
+
+```xml
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>io.openliberty</groupId>
+  <artifactId>openliberty-infinispan</artifactId>
+  <version>1.0</version>
+  <!-- https://mvnrepository.com/artifact/org.infinispan/infinispan-jcache -->
+  <dependencies>
+    <dependency>
+      <groupId>org.infinispan</groupId>
+      <artifactId>infinispan-jcache</artifactId>
+      <version>10.0.0.Final</version>
+    </dependency>
+  </dependencies>
+</project>
+```
+
+Then run the following commands to download and cleanup the jars:
+
+```code
+mvn dependency:copy-dependencies -DoutputDirectory=infinispan
+rm -f infinispan/cdi-api-*.jar
+rm -f infinispan/javax.*.jar
+rm -f infinispan/jboss-transaction-api*.jar
+rm -f infinispan/microprofile-*-api-*.jar
+rm -f infinispan/reactive-streams-*.jar
+rm -f infinispan/smallrye-config-*.jar
+```
+
+== Give it a try!
+
+So there you have it. We can now run Open Liberty with Infinispan 10 in OpenShift to provide distributed in-memory HttpSession caching. Keep in mind this is still beta function, and any feedback, questions, or suggestions about further support is welcome. Let us know by posting to https://groups.io/g/openliberty[our Groups.io account].
+
