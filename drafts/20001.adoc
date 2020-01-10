@@ -1,0 +1,187 @@
+---
+layout: post
+title: "Diagnose slow requests more easily with improved request logging in Open Liberty 19.0.0.11"
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/tomjenningss
+author_github: https://github.com/tomjenningss
+seo-title: Diagnose slow requests more easily with improved request logging in Open Liberty 19.0.0.11 - OpenLiberty.io
+seo-description: Open Liberty 19.0.0.11 provides a useful option to automatically detect slow requests and logs the information when the request is complete through the Request Timing 1.0 feature. Java SE 13 release from AdoptOpenJDK, OpenJDK, or Oracle works with Open Liberty.
+blog_description: "Open Liberty 19.0.0.11 provides a useful option to automatically detect slow requests and logs the information when the request is complete through the Request Timing 1.0 feature. Java SE 13 release from AdoptOpenJDK, OpenJDK, or Oracle works with Open Liberty."
+---
+= Using Liberty Social Logging with Openshift
+Tom Jennings <https://github.com/tomjenningss>
+
+
+Open Liberty 20.0.0.1 provides a useful option to automatically detect slow requests and logs the information when the request is complete through the Request Timing 1.0 feature. Additionally, Java SE 13 release from AdoptOpenJDK, OpenJDK, or Oracle works with Open Liberty.
+
+Give it a try in link:/about/[Open Liberty] 19.0.0.11.
+
+If you're interested in what's coming soon in Open Liberty, take a look at our <<previews,current development builds>>. In particular, get an early insight into Jaeger support for MicroProfile OpenTracing, performance improvements through annotation caching, and GraphQL support.
+
+In Open Liberty 20.0.0.1:
+
+* <<SSAA,Support OpenShift OAuth server for Authentication and Authorization)>>
+* <<NMM,New processCpuTime metric in mpMetrics 2.0>>
+
+View the list of fixed bugs from https://github.com/OpenLiberty/open-liberty/issues?utf8=%E2%9C%93&q=label%3Arelease%3A20001+label%3A%22release+bug%22[20.0.0.1]
+
+[#run]
+== Run your apps using 20.0.0.1
+
+If you're using link:/guides/maven-intro.html[Maven], here are the coordinates:
+
+[source,xml]
+----
+<dependency>
+    <groupId>io.openliberty</groupId>
+    <artifactId>openliberty-runtime</artifactId>
+    <version>20.0.0.1</version>
+    <type>zip</type>
+</dependency>
+----
+
+Or for link:/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+dependencies {
+    libertyRuntime group: 'io.openliberty', name: 'openliberty-runtime', version: '[20.0.0.1,)'
+}
+----
+
+Or if you're using Docker:
+
+[source]
+----
+docker pull open-liberty
+----
+
+Or take a look at our link:/downloads/[Downloads page].
+
+[link=https://stackoverflow.com/tags/open-liberty]
+image::/img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="center"]
+
+[#SSAA]
+== Using Liberty Social Login with Openshift
+
+The Liberty `SocialLogin-1.0` feature can now be configured to use Open Shift's built in OAuth server and OAuth Proxy sidecar as authentication providers. The first is a standard OAuth Authorization Code flow, where a web browser accessing an app running in Liberty will be redirected to the OpenShift OAuth server to authenticate.
+The second is accepting an inbound token from the OpenShift OAuth Proxy sidecar or obtained from an Openshift API call. This approach requires less cluster-specific configuration.
+
+Most users of this will run Liberty in a pod, however in the Authorization Code flow, Liberty can run outside the OpenShift cluster. In either mode, an optional JWT can be created for propagation to downstream services
+
+Using OpenShift as a provider differs slightly from other OAuth providers, it requires a service account token to obtain information about the OAuth tokens.
+Once the client Id, secret, and token have been obtained from OpenShift, Liberty can be configured as shown below.
+
+To enable the feature add it to the `server.xml`
+
+Server configuration to use OpenShift OAuth server:
+
+[source, xml]
+----
+<server description="social">
+
+  <!-- Enable features -->
+  <featureManager>
+    <feature>appSecurity-3.0</feature>
+    <feature>socialLogin-1.0</feature>
+  </featureManager>
+
+<logging traceSpecification="com.ibm.ws.security.*=all=enabled" maxFiles="8" maxFileSize="200"/>
+
+<httpEndpoint  id="defaultHttpEndpoint" host="*" httpPort="8941" httpsPort="8946" > <tcpOptions soReuseAddr="true" /> </httpEndpoint>
+
+
+  <!-- specify your clientId, clientSecret and userApiToken as liberty variables or environment variables -->
+  <oauth2Login id="openshiftLogin" 
+    scope="user:full" 
+    clientId="${myclientId}" 
+    clientSecret="${myclientSecret}"
+    authorizationEndpoint="https://oauth-openshift.apps.papains.os.fyre.ibm.com/oauth/authorize" 
+    tokenEndpoint="https://oauth-openshift.apps.papains.os.fyre.ibm.com/oauth/token"
+    userNameAttribute="username" 
+    groupNameAttribute="groups" 
+    userApiToken="${serviceAccountToken}" 
+    userApiType="kube" 
+    userApi="https://api.papains.os.fyre.ibm.com:6443/apis/authentication.k8s.io/v1/tokenreviews"> 
+  </oauth2Login>
+
+  <keyStore id="defaultKeyStore" password="keyspass" />
+   
+  <!-- more application config would go here -->
+
+</server>
+----
+
+In the sidecar scenario, the configuration changes to accept an inbound token from the sidecar.
+Server configuration to use OAuth proxy sidecar:
+
+[source, xml]
+----
+<!-- specify your userApiToken as a liberty variable or environment variable -->
+  <!-- note that no clientId or clientSecret are needed --> 
+  <oauth2Login id="openshiftLogin" 
+    scope="user:full" 
+    userNameAttribute="username" 
+    groupNameAttribute="groups" 
+    userApiToken="${serviceAccountToken}" 
+    userApiType="kube" 
+    accessTokenHeaderName="X-Forwarded-Access-Token"  
+    accessTokenRequired="true" 
+    userApi="https://kubernetes.default.svc/apis/authentication.k8s.io/v1/tokenreviews"> 
+  </oauth2Login>
+----
+
+To enable https communications, the cluster's public key or some other key can be specified in server.env and Liberty will use them.
+
+[#NMM]
+== New processCpuTime metric in mpMetrics 2.0
+
+This feature shows the user information about their application, such as CPU time used, memory heap, response time of servlets
+
+The update adds a new metric, processCpuTime, which returns the CPU time used by the process on which the JVM is running.
+
+This metric allows the developer to view a more accurate CPU load percentage on Cloud platforms via Grafana. Previously, the CPU load percentage was shown with the metric processCpuLoad. However, the load percentage was calculated using the total number of cores allocated to the deployment - because of that, if the deployment had a restricted number of cores, the processCpuLoad would end up showing a plateau on Grafana when the maximum number of cores was reached. For example, on a deployment with 32 cores allocated but restricted to 4 cores, the processCpuLoad graph would show a plateau at 12.5%, when all four cores are used. This is confusing and misleading.
+
+The new metric, processCpuTime, can be manipulated on Grafana (see picture) to create a more accurate representation of the CPU being used. rate(processCpuTime)[1m] shows the average rate of increase in CPU time over one minute. Dividing this by the total number of CPU cores, we can see a more accurate percentage of the CPU used, taking into account the restraints.
+
+Try it out for yourself
+
+
+
+
+The new metric will be displayed on the `/metrics` endpoint on `mpMetrics-2.0` and `mpMetrics-2.2`. On the dashboard, a new panel can be created with the following PromQL query: (rate(base:cpu_process_cpu_time[2m])/1e9) / base:cpu_available_processors{app=~[[app]]}. link:https://github.com/OpenLiberty/open-liberty-operator/tree/master/deploy/dashboards/metrics[View full dashboard]
+
+
+With constraints - you can see that the old version caps out at 12.5% (4/32); the new metric more accurately represents the percentage of CPU used. Note that there are 32 cores available when not setting constraints on the deployment.
+
+image::/img/blog/20001-highcpuload[align="center"]
+image::/img/blog/20001-lowcpuload[align="center"]
+
+
+No constraints (32 processors) - you can see that the old version and new version display the same thing.
+
+image::/img/blog/20001-noconstraints[align="center"]
+
+image::/img/blog/20001-noconstraints[align="center"]
+
+
+
+[#previews]
+
+== Previews of early implementations available in development builds
+
+You can now also try out early implementations of some new capabilities in the link:https://openliberty.io/downloads/#development_builds[latest Open Liberty development builds]:
+
+* <<acr, Automatically compress HTTP responses>>
+
+These early implementations are not available in 20.0.0.1 but you can try them out in our daily Docker image by running `docker pull openliberty/daily`. Let us know what you think!
+[#acr]
+== Automatically compress HTTP responses
+
+
+
+== Get Liberty 20.0.0.1 now
+
+Available through <<run,Maven, Gradle, Docker, and as a downloadable archive>>.
+
+
