@@ -1,30 +1,32 @@
 ---
 layout: post
-title: "Using Liberty Social Logging with Openshift in Open Liberty 20.0.0.1"
+title: "Using Liberty Social Logging with OpenShift in Open Liberty 20.0.0.1"
 categories: blog
 author_picture: https://avatars3.githubusercontent.com/tomjenningss
 author_github: https://github.com/tomjenningss
-seo-title: Using Liberty Social Logging with Openshift 20.0.0.1 - OpenLiberty.io
-seo-description: Open Liberty 20.0.0.1, supports new capabilities and elements with OpenShift OAuth server for Authentication and Authorization. In addition, there is a new MicroProfile Metric to measure CPU time, memory heap and response time.
-blog_description: "Open Liberty 20.0.0.1, supports new capabilities and elements with OpenShift OAuth server for Authentication and Authorization. In addition, there is a new MicroProfile Metric to measure CPU time, memory heap and response time."
+seo-title: Using Liberty Social Logging with OpenShift 20.0.0.1 - OpenLiberty.io
+seo-description: In Open Liberty 20.0.0.1, you can configure the Social Login feature to use Red Hat OpenShift's OAuth server for authentication. In addition, there is a new MicroProfile Metric to measure CPU time, memory heap and response time.
+blog_description: In Open Liberty 20.0.0.1, you can configure the Social Login feature to use Red Hat OpenShift's OAuth server for authentication. In addition, there is a new MicroProfile Metric to measure CPU time, memory heap and response time."
 ---
-= Using Liberty Social Logging with Openshift
+= Use Red Hat OpenShift's built-in OAuth server as an authentication provider in Open Liberty 20.0.0.1
 Tom Jennings <https://github.com/tomjenningss>
 
 
-Open Liberty 20.0.0.1, supports new capabilities and elements with OpenShift OAuth server for Authentication and Authorization. In addition, there is a new MicroProfile Metric to measure CPU time, memory heap and response time.  
+In Open Liberty 20.0.0.1, you can configure the Social Login feature to use Red Hat OpenShift's OAuth server for authentication. In addition, there is a new MicroProfile Metric to measure CPU time, memory heap and response time.  
 
 Give it a try in link:/about/[Open Liberty] 20.0.0.1
 
-If you're interested in what's coming soon in Open Liberty, take a look at our <<previews,current development builds>>. In particular, get an early insight into Jaeger support for MicroProfile OpenTracing, performance improvements through annotation caching, and GraphQL support.
+If you're interested in what's coming soon in Open Liberty, take a look at our <<previews,current development builds>>. Performance improvements through faster startups with annotation caching, and GraphQL support.
 
 In Open Liberty 20.0.0.1:
 
-* <<SSAA,Support OpenShift OAuth server for Authentication and Authorization>>
-* <<NMM,New Metric in mpMetrics 2.0>>
+* <<SSAA,Support OpenShift OAuth server for authentication and authorization>>
+* <<NMM, Monitor the process CPU time (MicroProfile Metrics 2.0)>>
+* <<ACC, Faster application startups with Liberty annotation caching>>
 * <<JSS, Updated JavaServer Face>>
 
-View the list of fixed bugs from https://github.com/OpenLiberty/open-liberty/issues?utf8=%E2%9C%93&q=label%3Arelease%3A20001+label%3A%22release+bug%22[20.0.0.1]
+
+View the list of fixed bugs in https://github.com/OpenLiberty/open-liberty/issues?utf8=%E2%9C%93&q=label%3Arelease%3A20001+label%3A%22release+bug%22[20.0.0.1]
 
 [#run]
 == Run your apps using 20.0.0.1
@@ -63,15 +65,15 @@ Or take a look at our link:/downloads/[Downloads page].
 image::/img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="center"]
 
 [#SSAA]
-== Using Liberty Social Login with Openshift
+== Using Liberty Social Login with Red Hat OpenShift
 
-The Liberty `SocialLogin-1.0` feature can now be configured to use Open Shift's built-in `OAuth server` and `OAuth Proxy sidecar` as authentication providers. The first is a standard OAuth Authorization Code flow, where a web browser accessing an app running in Liberty will be redirected to the OpenShift OAuth server to authenticate.
-The second is accepting an inbound token from the OpenShift OAuth Proxy sidecar or obtained from an Openshift API call. This approach requires less cluster-specific configuration.
+The SocialLogin feature `SocialLogin-1.0` can now be configured to use OpenShift’s built-in OAuth server and OAuth Proxy sidecar as authentication providers. The Social Login feature has several pre-configured providers (e.g. Google, GitHub, Facebook) but you can also configure additional providers (e.g. Instagram). OpenShift's OAuth server and OAuth Proxy sidecar can now be configured as additional providers too. The first is a standard OAuth Authorization Code flow, where a web browser accessing an app running in Liberty is redirected to the OpenShift OAuth server to authenticate.
+The second is accepting an inbound token from the OpenShift OAuth Proxy sidecar or obtained from an OpenShift API call. This approach requires less cluster-specific configuration.
 
 Most users of this will run Liberty in a pod; however, in the Authorization Code flow, Liberty can run outside the OpenShift cluster. In either mode, an optional JWT can be created for propagation to downstream services.
 
 Using OpenShift as a provider differs slightly from other OAuth providers, it requires a service account token to obtain information about the OAuth tokens.
-Once the: client Id, secret, and token have been obtained from OpenShift, Liberty can be configured as shown below.
+Once the: client ID, secret, and token have been obtained from OpenShift, Liberty can be configured as shown below.
 
 To enable the feature add it to the `server.xml`
 
@@ -132,31 +134,41 @@ Server configuration to use OAuth proxy sidecar:
   </oauth2Login>
 ----
 
-To enable `https communications`, the cluster's public key or some other key can be specified in server.env and Liberty will use them.
+Use of https communication requires that the server either have a key signed by a well-known certificate authority, which Liberty can trust automatically or that the server's public key be added to the Liberty trust store. OpenShift does not come with CA-signed keys by default, so the Red Hat OpenShift OAuth server's public key will need to be added. The most convenient way to do this is to specify an environment variable in `server.env`. That identifies the file containing the public key in PEM format. Liberty will read the file and add the key to its trust store.
+
+[source, xml]
+----
+# server.env
+
+# OAuth sidecar scenario: causes the Kubernetes default certificate that is pre-installed in pods to be added to Liberty trust store.
+cert_defaultKeyStore=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+
+# OAuth server scenario: causes the public keys from /tmp/trustedcert.pem (written by getcerts.sh) to be added to Liberty trust store.
+cert_defaultKeyStore=/tmp/trustedcert.pem
+
+----
 
 [#NMM]
-== New Microprofile Metric in mpMetrics 2.0
+== Monitor the process CPU time (MicroProfile Metrics 2.0)
 
-The update adds a new metric, `processCpuTime,` which returns the CPU time used by the process on which the JVM is running. This feature shows the user information about their application, such as CPU time used, memory heap, response time of servlets.
+A new metric, `processCpuTime,` which returns the CPU time used by the process on which the JVM is running. The MicroProfile Metrics feature provides information monitoring an application, such as CPU time used, memory heap, response time of servlets.
 
-This metric update allows the developer to view a more accurate CPU load percentage on Cloud platforms via Grafana. Previously, the CPU load percentage was shown with the `metric processCpuLoad`. However, the load percentage was calculated using the total number of cores allocated to the deployment - because of that, if the deployment had a restricted number of cores, the processCpuLoad would end up showing a plateau on Grafana when the maximum number of cores was reached. For example, on a deployment with 32 cores allocated but restricted to 4 cores, the processCpuLoad graph would show a plateau at 12.5%, when all four cores are used. This is confusing and misleading.
+The new `processCpuTime` metric provides a more accurate CPU load percentage on cloud platforms via Grafana. Previously, the CPU load percentage was shown with the metric `processCpuLoad`. However, the load percentage was calculated using the total number of cores allocated to the deployment. If the deployment has a restricted number of cores, the `processCpuLoad` ends up showing a plateau on Grafana when the maximum number of cores is reached. For example, on a deployment with 32 cores allocated but restricted to four cores, the `processCpuLoad` graph shows a plateau at 12.5% when all four cores are used. 
 
-The new metric, `processCpuTime,` can be manipulated on Grafana (refer to image) to create a more accurate representation of the CPU being used. `rate(processCpuTime)[1m]` shows the average rate of increase in CPU time over one minute. Dividing this by the total number of CPU cores, we can see a more accurate percentage of the CPU used, taking into account the restraints.
+The new metric, `processCpuTime,` can be manipulated on Grafana to create a more accurate representation of the CPU being used. `rate(processCpuTime)[1m]` shows the average rate of increase in CPU time over one minute. Dividing this by the total number of CPU cores, we can see a more accurate percentage of the CPU used, taking into account the constraints.
 
-The new metric will be displayed on the `/metrics` endpoint on `mpMetrics-2.0` and `mpMetrics-2.2`. On the dashboard, a new panel can be created with the following PromQL query: `(rate(base:cpu_process_cpu_time[2m])/1e9) / base:cpu_available_processors{app=~[[app]]}.` link:https://github.com/OpenLiberty/open-liberty-operator/tree/master/deploy/dashboards/metrics[View full dashboard.]
+The new `processCpuTime` metric is displayed on the `/metrics` endpoint with the MicroProfile Metrics 2.0 and 2.2 features. On the dashboard, a new panel can be created with the following PromQL query: `(rate(base:cpu_process_cpu_time[2m])/1e9) / base:cpu_available_processors{app=~[[app]]}.` link:https://github.com/OpenLiberty/open-liberty-operator/tree/master/deploy/dashboards/metrics[View full dashboard.]
 
 
-With constraints - the images show that the old version caps out at 12.5% (4/32); the new metric more accurately represents the percentage of CPU used. Note that there are 32 cores available when not setting constraints on the deployment.
+The following images show that the old metric, `processCpuLoad`, plateaus at 12.5% (4/23), while the new metric, `processCpuTime`, more accurately represents the percentage of CPU used.
 
-image::/img/blog/20001-highcpuload[align="center"]
-image::/img/blog/20001-lowcpuload[align="center"]
+image::/img/blog/20001-highcpuload.png[align="center", width=640,height=480]
+image::/img/blog/20001-lowcpuload.png[align="center"]
 
 
 No constraints (32 processors) - you can see that the old version and new version display the same thing.
 
-image::/img/blog/20001-noconstraints[align="center"]
-
-image::/img/blog/20001-noconstraints[align="center"]
+image::/img/blog/20001-noconstraints.png[align="center"]
 
 == Faster application startups with Liberty annotation caching
 
@@ -171,9 +183,9 @@ Annotation cache data is visible as a new, nested directory of server work area 
 In pipeline deployment environments, for example, Docker, for annotation caching to be effective, the server image must be "warmed" before packaging the deployment image, and application class cache data must be included in the deployment image. Warming the server means performing a single start of the server. It will cause cache data to be generated and available when packaging the server image. A failure to generate the cache data or to include the cache data in the deployment image will result in longer startup times. Since a typical startup uses a fresh copy of the deployment image, which will not have any cached data.
 
 [#JSS]
-== Updated JavaServer Face 2.3
+== Bug Fixes in the JavaServer Faces 2.3
 
-JavaServer Faces 2.3 (jsf-2.3) is the latest version of the JSF specification. JSF 2.3 contains many new features and enhancements. The jsf-2.3 feature pulls in the Apache MyFaces implementation and integrates it into the Liberty runtime. In the 20.0.0.1 release, the Apache MyFaces release used by the jsf-2.3 feature was updated to MyFaces 2.3.6.
+JavaServer Faces 2.3 contains a new feature to get bug fixes that are in Apache MyFaces 2.3.6. The jsf-2.3 feature pulls in the Apache MyFaces implementation and integrates it into the Liberty runtime. 
 
 The Apache MyFaces 2.3.6 release contains bug fixes. View link:https://issues.apache.org/jira/secure/ReleaseNote.jspa?projectId=10600&version=12346352[the release notes for more information.]
 
@@ -191,32 +203,38 @@ These early implementations are not available in 20.0.0.1 but you can try them o
 [#acr]
 == Automatically compress HTTP responses
 
-You are now free to try out HTTP Response Compression. 
+You can now try out HTTP response compression.
 
-Previous to this feature, Liberty only considered compression through the use of the $WSZIP private header. Previously there was no way for a customer to configure the compression of response messages. Support, now mainly consists of utilizing the Accept-Encoding header in conjunction with the Content-Type header, of determining if compression of the response message is possible and supported. It will allow the Liberty server to compress when able. It is beneficial because Customers will want to use the compression feature to help reduce network traffic, therefore reducing bandwidth and decrease the exchange times between clients and Liberty servers.
+Previous to this feature, Liberty only considered compression through the use of the `$WSZIP` private header. There was no way for a customer to configure the compression of response messages. Support now mainly consists of using the `Accept-Encoding` header in conjunction with the `Content-Type header`, of determining if compression of the response message is possible and supported. It allows the Liberty server to compress response messages when possible. It is beneficial because customers will want to use the compression feature to help reduce network traffic, therefore reducing bandwidth and decreasing the exchange times between clients and Liberty servers.
 
 A new element, `<compression>`, has been made available within the `<httpEndpoint>` for a user to be able to opt-in to using the compression support.
 
-The optional `types` attribute will allow the user to configure a comma-delimited list of content-types that should or should not be considered for compression. This list supports the use of the plus “+” and minus “-“ characters, to add or remove content-types to and from the default list. Content-types contain a type and a subtype, separated by a slash “/“ character. A wild card “*" character can be used as the subtype, to indicate all subtypes for a specific type.
+The optional `types` attribute will allow the user to configure a comma-delimited list of content types that should or should not be considered for compression. This list supports the use of the plus “++” and minus “-“ characters, to add or remove content types to and from the default list. Content types contain a type and a subtype separated by a slash “/“ character. A wild card "*"+ character can be used as the subtype to indicate all subtypes for a specific type.
 
-The default value of the types optional attribute is: “text/*, application/javascript".
+The default value of the types optional attribute is: `text/*, application/javascript`.
 
-Configuring the optional `serverPreferredAlgorithm` attribute, the configured value is verified against the “Accept-Encoding” header values. If the client accepts the configured value, this will be set as the compression algorithm to use. If the client does not accept the configured value, or if the configured value is set to ‘none’, the client preferred compression algorithm is chosen by default.
+Configuring the optional `serverPreferredAlgorithm` attribute, the configured value is verified against the “Accept-Encoding” header values. If the client accepts the configured value, this is set as the compression algorithm to use. If the client does not accept the configured value, or if the configured value is set to ‘none’, the client preferred compression algorithm is chosen by default.
 
 [source, xml]
-
+----
 <httpEndpoint  id="defaultHttpEndpoint"
         httpPort="9080"
         httpsPort="9443">
     <compression types=“+application/pdf, -text/html” serverPreferredAlgorithm=“gzip”/></httpEndpoint>
+----
 
-
-Open Liberty supports the following compression algorithms: `gzip`, `x-gzip`, `deflate`,` zlib`, and `identity (no compression)`
+Open Liberty supports the following compression algorithms: `gzip`, `x-gzip`, `deflate`, `zlib`, and `identity (no compression)`
 
 
 The `Http Response Compression` functionality has been designed from the following  link:https://github.com/OpenLiberty/open-liberty/issues/7502[Open Liberty Epic: #7502]. The design is outlined within the Epic for more detailed reading. The basic flow of the design is shown in the below diagrams:
 
 image::/img/blog/20001-http-response-compression-diagram.png[align="center"]
+
+[#GraphQL]
+== You are now free to use GraphQL with Open Liberty! 
+In our latest OpenLiberty development builds, users can now develop and deploy GraphQL applications.  GraphQL is a complement/alternative to REST that allows clients to fetch or modify remote data, but with fewer round-trips.  Liberty now supports the (still under development) MicroProfile GraphQL APIs (https://github.com/eclipse/microprofile-graphql[learn more]) that allow developers to create GraphQL apps using simple annotations - similar to how JAX-RS uses annotations to create a RESTful app.
+
+Developing and deploying a GraphQL app is cinch - take a look at this https://github.com/OpenLiberty/sample-mp-graphql[sample] to get started with these powerful APIs!
 
 
 == Get Liberty 20.0.0.1 now
