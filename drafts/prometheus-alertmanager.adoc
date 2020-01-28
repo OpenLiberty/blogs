@@ -5,8 +5,8 @@ categories: blog
 author_picture: https://avatars3.githubusercontent.com/u/34190173
 author_github: https://github.com/jennifer-c
 seo-title: Get alerts from your Open Liberty apps in Slack using Prometheus Alertmanager - OpenLiberty.io
-seo-description: we'll set up Prometheus Alertmanager to fire alerts to a specified Slack channel to notify you when, for example, your app's heap usage is too high. We'll configure Prometheus with alerting rules to receive certain alerts from Open Liberty, then we'll configure Prometheus Alertmanager to pass those alerts to a Slack channel.
-blog_description: "we'll set up Prometheus Alertmanager to fire alerts to a specified Slack channel to notify you when, for example, your app's heap usage is too high. We'll configure Prometheus with alerting rules to receive certain alerts from Open Liberty, then we'll configure Prometheus Alertmanager to pass those alerts to a Slack channel."
+seo-description: Set up Prometheus Alertmanager to fire alerts to a specified Slack channel to notify you when, for example, your app's heap usage is too high. Configure Prometheus with alerting rules to receive certain alerts from Open Liberty, then configure Prometheus Alertmanager to pass those alerts to a Slack channel.
+blog_description: "Set up Prometheus Alertmanager to fire alerts to a specified Slack channel to notify you when, for example, your app's heap usage is too high. Configure Prometheus with alerting rules to receive certain alerts from Open Liberty, then configure Prometheus Alertmanager to pass those alerts to a Slack channel."
 ---
 = Get alerts from your Open Liberty apps in Slack using Prometheus Alertmanager
 Jennifer Cheng <https://github.com/jennifer-c>
@@ -25,19 +25,25 @@ Download and extract both link:https://prometheus.io/download/#prometheus[Promet
 
 You also need a Slack channel to send alerts to, as well as a link:https://api.slack.com/messaging/webhooks[Slack webhook] for that channel.
 
-== Configure Prometheus to receive certain alerts from Open Liberty
+== Configure Prometheus to monitor metrics from Open Liberty
 
-JENNIFER: Add a brief introduction here to say what the reader will achieve/learn from this section (configure Prometheus to work with OL and then set up alerting rules in Prometheus to xxxx).
+In this section, you'll configure Prometheus to get metrics from Open Liberty. Then, you'll set up alerting rules using PromQL queries to give the Alertmanager some alerts to send.
 
 === Set up Prometheus to communicate with Open Liberty
-JENNIFER: Add a sentence here saying what the reader will do here and to what end? where are these steps done (eg is the yaml file in Prometheus configuration?). eg "You need to configure Prometheus to communicate with the Open Liberty server in your app."
+First, you’ll need to configure Prometheus to communicate with the Open Liberty server in your app so it can scrape metrics.
 
-. Edit the `prometheus.yml` file. Under the `scrape_configs` section, there is already a job configured for Prometheus itself. We need to add one for Open Liberty, which should look something like this:
+. In your Prometheus installation directory, edit the `prometheus.yml` file. Under the `scrape_configs` section, there is already a job configured for Prometheus itself. We need to add one for Open Liberty, which should look something like this:
 +
 ```
 - job_name: 'openliberty'
 
     scheme: 'https'
+
+    # If you have authentication enabled on your server, you need to give the username and password
+    # Note that you can use <mpMetrics authentication='false'/> in your server.xml to disable authentication
+    basic_auth:
+      username: 'adminusername'
+      password: 'adminpassword'
 
     tls_config:
       insecure_skip_verify: true
@@ -57,7 +63,7 @@ You're now ready to define which metrics you want Prometheus to collect.
 
 Create some alerting rules in Prometheus to define which metrics will be received by Prometheus for passing on to Slack.
 
-. Make a file called `alert.yml`. (JENNIFER: Where?) Inside that file, create some alerting rules, for example:
+. Create a file called `alert.yml` anywhere (take note of the directory, as we will need it later). Inside that file, create some alerting rules, for example:
 +
 ```
 groups:
@@ -84,7 +90,7 @@ image::/img/blog/prometheusAM_ui_alerts.png[Prometheus Alerts on UI, align="left
 
 == Configure Prometheus Alertmanager to pass alerts to Slack
 
-JENNIFER:  Add a brief introduction here to say what the reader will achieve/learn from this section (configure Prometheus Alertmanager to work with Slack and then  xxxx). 
+In this section, you'll configure the Prometheus Alertmanager to send customized messages to your Slack channel based on the alerting rules we set up earlier.
 
 
 === Configuring the Prometheus Alertmanager to communicate with Slack
@@ -110,6 +116,10 @@ slack_configs:
 The `CommonAnnotations` come from your `alert.yml` file. The text is written using the link:https://golang.org/pkg/text/template/[Go templating] system.
 +
 . Run `./alertmanager`.
++
+If you're running Alertmanager locally and run into an error, try running the command with an additional parameter:
++
+`./alertmanager --cluster.listen-address=""`
 
 The Alertmanager is located at `http://localhost:9093` by default. Since we haven't generated any test data yet, you won't see any alert groups at the moment. We'll do that next.
 
@@ -247,4 +257,4 @@ The matchers can be any metadata from your rules, e.g. labels, annotations, rule
 
 Now that you have a basic configuration of the Prometheus Alertmanager set up, you can play with Prometheus rules to create a more comprehensive alerting system. You can also customize the messages to be more informative by using the Go templating system.
 
-Need some inspiration? Take a look at our link:https://github.com/jennifer-c/openliberty-alertmanager[a sample configuration for Open Liberty.]
+Need some inspiration? Take a look at our link:https://github.com/jennifer-c/openliberty-alertmanager[sample configuration for Open Liberty.]
