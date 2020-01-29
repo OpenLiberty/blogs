@@ -9,52 +9,60 @@ seo-title: Create Docker images with Open Liberty compatible with Raspberry Pi
 seo-description: Run Liberty Bikes on the Raspberry Pi using ARM compatible Docker images.
 ---
 = Create Docker images with Open Liberty compatible with Raspberry Pi 
-It is well known that Raspberry Pi's are useful pieces of technology with lots of potential. We made use of them by deploying a kubernetes cluster to run link:https://github.com/OpenLiberty/liberty-bikes[Liberty Bikes], a real-time web based multiplayer game running on OpenLiberty. Fortunately Open Liberty is small and lightweight so it was never a problem to fit it on the original Raspberry Pi back in 2012. Although, we have used Raspberry Pi 3's for this demonstration.
+It is well known that link:https://www.raspberrypi.org/[Raspberry Pi's] are useful pieces of technology with lots of potential. We made use of them by deploying a Kubernetes cluster to run link:https://github.com/OpenLiberty/liberty-bikes[Liberty Bikes], a real-time web based multiplayer game running on OpenLiberty. Fortunately Open Liberty is small and lightweight so it was never a problem to fit it on the original Raspberry Pi back in 2012. In this post, I explain how to create a Docker image containing Open Liberty that can run on a Raspberry Pi 3.
 
-The complication when moving to a Raspberry Pi is that it has an ARM CPU at its heart, meaning that machine code compiled for x86 or x86-64 CPUs (the standard CPUs you get in laptops/desktops today) won’t execute. Liberty is written in Java so it doesn’t have to worry about what the CPU architecture is: as long as there is a Java runtime it’s able to run (as the Java runtime itself interprets the Java code and executes it on the hardware). We do have official Open Liberty images on Docker Hub, but they are layered on top of the official IBM image, which is built on top of Ubuntu and doesn’t have a JVM that will run on ARM.
+The complication when moving to a Raspberry Pi is that it has an ARM CPU at its heart, meaning that machine code compiled for x86 or x86-64 CPUs (the standard CPUs you get in laptops/desktops today) won’t execute. Liberty is written in Java so it doesn’t have to worry about what the CPU architecture is: as long as there is a Java runtime it’s able to run (as the Java runtime itself interprets the Java code and executes it on the hardware). We do have link:https://hub.docker.com/_/open-liberty[official Open Liberty images on Docker Hub], but they are layered on top of the official IBM image, which is built on top of Ubuntu for an x86 architecture and doesn’t have a JVM that runs on ARM.
 
-This means you can’t take our Open Liberty Docker image from Docker Hub, which is designed for an x86 architecture, and run it on the Pi without any configuration to the Docker images. We need to edit the Dockerfiles that define how to build the x86 Liberty Docker image and modify them to build 
+This means you can’t take our Open Liberty Docker image from Docker Hub and run it on the Pi without any configuration to the Docker images. We need to edit the Dockerfiles that define how to build the x86 Liberty Docker image and modify them to build 
 an image for the ARM Raspberry Pi.
 
-=== Open Liberty Images
+== Build an ARM Open Liberty image
 To start, take a copy of the link:https://github.com/OpenLiberty/ci.docker/tree/master/official/latest/kernel/java11/openj9[kernel Dockerfile for the x86 Liberty Docker image]. This can be used as the basis for custom built images that contain only the features required for a specific application. 
 
-Edit the `FROM` target in the Dockerfile to base the Open Liberty image on an link:https://hub.docker.com/r/arm32v7/adoptopenjdk/[official OpenJDK] image that is compatible with ARM.
+Edit the `FROM` target in the Dockerfile to base the Open Liberty image on an link:https://hub.docker.com/r/arm32v7/adoptopenjdk/[official OpenJDK] image that is compatible with ARM, for example:
 
-[source]
+[source, text]
+----
 FROM arm32v7/adoptopenjdk:11-jre-hotspot
 ...
 CMD ["/opt/ol/wlp/bin/server", "run", "defaultServer"]
+----
 
-Build this image so it is stored locally. You will now be able to use this image as a base for your applications. Instructions to build a Docker image that has your application and configuration pre-loaded can be found link:https://github.com/OpenLiberty/ci.docker#building-an-application-image[here]. 
+Build this image so it is stored locally. You can now use this image as a base for your applications. Instructions to build a Docker image that has your application and configuration pre-loaded can be found link:https://github.com/OpenLiberty/ci.docker#building-an-application-image[here]. 
 
 === Liberty Bikes 
 Liberty bikes is an application consisting of four microservices and each image for the services use the link:https://github.com/OpenLiberty/ci.docker/blob/master/official/19.0.0.9/microProfile2/java11/openj9/Dockerfile[open-liberty:microProfile2-java11] as a base. Edit the `FROM` target in this Dockerfile so that it uses the image that you just built. 
 
 
-[source]
+[source, text]
+----
 FROM <YOUR IMAGE NAME>
 RUN cp /opt/ol/wlp/templates/servers/microProfile2/server.xml /config/server.xml
+----
 
-Build the microProfile2-java11 image so it is also stored locally and can be used for the application. For example,   
+Build the `microProfile2-java11` image so it is also stored locally and can be used for the application. Run the following commands:   
 
-[source]
+```
 git clone https://github.com/OpenLiberty/liberty-bikes.git
 cd liberty-bikes
 nano auth-service/Dockerfile 
+````
 
-[source]
+
+
+[source, text]
+----
 FROM <YOUR MICROPROFILE IMAGE NAME>
 ...
 RUN printf 'httpPort=8082\n\
 httpsPort=8482' > /config/bootstrap.properties
 EXPOSE 8082 8482
+----
 
-Edit the `FROM` target from the the other three Dockerfiles in the `frontend`, `game-service` and `player-service` files. You can then build all the microservice applications and deploy them to locally running liberty servers.
+Edit the `FROM` target from the the other three Dockerfiles in the `frontend`, `game-service`, and `player-service` files. You can then build all the microservice applications and deploy them to locally running liberty servers.
 
-[source]
- ./gradlew start frontend:open
+`./gradlew start frontend:open`
 
 To stop all liberty servers, issue the command:
-[source]
- ./gradlew stop
+
+`./gradlew stop`
