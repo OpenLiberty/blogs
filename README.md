@@ -1,11 +1,12 @@
 # Contributing to the blog
 
+0. Create an issue in the repository for your blog post.
 1. Fork this repository and clone.
 2. Create a new blog post file in the `drafts` folder with the file name `post-title.adoc`.
-3. Write your blog post in there then create a pull request with @lauracowen and anyone else as reviewer.
-4. After resolving any problems and making any edits, the post will be published by moving it to the `publish` folder and renaming the file to `YYYY-MM-DD-post-title.adoc`.
+3. Write your blog post in there then create a pull request (linked to the issue you created in Step 0) with @lauracowen and anyone else as reviewer. Tag the issue number in the pull request to link them. [Sign the pull request.](CONTRIBUTING.adoc)
+4. After resolving any problems and making any edits, Laura will publish the post by moving it to the `publish` folder and renaming the file to `YYYY-MM-DD-post-title.adoc`.
 
-Blogs are written in [AsciiDoc](https://asciidoctor.org/docs/asciidoc-writers-guide/) format with a file extension of `.adoc`.
+Blog posts are written in [AsciiDoc](https://asciidoctor.org/docs/asciidoc-writers-guide/) format with a file extension of `.adoc`.
 
 In the blog post file the following front matter variables must be set:
 - layout: post
@@ -32,9 +33,9 @@ Once approved (ask `lauracowen`, or `NottyCode` as backup, to review/approve you
 
 ### Adding tags to your blog post
 
-To add tags to your post, please open a pull request with your edits to [blog_tags.json](https://github.com/OpenLiberty/openliberty.io/blob/master/src/main/content/blog_tags.json). You simply need to add the title of your post (without the date and file extension) to the `posts` array under the tags you want to use. (For example, if the file name is 2019-08-15-blog-post.adoc, you would just add `"blog-post"`).
+To add tags to your post, please open a pull request with your edits to [blog_tags.json](https://github.com/OpenLiberty/blogs/blob/master/blog_tags.json). You simply need to add the title of your post (without the date and file extension) to the `posts` array under the tags you want to use. (For example, if the file name is 2019-08-15-blog-post.adoc, you would just add `"blog-post"`.)
 
-You can request a review from `ellenwyllie` or `steven1046` if you are unsure who to ask.
+You can request a review from `lauracowen` or `ellenwyllie` if you are unsure who to ask.
 
 
 ### Blog posts with multiple authors
@@ -65,7 +66,7 @@ Also provide a level 1 heading eg:
 Certain characters (eg apostrophe ' ) in the main heading are displayed incorrectly. To fix, escape with a backslash (`\`).
 eg `= Minimise turnaround times with Open Liberty\'s dev mode`
 
-# Docker container for development
+# Docker container for previewing your post
 
 Github.com does a pretty good job of rendering asciidoc so you can preview your file there, but to see exactly what it will
 look like you'll need to install the website software and run it. 
@@ -78,7 +79,7 @@ docker pull kinueng/openliberty.io
 ```
 Replace "currentFolder" in the following command with the full path to the folder you are in. 
 ```
-docker run --name website -it -p 4000:4000 -v currentFolder/openliberty.io:/home/jekyll kinueng/openliberty.io
+docker run --rm --name website -it -p 4000:4000 -v currentFolder/openliberty.io:/home/jekyll kinueng/openliberty.io
 
 # example when current directory is /Users/bruce/projects/blog/website:
 # docker run --name website -it -p 4000:4000 -v /Users/bruce/projects/blog/website/openliberty.io:/home/jekyll kinueng/openliberty.io
@@ -107,19 +108,5 @@ You will see `Jekyll` detect your new files and regenerate the blog files.  You 
             ...done in 121.8705398 seconds.
 ```
 
-### Restarting the container
-If you try to run the `docker run....` command above when the container already exists or has been stopped, you'll get an error like this:
-
-```
-docker: Error response from daemon: Conflict. The container name "/website" is already in use by container "ddc88f127404e8df53ad149245f636a54f6d5b501ac93477985c27a12b061a94". You have to remove (or rename) that container to be able to reuse that name.
-```
-
-Instead, run `docker start website`. 
-
-If the container's been stopped (you pressed control-c, didn't you?) you can run `docker ps -a` to get it's container id, then run `docker rm [containerid]` to remove it. Then issue the docker run command again. 
-
-There's no feedback about what it's doing. If you run `docker ps`, you can see that the `website` container is now running. However, it takes a few mins for the whole site to come back up so that you can access it from `0.0.0.0:4000` in your browser. So be patient.
-
-When you can access `0.0.0.0:4000`, run the four commands above to update the running container with your new edits (starting with the `docker exec....` command).
 
 
