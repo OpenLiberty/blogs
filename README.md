@@ -74,7 +74,7 @@ Provide a level 1 heading, eg:
 
 Provide the author's name and GitHub ID, eg:
 
-`Sebastian Daschner <https://github.com/sdaschner>`
+`author name <https://github.com/authorid>`
 
 ### Troubleshooting
 
