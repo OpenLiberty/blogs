@@ -1,10 +1,16 @@
 # Contributing to the blog
 
-0. Create an issue in the repository for your blog post.
+## Get started
+
+1. Create an [issue](https://github.com/openliberty/blogs/issues) for your blog post. Use the title of the blog post as the name of the issue so it's easy to find. Assign the issue to yourself.
 1. Fork this repository and clone.
-2. Create a new blog post file in the `drafts` folder with the file name `post-title.adoc`.
-3. Write your blog post in there then create a pull request (linked to the issue you created in Step 0) with @lauracowen and anyone else as reviewer. Tag the issue number in the pull request to link them. [Sign the pull request.](CONTRIBUTING.adoc)
-4. After resolving any problems and making any edits, Laura will publish the post by moving it to the `publish` folder and renaming the file to `YYYY-MM-DD-post-title.adoc`.
+1. Create a new blog post file in the `drafts` folder with the file name `post-title.adoc` and write your blog post in there.
+1. Create a pull request (PR) from your fork to this repo. Put the issue number (e.g. #123) in the PR description so GitHub links it. Make @lauracowen and anyone who can do a technical review of the content as reviewers.
+1. [Sign the pull request.](CONTRIBUTING.adoc)
+1. After reviewing and editing for style, Laura might ask you to make some changes or to clarify some details.
+1. When everything is resolved and you're happy with any edits made, Laura will publish the post by moving it to the `publish` folder and renaming the file to `YYYY-MM-DD-post-title.adoc`.
+
+## How to write the blog post
 
 Blog posts are written in [AsciiDoc](https://asciidoctor.org/docs/asciidoc-writers-guide/) format with a file extension of `.adoc`.
 
@@ -33,14 +39,19 @@ Once approved (ask `lauracowen`, or `NottyCode` as backup, to review/approve you
 
 ### Adding tags to your blog post
 
+To make your blog post easily retrieveable, add relevant tags to it.
+
 To add tags to your post, please open a pull request with your edits to [blog_tags.json](https://github.com/OpenLiberty/blogs/blob/master/blog_tags.json). You simply need to add the title of your post (without the date and file extension) to the `posts` array under the tags you want to use. (For example, if the file name is 2019-08-15-blog-post.adoc, you would just add `"blog-post"`.)
 
-You can request a review from `lauracowen` or `ellenwyllie` if you are unsure who to ask.
+If you want a new tag adding, talk to Laura; please don't just add it. Keep your edits simple and don't break the JSON syntax.
+
+You can request a review from `lauracowen` or `ellenwyllie` if you are unsure.
 
 
 ### Blog posts with multiple authors
 
-If you would like to publish a blog post with more than 1 author, you can add the ```additional_authors``` attribute to the liquid front matter. Any number of additional authors can be specified using the following format:
+If you would like to publish a blog post with more than 1 author, you can add the `additional_authors` attribute to the liquid front matter. Any number of additional authors can be specified using the following format:
+
 ```
 additional_authors: 
  - name: author 2 first and last name
@@ -51,22 +62,26 @@ additional_authors:
    image: secure url to author 3 picture
 ```
 
-### Contributing a third party blog post
+### Contributing a third-party blog post
 
-If you would like to add a blog post that is actually a link to an existing third party blog post, you can follow the normal steps described above for creating a blog post. You simply need to add the following attributes to the liquid front matter: 
-- redirect_link: secure_url_to_3rd_party_post
-- permalink: /blog/redirected.html
+If you would like to add a blog post that is actually a link to an existing third-party blog post, you can follow the normal steps described above for creating a blog post. You simply need to add the following attributes to the liquid front matter: 
+- `redirect_link: secure_url_to_3rd_party_post`
+- `permalink: /blog/redirected.html`
 
-Also provide a level 1 heading eg:
+Provide a level 1 heading, eg:
 
 `= Creating a cool app with MicroProfile`
+
+Provide the author's name and GitHub ID, eg:
+
+`Sebastian Daschner <https://github.com/sdaschner>`
 
 ### Troubleshooting
 
 Certain characters (eg apostrophe ' ) in the main heading are displayed incorrectly. To fix, escape with a backslash (`\`).
 eg `= Minimise turnaround times with Open Liberty\'s dev mode`
 
-# Docker container for previewing your post
+# Preview your post using a Docker container
 
 Github.com does a pretty good job of rendering asciidoc so you can preview your file there, but to see exactly what it will
 look like you'll need to install the website software and run it. 
