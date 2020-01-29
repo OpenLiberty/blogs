@@ -86,16 +86,12 @@ docker run --rm --name website -it -p 4000:4000 -v currentFolder/openliberty.io:
 ```
 
 ### Update the running container with your edits
-Before your new or updated blog entry will appear on the website, you will need to run the commands below to update the container with your latest changes, then wait for the container to finish processing them.  Then you can see your changes at http://localhost:4000/blog/
+Before your new or updated blog entry will appear on the website, you will need to run the script below to update the container with your latest changes, then wait for the container to finish processing them.  Then you can see your changes at http://localhost:4000/blog/
 
 Note that blogs named with dates in the future, e.g. 2099-01-05, will not be shown, so don't do that. 
 
 ```
-docker exec -it website rm -rf /home/jekyll/src/main/content/_drafts /home/jekyll/src/main/content/_posts /home/jekyll/src/main/content/img/blog
-docker cp blogs/drafts website:/home/jekyll/src/main/content/_drafts
-docker cp blogs/publish website:/home/jekyll/src/main/content/_posts
-docker cp blogs/img/blog website:/home/jekyll/src/main/content/img
-docker cp blogs/blog_tags.json website:/home/jekyll/src/main/content
+./blogs/scripts/refresh_docker_image.sh
 ```
 
 ### How to know when your changes are rendered by the container
