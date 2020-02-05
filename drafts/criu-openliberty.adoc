@@ -1,0 +1,70 @@
+---
+layout: post
+title: "Turbo-charge Java application start-up on Open Liberty with CRIU snapshots"
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/u/28316667
+author_github: https://github.com/ashu-mehra
+additional_authors: 
+ - name: Dinakar Guniguntala
+   github: https://github.com/dinogun
+   image: https://avatars3.githubusercontent.com/dinogun
+ - name: Vijay Sundaresan
+   github: https://github.com/vijaysun-omr
+   image: https://avatars3.githubusercontent.com/vijaysun-omr
+seo-title: Turbo-charge Java application start-up on Open Liberty with CRIU snapshots
+seo-description: CRIU is a Linux tool that can reduce start-up times of Java applications by enabling application instance to be resumed from snapshots. Benefits and challenges are discussed.
+blog_description: "CRIU is a Linux tool that can reduce start-up times of Java applications by enabling application instance to be resumed from snapshots. Benefits and challenges are discussed."
+---
+= Turbo-charge Java application start-up on Open Liberty with CRIU snapshots
+Ashutosh Mehra <https://github.com/ashu-mehra>
+
+To reduce costs in serverless environments, applications should scale to zero (consume no resources) when not in use but then be able to create new instances immediately when a new request comes in. Open Liberty can https://openliberty.io/blog/2019/10/30/faster-startup-open-liberty.html[start an application from zero to first response in just 1 second], which is more than sufficient in many production scenarios. In serverless environments, however, application start-up time should ideally be <200msec to avoid the application user having to wait for a response. While Java has, for a long time, been the mainstay of backend app development, multi-second start-up time currently makes it less attractive for serverless deployments. Checkpoint/Restore in Userspace (CRIU) is a potential solution for reducing start-up time in Java applications.
+
+CRIU is a feature on the Linux operating system that enables a snapshot (checkpoint) to be taken of a running application; the application instance can then be restarted from the point at which the snapshot was taken, reducing start-up time. CRIU has tremendous potential for reducing start-up times of Java applications so that they can scale to zero and be run in serverless environments.
+
+In this blog post, we discuss the benefits and current challenges of using CRIU technology to provide faster start-up times.
+
+== Impact of using CRIU snapshots on application start-up times
+
+We measured the start-up time (the time to receive the first response from the application) of three Java applications of varying complexity when using CRIU. The first application https://github.com/HotswapProjects/pingperf[pingperf] is a very simple application, similar to a HelloWorld web app. It consists of just two features, CDI and JAX-RS. The second application, https://github.com/blueperf/acmeair-monolithic-java[acmeair], is a bit more complex and models a fictitious airline company website. In addition to CDI and JAX-RS, it uses the Java EE Managed Beans and WebSocket features. The third, more complex, application is https://github.com/WASdev/sample.daytrader7[daytrader7], which emulates a stock-trading system and it requires 13 features from the Java EE 7 set, including EJB, JSF, JPA, concurrency, and JSON-P.
+
+The following chart shows the time to first response for each of the applications without and with CRIU enabled:
+
+image::/img/blog/time_to_first_response.png[align="center"]
+
+The amount that the start-up time is reduced depends on the application under test. Our testing of these three applications, which represent a spectrum of Java EE applications, indicates a 5-10 times improvement in start-up time, with the greater benefits of CRIU coming from more complex, slower to start, applications.
+
+== Current challenges of using CRIU technology
+
+While these numbers are very encouraging, there are still some practical challenges of using CRIU technology that need to be overcome before we can use it for applications in production. While not an exhaustive list, we discuss some of them here.
+
+=== No API to specify when the snapshot should be taken
+
+In our tests we chose to take the snapshot after Open Liberty start-up was completed (when the console displays `The <server-name> server is ready to run a smarter planet`) but before the first request was processed by the server. We made this choice manually but the application server is the most suitable layer in the stack to decide when the snapshot is taken because it knows when its start-up phase has completed and it is ready to handle requests. It would be useful to have an API so that the application can specify when it would like a snapshot to be taken; this would be a valuable addition to the Java specification.
+
+=== Lack of encryption on CRIU snapshots
+
+A CRIU snapshot of the application contains a full dump of the address space and so, if the application has already created secrets and keys when the snapshot is taken, that sensitive information becomes part of the snapshot as well. Currently, the CRIU snapshot is stored in files on disk without any protection, which increases the chances of leaking secrets, keys, and other sensitive information. To some extent this problem can be worked around in cooperation with the application by ensuring no sensitive information is accessed until the snapshot has been taken. Another option could be to encrypt the snapshot, but decrypting it every time before restoring the application can diminish the start-up advantage of using CRIU in the first place.
+
+=== No Address Space Layout Randomization (ASLR)
+
+ASLR is an important OS kernel technique to prevent attackers from guessing the code location by mapping pages to different addresses in different invocations of an application. However, every instance restored from a CRIU snapshot ends up with exactly the same address space layout, so it could be a security concern akin to disabling ASLR. This would need further investigation by the Linux or CRIU communities to find a suitable solution.
+
+=== Predictable random number generators
+
+If you are using random number generators and have seeded them before the snapshot is taken, your application might end up with the same sequence of random numbers every time a new instance is started from the snapshot. We have verified this issue by using the `java.util.Random` class whereas it may be that alternatives such as the `java.secure.SecureRandom` class are not affected by this and are therefore secure enough to be used in these situations.
+
+=== Running as non-root user
+
+Currently CRIU needs access to various files and system calls that are only available when it is run as the root user. It is possible to use the Linux capability system to determine the smallest set of capabilities for which CRIU needs root access to snapshot and restore the application. Additional capabilities can then be provided using the `setcap` command which should then allow CRIU to be run as a non-root user.
+
+== What next?
+
+CRIU has tremendous potential for reducing start-up times of Java applications so that they can scale to zero and be run in environments that rely on fast start-up times. Instead of re-writing applications in other languages that are perceived to have faster start-up times, development teams can run their existing Java applications with faster start-up times.
+
+Some of the challenges discussed above can be mitigated by proper support from the application by delaying the creation of resources that could potentially compromise security until the snapshot is taken. Then there are other challenges that need action on part of the Linux or CRIU community and there are certainly cases in which those communities are already quite active in developing relevant new features (such as time namespace and rootless CRIU). There are also a set of technically surmountable challenges that simply may not have received the necessary attention so far because there was no strong use case (and this is where we hope that blog posts such as this would raise awareness of opportunities in areas that may not have been considered earlier).
+
+== Method details
+
+All our experiments were done on a X86 server machine with 64 CPUs (Intel(R) Xeon(R) CPU E7-8867 v3 @ 2.50GHz) but the applications were pinned to 4 CPUs. The definition of start-up time is actually the time taken to receive the first response from the application from the time that the application is started.
+The CRIU snapshot in our experiments was taken after the Open Liberty start-up was completed but before the first request was processed by the server. We manually chose the point at which the CRIU snapshot was taken to be when the `The <server-name> server is ready to run a smarter planet` message is printed to the console.
