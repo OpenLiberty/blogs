@@ -1,0 +1,248 @@
+---
+layout: post
+title: A preview into support for MicroProfile 3.3 on Open Liberty
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/yasmin-aumeeruddy
+author_github: https://github.com/yasmin-aumeeruddy
+seo-title: TITLE FOR  Open Liberty 20.0.0.2
+seo-description: A preview of improvements for health, metrics, config and fault tolerance in MicroProfile 3.3 along with more early implementations of development builds.
+blog_description: A preview of improvements for health, metrics, config and fault tolerance in MicroProfile 3.3 along with more early implementations of development builds.
+---
+= A preview into support for MicroProfile 3.3 on Open Liberty
+Yasmin Aumeeruddy <https://github.com/yasmin-aumeeruddy>
+
+link:https://openliberty.io/about/[Open Liberty]
+
+Open Liberty 20.0.0.2 provides bug fixes and quality improvements.  If you're curious about what's coming in future Open Liberty releases, take a look at our <<previews,previews in the latest development builds>>. In particular, get an early insight into support for MicroProfile 3.3 on open Liberty.
+[#run] 
+
+== Run your apps using 20.0.0.2
+
+If you're using link:https://openliberty.io/guides/maven-intro.html[Maven], here are the coordinates:
+
+[source,xml]
+----
+<dependency>
+    <groupId>io.openliberty</groupId>
+    <artifactId>openliberty-runtime</artifactId>
+    <version>20.0.0.2</version>
+    <type>zip</type>
+</dependency>
+----
+
+Or for link:https://openliberty.io/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+dependencies {
+    libertyRuntime group: 'io.openliberty', name: 'openliberty-runtime', version: '[20.0.0.2,)'
+}
+----
+
+Or if you're using link:https://openliberty.io/guides/containerize.html[Docker]:
+
+[source]
+----
+FROM open-liberty
+----
+Or take a look at our link:https://openliberty.io/downloads/[Downloads page].
+
+[link=https://stackoverflow.com/tags/open-liberty]
+image::https://openliberty.io/img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="center"]
+
+[#previews]
+== Previews of early implementations available in development builds
+
+You can now also try out early implementations of some new capabilities in the link:{url-prefix}/downloads/#development_builds[latest Open Liberty development builds]:
+
+* <<mp, MicroProfile 3.3 support>>
+    ** <<metrics, Monitor microservice applications easily wth metrics (MicroProfile Metrics 2.3)>>
+    ** <<health, Provide your own health check procedures (MicroProfile Health Check 2.1)>>
+    ** <<config, External configuration of your microservices with MicroProfile Config 1.4>>
+    ** <<fault, Monitor faults in your microservices (MicroProfile Fault Tolerance 2.1)>>
+* <<kafka, MicroProfile Reactive Messaging>>
+* <<json, Omit JSON fields in the JSON logging process >>
+* <<acr, Automatically compress HTTP responses>>
+* <<GraphQL, GraphQL with Open Liberty>>
+
+These early implementations are not available in 20.0.0.2 but you can try them out in our daily Docker image by running `docker pull openliberty/daily`. Let us know what you think!
+
+[#mp]
+
+== MicroProfile 3.3 support on Open Liberty
+
+
+[#metrics]
+=== Monitor microservice applications easily wth metrics (mpMetrics-2.3)
+
+MicroProfile Metrics 2.3 introduces a new metric type called a Simple Timer (annotated with `@SimplyTimed`) and runtime provided metrics that track REST resource method usage and is backed by the new Simple Timer metric.
+
+The new Simple Timer metric is a light-weight alternative to the existing Timer metric. It only tracks the total timing duration and counts the amount of times it was invoked. The Timer metric on the other hand is a performance heavy metric that continually calculates duration statistics and throughput statistics resulting in 14 values.
+
+The new REST stat metrics are gathered from REST resource method usage (i.e `GET`, `POST`, `PUT`, `DELETE`, `OPTIONS`, `PATCH`, `HEAD`). Total time duration and total count of invocation is tracked ( by use of the Simple Timer metric). This functionality is properly enabled when used in combination with the `jaxrsMonitor-1.0` feature. ALL REST stat metrics will use the REST.request metric name and will be tagged/labeled with their fully qualified class name and method signature.
+
+To enable the feature, include the following in the `server.xml`:
+
+`<feature>mpMetrics-2.3</feature>`
+
+
+[#health]
+=== Provide your own health check procedures (mpHealth-2.2)
+
+MicroProfile Health Check 2.2 enables you to provide your own health check procedures to be invoked by Open Liberty to verify the health of your microservice.
+
+In the `mpHealth-2.2` feature, all of the supported Qualifiers (Liveness and Readiness) now have annotation literals added in the specification. These ease programmatic lookup and support for inline instantiation of the qualifiers, which was not supported in the previous versions.
+
+Also, for better integration with third party frameworks, like MicroProfile Rest Client, the `HealthCheckResponse` class declaration was changed from an abstract class to a concrete class with constructors allowing for direct instantiation on the consuming end.
+
+To enable the feature, include the following in the `server.xml`:
+
+`<feature>mpHealth-2.2</feature>`
+
+Applications are expected to provide health check procedures by implementing the `HealthCheck` interface with the `@Liveness` or `@Readiness` annotations. These are used by Open Liberty to verify the Liveness or Readiness of the application, respectively. Add the logic of your health check in the `call()` method, and return the `HealthCheckResponse` object, by using the simple `up()`/`down()` methods from the API:
+
+[source,xml]
+----
+**Liveness Check**
+@Liveness
+@ApplicationScoped
+public class AppLiveCheck implements HealthCheck {
+...
+    @Override
+     public HealthCheckResponse call() {
+       ...
+       HealthCheckResponse.up("myCheck");
+       ...
+     }
+}
+----
+
+To view the status of each health check, access the either the 
+`\http://<hostname>:<port>/health/live` or `\http://<hostname>:<port>/health/ready` endpoints.
+
+[#config]
+=== External configuration of your microservices with MicroProfile Config 1.4 (mpConfig-1.4)
+
+The MicroProfile Config 1.4 feature provides an implementation of the Eclipse MicroProfile Config 1.4 API which has mainly had changes to the built-in and implicit converters.
+
+The Open Liberty implementation already supported `byte`/`Byte` and `short`/`Short` but `char`/`Character` has now been added. 
+
+The implicit converter order has also been slightly changed as the order was previously `of(String)`, `valueOf(String)`, `constructor(String)`, `parse(CharSequence)`. The last two have been swapped, resulting in `of(String)`, `valueOf(String)`, `parse(CharSequence)`, `constructor(String)`. The reason for this change is that static `parse(CharSequence)` methods typically have some built-in caching of their results and are therefore faster in some cases. There has also been a noteable internal change to the Open Liberty implementation. In versions prior to 1.4, some dynamic caching was included where were updated by means of a background thread to scan available `ConfigSources`. This cache and background thread has been removed to avoid repeated queries of large `ConfigSources`.
+
+To enable the feature, include the following in the `server.xml`:
+
+`<feature>mpConfig-1.4</feature>`
+
+For more information:
+
+https://github.com/eclipse/microprofile-config/milestone/7?closed=1[Changes to the API since 1.3]
+
+[#fault]
+=== Monitor faults in your microservices (mpFaultTolerance-2.1)
+
+MicroProfile Fault Tolerance allows developers to easily apply strategies for mitigating failure to their code. It provides annotations which developers can add to methods to use bulkhead, circuit breaker, retry, timeout and fallback strategies. In addition, it provides an annotation which causes a method to be run asynchronously.
+
+MicroProfile Fault Tolerance 2.1 is a minor release which includes the following changes:
+
+* Adds new parameters `applyOn` and `skipOn` to `@Fallback` and adds `skipOn` to `@CircuitBreaker` to give the user more control over which exceptions should trigger these strategies.
+* Ensures that the CDI request context is active during the execution of methods annotated with `@Asynchronous`. 
+In addition, this Fault Tolerance release also adds more detail into the Javadoc and makes some minor clarifications to the specification.
+
+[#json]
+== Omit JSON fields in the JSON logging process
+
+In Open Liberty, users have the option to format their server logs in basic or JSON format. When logs are in JSON format, users have to specify the sources (`message`, `trace`, `accessLog`, `ffdc`, `audit`) they want to send to `messages.log` or `console.log`/`standard-out`.
+
+This feature adds an option for users to omit JSON fields in the JSON logging process. Previously, Open Liberty always has the default fields in the JSON output but users can now specify the JSON fields they want to omit.
+
+The option to omit JSON field names in open Liberty is extremely useful, as users may not want certain default fields provided by Open Liberty in their JSON output. Undesired fields add to the size of the records which wastes network I/O during record transmissions and waste space in downstream log aggregation tools. Now users have the option to only emit the fields they need so they can send to downstream log aggregation tools without using more space and I/O than necessary. For example, a user running Open liberty in docker containers with a single server in each container may not want to include the JSON fields that represent the server name and user directory.
+
+When logs are in JSON format, you can use the existing `jsonFieldMappings` attribute to omit fields. The attribute initially was only used for renaming field names. To omit a field for all sources, use the following format `defaultFieldName:` . To omit a field for a specific source, use the following format `source:defaultFieldName:`` where source is the source you want to specify (such as `message`, `trace`, `accessLog`, `ffdc`, `audit`).
+
+Here is an example of configuring JSON field name by adding the following to `bootstrap.properties`:
+
+`com.ibm.ws.logging.json.field.mappings=trace:ibm_userDir: ,ibm_datetime:`
+
+
+For more information:
+
+* https://openliberty.io/docs/ref/config/#logging.html[Configuration]
+* https://www.ibm.com/support/knowledgecenter/en/SSEQTP_liberty/com.ibm.websphere.wlp.doc/ae/rwlp_logging.html[Logging and trace]
+
+[#ejb]
+== Persistent EJB Timers coordination and failover across members (ejbPersistentTimer-3.2)
+
+Prior to this feature, it was possible to partly coordinate automatic EJB persistent timers across multiple Open Liberty servers by configuring the EJB timer service to persist timers to the same database. This caused a single timer instance to be created on one of the servers but without the ability to fail over to another server if the original server stops or crashes. To enable fail over, this feature adds a new configurable attribute, `missedTaskThreshold`, which specifies the maximum amount of time that you want to allow for an execution of a persistent timer to complete before allowing another server to take over and run it instead.
+
+Enable the EJB persistent timers feature, or another feature that implicitly enables it, such as `ejb-3.2` and configure it to use a data source. In this example, we let it use the Java/Jakarta EE default data source. This much is required regardless of whether fail over is desired. To use fail over, ensure that configuration for all servers is pointing at the same database and uses the same database schema. Then include a value for the `missedTaskThreshold` attribute.
+
+
+[source,xml]
+----
+<server>
+  <featureManager>
+    <feature>ejbPersistentTimer-3.2</feature>
+    <feature>jdbc-4.2</feature>
+    ... other features
+  </featureManager>
+
+  <dataSource id="DefaultDataSource">
+    <jdbcDriver libraryRef="OraLib"/>
+    <properties.oracle URL="jdbc:oracle:thin:@//localhost:1521/EXAMPLEDB"/>
+    <containerAuthData user="dbuser" password="dbpwd"/>
+  </dataSource>
+  <library id="OraLib">
+    <file name="${shared.resource.dir}/jdbc/ojdbc8.jar" />
+  </library>
+
+  <!-- The following enables fail over for persistent timers -->
+  <persistentExecutor id="defaultEJBPersistentTimerExecutor" missedTaskThreshold="5m"/>
+
+  ...
+</server>
+----
+
+[#acr]
+== Automatically compress HTTP responses
+
+You can now try out HTTP response compression.
+
+Previous to this feature, Liberty only considered compression through the use of the `$WSZIP` private header. There was no way for a customer to configure the compression of response messages. Support now mainly consists of using the `Accept-Encoding` header in conjunction with the `Content-Type header`, of determining if compression of the response message is possible and supported. It allows the Liberty server to compress response messages when possible. It is beneficial because customers will want to use the compression feature to help reduce network traffic, therefore reducing bandwidth and decreasing the exchange times between clients and Liberty servers.
+
+A new element, `<compression>`, has been made available within the `<httpEndpoint>` for a user to be able to opt-in to using the compression support.
+
+The optional `types` attribute will allow the user to configure a comma-delimited list of content types that should or should not be considered for compression. This list supports the use of the plus “++” and minus “-“ characters, to add or remove content types to and from the default list. Content types contain a type and a subtype separated by a slash “/“ character. A wild card "*"+ character can be used as the subtype to indicate all subtypes for a specific type.
+
+The default value of the types optional attribute is: `text/*, application/javascript`.
+
+Configuring the optional `serverPreferredAlgorithm` attribute, the configured value is verified against the “Accept-Encoding” header values. If the client accepts the configured value, this is set as the compression algorithm to use. If the client does not accept the configured value, or if the configured value is set to ‘none’, the client preferred compression algorithm is chosen by default.
+
+[source, xml]
+----
+<httpEndpoint  id="defaultHttpEndpoint"
+        httpPort="9080"
+        httpsPort="9443">
+    <compression types=“+application/pdf, -text/html” serverPreferredAlgorithm=“gzip”/></httpEndpoint>
+----
+
+Open Liberty supports the following compression algorithms: `gzip`, `x-gzip`, `deflate`, `zlib`, and `identity (no compression)`
+
+
+The `Http Response Compression` functionality has been designed from the following  link:https://github.com/OpenLiberty/open-liberty/issues/7502[Open Liberty Epic: #7502]. The design is outlined within the Epic for more detailed reading. The basic flow of the design is shown in the below diagrams:
+
+image::img/blog/20001-http-response-compression-diagram.png[align="center"]
+
+[#GraphQL]
+== You are now free to use GraphQL with Open Liberty! 
+In our latest OpenLiberty development builds, users can now develop and deploy GraphQL applications.  GraphQL is a complement/alternative to REST that allows clients to fetch or modify remote data, but with fewer round-trips.  Liberty now supports the (still under development) MicroProfile GraphQL APIs (link:https://github.com/eclipse/microprofile-graphql[learn more]) that allow developers to create GraphQL apps using simple annotations - similar to how JAX-RS uses annotations to create a RESTful app.
+
+Developing and deploying a GraphQL app is cinch - take a look at this link:https://github.com/OpenLiberty/sample-mp-graphql[sample] to get started with these powerful APIs!
+
+
+
+
+View the list of fixed bugs from https://github.com/OpenLiberty/open-liberty/issues?utf8=%E2%9C%93&q=label%3Arelease%3A190012+label%3A%22release+bug%22[20.0.0.2]
+
+== Get Liberty 20.0.0.2 now
+
+Available through <<run,Maven, Gradle, Docker, and as a downloadable archive>>.
