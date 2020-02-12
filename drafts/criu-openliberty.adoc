@@ -20,9 +20,7 @@ Ashutosh Mehra <https://github.com/ashu-mehra>
 
 To reduce costs in serverless environments, applications should scale to zero (consume no resources) when not in use but then be able to create new instances immediately when a new request comes in. Open Liberty can https://openliberty.io/blog/2019/10/30/faster-startup-open-liberty.html[start an application from zero to first response in just 1 second], which is more than sufficient in many production scenarios. In serverless environments, however, application start-up time should ideally be <200msec to avoid the application user having to wait for a response. While Java has, for a long time, been the mainstay of backend app development, multi-second start-up time currently makes it less attractive for serverless deployments. Checkpoint/Restore in Userspace (CRIU) is a potential solution for reducing start-up time in Java applications.
 
-CRIU is a feature on the Linux operating system that enables a snapshot (checkpoint) to be taken of a running application; the application instance can then be restarted from the point at which the snapshot was taken, reducing start-up time. CRIU has tremendous potential for reducing start-up times of Java applications so that they can scale to zero and be run in serverless environments.
-
-In this blog post, we discuss the benefits and current challenges of using CRIU technology to provide faster start-up times.
+CRIU is a feature on the Linux operating system that enables a snapshot (checkpoint) to be taken of a running application; the application instance can then be restarted from the point at which the snapshot was taken, reducing start-up time. CRIU has tremendous potential for reducing start-up times of Java applications so that they can scale to zero and be run in serverless environments.lol
 
 == Impact of using CRIU snapshots on application start-up times
 
@@ -37,10 +35,6 @@ The amount that the start-up time is reduced depends on the application under te
 == Current challenges of using CRIU technology
 
 While these numbers are very encouraging, there are still some practical challenges of using CRIU technology that need to be overcome before we can use it for applications in production. While not an exhaustive list, we discuss some of them here.
-
-=== No API to specify when the snapshot should be taken
-
-In our tests we chose to take the snapshot after Open Liberty start-up was completed (when the console displays `The <server-name> server is ready to run a smarter planet`) but before the first request was processed by the server. We made this choice manually but the application server is the most suitable layer in the stack to decide when the snapshot is taken because it knows when its start-up phase has completed and it is ready to handle requests. It would be useful to have an API so that the application can specify when it would like a snapshot to be taken; this would be a valuable addition to the Java specification.
 
 === Lack of encryption on CRIU snapshots
 
@@ -57,6 +51,10 @@ If you are using random number generators and have seeded them before the snapsh
 === Running as non-root user
 
 Currently CRIU needs access to various files and system calls that are only available when it is run as the root user. It is possible to use the Linux capability system to determine the smallest set of capabilities for which CRIU needs root access to snapshot and restore the application. Additional capabilities can then be provided using the `setcap` command which should then allow CRIU to be run as a non-root user.
+
+=== No API to specify when the snapshot should be taken
+
+In our tests we chose to take the snapshot after Open Liberty start-up was completed (when the console displays `The <server-name> server is ready to run a smarter planet`) but before the first request was processed by the server. We made this choice manually but the application server is the most suitable layer in the stack to decide when the snapshot is taken because it knows when its start-up phase has completed and it is ready to handle requests. It would be useful to have an API so that the application can specify when it would like a snapshot to be taken; this would be a valuable addition to the Java specification.
 
 == What next?
 
