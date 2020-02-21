@@ -1,10 +1,10 @@
 ---
 layout: post
-title: "Open Liberty development mode with Gradle"
+title: "Rapid application development with Gradle and Open Liberty's dev mode"
 categories: blog
 author_picture: https://avatars3.githubusercontent.com/u/28316667
 author_github: https://github.com/rzgry
-seo-title: Open Liberty development mode with Gradle - OpenLiberty.io
+seo-title: Rapid application development with Gradle and Open Liberty's dev mode - OpenLiberty.io
 seo-description: Develop Java applications quicker using Open Liberty development mode with Gradle.
 blog_description: "Develop Java applications quicker using Open Liberty development mode with Gradle."
 ---
@@ -13,12 +13,19 @@ Ryan Zegray <https://github.com/rzgry>
 
 Open Liberty development mode, or dev mode, now works with Gradle projects. Open Liberty dev mode allows you to develop applications with any text editor or IDE by providing hot reload and deployment, on demand testing, and debugger support. Your code is automatically compiled and deployed to your running server, making it easy to iterate on your changes. You can run tests on demand or even automatically so that you can get immediate feedback on your changes. You can also attach a debugger at any time to debug your running application.
 
-If you would like to try out dev mode with Gradle, you can follow the steps in the https://github.com/OpenLiberty/demo-devmode[demo-devmode] sample project.
+We will be enabling a MicroProfile health check endpoint in a sample REST microservice using Open Liberty dev mode and Gradle.
 
-== Setting up the project
+You can follow along by cloning the https://github.com/OpenLiberty/demo-devmode[demo-devmode] sample project.
 
-For Gradle projects, dev mode is run through the Liberty Gradle Plugin.  Specify the Liberty Gradle Plugin with version `3.0` or above in your project’s `build.gradle` file.
-[source,xml]
+----
+git clone https://github.com/OpenLiberty/demo-devmode.git
+----
+
+== Including the liberty gradle plugin
+
+For Gradle projects, dev mode is run through the Liberty Gradle Plugin version `3.0` or above. You will notice the sample project defines the plugin in the projects `build.gradle` file.
+
+[source,groovy]
 ----
 buildscript {
     repositories {
@@ -30,23 +37,73 @@ buildscript {
 }
 ----
 
-== Starting dev mode
+== Starting the application using dev mode
 
-Start dev mode by running the following command in your project: `gradle libertyDev`
+Start dev mode by running the following command in your project: `gradle libertyDev`. This will start the server in dev mode along with installing features and deploying your application.
 
 == Automatically recompiling and deploying to the running server
 
-Once dev mode is started, source code changes are automatically compiled and deployed to the running server.  You can add new dependencies in your `build.gradle` file to be used for compilation.  Resources and server configuration changes are also picked up.  If any features are added to the `server.xml` file, they are installed automatically.
+Once dev mode is started, source code changes are automatically compiled and deployed to the running server. If any features are added to the `server.xml` file, they are installed automatically.
+
+Add the `mpHealth-2.1` feature to `src/main/liberty/config/server.xml`. You can now access the http://localhost:9080/health endpoint (though it's just an empty array).
+
+Create the `src/main/java/io/openliberty/sample/system/SystemLivenessCheck.java` class. Changes are reflected in the http://localhost:9080/health endpoint
+
+[source,java]
+----
+package io.openliberty.sample.system;
+
+import javax.enterprise.context.ApplicationScoped;
+
+import java.lang.management.MemoryMXBean;
+import java.lang.management.ManagementFactory;
+
+import org.eclipse.microprofile.health.Liveness;
+import org.eclipse.microprofile.health.HealthCheck;
+import org.eclipse.microprofile.health.HealthCheckResponse;
+
+@Liveness
+@ApplicationScoped
+public class SystemLivenessCheck implements HealthCheck {
+
+    @Override
+    public HealthCheckResponse call() {
+        MemoryMXBean memBean = ManagementFactory.getMemoryMXBean();
+        long memUsed = memBean.getHeapMemoryUsage().getUsed();
+        long memMax = memBean.getHeapMemoryUsage().getMax();
+  
+        return HealthCheckResponse.named(
+            SystemResource.class.getSimpleName() + " liveness check")
+                                  .withData("memory used", memUsed)
+                                  .withData("memory max", memMax)
+                                  .state(memUsed < memMax * 0.9).build();
+    }
+    
+}
+----
 
 == Running tests automatically and on demand
 
-To run tests on demand, press Enter in the terminal where dev mode is running.
+Go to the console where you started dev mode, and press Enter. This will run the tests on a separate thread while dev mode is still active.
 
 To run tests automatically after every change, include the `--hotTests` parameter when starting dev mode.  For example: `gradle libertyDev --hotTests`
 
 == Attaching a debugger
 
 At any point during dev mode, you can attach a Java debugger to debug your application.  By default, the debug port is `7777`, but another port can be used and shown in the console output if the default port is not available.
+
+In `src/main/java/io/openliberty/sample/system/SystemLivenessCheck.java`, set a breakpoint inside the call() method.
+
+Attach your IDE's debugger to port 7777.
+For example, in VS Code, click Debug > Add Configuration... > Java: Attach > set "port": "7777". Then View > Debug > select Debug (Attach), then press the arrow icon to start debugging.
+
+In your browser, go to http://localhost:9080/health.
+
+Notice your IDE pauses at the breakpoint that you set, allowing you to debug.
+
+Disconnect the debugger.
+
+When you are done, press Ctrl-C in the console to terminate dev mode and stop your server.
 
 == Stopping dev mode
 
