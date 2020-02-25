@@ -11,13 +11,72 @@ blog_description: "Develop microservices quicker using the OpenAPI Generator and
 = The OpenAPI Generator has added support for Eclipse MicroProfile
 Paul Gooderham <https://github.com/turkeylurkey>
 
-If your application calls a lot of microservices you'll want all the help you can get. And if you use Eclipse MicroProfile you can now use the OpenAPI Generator to get that help.
+Say you own a Java web application that you implemented with Microprofile and it is the front end for a collection of stores. Today you are going to add a pet store. You found a pet store back-end service that you're going to use because it provides a RESTful interface. You can use the OpenAPI Generator to accelerate the integration.
 
-The client generator works for remote RESTful microservices that are described using the OpenAPI specification. The service's endpoints and data types are described in yaml or JSON format and should be available as a file or for download from a URL.
+The pet store service documents the API using the OpenAPI specification because it is both human readable and machine readable. You download the API documentation in a file called petstore.yaml. The challenge now is to design and code the Java module that will communicate with the pet store service.
+
+The OpenAPI Generator can write some of that code for you. It can interpret the description in the yaml file and pull out the data model and the API. It will create Java files that describe the data model objects and method interfaces for each of the pet store endpoints.
+
+As an example the following snippet shows an endpoint to add a new pet in the petstore.yaml:
+-----
+/pet:
+  post:
+    summary: Add a new pet to the store
+    consumes:
+      - application/json
+    produces:
+      - application/json
+    parameters:
+      - in: body
+        name: body
+        schema:
+          $ref: '#/definitions/Pet'
+-----
+This endpoint's URL could look something like https://www.bigpet.com/pet. The http verb is POST, the request's body is JSON and the body conforms to the schema referenced in the 'definitions' portion of the API document:
+-----
+  Pet:
+    description: A pet for sale in the pet store
+    type: object
+    properties:
+      id:
+        type: integer
+      name:
+        type: string
+        example: Rex the dog
+      photoUrls:
+        type: array
+        items:
+          type: string
+-----
+This schema defines three fields: one integer, one string and one array. A sample Pet object (in yaml format) could be:
+-----
+Pet:
+  id: 1234
+  name: Rex
+  photoUrls:
+    - https://photos.com/abcd1234
+-----
+
+The generator will create model objects in Java for each of the types defined in the petstore.yaml. You can use these objects to transfer data to and from the service. For example, the Java Pet object will be, in part:
+-----
+public class Pet  {
+  private Long id;
+  private String name;
+  private List<String> photoUrls = new ArrayList<String>();
+  ...
+-----
+The generator will also create a Java interface for each endpoint. You can use these methods in your Microprofile front end to access the service. For example, to create a new pet you would call this method:
+-----
+    @POST
+    @Path("/pet")
+    @Consumes({ "application/json" })
+    public void addPet(Pet pet) throws ApiException, ProcessingException;
+-----
+While the OpenAPI Generator will create the framework, you still must implement the methods that will access the service. However, this task is much easier with the design laid out and some of the code written.
 
 == Command Line
 
-There are two ways to get started. The first is to download the official build and invoke the generator from the command line. See https://github.com/OpenAPITools/openapi-generator#13---download-jar[1.3 - Download JAR] and look for the jar location, e.g.: https://repo1.maven.org/maven2/org/openapitools/openapi-generator-cli/4.2.3/openapi-generator-cli-4.2.3.jar
+There are two ways to get started. The first is to download the official build and invoke the generator from the command line. See https://openapi-generator.tech/docs/installation#jar[Download Instructions].
 
 After you download the jar you can use a command similar to the following. Specify a yaml file that describes the remote service, the package names you'd like to appear in your new Java files and the directory where the output should appear.
 -----
@@ -28,7 +87,7 @@ java -jar openapi-generator-cli-4.2.3.jar \
   --input-spec petstore.yaml \
   --api-package org.acme.ourapp.petstore.api \
   --model-package org.acme.ourapp.petstore.model \
-  --output output_dir/client/petstore
+  --output project-dir
 -----
 This command will generate Java objects that represent the data the microservice recognises and Java interface files that describe methods which represent the REST endpoints. You complete the work by coding the implementations.
 
@@ -37,3 +96,6 @@ This command will generate Java objects that represent the data the microservice
 Alternatively, if you are writing your code using Visual Studio Code you can download the client generator as an extension. See the marketplace page for download and install instructions. https://marketplace.visualstudio.com/items?itemName=MicroProfile-Community.mp-rest-client-generator-vscode-ext[Visual Studio Code Marketplace].
 
 After installing the extension just right click the directory where the ouput files should be placed and select Generate a MicroProfile Rest Client. Navigate to the yaml file, confirm the directory and package names and hit enter. The generator will run and provide the Java model objects and API interfaces described previously.
+
+== Conclusion
+Integrating a new microservice into your Microprofile application can be accelerated by using the OpenAPI Generator. Take advantage of this new feature by downloading the latest version or the new Visual Studio Code extension. 
