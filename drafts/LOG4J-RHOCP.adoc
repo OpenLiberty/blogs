@@ -33,6 +33,7 @@ One of the options to send your Log4j 2 logs to RHOCP's EFK EFK stack, is to use
 
 image::../img/blog/log4j-rhocp-diagrams/solution-1.png[]
 By streaming the application logs to its own stdout, it separates the Liberty server logs from the application logs
+
 1.
 Configure your Log4j 2 to send logs to a File, or RollingFile to the list of Appenders:
 ```
@@ -61,22 +62,24 @@ Add the Appender as a reference to your Logger:
       ....
 </Loggers>
 ```
-2. Modify your application deployment to add a sidecar container that tails your application logs. You want to write the log to a persistent volume for storage:
-a. For your deployed application, modify the deployment to define the shared volume:
+
+2.
+Modify your application deployment to add a sidecar container that tails your application logs. You want to write the log to a persistent volume for storage:
+i. For your deployed application, modify the deployment to define the shared volume:
 
 ```
       volumes:
         - name: outputlog
           emptyDir: {}
 ```
-b. Mount the volume to your main application container:
+ii. Mount the volume to your main application container:
 ```
           volumeMounts:
             - name: outputlog
               mountPath: /output/logs
 ```
 
-c. Create another container and mount the volume of the directory where the log is located. This command will tail the logs to send them to stdout:
+iii. Create another container and mount the volume of the directory where the log is located. This command will tail the logs to send them to stdout:
 ```
   - name: app-sidecar
           image: 'linyusha/java-microprofile:latest'
@@ -91,7 +94,8 @@ c. Create another container and mount the volume of the directory where the log 
 ```
 
 
-3. On your OpenShift Kibana, you should see the application logs under project.* index along with your other Liberty server logs:
+3.
+On your OpenShift Kibana, you should see the application logs under project.* index along with your other Liberty server logs:
 
 image::../img/blog/log4j-rhocp-diagrams/log4j-rhocp-output.png[]
 
@@ -100,7 +104,8 @@ image::../img/blog/log4j-rhocp-diagrams/log4j-rhocp-output.png[]
 
 You can create a sidecar container with a separate logging agent that you have configured specifically to run with your application. This provides you the flexibility to use Fluentd to specify where you want to send your Log4j 2 logs to. In this case, we are directing our logs to stdout to send them to RHOCP EFK stack.
 
-1. Create a Fluentd config map specifying the `source` (where you want Fluentd to scrape your logs) and `match` (where you want to send the logs to).
+1.
+Create a Fluentd config map specifying the `source` (where you want Fluentd to scrape your logs) and `match` (where you want to send the logs to).
 
 ```
 apiVersion: v1
@@ -124,10 +129,11 @@ data:
     </match>
 ```
 
-2. Create a sidecar container running fluentd. The pod mounts a volume where Fluentd can pick up its configuration data. To modify your deployment:
+2.
+Create a sidecar container running fluentd. The pod mounts a volume where Fluentd can pick up its configuration data. To modify your deployment:
 
 
-a. Add the config map as a volume to your deployment.
+i. Add the config map as a volume to your deployment.
 ```
  volumes:
   - name: outputlog
@@ -137,7 +143,7 @@ a. Add the config map as a volume to your deployment.
       name: fluentd-config
 ```
 
-b. Mount the application log directory to your main container:
+ii. Mount the application log directory to your main container:
 
 ```
           volumeMounts:
@@ -145,7 +151,7 @@ b. Mount the application log directory to your main container:
               mountPath: /output/logs
 ```
 
-c. Create the sidecar with Fluentd logging agent:
+iii. Create the sidecar with Fluentd logging agent:
 
 ```
   - name: count-agent
