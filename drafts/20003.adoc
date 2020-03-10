@@ -17,7 +17,7 @@ Tom Jennings <https://github.com/tomjenningss>
 :url-about: /about/
 
 // tag::intro[]
-In Open Liberty 20.0.0.3, you can description.
+In Open Liberty 20.0.0.3, you now have the ability to add the SameTime Cookie on the session, having access to three values on the SameTime attribute. As well, you now have the ability to use the Kafka client API allowing users to access Kafka specific message properties, not just the payload of the specific message as you had previously with MicroProfile Reactive `Message` API 
 
 In link:{url-about}[Open Liberty] 20.0.0.3:
 
@@ -28,7 +28,7 @@ In link:{url-about}[Open Liberty] 20.0.0.3:
 View the list of fixed bugs in https://github.com/OpenLiberty/open-liberty/issues?utf8=%E2%9C%93&q=label%3Arelease%3A20003+label%3A%22release+bug%22[20.0.0.3].
 // end::intro[]
 
-If you're interested in what's coming soon in Open Liberty, take a look at our <<previews,current development builds>>. Including updated features to MicroProfile: Rest Client, Metrics, Health, Fault Tolerance, Config. As well as GraphQL with Open Liberty, Automatically compress HTTP responses, and Persistent EJB Timers.
+If you're interested in what's coming soon in Open Liberty, take a look at our <<previews,current development builds>>. These include updated features to MicroProfile: Rest Client, Metrics, Health, Fault Tolerance, Config. As well as GraphQL with Open Liberty, Automatically compress HTTP responses, and Persistent EJB Timers.
 
 // tag::run[]
 [#run]
@@ -214,6 +214,7 @@ You can now also try out early implementations of some new capabilities in the l
 ** <<hcp, Provide health check procedures (MicrProfile Health 2.2)>>
 ** <<mfm, Monitor faults in your microservices (Fault Tolerance 2.1)>>
 ** <<conf, External configuration of your microservices with MicroProfile Config 1.4 >>
+* <<ssac, Support OpenShift service account credentials for authentication>>
 * <<acr, Automatically compress HTTP responses>>
 * <<ejb, Persistent EJB Timers coordination and failover across members (ejbPersistentTimer-3.2)>>
 
@@ -375,6 +376,44 @@ Enable the EJB persistent timers feature, or another feature that implicitly ena
 </server>
 ----
 
+[#ssac]
+=== Support OpenShift service account credentials for authentication 
+
+This new feature for Open Liberty means that application developers can use the new `socialLogin-1.0` feature allows applications to be secured by using popular social media OAuth and OpenIDConnect providers, and supports configuration for additional providers.
+
+The `socialLogin-1.0` feature can now be configured to use OpenShift service accounts to authenticate and authorize protected resource requests. This allows server administrators to secure, for example, monitoring and metrics endpoints that might produce sensitive information but require repeated access by an automated process or non-human entity. The new behavior allows service accounts to authenticate themselves by providing in the 'request a service account token' that was created within the OpenShift cluster.
+
+A new `<okdServiceLogin>` configuration element is now provided to support this behavior. The socialLogin-1.0 feature must be enabled to gain access to this new element.
+
+The minimum configuration requires only that an <okdServiceLogin> element be specified in the `server xml`:
+[source, xml]
+----
+<server>
+
+<!-- Enable features -->
+<featureManager>
+  <feature>appSecurity-3.0</feature>
+  <feature>socialLogin-1.0</feature>
+</featureManager>
+
+<okdServiceLogin />
+
+</server>
+----
+
+The minimum configuration assumes that the Liberty server is packaged and deployed within an OpenShift cluster. By default, the `<okdServiceLogin>` element will be used to authenticate all protected resource requests that the Liberty server receives.
+
+Incoming requests to protected resources must include a service account token. The token must be specified as a bearer token in the `Authorization` header of the request. The Liberty server will use the service account token to query information about the associated service account from the OpenShift cluster. The OpenShift project that the service account is in will be used as the group for the service account when making authorization decisions. Similarly, the name of the service account will be used as the user name.
+
+If the Liberty server is not deployed within an OpenShift cluster, the `userValidationApi` attribute should be configured and set to the value for the appropriate User API endpoint in the OpenShift cluster:
+[source, xml]
+----
+<okdServiceLogin userValidationApi="https://cluster.domain.example.com/apis/user.openshift.io/v1/users/~" />
+----
+
+Multiple `<okdServiceLogin>` elements can be configured as long as each element has a unique id attribute specified. In those cases, authentication filters should also be configured to ensure the appropriate endpoints are protected by a unique `<okdServiceLogin>` instance.
+
+More information about OpenShift service accounts can be found in the OpenShift documentation for link:https://docs.openshift.com/container-platform/4.3/authentication/understanding-and-creating-service-accounts.html[Understanding and creating service accounts.]
 
 [#acr]
 == Automatically compress HTTP responses
@@ -413,6 +452,6 @@ In our latest OpenLiberty development builds, users can now develop and deploy G
 Developing and deploying a GraphQL app is cinch - take a look at this link:https://github.com/OpenLiberty/sample-mp-graphql[sample] to get started with these powerful APIs!
 
 
-== Get Liberty 20.0.0.1 now
+== Get Liberty 20.0.0.3 now
 
 Available through <<run,Maven, Gradle, Docker, and as a downloadable archive>>.
