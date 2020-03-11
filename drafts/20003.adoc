@@ -1,15 +1,15 @@
 ---
 layout: post
-title: "20003"
+title: "New Kafka Client API allowing Kafka specific message properties in Open Liberty 20.0.0.3"
 categories: blog
 author_picture: https://avatars3.githubusercontent.com/tomjenningss
 author_github: https://github.com/tomjenningss
-seo-title: In Open Liberty 20.0.0.3, you can now add the SameTime Cookie on the session, with three values on the SameTime attribute. As well you can use the Kafka client API, allowing users to access Kafka specific message properties, not just the payload of the specific message as you had previously with MicroProfile Reactive `Message` API - OpenLiberty.io
-seo-description: In Open Liberty 20.0.0.3, you can now add the SameTime Cookie on the session, with three values on the SameTime attribute. As well you can use the Kafka client API, allowing users to access Kafka specific message properties, not just the payload of the specific message as you had previously with MicroProfile Reactive `Message` API.
-blog_description: In Open Liberty 20.0.0.3, you can now add the SameTime Cookie on the session, with three values on the SameTime attribute. As well you can use the Kafka client API, allowing users to access Kafka specific message properties, not just the payload of the specific message as you had previously with MicroProfile Reactive `Message` API.
+seo-title: New Kafka Client API allowing Kafka specific message properties in Open Liberty 20.0.0.3
+seo-description: You can use the Kafka client API, allowing users to access Kafka specific message properties. Also add the SameSite Cookie on the session, with three values on the SameSite attribute.
+blog_description: You can use the Kafka client API, allowing users to access Kafka specific message properties. Also add the SameSite Cookie on the session, with three values on the SameSite attribute.
 ---
 
-= Allow the SameSite attribute to be set on a Cookie in Open Liberty 20.0.0.3
+= New Kafka Client API allowing Kafka specific message properties in Open Liberty 20.0.0.3
 
 Tom Jennings <https://github.com/tomjenningss>
 :imagesdir: /
@@ -17,12 +17,12 @@ Tom Jennings <https://github.com/tomjenningss>
 :url-about: /about/
 
 // tag::intro[]
-In Open Liberty 20.0.0.3, you can now add the SameTime Cookie on the session, with three values on the SameTime attribute. As well you can use the Kafka client API, allowing users to access Kafka specific message properties, not just the payload of the specific message as you had previously with MicroProfile Reactive `Message` API.
+In Open Liberty 20.0.0.3, you can use the Kafka client API, allowing users to access Kafka specific message properties such as message key and message headers, not just the payload of the specific message as you previously had with MicroProfile Reactive `Message` API. Also, you can now add the SameSite Cookie on the session, with three values on the SameSite attribute.
 
 In link:{url-about}[Open Liberty] 20.0.0.3:
 
-* <<ASCA,Adding the SameTime cookie attribute>>
 * <<kafka,Kafka specific properties>>
+* <<ASCA,Adding the SameSite cookie attribute>>
 
 
 View the list of fixed bugs in https://github.com/OpenLiberty/open-liberty/issues?utf8=%E2%9C%93&q=label%3Arelease%3A20003+label%3A%22release+bug%22[20.0.0.3].
@@ -70,75 +70,6 @@ Or take a look at our link:{url-prefix}/downloads/[Downloads page].
 image::img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="center"]
 
 //tag::features[]
-[#ASCA]
-== Adding the SameTime cookie attribute 
-
-Open Liberty now offers the ability to set the SameSite attribute on the Session cookie, the LTPA, and JWT cookies as well as application-defined cookies. The SameSite attribute can be added by adding one or more `server.xml` configuration options.
-
-The Servlet `javax.servlet.http.Cookie` API does not offer the ability to set the SameSite attribute on a Cookie. If the SameSite attribute is needed, the options for setting it are currently limited to using the `HttpServletResponse.addHeader` and `HttpServletResponse.setHeader` and constructing the Set-Cookie header. The SameTime attribute is used by browsers to determine if a particular cookie should be sent with a request. 
-
-There are three values for the SameSite attribute: `Lax`, `Strict`, `None`.
-
-* `SameSite=Strict`: The cookie will only be sent along with same-site requests. The cookie is only sent by the browser if the site for the cookie matches the site in the address bar for example.
-
-* `SameSite=Lax`: The cookie will be sent with same-site requests and with cross-site top-level navigations. Clicking a link for example.
-
-* `SameSite=None`: The cookie will be sent with same-site and cross-site requests. The cookie is sent by the browser for third party contexts, embedded content for example.
-
-To use SameTime cookie attribute:
-
-1.  Set the Session Cookie SameSite attribute using the following `server.xml` configuration:
-`<httpSession cookieSameSite="Disabled|Strict|Lax|None"/>`
-
-2. The default value is `Disabled`. This means no SameSite attribute will be added.
-Set the `LTPA/JWT` Cookie SameSite attribute using the following server.xml configuration:
-`<webAppSecurity sameSiteCookie="Disabled|Strict|Lax|None"/>`
-
-3. The default value is `Disabled`. This means no SameSite attribute will be added.
-Set the SameSite attribute on Cookies via the following server.xml configuration:
-
-[server, xml]
-```
-    <httpEndpoint id="defaultHttpEndpoint"
-                  httpPort="9080"
-                  httpsPort="9443" >
-        <samesite lax="cookieOne" strict="cookieTwo" none="cookieThree"/>
-    </httpEndpoint>
-```
-
-The `<httpEndpoint/>` SameSite configuration allows the use of wildcards in the following ways:
-
-A standalone wildcard ( * ). All cookies would have the SameSite=Lax attribute. This includes the Session and LTPA/JWT cookies unless the `<httpSession/>` and/or `<webAppSecurity/>` configuration has also been set.
-
-[server, xml]
-```
-    <httpEndpoint id="defaultHttpEndpoint"
-                  httpPort="9080"
-                  httpsPort="9443" >
-        <samesite lax="*" />
-    </httpEndpoint>
-```
-
-At the end of one or more cookie names. The below snippet would map the following cookie name to SameSite attributes:
-
-* cookieOne -> SameSite=Lax
-* cookieTwo -> SameSite=Strict
-* cookieThree -> SameSite=None
-```
-    <httpEndpoint id="defaultHttpEndpoint"
-                  httpPort="9080"
-                  httpsPort="9443" >
-        <samesite lax="cookie*" strict="cookieTwo" none="cookieThree"/>
-    </httpEndpoint>
-```
-
-The `<httpSession/>` and `<webAppSecurity/>` configuration takes precedence over the `<httpEndpont/>configuration`.
-
-When a cookie matches the `SameSite=None` configuration then the `Secure` attribute will be automatically added to the cookie.
-
-The `<httpEndpoint/>` configuration can apply to any `Set-Cookie` header.
-
-Technical details regarding the SameSite attribute can be found in the following RFC: link:https://tools.ietf.org/html/draft-ietf-httpbis-rfc6265bis-03#section-4.1.2.7[Cookies: HTTP State Management Mechanism]
 
 [#kafka]
 == Kafka specific properties
@@ -201,6 +132,77 @@ public Message<ProducerRecord<K, V>> publish() {
    return Message.of(pr);
 }
 ----
+
+[#ASCA]
+== Adding the SameSite cookie attribute 
+
+Open Liberty now offers the ability to set the SameSite attribute on the Session cookie, the LTPA, and JWT cookies as well as application-defined cookies. The SameSite attribute can be added by adding one or more `server.xml` configuration options.
+
+The Servlet `javax.servlet.http.Cookie` API does not offer the ability to set the SameSite attribute on a Cookie. If the SameSite attribute is needed, the options for setting it are currently limited to using the `HttpServletResponse.addHeader` and `HttpServletResponse.setHeader` and constructing the Set-Cookie header. The SameSite attribute is used by browsers to determine if a particular cookie should be sent with a request. 
+
+There are three values for the SameSite attribute: `Lax`, `Strict`, `None`.
+
+* `SameSite=Strict`: The cookie will only be sent along with same-site requests. The cookie is only sent by the browser if the site for the cookie matches the site in the address bar for example.
+
+* `SameSite=Lax`: The cookie will be sent with same-site requests and with cross-site top-level navigations. Clicking a link for example.
+
+* `SameSite=None`: The cookie will be sent with same-site and cross-site requests. The cookie is sent by the browser for third party contexts, embedded content for example.
+
+To use SameSite cookie attribute:
+
+1.  Set the Session Cookie SameSite attribute using the following `server.xml` configuration:
+`<httpSession cookieSameSite="Disabled|Strict|Lax|None"/>`
+
+2. The default value is `Disabled`. This means no SameSite attribute will be added.
+Set the `LTPA/JWT` Cookie SameSite attribute using the following server.xml configuration:
+`<webAppSecurity sameSiteCookie="Disabled|Strict|Lax|None"/>`
+
+3. The default value is `Disabled`. This means no SameSite attribute will be added.
+Set the SameSite attribute on Cookies via the following server.xml configuration:
+
+[server, xml]
+```
+    <httpEndpoint id="defaultHttpEndpoint"
+                  httpPort="9080"
+                  httpsPort="9443" >
+        <samesite lax="cookieOne" strict="cookieTwo" none="cookieThree"/>
+    </httpEndpoint>
+```
+
+The `<httpEndpoint/>` SameSite configuration allows the use of wildcards in the following ways:
+
+A standalone wildcard ( * ). All cookies would have the SameSite=Lax attribute. This includes the Session and LTPA/JWT cookies unless the `<httpSession/>` and/or `<webAppSecurity/>` configuration has also been set.
+
+[server, xml]
+```
+    <httpEndpoint id="defaultHttpEndpoint"
+                  httpPort="9080"
+                  httpsPort="9443" >
+        <samesite lax="*" />
+    </httpEndpoint>
+```
+
+At the end of one or more cookie names. The below snippet would map the following cookie name to SameSite attributes:
+
+* cookieOne -> SameSite=Lax
+* cookieTwo -> SameSite=Strict
+* cookieThree -> SameSite=None
+```
+    <httpEndpoint id="defaultHttpEndpoint"
+                  httpPort="9080"
+                  httpsPort="9443" >
+        <samesite lax="cookie*" strict="cookieTwo" none="cookieThree"/>
+    </httpEndpoint>
+```
+
+The `<httpSession/>` and `<webAppSecurity/>` configuration takes precedence over the `<httpEndpont/>configuration`.
+
+When a cookie matches the `SameSite=None` configuration then the `Secure` attribute will be automatically added to the cookie.
+
+The `<httpEndpoint/>` configuration can apply to any `Set-Cookie` header.
+
+Technical details regarding the SameSite attribute can be found in the following RFC: link:https://tools.ietf.org/html/draft-ietf-httpbis-rfc6265bis-03#section-4.1.2.7[Cookies: HTTP State Management Mechanism]
+
 //end::features[]
 
 [#previews]
@@ -214,9 +216,10 @@ You can now also try out early implementations of some new capabilities in the l
 ** <<hcp, Provide health check procedures (MicrProfile Health 2.2)>>
 ** <<mfm, Monitor faults in your microservices (Fault Tolerance 2.1)>>
 ** <<conf, External configuration of your microservices with MicroProfile Config 1.4 >>
+* <<ejb, Persistent EJB Timers coordination and failover across members (ejbPersistentTimer-3.2)>>
 * <<ssac, Support OpenShift service account credentials for authentication>>
 * <<acr, Automatically compress HTTP responses>>
-* <<ejb, Persistent EJB Timers coordination and failover across members (ejbPersistentTimer-3.2)>>
+* <<GraphQL, GraphQL with Open Liberty >>
 
 These early implementations are not available in 20.0.0.3 but you can try them out in our daily Docker image by running `docker pull openliberty/daily`. Let us know what you think!
 
