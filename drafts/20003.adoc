@@ -1,0 +1,459 @@
+---
+layout: post
+title: "Access specific properties in Kafka messages and set the SameSite attribute on cookies in Open Liberty 20.0.0.3"
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/tomjenningss
+author_github: https://github.com/tomjenningss
+seo-title: Access specific properties in Kafka messages and set the SameSite attribute on cookies in Open Liberty 20.0.0.3
+seo-description: You can use the Kafka client API to access Kafka specific properties such as the message key and message headers, not just the payload of the specific message. Also, you can now add the SameSite attribute on session, LTPA, and JWT cookies.
+blog_description: You can use the Kafka client API to access Kafka specific properties such as the message key and message headers, not just the payload of the specific message. Also, you can now add the SameSite attribute on session, LTPA, and JWT cookies.
+---
+= Access specific properties in Kafka messages and set the SameSite attribute on cookies in Open Liberty 20.0.0.3
+
+Tom Jennings <https://github.com/tomjenningss>
+:imagesdir: /
+:url-prefix:
+:url-about: /about/
+
+// tag::intro[]
+In Open Liberty 20.0.0.3, you can now access Kafka specific properties such as the message key and message headers, not just the payload of the message, as was the case with the basic MicroProfile Reactive Messaging Message API. Also, you can now set the SameSite attribute on the Session cookie, the LTPA, and JWT cookies as well as application-defined cookies.
+
+In link:{url-about}[Open Liberty] 20.0.0.3:
+
+* <<kafka,Kafka specific properties>>
+* <<ASCA,Adding the SameSite cookie attribute>>
+
+
+View the list of fixed bugs in https://github.com/OpenLiberty/open-liberty/issues?utf8=%E2%9C%93&q=label%3Arelease%3A20003+label%3A%22release+bug%22[20.0.0.3].
+// end::intro[]
+
+If you're interested in what's coming soon in Open Liberty, take a look at our <<previews,current development builds>>. These include updated features to MicroProfile: Rest Client, Metrics, Health, Fault Tolerance, Config. As well as GraphQL with Open Liberty, Automatically compress HTTP responses, and Persistent EJB Timers.
+
+// tag::run[]
+[#run]
+
+== Run your apps using 20.0.0.3
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], here are the coordinates:
+
+[source,xml]
+----
+<dependency>
+    <groupId>io.openliberty</groupId>
+    <artifactId>openliberty-runtime</artifactId>
+    <version>20.0.0.3</version>
+    <type>zip</type>
+</dependency>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+dependencies {
+    libertyRuntime group: 'io.openliberty', name: 'openliberty-runtime', version: '[20.0.0.3,)'
+}
+----
+
+Or if you're using Docker:
+
+[source]
+----
+FROM open-liberty
+----
+//end::run[]
+
+Or take a look at our link:{url-prefix}/downloads/[Downloads page].
+
+[link=https://stackoverflow.com/tags/open-liberty]
+image::img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="center"]
+
+//tag::features[]
+
+[#kafka]
+== Kafka specific properties
+
+New to Open Liberty is Kafka specific properties. The basic MicroProfile Reactive Messaging `Message` API does not let the user access anything other than the payload of the message. The native Kafka client API allows the user to access some Kafka specific message properties, such as the message key and message headers.
+
+=== Incoming Messages
+For incoming messages, we have now allowed the user to unwrap a Message to gain access to the underlying `ConsumerRecord`.
+
+[source, java]
+----
+@Incoming("channel1")
+public CompletionStage<Void> consume(Message<String> message) {
+    ConsumerRecord<String, String> cr = (ConsumerRecord<String, String>) message.unwrap(ConsumerRecord.class);
+    String key = consumerRecord.key();
+    String value = consumerRecord.value();
+    String topic = consumerRecord.topic();
+    int partition = consumerRecord.partition();
+    long timestamp = consumerRecord.timestamp();
+    Headers headers = consumerRecord.headers();
+    // some more code....
+    return CompletableFuture.completedFuture(null);
+}
+
+----
+
+=== Outgoing Messages
+
+For outgoing messages, if the payload is a ProducerRecord then the properties within it are passed on to Kafka.
+[source, java]
+----
+@Outgoing("channel2")
+public Message<ProducerRecord> publish() throws UnsupportedEncodingException {
+   ProducerRecord<String, String> producerRecord = new ProducerRecord<String, String>("myTopic", null, "myKey", "myValue");
+   producerRecord.headers().add("HeaderKey", "HeaderValue".getBytes("UTF-8"));
+   return Message.of(producerRecord);
+}
+----
+
+The example above assumes that no topic has been explicitly pre-configured in the MicroProfile Config for the channel. If the topic is pre-configured then that will take precedence and the topic in the ProducerRecord will be ignored.
+
+=== Example using a pre-configured topic
+
+In this example, the topic is pre-configured using MicroProfile Config to be `myOtherTopic` so the topic set in the ProducerRecord is ignored.
+
+MicroProfile Config Properties
+
+[source, java]
+----
+mp.reactive.messaging.channel3.connector=liberty-kafka
+mp.reactive.messaging.channel3.topic=myOtherTopic #Overrides value in code
+----
+Reactive Messaging Bean
+
+[source, java]
+----
+@Outgoing("channel3")
+public Message<ProducerRecord<K, V>> publish() {
+   ProducerRecord pr = new ProducerRecord("myTopic", "myValue");
+   return Message.of(pr);
+}
+----
+
+[#ASCA]
+== Adding the SameSite cookie attribute 
+
+Open Liberty now offers the ability to set the SameSite attribute on the Session cookie, the LTPA, and JWT cookies as well as application-defined cookies. The SameSite attribute can be added by adding one or more `server.xml` configuration options.
+
+The Servlet `javax.servlet.http.Cookie` API does not offer the ability to set the SameSite attribute on a Cookie. If the SameSite attribute is needed, the options for setting it are currently limited to using the `HttpServletResponse.addHeader` and `HttpServletResponse.setHeader` and constructing the Set-Cookie header. The SameSite attribute is used by browsers to determine if a particular cookie should be sent with a request. 
+
+There are three values for the SameSite attribute: `Lax`, `Strict`, `None`.
+
+* `SameSite=Strict`: The cookie will only be sent along with same-site requests. The cookie is only sent by the browser if the site for the cookie matches the site in the address bar for example.
+
+* `SameSite=Lax`: The cookie will be sent with same-site requests and with cross-site top-level navigations. Clicking a link for example.
+
+* `SameSite=None`: The cookie will be sent with same-site and cross-site requests. The cookie is sent by the browser for third party contexts, embedded content for example.
+
+To use SameSite cookie attribute:
+
+1.  Set the Session Cookie SameSite attribute using the following `server.xml` configuration:
+`<httpSession cookieSameSite="Disabled|Strict|Lax|None"/>`
+
+2. The default value is `Disabled`. This means no SameSite attribute will be added.
+Set the `LTPA/JWT` Cookie SameSite attribute using the following server.xml configuration:
+`<webAppSecurity sameSiteCookie="Disabled|Strict|Lax|None"/>`
+
+3. The default value is `Disabled`. This means no SameSite attribute will be added.
+Set the SameSite attribute on Cookies via the following server.xml configuration:
+
+[server, xml]
+```
+    <httpEndpoint id="defaultHttpEndpoint"
+                  httpPort="9080"
+                  httpsPort="9443" >
+        <samesite lax="cookieOne" strict="cookieTwo" none="cookieThree"/>
+    </httpEndpoint>
+```
+
+The `<httpEndpoint/>` SameSite configuration allows the use of wildcards in the following ways:
+
+A standalone wildcard ( * ). All cookies would have the SameSite=Lax attribute. This includes the Session and LTPA/JWT cookies unless the `<httpSession/>` and/or `<webAppSecurity/>` configuration has also been set.
+
+[server, xml]
+```
+    <httpEndpoint id="defaultHttpEndpoint"
+                  httpPort="9080"
+                  httpsPort="9443" >
+        <samesite lax="*" />
+    </httpEndpoint>
+```
+
+At the end of one or more cookie names. The below snippet would map the following cookie name to SameSite attributes:
+
+* cookieOne -> SameSite=Lax
+* cookieTwo -> SameSite=Strict
+* cookieThree -> SameSite=None
+```
+    <httpEndpoint id="defaultHttpEndpoint"
+                  httpPort="9080"
+                  httpsPort="9443" >
+        <samesite lax="cookie*" strict="cookieTwo" none="cookieThree"/>
+    </httpEndpoint>
+```
+
+The `<httpSession/>` and `<webAppSecurity/>` configuration takes precedence over the `<httpEndpont/>configuration`.
+
+When a cookie matches the `SameSite=None` configuration then the `Secure` attribute will be automatically added to the cookie.
+
+The `<httpEndpoint/>` configuration can apply to any `Set-Cookie` header.
+
+Technical details regarding the SameSite attribute can be found in the following RFC: link:https://tools.ietf.org/html/draft-ietf-httpbis-rfc6265bis-03#section-4.1.2.7[Cookies: HTTP State Management Mechanism]
+
+//end::features[]
+
+[#previews]
+== Previews of early implementations available in development builds
+
+You can now also try out early implementations of some new capabilities in the link:{url-prefix}/downloads/#development_builds[latest Open Liberty development builds]:
+
+* <<mp3, MicroProfile 3.3>>
+** <<mpr, Introducing MicroProfile rest client (MicropProfile Rest Client 1.4)>>
+** <<mra, Monitor microservice applications (MicropProfile Metrics 2.3)>>
+** <<hcp, Provide health check procedures (MicrProfile Health 2.2)>>
+** <<mfm, Monitor faults in your microservices (Fault Tolerance 2.1)>>
+** <<conf, External configuration of your microservices with MicroProfile Config 1.4 >>
+* <<ejb, Persistent EJB Timers coordination and failover across members (ejbPersistentTimer-3.2)>>
+* <<ssac, Support OpenShift service account credentials for authentication>>
+* <<acr, Automatically compress HTTP responses>>
+* <<GraphQL, GraphQL with Open Liberty >>
+
+These early implementations are not available in 20.0.0.3 but you can try them out in our daily Docker image by running `docker pull openliberty/daily`. Let us know what you think!
+
+[#mp3]
+== MicroProfile 3.3 support
+[#mpr]
+=== MicroProfile Rest Client (mpRestClient-1.4)
+
+MicroProfile Rest Client 1.4 adds injection into ClientHeadersFactory instances. When executing a Rest Client inside a JAX-RS request, it can be useful to pull data from the JAX-RS request's context or from CDI to use to determine which HTTP headers to send on the outgoing request. With MP Rest Client 1.4, this is now possible.
+
+To enable MP Rest Client 1.4, add this feature to your server.xml:
+`<feature>mpRestClient-1.4</feature>`
+
+CDI and/or JAX-RS injection into your ClientHeadersFactory will enable you to do things like:
+
+[source, java]
+----
+@ApplicationScoped
+public class MyCustomClientHeadersFactory implements ClientHeadersFactory {
+
+    @Context
+    private UriInfo uriInfo;
+
+    @Inject
+    private Foo foo;
+
+    @Override
+    public MultivaluedMap<String, String> update(MultivaluedMap<String, String> incomingHeaders,
+                                                 MultivaluedMap<String, String> clientOutgoingHeaders) {
+        MultivaluedMap<String, String> myHeaders = new MultivaluedHashMap<>();
+        myHeaders.putSingle("X-HEADER_FROM_CUSTOM_CLIENTHEADERSFACTORY", "456");
+
+        URI uri = uriInfo.getAbsolutePath();
+        myHeaders.putSingle("X-INJECTED_URI_INFO", uri == null ? "null" : uri.toString());
+
+        myHeaders.putSingle("X-INJECTED_FOO", foo.getWord());
+
+        return myHeaders;
+    }
+}
+----
+link:https://github.com/eclipse/microprofile-rest-client[Learn more about MP Rest Client]
+
+[#mra]
+=== Monitor microservice applications easily wth metrics (mpMetrics-2.3)
+
+MicroProfile Metrics 2.3 introduces a new metric type called a Simple Timer (annotated with `@SimplyTimed`) and runtime provided metrics that track REST resource method usage and is backed by the new Simple Timer metric.
+
+The new Simple Timer metric is a light-weight alternative to the existing Timer metric. It only tracks the total timing duration and counts the amount of times it was invoked. The Timer metric on the other hand is a performance heavy metric that continually calculates duration statistics and throughput statistics resulting in 14 values.
+
+The new REST stat metrics are gathered from REST resource method usage (i.e `GET`, `POST`, `PUT`, `DELETE`, `OPTIONS`, `PATCH`, `HEAD`). Total time duration and total count of invocation is tracked ( by use of the Simple Timer metric). This functionality is properly enabled when used in combination with the `jaxrsMonitor-1.0` feature. ALL REST stat metrics will use the REST.request metric name and will be tagged/labeled with their fully qualified class name and method signature.
+
+To enable the feature, include the following in the `server.xml`:
+
+`<feature>mpMetrics-2.3</feature>`
+[#hcp]
+=== Provide your own health check procedures (mpHealth-2.2)
+
+MicroProfile Health Check 2.2 enables you to provide your own health check procedures to be invoked by Open Liberty to verify the health of your microservice.
+
+In the `mpHealth-2.2` feature, all of the supported Qualifiers (Liveness and Readiness) now have annotation literals added in the specification. These ease programmatic lookup and support for inline instantiation of the qualifiers, which was not supported in the previous versions.
+
+Also, for better integration with third party frameworks, like MicroProfile Rest Client, the `HealthCheckResponse` class declaration was changed from an abstract class to a concrete class with constructors allowing for direct instantiation on the consuming end.
+
+To enable the feature, include the following in the `server.xml`:
+
+`<feature>mpHealth-2.2</feature>`
+
+Applications are expected to provide health check procedures by implementing the `HealthCheck` interface with the `@Liveness` or `@Readiness` annotations. These are used by Open Liberty to verify the Liveness or Readiness of the application, respectively. Add the logic of your health check in the `call()` method, and return the `HealthCheckResponse` object, by using the simple `up()`/`down()` methods from the API:
+
+[source,java]
+----
+*Liveness Check*
+@Liveness
+@ApplicationScoped
+public class AppLiveCheck implements HealthCheck {
+...
+    @Override
+     public HealthCheckResponse call() {
+       ...
+       HealthCheckResponse.up("myCheck");
+       ...
+     }
+}
+----
+
+To view the status of each health check, access the either the 
+`\http://<hostname>:<port>/health/live` or `\http://<hostname>:<port>/health/ready` endpoints.
+
+[#mfm]
+=== Monitor faults in your microservices (mpFaultTolerance-2.1)
+
+MicroProfile Fault Tolerance allows developers to easily apply strategies for mitigating failure to their code. It provides annotations which developers can add to methods to use bulkhead, circuit breaker, retry, timeout and fallback strategies. In addition, it provides an annotation which causes a method to be run asynchronously.
+
+MicroProfile Fault Tolerance 2.1 is a minor release which includes the following changes:
+
+* Adds new parameters `applyOn` and `skipOn` to `@Fallback` and adds `skipOn` to `@CircuitBreaker` to give the user more control over which exceptions should trigger these strategies.
+* Ensures that the CDI request context is active during the execution of methods annotated with `@Asynchronous`. 
+* This Fault Tolerance release also adds more detail into the Javadoc and makes some minor clarifications to the specification.
+
+For more information: 
+
+* Get an introduction to MicroProfile Fault Tolerance:
+** link:https://openliberty.io/guides/retry-timeout.html[Failing fast and recovering from errors]
+** link:https://openliberty.io/guides/circuit-breaker.html[Preventing repeated failed calls to microservices]
+* link:https://download.eclipse.org/microprofile/microprofile-fault-tolerance-2.1/apidocs/[Reference the Javadoc]
+* link:https://download.eclipse.org/microprofile/microprofile-fault-tolerance-2.1/microprofile-fault-tolerance-spec.html[Reference the full specification] including the link:https://download.eclipse.org/microprofile/microprofile-fault-tolerance-2.1/microprofile-fault-tolerance-spec.html#release_notes_21[2.1 release notes]
+* link:https://github.com/OpenLiberty/open-liberty[Report any issues on Github]
+
+[#conf]
+=== External configuration of your microservices with MicroProfile Config 1.4 (mpConfig-1.4)
+
+The MicroProfile Config 1.4 feature provides an implementation of the Eclipse MicroProfile Config 1.4 API which has mainly had changes to the built-in and implicit converters.
+
+The Open Liberty implementation already supported `byte`/`Byte` and `short`/`Short` but `char`/`Character` has now been added. 
+
+The implicit converter order has also been slightly changed as the order was previously `of(String)`, `valueOf(String)`, `constructor(String)`, `parse(CharSequence)`. The last two have been swapped, resulting in `of(String)`, `valueOf(String)`, `parse(CharSequence)`, `constructor(String)`. The reason for this change is that static `parse(CharSequence)` methods typically have some built-in caching of their results and are therefore faster in some cases. There has also been a noteable internal change to the Open Liberty implementation. In versions prior to 1.4, some dynamic caching was included which were updated by means of a background thread to scan available `ConfigSources`. This cache and background thread have been removed to avoid repeated queries of large `ConfigSources`.
+
+To enable the feature, include the following in the `server.xml`:
+
+`<feature>mpConfig-1.4</feature>`
+
+For more information:
+
+* link:https://github.com/eclipse/microprofile-config/milestone/7?closed=1[Changes to the API since 1.3]
+
+[#ejb]
+== Persistent EJB Timers coordination and failover across members (ejbPersistentTimer-3.2)
+
+Prior to this feature, it was possible to partly coordinate automatic EJB persistent timers across multiple Open Liberty servers by configuring the EJB timer service to persist timers to the same database. This caused a single timer instance to be created on one of the servers but without the ability to fail over to another server if the original server stops or crashes. To enable fail over, this feature adds a new configurable attribute, `missedTaskThreshold`, which specifies the maximum amount of time that you want to allow for an execution of a persistent timer to complete before allowing another server to take over and run it instead.
+
+Enable the EJB persistent timers feature, or another feature that implicitly enables it, such as `ejb-3.2` and configure it to use a data source. In this example, we let it use the Java/Jakarta EE default data source. This much is required regardless of whether fail over is desired. To use fail over, ensure that configuration for all servers is pointing at the same database and uses the same database schema. Then include a value for the `missedTaskThreshold` attribute.
+
+
+[source,xml]
+----
+<server>
+  <featureManager>
+    <feature>ejbPersistentTimer-3.2</feature>
+    <feature>jdbc-4.2</feature>
+    ... other features
+  </featureManager>
+
+  <dataSource id="DefaultDataSource">
+    <jdbcDriver libraryRef="OraLib"/>
+    <properties.oracle URL="jdbc:oracle:thin:@//localhost:1521/EXAMPLEDB"/>
+    <containerAuthData user="dbuser" password="dbpwd"/>
+  </dataSource>
+  <library id="OraLib">
+    <file name="${shared.resource.dir}/jdbc/ojdbc8.jar" />
+  </library>
+
+  <!-- The following enables fail over for persistent timers -->
+  <persistentExecutor id="defaultEJBPersistentTimerExecutor" missedTaskThreshold="5m"/>
+
+  ...
+</server>
+----
+
+[#ssac]
+=== Support OpenShift service account credentials for authentication 
+
+This new feature for Open Liberty means that application developers can use the new `socialLogin-1.0` feature allows applications to be secured by using popular social media OAuth and OpenIDConnect providers, and supports configuration for additional providers.
+
+The `socialLogin-1.0` feature can now be configured to use OpenShift service accounts to authenticate and authorize protected resource requests. This allows server administrators to secure, for example, monitoring and metrics endpoints that might produce sensitive information but require repeated access by an automated process or non-human entity. The new behavior allows service accounts to authenticate themselves by providing in the 'request a service account token' that was created within the OpenShift cluster.
+
+A new `<okdServiceLogin>` configuration element is now provided to support this behavior. The socialLogin-1.0 feature must be enabled to gain access to this new element.
+
+The minimum configuration requires only that an <okdServiceLogin> element be specified in the `server xml`:
+[source, xml]
+----
+<server>
+
+<!-- Enable features -->
+<featureManager>
+  <feature>appSecurity-3.0</feature>
+  <feature>socialLogin-1.0</feature>
+</featureManager>
+
+<okdServiceLogin />
+
+</server>
+----
+
+The minimum configuration assumes that the Liberty server is packaged and deployed within an OpenShift cluster. By default, the `<okdServiceLogin>` element will be used to authenticate all protected resource requests that the Liberty server receives.
+
+Incoming requests to protected resources must include a service account token. The token must be specified as a bearer token in the `Authorization` header of the request. The Liberty server will use the service account token to query information about the associated service account from the OpenShift cluster. The OpenShift project that the service account is in will be used as the group for the service account when making authorization decisions. Similarly, the name of the service account will be used as the user name.
+
+If the Liberty server is not deployed within an OpenShift cluster, the `userValidationApi` attribute should be configured and set to the value for the appropriate User API endpoint in the OpenShift cluster:
+[source, xml]
+----
+<okdServiceLogin userValidationApi="https://cluster.domain.example.com/apis/user.openshift.io/v1/users/~" />
+----
+
+Multiple `<okdServiceLogin>` elements can be configured as long as each element has a unique id attribute specified. In those cases, authentication filters should also be configured to ensure the appropriate endpoints are protected by a unique `<okdServiceLogin>` instance.
+
+More information about OpenShift service accounts can be found in the OpenShift documentation for link:https://docs.openshift.com/container-platform/4.3/authentication/understanding-and-creating-service-accounts.html[Understanding and creating service accounts.]
+
+[#acr]
+== Automatically compress HTTP responses
+
+You can now try out HTTP response compression.
+
+Previous to this feature, Liberty only considered compression through the use of the `$WSZIP` private header. There was no way for a customer to configure the compression of response messages. Support now mainly consists of using the `Accept-Encoding` header in conjunction with the `Content-Type header`, of determining if compression of the response message is possible and supported. It allows the Liberty server to compress response messages when possible. It is beneficial because customers will want to use the compression feature to help reduce network traffic, therefore reducing bandwidth and decreasing the exchange times between clients and Liberty servers.
+
+A new element, `<compression>`, has been made available within the `<httpEndpoint>` for a user to be able to opt-in to using the compression support.
+
+The optional `types` attribute will allow the user to configure a comma-delimited list of content types that should or should not be considered for compression. This list supports the use of the plus “++” and minus “-“ characters, to add or remove content types to and from the default list. Content types contain a type and a subtype separated by a slash “/“ character. A wild card "*"+ character can be used as the subtype to indicate all subtypes for a specific type.
+
+The default value of the types optional attribute is: `text/*, application/javascript`.
+
+Configuring the optional `serverPreferredAlgorithm` attribute, the configured value is verified against the “Accept-Encoding” header values. If the client accepts the configured value, this is set as the compression algorithm to use. If the client does not accept the configured value, or if the configured value is set to ‘none’, the client preferred compression algorithm is chosen by default.
+
+[source, xml]
+----
+<httpEndpoint  id="defaultHttpEndpoint"
+        httpPort="9080"
+        httpsPort="9443">
+    <compression types=“+application/pdf, -text/html” serverPreferredAlgorithm=“gzip”/></httpEndpoint>
+----
+
+Open Liberty supports the following compression algorithms: `gzip`, `x-gzip`, `deflate`, `zlib`, and `identity (no compression)`
+
+
+The `Http Response Compression` functionality has been designed from the following  link:https://github.com/OpenLiberty/open-liberty/issues/7502[Open Liberty Epic: #7502]. The design is outlined within the Epic for more detailed reading. The basic flow of the design is shown in the below diagrams:
+
+image::img/blog/20001-http-response-compression-diagram.png[align="center"]
+
+[#GraphQL]
+== You are now free to use GraphQL with Open Liberty! 
+In our latest OpenLiberty development builds, users can now develop and deploy GraphQL applications.  GraphQL is a complement/alternative to REST that allows clients to fetch or modify remote data, but with fewer round-trips.  Liberty now supports the (still under development) MicroProfile GraphQL APIs (link:https://github.com/eclipse/microprofile-graphql[learn more]) that allow developers to create GraphQL apps using simple annotations - similar to how JAX-RS uses annotations to create a RESTful app.
+
+Developing and deploying a GraphQL app is cinch - take a look at this link:https://github.com/OpenLiberty/sample-mp-graphql[sample] to get started with these powerful APIs!
+
+
+== Get Liberty 20.0.0.3 now
+
+Available through <<run,Maven, Gradle, Docker, and as a downloadable archive>>.
