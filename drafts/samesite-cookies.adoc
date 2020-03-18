@@ -1,0 +1,134 @@
+---
+layout: post
+title: "Setting the SameSite Attribute on Cookies"
+categories: blog
+author_picture: https://avatars1.githubusercontent.com/u/29307632
+
+author_github: https://github.com/pnicolucci
+seo-title: Title - Setting the SameSite Attribute on Cookies
+seo-description: A short article with simple configuration examples to demonstrate how to configure an Open Liberty server to set a SameSite attribute on cookies.
+blog_description: A short article with simple configuration examples to demonstrate how to configure an Open Liberty server to set a SameSite attribute on cookies.
+additional_authors:
+- name: Paul Nicolucci
+  github: https://github.com/pnicolucci
+  image: https://avatars1.githubusercontent.com/u/29307632
+---
+= Setting the SameSite Attribute on Cookies
+Paul Nicolucci https://twitter.com/PaulNicolucci
+
+The `SameSite` cookie attribute is used by web browsers to determine if a particular cookie should be sent with a request. The `SameSite` attribute has three possible values: `Lax`, `Stict`, `None`. Up until recently web browsers treated a cookie without a `SameSite` attribute as if the cookie specified a `SameSite` attribute with a value of `None`. Chrome recently changed this behavior and other web browsers will soon follow. The new web browser behavior is to treat a cookie without a `SameSite` attribute as if the cookie specified a `SameSite` attribute with a value of `Lax`. The Servlet specification does not offer any API to set the `SameSite` attribute on a https://javaee.github.io/javaee-spec/javadocs/javax/servlet/http/Cookie.html[Cookie] so there historically was only one way to set the `SameSite` attribute on cookies in Open Liberty and that was to manually write the `Set-Cookie` header and add it to the https://javaee.github.io/javaee-spec/javadocs/javax/servlet/http/HttpServletResponse.html[HttpServletResponse]. Open Liberty is now adding multiple new server configurations to allow a user to specify the `SameSite` cookie attribute for their application defined cookies as well as the session and security cookies. These new server configurations will help minimize application level changes due to the new handling of the `SameSite` attribute.
+
+== What is the SameSite Cookie Attribute?
+
+The `SameSite` attribute is used by web browsers to determine if a particular cookie should be sent with a request. There are three values for the `SameSite` attribute: `Lax`, `Strict`, `None`. The `SameSite` attribute can help protect against Cross Site Request Forgery (CSRF) attacks. 
+
+`SameSite=Strict`: The cookie is only sent with "same-site" requests. The cookie is only sent by the web browser if the site for the cookie matches the site in the address bar for example.
+
+`SameSite=Lax`: The cookie is sent with both "same-site" and "cross-site" top-level navigation requests. Clicking a link for example.
+
+`SameSite=None`: The cookie is sent with both "same-site" and "cross-site" requests. The cookie is sent by the web browser for third party contexts, embedded content for example.
+
+== Why does anyone care about the SameSite Attribute?
+
+* There are two main changes in how the SameSite attribute is going to be handled: +
+. Cookies without a `SameSite` attribute will be  treated as if they have the `SameSite` attribute value of `Lax`. +
+. Cookies defined as having a `SameSite` attribute value of `None` will also require the `Secure` attribute to be defined. +
+
+The `SameSite` attribute is not a new concept and is detailed in great length here: https://tools.ietf.org/html/draft-ietf-httpbis-rfc6265bis-03#section-4.1.2.7[HTTP State Management Mechanism]. Until recently web browsers have treated a Cookie without a `SameSite` attribute as having a `SameSite` attribute value of `None`. Chrome and other web browsers are starting to change how they deal with Cookies without a `SameSite` attribute defined. Details as to the new enforcement can be found here: https://tools.ietf.org/html/draft-west-cookie-incrementalism-00[Incrementally Better Cookies]
+
+== The Servlet API lacks support for SameSite
+Currently the Servlet specification does not support the `SameSite` attribute and it can not be defined using the https://javaee.github.io/javaee-spec/javadocs/javax/servlet/http/Cookie.html[Cookie API].
+
+The only available way to set the `SameSite` attribute using the Servlet specification is specifically defining a `Set-Cookie` header using the following two APIs:
+
+* HttpServletResponse
+. https://javaee.github.io/javaee-spec/javadocs/javax/servlet/http/HttpServletResponse.html#setHeader-java.lang.String-java.lang.String-[HttpServletResponse.setHeader]
+. https://javaee.github.io/javaee-spec/javadocs/javax/servlet/http/HttpServletResponse.html#addHeader-java.lang.String-java.lang.String-[HttpServletResponse.addHeader]
+
+== Setting the SameSite attribute in Open Liberty
+Now that the  https://github.com/OpenLiberty/open-liberty/issues/10086[Allow the SameSite attribute to be set on a Cookie] feature is completed there are currently three new ways to set the `SameSite` attribute in Open LIberty.
+
+==== Setting the SameSite attribute on the Session Cookie using server.xml configuration
+   <httpSession cookieSameSite="Lax|Strict|None|Disabled"/>
+
+The default value of `cookieSameSite` is `Disabled`. The `Disabled` value means that no `SameSite` attribute will be added to the Session Cookie.
+
+If the `None` value is used for `cookieSameSite` then the `Secure` attribute will automatically be added to the Session Cookie.
+
+==== Setting the SameSite attribute on the Ltpa/Jwt Security Cookies
+   <webAppSecurity sameSiteCookie="Lax|Strict|None|Disabled"/>
+
+The default value of `sameSiteCookie` is `Disabled`. The `Disabled` value means that no `SameSite` attribute will be added to the Security Cookies.
+
+If the `None` value is used for `sameSiteCookie` then the `Secure` attribute will automatically be added to the Security Cookies.
+
+==== Setting the SameSite attribute for other Cookies
+    <httpEndpoint id="defaultHttpEndpoint"
+                  httpPort="9080"
+                  httpsPort="9443" >
+        <samesite lax="chocolateChip,oatmeal" strict="peanutButter" none="sugar"/>
+   </httpEndpoint>
+
+Each attribute of the `samesite` element takes a comma (`,`) deliminted list of cookie names.
+
+* In the given example cookies with the following names would have the `SameSite` attribute defined as:
+. `chocolateChip` and `oatmeal` would have a `SameSite` attribute of `Lax`.
+. `peanutButter` would have a `SameSite` attribute of `Strict`.
+. `sugar` would have a `SameSite` attribute of `None` as well as the `Secure` attribute would automatically be added.
+
+The `httpEndpoint` configuration will only add the `SameSite` attribute to a cookie if it does not already exist.
+
+The `httpEndpoint` configuration gives the ability to add the `SameSite` attribute to cookies added with the https://javaee.github.io/javaee-spec/javadocs/javax/servlet/http/HttpServletResponse.html#setHeader-java.lang.String-java.lang.String-[HttpServletResponse.setHeader] and https://javaee.github.io/javaee-spec/javadocs/javax/servlet/http/HttpServletResponse.html#addHeader-java.lang.String-java.lang.String-[HttpServletResponse.addHeader] methods as well as any cookies added via https://javaee.github.io/javaee-spec/javadocs/javax/servlet/http/HttpServletResponse.html#addCookie-javax.servlet.http.Cookie-[HttpServletResponse.addCookie(Cookie cookie)].
+
+The `httpEndpoint` configuration also allows the use of the wildcard character (`*`).
+
+* Wildcard Support:
+. As a standalone character:
+
+   <samesite lax="*"/>
+
+. At the end of one or more cookie names:
+
+   <!--sugar would have the None SameSite attribute value as well as Secure attribute added -->
+   <!-- peanutButter would have the Strict SameSite attribute value -->
+   <!-- all other cookies would have the Lax SameSite attribute value -->
+   <samesite lax="*" strict="peanutButter" none="suga*"/>
+
+If the `httpSession` and/or `webAppSecurity` configurations have not been set then given the above examples the Session cookie `SameSite` attribute value would be `Lax` as well as the Security cookies `SameSite` attribute value would be `Lax`.
+
+Any number of cookie names can contain the wildcard character at the end and for any given cookie name the most specific pattern will be matched.
+
+Only one standalone wildcard character is allowed. The following is an invalid configuration:
+
+   <samesite lax="*" strict="*"/>
+
+The above configuration would result in a WARNING message:
+
+   A duplicate cookie name or pattern [*] was found in the SameSite [strict] configuration. The [*] cookie name or pattern is ignored for all configuration lists. Any cookie name or pattern that is defined by the lax, none, and strict configurations can be defined in only one of the three configurations.
+
+The `httpEndpoint` configuration also allows the use of a reference to the `samesite` configuration:
+
+   <httpEndpoint id="defaultHttpEndpoint"
+               httpPort="9080"
+               httpsPort="9443"
+               samesiteRef="samesiteReference">
+   </httpEndpoint>
+   <samesite strict="cookieOne" id="samesiteReference"/>
+
+
+== Precedence of Open Liberty SameSite configuration
+The configuration for `httpSession` and `webAppSecurity` take precedence over the `httpEndpoint` configuration.
+
+For example if a server.xml contained the following configuration:
+
+   <httpSession cookieSameSite="Lax"/>
+   <httpEndpoint id="defaultHttpEndpoint"
+                  httpPort="9080"
+                  httpsPort="9443" >
+      <samesite strict="JSESSIONID"/>
+   </httpEndpoint>
+
+The Session Cookie with the name `JSESSIONID` (the default Session cookie name) would have the `SameSite` attribute of `Lax`
+
+== In summary
+Chrome and other web browsers have changed how they treat cookies without a `SameSite` attribute defined. This web browser change in behavior and lack of the Servlet sepecification having an API to set the `SameSite` attribute on Cookie objects requires an alternative way to set the `SameSite` attribute to minimize application level changes. The `httpSession`, `webAppSecuity`, and `httpEndpoint` configurations give such an alternative.
