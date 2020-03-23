@@ -1,21 +1,32 @@
 ---
 layout: post
-title: "MicroProfile Fault Tolerance. How can I use @Asynchronous?"
+title: "Asynchronous programming made resilient with MicroProfile Fault Tolerance"
 categories: blog
 author_picture: https://avatars2.githubusercontent.com/u/55994281?s=460&u=e02b856ba160c3a4275f760606f679811c90a1af&v=4
 author_github: https://github.com/Joseph-Cass
 seo-title: Using MicroProfile Fault Tolerance @Asynchronous Open Liberty - OpenLiberty.io
-seo-description: MicroProfile Fault Tolerance @Asynchronous allows you to add additional functionality to @Timeout and @Bulkhead annotations, and allows you to use the other Fault Tolerance annotations with other asynchronous APIs.
-blog_description: "MicroProfile Fault Tolerance @Asynchronous allows you to add additional functionality to @Timeout and @Bulkhead annotations, and allows you to use the other Fault Tolerance annotations with other asynchronous APIs"
+seo-description: MicroProfile Fault Tolerance @Asynchronous allows you to add additional functionality to @Timeout and @Bulkhead annotations and allows you to use the other Fault Tolerance annotations with other asynchronous APIs.
+blog_description: "MicroProfile Fault Tolerance @Asynchronous allows you to add additional functionality to @Timeout and @Bulkhead annotations and allows you to use the other Fault Tolerance annotations with other asynchronous APIs"
+additional_authors: 
+ - name: Andrew Rouse
+   github: https://github.com/Azquelt
+   image: https://avatars3.githubusercontent.com/u/2011102?s=460&u=4754ac398d208d72a7aff0bdeab828562a192d53&v=4
 ---
-= MicroProfile Fault Tolerance. How can I use `@Asynchronous`?
+= Asynchronous programming made resilient with MicroProfile Fault Tolerance
 Joseph Cass <https://github.com/Joseph-Cass>
 
-MicroProfile Fault Tolerance can help you easily make your applications more reliable and resilient without cluttering up your code.
+https://www.oracle.com/technetwork/java/javase/overview/java8-2100321.html[Java 8] is long-term support and https://www.jetbrains.com/lp/devecosystem-2019/java/[the most commonly used Java version]. It has many awesome features; one of which is https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/CompletionStage.html[CompletionStage], which allows you to make your code asynchronous. Great stuff! However, you might have the following questions:
+
+[.text-center]
+*_"How can I make my asynchronous methods resilient to faults? What if an asynchronous method unexpectedly returns an exception? What happens then?"_*
+
+=== MicroProfile Fault Tolerance
+
+Luckily https://github.com/eclipse/microprofile-fault-tolerance[MicroProfile Fault Tolerance] comes to rescue. In this blog post we will go through how to make your asynchronous program resilient.
 
 There are many different annotations which MicroProfile Fault Tolerance provides for helping you deal with failure: https://download.eclipse.org/microprofile/microprofile-fault-tolerance-2.1/apidocs/org/eclipse/microprofile/faulttolerance/Retry.html[@Retry], https://download.eclipse.org/microprofile/microprofile-fault-tolerance-2.1/apidocs/org/eclipse/microprofile/faulttolerance/Timeout.html[@Timeout], https://download.eclipse.org/microprofile/microprofile-fault-tolerance-2.1/apidocs/org/eclipse/microprofile/faulttolerance/CircuitBreaker.html[@CircuitBreaker], https://download.eclipse.org/microprofile/microprofile-fault-tolerance-2.1/apidocs/org/eclipse/microprofile/faulttolerance/Bulkhead.html[@Bulkhead] and https://download.eclipse.org/microprofile/microprofile-fault-tolerance-2.1/apidocs/org/eclipse/microprofile/faulttolerance/Fallback.html[@Fallback].
 
-In this post, we're going to talk about another annotation which is slightly different: https://download.eclipse.org/microprofile/microprofile-fault-tolerance-2.1/apidocs/org/eclipse/microprofile/faulttolerance/Asynchronous.html[@Asynchronous].
+But there's one in particular we're going to talk about which is slightly different: https://download.eclipse.org/microprofile/microprofile-fault-tolerance-2.1/apidocs/org/eclipse/microprofile/faulttolerance/Asynchronous.html[@Asynchronous].
 
 Asynchronous isn't a strategy for dealing with failure, so why is it in MicroProfile Fault Tolerance? Well, it allows us to add some additional functionality to the `@Timeout` and `@Bulkhead` annotations, and it allows us to use the other Fault Tolerance annotations with other asynchronous APIs.
 
@@ -24,27 +35,26 @@ Before we talk about how `@Asynchronous` enhances other annotations, let's talk 
 == What does `@Asynchronous` do?
 The `@Asynchronous` annotation makes your method run asynchronously, meaning that rather than running when you call it, it will run some time later, usually on another thread.
 
-One of the ways we can use this is to run several things in parallel. To do this, we add the `@Asynchronous` annotation to the method, and we change the method to return either a https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/Future.html[Future] or https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/CompletionStage.html[CompletionStage]. In our method body, we can use `CompletableFuture.completedFuture()` to make our result compatible with the new return type.
+One of the ways we can use this is to run several things in parallel. To do this, we add the `@Asynchronous` annotation to the method, and we change the method to return either a https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/CompletionStage.html[CompletionStage] (preferable) or https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/Future.html[Future]. In our method body, we can use `CompletableFuture.completedFuture()` to make our result compatible with the new return type.
 
 [source,java]
 ----
+@Asynchronous
+public CompletionStage<String> serviceA() { 
 
-	@Asynchronous
-	public CompletionStage<String> serviceA() { 
+	return CompletableFuture.completedFuture("serviceA");
 
-		return CompletableFuture.completedFuture("serviceA");
-
-	}
+}
 ----
 
 === `@Asynchronous` method execution
 So what does this do when we call the method?
 
-Well, usually when you call a method, you call it, and then it returns a result. However, when we use the `@Asynchronous` annotation, Fault Tolerance gets in between. When you call the method, Fault Tolerance first schedules to your method to run later on a different thread, then it returns you a `Future` or `CompletionStage`. This isn't the `Future` or `CompletionStage` that's returned from your method, because your method hasn't run yet, it's an object created entirely by Fault Tolerance. 
+Well, usually when you call a method, you call it, and then it returns a result. However, when we use the `@Asynchronous` annotation, Fault Tolerance gets in between. When you call the method, Fault Tolerance first schedules your method to run later on a different thread, then it returns you a `CompletionStage` or `Future`. This isn't the `CompletionStage` or `Future` that's returned from your method, because your method hasn't run yet, it's an object created entirely by Fault Tolerance. 
 
-image::../img/blog/FT-basic-asynchronous-execution-flow.png[Fault Tolerance asynchronous execution flow]
+image::/img/blog/FT-basic-asynchronous-execution.png[Fault Tolerance asynchronous execution flow]
 
-Sometime later, your method runs and returns a `Future` or `CompletionStage`. Now, Fault Tolerance will go and complete the `Future` or `CompletionStage` object which was returned to the caller earlier, with the value that was returned from your method.
+Sometime later, your method runs and returns a `CompletionStage` or `Future`. Now, Fault Tolerance will go and complete the `CompletionStage` or `Future` object which was returned to the caller earlier, with the value that was returned from your method.
 
 
 == How you can use `@Asynchronous`
@@ -58,23 +68,23 @@ To run two methods in parallel, you can write methods which call two other servi
 
 [source,java]
 ----
-	@Inject
-	private RequestScopedClass1 requestScopedBean1;
+@Inject
+private RequestScopedClass1 requestScopedBean1;
 
-    @Inject
-	private RequestScopedClass2 requestScopedBean2;
+@Inject
+private RequestScopedClass2 requestScopedBean2;
 
-	public CompletionStage<String> callServicesAsynchronously()  {
+public CompletionStage<String> callServicesAsynchronously()  {
 
-		CompletionStage<String> result1 = requestScopedBean1.serviceA(); // Where serviceA is annotated with @Asynchronous
-		CompletionStage<String> result2 = requestScopedBean2.serviceB(); // Where serviceB is annotated with @Asynchronous	
-        ...
-	}
+	CompletionStage<String> result1 = requestScopedBean1.serviceA(); // Where serviceA is annotated with @Asynchronous
+	CompletionStage<String> result2 = requestScopedBean2.serviceB(); // Where serviceB is annotated with @Asynchronous	
+    ...
+}
 ----
 
 First, serviceA is called, and then serviceB, then the program waits for results from both. This lets both services be called simultaneously, rather than sequentially. 
 
-Any other Fault Tolerance annotations can also be used. For example, a Retry can be added to serviceA and a Timeout to serviceB. If serviceA needs several retries, the call to `future.get()` won't return until all the retries are complete.
+Any other Fault Tolerance annotations can also be used. For example, a Retry can be added to serviceA and a Timeout to serviceB. If serviceA needs several retries, then call to retrieve the result, such as `CompletionStage.thenAccept()` or  `Future.get()` won't return until all the retries are complete.
 
 [source,java]
 ----
@@ -86,7 +96,7 @@ public class RequestScopedClass1 {
 	public CompletionStage<String> serviceA() { 
 
         doSomethingWhichMightFail()
-		return CompletableFuture.completedFuture("serviceB");
+		return CompletableFuture.completedFuture("serviceA");
 
 	}
 }
@@ -112,46 +122,46 @@ Another use is to apply Fault Tolerance to an API which is already asynchronous.
 
 In this example, we'll use the JAX-RS client API for calling remote REST services, introduced in JAX-RS 2.1. We can build up a request to fetch a String from a given URL with a GET request and the return type is a `CompletionStage` of String:
 
-===== Client API:
+==== JAX-RS client API `CompletionStage` example:
 
 [source,java]
 ----
-	private Client client = ClientBuilder.newClient();
+private Client client = ClientBuilder.newClient();
 
-	public CompletionStage<String> clientDemo() {
+public CompletionStage<String> clientDemo() {
 
-    	CompletionStage<String> response = client.target("http://example.com/resource")
+    CompletionStage<String> response = client.target("http://example.com/resource")
                      .request(MediaType.TEXT_PLAIN)
                      .rx()
                      .get(String.class);
 
-    	return response;
+    return response;
 	
-    }
+}
 ----
-===== Server API:
+==== Fetching the following resource:
 [source,java]
 ----
-	@GET
-	@Path("http://example.com/resource")
-	public CompletionStage<String> fetchExample() { 
+@GET
+@Path("/resource")
+public CompletionStage<String> fetchExample() { 
 
-		return CompletableFuture.completedFuture("result");
+	return CompletableFuture.completedFuture("responseText");
 
-	}
+}
 ----
 
 If we call the `clientDemo()` method, without any annotations, it works as we expect. We call it, receive a `CompletionStage<String>` (named `response` in the example), and then we can add an action to take when the `CompletionStage` completes.
 
 [source,java]
 ----
-System.out.print(response.toCompletableFuture().get());
---> https://www.google.com/
+response.thenAccept(System.out::println);
+--> responseText
 ----
 
 However, what happens if we want to use the `@Retry` annotation with our method? The answer is nothing. 
 
-Even if the HTTP request fails, the request doesn't get retried. Why is this? Well, Fault Tolerance acts around method calls. If you annotate a method with `@Retry` and it throws an exception then it gets retried. However, when we do an HTTP request through this JAX-RS client API, if there's a problem it doesn't throw an exception. It can't throw an exception. It's going to do the request asynchronously, so when this method returns, it probably hasn't even made the request yet, let alone found out that it failed. If an exception does occur, it will be propaged to the `CompletionStage` and can be handled there. But the result is, that this method will never throw an exception, even if the request fails and so the request will never be retried.
+Even if the HTTP request fails, the request doesn't get retried. Why is this? Well, Fault Tolerance acts around method calls. If you annotate a method with `@Retry` and it throws an exception then it gets retried. However, when we do an HTTP request through this JAX-RS client API, if there's a problem it doesn't throw an exception. It can't throw an exception. It's going to do the request asynchronously, so when this method returns, it probably hasn't even made the request yet, let alone found out that it failed. If an exception does occur, it will be propagated  to the `CompletionStage` and can be handled there. But the result is, that this method will never throw an exception, even if the request fails and so the request will never be retried.
 
 *@Asynchronous to the rescue!*
 
@@ -159,11 +169,11 @@ However, if we add the `@Asynchronous` annotation and the method returns a `Comp
 
 [source,java]
 ----
-    @Asynchronous
-    @Retry
-    public CompletionStage<String> clientDemo() {
-        ...
-    }
+@Asynchronous
+@Retry
+public CompletionStage<String> clientDemo() {
+    ...
+}
 ----
 
 That means that when we call this method and it returns a `CompletionStage`, it's only when that `CompletionStage` completes that Fault Tolerance will look at the result and decide whether to retry. So, if the request fails, the `CompletionStage` completes with an exception, Fault Tolerance decides that a Retry is needed and it calls the method again. As before, Fault Tolerance has intercepted the method call, so the `CompletionStage` returned to the caller is a different `CompletionStage` so that the caller doesn't get the result until all the Retries have been completed.
@@ -178,11 +188,11 @@ So to recap, to use Fault Tolerance with an asynchronous API you must:
 We've covered running things in parallel and applying Fault Tolerance to asynchronous APIs, now let's look at the way using the `@Asynchronous` annotations affects other Fault Tolerance annotations.
 
 === Timeout
-When you use the `@Asynchronous` and `@Timeout` annotations together, the `Future` or `CompletionStage` returned to the caller can be completed as soon as the timeout expires, even if the method is still running. This is because the method is running on another thread, so even though that thread is still occupied, we can signal that the result is ready to another thread which might be waiting for it.
+When you use the `@Asynchronous` and `@Timeout` annotations together, the `CompletionStage` or `Future` returned to the caller can be completed as soon as the timeout expires, even if the method is still running. This is because the method is running on another thread, so even though that thread is still occupied, we can signal that the result is ready to another thread which might be waiting for it.
 
 The thread running the method is still interrupted, so it can stop what it's working on and save resources, but if you need to apply a timeout to a long running operation which doesn't respond to being interrupted, you can use the `@Asynchronous` annotation. 
 
-Note: Be aware that the operation may still run to completion, even though the timeout has expired and you've recieved the TimeoutException.
+Note: Be aware that the operation may still run to completion, even though the timeout has expired and you've received the TimeoutException.
 
 
 === Bulkhead
@@ -195,21 +205,11 @@ Just like the number of concurrent executions, the size of the queue can also be
 == Asynchronous flow of execution
 The last thing we're going to cover is how the flow of execution changes when using the `@Asynchronous` annotation compared to when it's not used. 
 
-The following diagrams are accurate for mpFaultTolerance-2.0.
+The following diagram demonstrates how Fault Tolerance is applied when a method annotated with `@Asynchronous` is executed and is accurate for mpFaultTolerance-2.0. The differences from synchronous execution are highlighted in dark green, and discussed below:
 
-The first demonstrates how Fault Tolerance is applied to a regular synchronous method execution:
+image::/img/blog/FT-asynchronous-execution-flow.png[Fault Tolerance asynchronous execution flow]
 
-==== Synchronous execution
-
-image::../img/blog/FT-synchronous-execution-flow.png[Fault Tolerance synchronous execution flow] 
-
-The following demonstrates how Fault Tolerance is applied to a method annotated with `@Asynchronous` which returns a `Future`:
-
-==== Asynchronous execution
-
-image::../img/blog/FT-asynchronous-execution-flow.png[Fault Tolerance asynchronous execution flow]
-
-The first difference from synchronous flow of execution is that a `Future` is returned before the method runs. When the method has actually returned, the result from the method is then propagated to this `Future` so that the caller can get it. 
+The first difference from synchronous flow of execution is that a `CompletionStage` or `Future` is returned before the method runs. When the method has actually returned, the result from the method is then propagated into the `CompletionStage` or `Future` so that the caller can get it. 
 
 The next difference comes in the Bulkhead. As well as either accepting or rejecting the execution, the Bulkhead can also queue it to be run later. Next, if the method is accepted by the Bulkhead, it then is scheduled to be run on another thread, rather than run immediately. We then see the enhancement to Timeout. If the timeout expires, the method is interrupted, but we also skip forwards to this point and process the result as if the method had finished with a TimeoutException. 
 
