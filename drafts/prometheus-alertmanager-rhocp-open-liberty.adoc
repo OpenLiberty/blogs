@@ -1,6 +1,6 @@
 ---
 layout: post
-title: "Get alerts from your Open Liberty apps in Slack using Prometheus Alertmanager on the Red Hat OpenShift Container Platform (RHOCP) 4.3"
+title: "Get alerts from your Open Liberty apps in Slack using Prometheus Alertmanager on Red Hat OpenShift Container Platform (RHOCP) 4.3"
 categories: blog
 author_picture: https://avatars3.githubusercontent.com/u/34190173
 author_github: https://github.com/jennifer-c
@@ -10,16 +10,15 @@ blog_description: "Set up Prometheus Alertmanager on Red Hat OpenShift Container
 ---
 = Get alerts from your Open Liberty apps in Slack using Prometheus Alertmanager in RHOCP 4.3
 Jennifer Cheng <https://github.com/jennifer-c>
+:url-prefix:
 
-Note: We had good reception for our link:https://openliberty.io/blog/2020/01/29/alerts-slack-prometheus-alertmanager-open-liberty.html[original blog post] for setting up Prometheus Alertmanager, so we're publishing a version that'll set you up on Red Hat OpenShift Container Platform too.
+We had good reception for our link:https://openliberty.io/blog/2020/01/29/alerts-slack-prometheus-alertmanager-open-liberty.html[original blog post] for setting up Prometheus Alertmanager, so we're publishing a version that'll set you up on Red Hat OpenShift Container Platform too.
 
 Every application needs a strong monitoring system to catch unexpected issues, whether it's an overloaded heap or a slow-responding servlet. link:https://openliberty.io/guides/microprofile-metrics.html[MicroProfile Metrics] provides the ability to expose metrics for your application. Used in conjunction with the open source monitoring system link:https://prometheus.io/[Prometheus] and the link:https://prometheus.io/docs/alerting/overview/[Prometheus Alertmanager], we can build a strong foundation for monitoring your system and reacting quickly to issues.
 
 In this post, we'll set up Prometheus Alertmanager on Red Hat OpenShift Container Platform 4.3 using the Prometheus Operator. The Alertmanager will fire alerts to a specified Slack channel to notify you when, for example, your app's heap usage is too high. We'll configure Prometheus with alerting rules to receive certain alerts from Open Liberty, then we'll configure Prometheus Alertmanager to pass those alerts to a Slack channel.
 
-You'll also find some tips for more advanced Alertmanager configurations, including grouping your alerts, sending different alerts to different places based on severity, and silencing your alerts.
-
-Already familiar with Alertmanager? Check out link:https://github.com/jennifer-c/openliberty-alertmanager[a sample configuration for Open Liberty]. The repository also contains the configuration files used as an example in this blog post, if you get stuck along the way.
+Already familiar with Alertmanager? Check out link:https://github.com/jennifer-c/openliberty-alertmanager[some sample rules for Open Liberty]. The repository also contains the configuration files used as an example in this blog post, if you get stuck along the way.
 
 == What you'll need
 
@@ -162,9 +161,7 @@ You can now access the Alertmanager UI. Since we haven't configured Prometheus t
 === Receiving alerts via Prometheus Alertmanager
 Now that the Alertmanager is set up, we need to configure Prometheus to talk to it.
 
-First, we'll need to expose the Alertmanager port. We can do that by creating a ClusterIP service.
-
-. On the RHOCP web console, click on Networking > Services > Create Service. Create a ClusterIP service:
+. First, we'll need to expose the Alertmanager port. On the RHOCP web console, click on Networking > Services > Create Service. Create a ClusterIP service:
 +
 ```
 apiVersion: v1
@@ -198,126 +195,13 @@ spec:
         port: web
 ```
 +
-. Go to your Prometheus instance, then click on Alerts. Ensure that at least one alert is firing.
+. Go to your Prometheus route, then click on Alerts. Ensure that at least one alert is firing.
 . Verify that Alertmanager has received the alert by going to the Alertmanager route.
 +
 image::/img/blog/prometheusAM_rhocp_alertmanager_alerts.png[Alert viewed on Alertmanager web UI, align="left"]
 +
 . Check your Slack channel to see your message.
-
++
 image::/img/blog/prometheusAM_rhocp_slack_alert.png[Alert on Slack, align="left"]
 
-== Additional tips for when you're creating larger alerting systems
-
-Note: This section is unchanged from the original blog post. To load in new rules, you can edit your Prometheus Rule instance's YAML from the web console, under Operators > Installed Operators > Prometheus Operator > Prometheus Rule. Similarly, to update your Alertmanager configuration, simply edit your `alertmanager.yaml` and re-create the secret.
-
-When creating larger alerting systems, it's crucial to keep your alerts organized so that you can respond quickly to any problems. You can configure your Alertmanager to group certain alerts together using _groups_, to send alerts to different locations using _routes_, and to only send useful alerts (while not compromising coverage of your data) with _inhibition_.
-
-If you want to test these configurations out yourself, you'll need to have a couple of rules to play with. To your rule file, `alert.yml`, add the following rules:
-
-```
-- alert: heapUsageAbove90%
-  expr: base_memory_usedHeap_bytes / base_memory_maxHeap_bytes > 0.9
-  for: 30s
-  labels:
-    alerttype: heap
-    severity: critical
-  annotations:
-    summary: "Heap usage is above 90%"
-    description: "{{ $labels.instance }} heap usage above 90%"
-- alert: heapUsageAbove50%
-  expr: base_memory_usedHeap_bytes / base_memory_maxHeap_bytes > 0.5
-  for: 30s
-  labels:
-    alerttype: heap
-    severity: warning
-  annotations:
-    summary: "Heap usage is above 50%"
-    description: "{{ $labels.instance }} heap usage is above 50%"
-```
-
-If your `alert.yml` file still has the old rule `heapUsageTooHigh`, you can delete that one. For testing purposes, you can change the thresholds to be much smaller (`0.02` and `0.01`, for example, are what we used to test with.)
-
-=== Routes
-There's a time and a place for everything, and that includes alerts. Routing your alerts allows you to use multiple different receivers based on the label assigned to each rule.
-
-For example, if you wanted to use PagerDuty to page critical alerts, and use Slack to send notifications of warning alerts, you can set the `route` to look like the following in `alertmanager.yaml`:
-
-```
-# The root route. This route is used as the default
-# if there are no matches in the child routes.
-route:
-  group_wait: 10s
-  group_interval: 10s
-  repeat_interval: 5m
-  receiver: 'default_receiver'
-  # A child route - all critical alerts follow this route
-  # and use the receiver 'pager_receiver'
-  routes:
-  - match:
-      # This can be any label or annotation
-      severity: critical
-    receiver: pager_receiver
-    repeat_interval: 30m
-```
-
-And set up a new receiver for PagerDuty by adding this to `receivers`:
-
-```
-- name: pager-receiver
-  pagerduty_configs:
-  - service_key: <your service key>
-```
-
-Now, your alerts will be routed to different locations depending on the severity.
-
-=== Groups
-If you have a network of systems that goes down, you probably don't want to receive an alert for every single instance - instead, it'd be preferable to get one alert that encapsulates all the other ones.
-
-In your `alertmanager.yaml`, under `route`, you can group your alerts by label name:
-```
-route:
-  group_by: [ alerttype ]
-  group_wait: 10s
-  group_interval: 10s
-  repeat_interval: 5m
-  receiver: 'default_receiver'
-```
-
-The alerts will be grouped by `alerttype`, and the group will only send one alert with all of the information.
-
-image::/img/blog/prometheusAM_alertmanager_grouping.png[Alerts grouped in Alertmanager UI, align="left"]
-
-=== Inhibition
-For scenarios where you have multiple alerts that convey the same information, inhibiting your alerts can be useful. For example, if you have one alert that detects when 50% of your memory heap is used, and another alert for 90% of memory heap being used, there's no reason to send out alerts for the 50% problem.
-
-In your `alertmanager.yaml`, add the following under `inhibition_rules`:
-```
-- source_match:
-    severity: 'critical'
-  # The alert that gets muted
-  target_match:
-    severity: 'warning'
-  # Both source and target need to have the same value to inhibit the alert
-  equal: [ 'alerttype' ]
-```
-The alert that has the label `severity: warning` (the target) will not be sent if there is an alert with the label `severity: critical` (the source). Both alerts must have the same value for the label `alerttype`. In our scenario, the alert `heapUsageAbove50%` will be inhibited if `heapUsageAbove90%` is firing at the same time.
-
-image::/img/blog/prometheusAM_alerts_firing.png[Alerts firing in Prometheus UI, align="left"]
-
-image::/img/blog/prometheusAM_slack_alert_inhibited.png[Slack alert for inhibited alert, align="left"]
-
-If we change the `alerttype` to be different values, the inhibition rule no longer matches, and both alerts will be sent. You can try it out by making the two `alerttype` labels different.
-
-== Silencing alerts
-Sometimes, you need to temporarily stop receiving alerts. For example, if you need to take your server down temporarily for maintenance, you don't want to receive any false positives. To do that, you can silence your alerts in the Alertmanager UI, under the `Silences` tab:
-
-image::/img/blog/prometheusAM_alertmanager_silences.png[Silencing Alerts in Alertmanager UI, align="left"]
-
-The matchers can be any metadata from your rules, e.g. labels, annotations, rule group name, etc.
-
-== Next steps
-
-Now that you have a basic configuration of the Prometheus Alertmanager set up, you can play with Prometheus rules to create a more comprehensive alerting system. You can also customize the messages to be more informative by using the Go templating system.
-
-Need some inspiration? Take a look at our link:https://github.com/jennifer-c/openliberty-alertmanager[sample configuration for Open Liberty.]
+For more advanced configurations, check out the link:/blog/2020/01/29/alerts-slack-prometheus-alertmanager-open-liberty.html#tips[additional tips for when you’re creating larger alerting systems] in the original blog post. To load in new rules, you can edit your Prometheus Rule instance's YAML from the web console, under Operators > Installed Operators > Prometheus Operator > Prometheus Rule. Similarly, to update your Alertmanager configuration, simply edit your `alertmanager.yaml` and re-create the secret.
