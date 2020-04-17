@@ -13,7 +13,7 @@ blog_description: "Add custom fields to your application's JSON logs to assist d
 Yushan Lin <https://github.com/Yushan-Lin>
 
 When developing applications, there are many logging utility options to choose from, based on your needs. One of the logging utilities, Log4j 2, is commonly used for logging in applications. 
-Log4j 2 has an API you can use to output log statements to a variety of output targets. In Open Liberty logging, only JUL (`java.util.logging`) logs are merged with Liberty logs and sent to messages.log/console. When running in a docker container in OpenShift, Log4j 2 logs that are written to the file system do not get picked up automatically. In this blog, we will show you how to get your Log4j 2 logs into RHOCP's EFK stack for viewing and analysis. We will present two approaches to forward logs using a sidecar container and a third approach to forward Log4j 2 logs to JUL.
+Log4j 2 has an API you can use to output log statements to a variety of output targets. In Open Liberty logging, only JUL (`java.util.logging`) logs are merged with Liberty logs and sent to messages.log/console. When running in a Docker container in OpenShift, Log4j 2 logs that are written to the file system do not get picked up automatically. In this blog, we will show you how to get your Log4j 2 logs into RHOCP's EFK stack for viewing and analysis. We will present two approaches to forward logs using a sidecar container and a third approach to forward Log4j 2 logs to JUL.
 
 When deploying your application in Liberty, you must specify where you want to send your Log4j 2 logs to. Log4j 2 logs are not merged with Liberty server logs. You may want to visualize both your Log4j 2 application logs and Liberty logs on the same Kibana dashboard to better monitor your applications and servers.
 
@@ -129,19 +129,18 @@ data:
     </match>
 ```
 
-2. Create a sidecar container running fluentd. The pod mounts a volume where Fluentd can pick up its configuration data. To modify your deployment:
+2. Create a sidecar container running Fluentd. The pod mounts a volume where Fluentd can pick up its configuration data. To modify your deployment:
 
 
 a. Add the config map as a volume to your deployment.
-
+```
  volumes:
   - name: outputlog
     emptyDir: {}
   - name: config-volume
     configMap:
       name: fluentd-config
-
-
+```
 b. Create the sidecar with Fluentd logging agent:
 
 ```
@@ -184,7 +183,7 @@ https://kabanero.io/guides/app-logging-ocp-4-2/
 
 image::../img/blog/log4j-rhocp-diagrams/solution-2.png[]
 
-Another way to direct your Log4j 2 logs to RHOCP's EFK stack is using the [Log4j 2 to SLF4J Adapter](https://logging.apache.org/log4j/2.x/log4j-to-slf4j/index.html) (since SLF4J can be configured to use JUL as the underlying implementation). The Log4j 2 to SLF4J Adapter allows applications coded to the Log4j 2 API to be routed to SLF4J. You can use this technique to merge your Log4j 2 logs with Liberty logs. Using this adapter may cause some loss of performance as the Log4j 2 messages are formatted before they can be passed to SLF4J.  After being passed to SLF4J, the log will be formatted and merged with Liberty logs before being passed to console.log/stdout.
+Another way to direct your Log4j 2 logs to RHOCP's EFK stack is using the [Log4j 2 to SLF4J Adapter](https://logging.apache.org/log4j/2.x/log4j-to-slf4j/index.html). SLF4J can be configured to use JUL as the underlying implementation. The Log4j 2 to SLF4J Adapter allows applications coded to the Log4j 2 API to be routed to SLF4J. You can use this technique to merge your Log4j 2 logs with Liberty logs. Using this adapter may cause some loss of performance as the Log4j 2 messages are formatted before they can be passed to SLF4J [2].  After being passed to SLF4J, the log will be formatted and merged with Liberty logs before being passed to console.log/stdout.
 To use this adapter, add the dependency to your pom.xml:
 ```
 		<dependency>
@@ -235,3 +234,5 @@ Using Liberty with Elastic Stack (aka ELK)	https://community.ibm.com/community/u
 References:
 
 [1] https://kubernetes.io/docs/concepts/workloads/pods/pod-overview/
+
+[2] https://logging.apache.org/log4j/2.x/log4j-to-slf4j/index.html
