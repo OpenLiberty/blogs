@@ -40,13 +40,11 @@ The value for this header in the response indicates the desired encoding algorit
 
 . The server's preferred algorithm
 +
-A preferred algorithm can be configured in the Open Liberty server using the link:https://www.openliberty.io/docs/ref/config/compression.html[`serverPreferredAlgorithm` attribute]. The value indicated by this attribute is used as long as the `Accept-Encoding` header in the HTTP request contains this name, implicitly or explicitly, with a quality value larger than `0.000`. This value is used regardless of whether there are other higher ranked quality values in the `Accept-Encoding` header.
-+
-For instance, consider the following header: `Accept-Encoding: deflate;q=0.5, gzip;q=1.0`. Without defining a server-preferred encoding, the server would pick `gzip`, as it is the highest ranked quality value in the list. However, if `deflate` were set as the server-preferred encoding algorithm, the same `Accept-Encoding` header would result in `deflate` being chosen.
+A preferred algorithm can be configured in the Open Liberty server using the link:https://www.openliberty.io/docs/ref/config/compression.html[`serverPreferredAlgorithm` attribute]. The value indicated by this attribute is used as long as the `Accept-Encoding` header in the HTTP request indicates that this algorithm is supported by the client, regardless of whether the client has indicated in the `Accept-Encoding` header that it prefers other algorithms more.
 
 . The HTTP client's preferred algorithm
 +
-The HTTP client can indicate which algorithms are supported and its preferred algorithms in the `Accept-Encoding` header of the HTTP request. The `Accept-Encoding` header specifies which algorithms the HTTP client supports or does not support, and can also indicate order of preference for each encoding algorithm.
+The HTTP client can indicate which algorithms are supported and its preferred algorithms in the `Accept-Encoding` header of the HTTP request. The `Accept-Encoding` header specifies which algorithms the HTTP client supports or does not support, and can also indicate order of preference (its quality; from `0.000 - 1.000`, where `0.000` means the algorithm is not supported by the client) for each encoding algorithm.
 
 The encoding algorithms listed in the `Accept-Encoding` header are sorted in descending order by the server and each value is evaluated until a valid encoding is found. The highest ranked valid algorithm is chosen. If the `gzip` algorithm is tied among the highest ranked, it is chosen as the algorithm to use. If there are no explicitly named encoding algorithms, and an asterisk (`{star}`) is used, `gzip` is used if possible. If `gzip` cannot be used, `deflate` is used. If both are declared as unsupported by means of a quality value of `0.000`, no content encoding algorithm is chosen.
 +
@@ -76,12 +74,6 @@ For example, assuming the `$WSZIP` header and the server's preferred algorithm a
 If an appropriate encoding algorithm is not found, or if the encoding algorithm is `identity`, no compression is attempted.
 
 Additionally, as the `Accept-Encoding` header influences the Open Liberty's process for selecting and representing the response, a `Vary` header with the value of `Accept-Encoding` is also added to the response. This header informs cache intermediaries that this response’s content may change in a subsequent request if the `Accept-Encoding` header changes. The header is added regardless of whether the response is ultimately compressed or not, as long as compression is configured in the `server.xml`.
-
-=== The Accept-Encoding header in HTTP requests
-
-The `Accept-Encoding` header in HTTP requests specifies which algorithms the HTTP client supports or does not support. The values provided by this header can optionally be accompanied by a quality value, ranging from `0.000-1.000`, which indicates a preference for the encoding. When the quality value is omitted for an encoding algorithm, the Open Liberty server interprets it as having a value of `1.000`. On the other hand, a value of `0.000` indicates that the HTTP client does not support the algorithm. The use of the asterisk (`*`) symbol is supported to indicate all encoding algorithms that are not explicitly mentioned by the header.
-
-For example, an HTTP client can specify that it supports the `gzip` and `deflate` algorithms by setting the `Accept-Encoding` header to `Accept-Encoding: gzip, deflate`, it could specify that _any_ encoding is supported with `Accept-Encoding: *`. The client can also indicate a preference for `gzip` over `deflate` (while supporting both) with `Accept-Encoding: deflate;q=0.5, gzip;q=1.0`, or that no other algorithm should be used with `Accept-Encoding: deflate;q=0.5, gzip;q=1.0, *;q=0`.
 
 == Try it out
 
