@@ -8,7 +8,7 @@ seo-title: Faster web service communications with HTTP response compression on O
 seo-description: You can now specify in the server configuration which HTTP endpoints will consider compressing HTTP responses. HTTP response compression may be used to reduce bandwidth between HTTP clients and the server.
 blog_description: You can now specify in the server configuration which HTTP endpoints will consider compressing HTTP responses. HTTP response compression may be used to reduce bandwidth between HTTP clients and the server.
 ---
-= Faster web service communications with HTTP response compression on Open Liberty
+= Faster responses with HTTP response compression on Open Liberty
 Manuel Saldana <https://github.com/mrsaldana>
 :imagesdir: /
 :url-prefix:
@@ -16,37 +16,37 @@ Manuel Saldana <https://github.com/mrsaldana>
 :add: pass:[+]
 
 
-You can now configure Open Liberty (20.0.0.4+) so that HTTP responses are considered for compression. Compressing the sizes of HTTP responses, reduces bandwidth which, in turn, decreases the time taken for HTTP clients to get responses from other web services running on Open Liberty. Open Liberty first determines whether the response should be compressed. If the response should be compressed, Open Liberty then checks whether there is an encoding algorithm to perform the compression that is supported by (can be decoded by) the HTTP client that will receive the compressed response.
+You can now configure Open Liberty (20.0.0.4+) to compress HTTP responses. Compressing the sizes of HTTP responses reduces bandwidth which, in turn, decreases the time taken for HTTP clients to get responses. Open Liberty first determines whether the response should be compressed then, if so, checks whether there is an encoding algorithm to perform the compression that is supported by the HTTP client.
 
 == Determining whether a response should be compressed
 
-When Open Liberty is configured to compress HTTP responses, it determines whether it _should_ compress a response by checking the headers in the response:
+When Open Liberty is configured to compress HTTP responses, it first determines whether it _should_ compress a response by checking the headers in the response:
 
 `Content-Encoding` header:: If the response is not already encoded, it will be considered for compression. If the response is already encoded, no further attempts are made to encode the body.
 
-`Content-Length` header:: If the body of the response is `2048` bytes or larger, it can be compressed. If it is smaller than `2048` bytes, it is too small to benefit from compression.
+`Content-Length` header:: If the body of the response is `2048` bytes or larger, it can be compressed. If it is smaller than `2048` bytes, it is too small to benefit from compression and no attempt will be made to compress it.
 
-`Content-Type` header:: If the type of content in the response body is in the list of types configured in the Open Liberty server as being valid candidates for compression, it can be compressed.
+`Content-Type` header:: If the type of content in the response body is in the list of types configured in the Open Liberty server as being valid candidates for compression, it can be compressed. Otherwise, no attempt will be made to compress it.
 
-If Open Liberty determines that the response should be compressed, it then verifies whether the response _can_ be compressed.
+If Open Liberty determines that the response should be compressed, it then verifies whether there is an acceptable algorithm available to compress it.
 
 == Verifying whether a response can be compressed
 
-The Open Liberty server can use the `gzip`, `x-gzip`, `deflate`, `zlib`, or `identity` encoding algorithms to compress the responses before returning them to the HTTP client that made the request. However, an HTTP client does not necessarily support all these encoding algorithms, so the client can indicate which algorithms it supports, and even which it prefers to be used.
+The Open Liberty server can use the `gzip`, `x-gzip`, `deflate`, `zlib`, or `identity` encoding algorithms to compress responses before returning them to the HTTP client that made the request. However, an HTTP client does not necessarily support all these encoding algorithms, so the client can indicate which algorithms it supports and even which algorithm it prefers to be used.
 
 Open Liberty chooses which algorithm to use according to the following criteria, which it evaluates in order until an encoding algorithm is identified that is supported by _both_ the HTTP client and the Open Liberty server:
 
-. Using the `$WSZIP` private header
+. The value of the `$WSZIP` private header
 +
-Historically, Open Liberty only considered compression when this private header was used. The value for this header indicates the desired encoding algorithm.
+The value for this header indicates the desired encoding algorithm.
 
-. Using the server's preferred algorithm
+. The server's preferred algorithm
 +
 A preferred algorithm can be configured in the Open Liberty server using the link:https://www.openliberty.io/docs/ref/config/compression.html[`serverPreferredAlgorithm` attribute]. The value indicated by this attribute is used as long as the `Accept-Encoding` header in the HTTP request contains this name, implicitly or explicitly, with a quality value larger than `0.000`. This value is used regardless of whether there are other higher ranked quality values in the `Accept-Encoding` header.
 +
 For instance, consider the following header: `Accept-Encoding: deflate;q=0.5, gzip;q=1.0`. Without defining a server-preferred encoding, the server would pick `gzip`, as it is the highest ranked quality value in the list. However, if `deflate` were set as the server-preferred encoding algorithm, the same `Accept-Encoding` header would result in `deflate` being chosen.
 
-. Using the HTTP client's preferred algorithm
+. The HTTP client's preferred algorithm
 +
 The HTTP client can indicate which algorithms are supported and its preferred algorithms in the `Accept-Encoding` header of the HTTP request. These are sorted in descending order by the server and each value is evaluated until a valid encoding is found. The highest ranked valid algorithm is chosen. If the `gzip` algorithm is tied among the highest ranked, it is chosen as the algorithm to use. If there are no explicitly named encoding algorithms, and an asterisk (`{star}`) is used, `gzip` is used if possible. If `gzip` cannot be used, `deflate` is used. If both are declared as unsupported by means of a quality value of `0.000`, no content encoding algorithm is chosen.
 +
@@ -81,13 +81,24 @@ Additionally, as the `Accept-Encoding` header influences the Open Liberty's proc
 
 The `Accept-Encoding` header in HTTP requests specifies which algorithms the HTTP client supports or does not support. The values provided by this header can optionally be accompanied by a quality value, ranging from `0.000-1.000`, which indicates a preference for the encoding. When the quality value is omitted for an encoding algorithm, the Open Liberty server interprets it as having a value of `1.000`. On the other hand, a value of `0.000` indicates that the HTTP client does not support the algorithm. The use of the asterisk (`*`) symbol is supported to indicate all encoding algorithms that are not explicitly mentioned by the header.
 
-For example, an HTTP client can specify that it supports the `gzip` and `deflate` algorithms by setting the `Accept-Encoding` header to `Accept-Encoding: gzip, deflate`, it could specify that *any* encoding is supported with `Accept-Encoding: *`. The client can also indicate a preference for `gzip` over `deflate` (though both are supported) with `Accept-Encoding: deflate;q=0.5, gzip;q=1.0`, or that no other algorithm should be used with `Accept-Encoding: deflate;q=0.5, gzip;q=1.0, *;q=0`
+For example, an HTTP client can specify that it supports the `gzip` and `deflate` algorithms by setting the `Accept-Encoding` header to `Accept-Encoding: gzip, deflate`, it could specify that _any_ encoding is supported with `Accept-Encoding: *`. The client can also indicate a preference for `gzip` over `deflate` (while supporting both) with `Accept-Encoding: deflate;q=0.5, gzip;q=1.0`, or that no other algorithm should be used with `Accept-Encoding: deflate;q=0.5, gzip;q=1.0, *;q=0`
 
 == Try it out
 
-To use HTTP response compression, you need *Open Liberty 20.0.0.4*. Configure the `server.xml` with a new element called `<compression>`. You can configure compression for all HTTP endpoints or separately for each HTTP endpoint. See link:https://www.openliberty.io/docs/ref/config/#compression.html[Compression Options (compression)] for more details of the options.
+To use HTTP response compression, configure the `server.xml` with a new element called `<compression>`. You can configure compression for individual HTTP endpoints or for all endpoints at once. See link:https://www.openliberty.io/docs/ref/config/#compression.html[Compression Options (compression)] for more details of the attributes.
 
-=== Configuring compression for all HTTP endpoints
+Configuring compression for individual HTTP endpoints:
+
+[source,xml]
+----
+<httpEndpoint id="defaultHttpEndpoint"
+                        httpPort="9080"
+                        httpsPort="9443">
+    <compression serverPreferredAlgorithm="deflate|gzip|x-gzip|zlib|identity|none>" types="list_of_types"/>
+</httpEndpoint>
+----
+
+Configuring compression for all HTTP endpoints:
 
 [source, xml]
 ----
@@ -106,19 +117,4 @@ To use HTTP response compression, you need *Open Liberty 20.0.0.4*. Configure th
     <compression id="myCompressionID" serverPreferredAlgorithm="deflate|gzip|x-gzip|zlib|identity|none>" types="list_of_types"/>
 ----
 
-=== Configuring compression separately for each HTTP endpoint
-
-[source,xml]
-----
-<httpEndpoint id="defaultHttpEndpoint"
-                        httpPort="9080"
-                        httpsPort="9443">
-    <compression serverPreferredAlgorithm="deflate|gzip|x-gzip|zlib|identity|none>" types="list_of_types"/>
-</httpEndpoint>
-----
-
-===  Configuration pitfalls
-
-If the HTTP transport encounters a configuration that is considered invalid, a warning message with an appropriate message is logged. If this happens, the link:https://www.openliberty.io/docs/ref/config/#compression.html[default value for the attribute] that was misconfigured is used.
-
-The following message keys are associated to misconfigurations of the `<compression>` element's attributes: `CWWKT0029W`, `CWWKT0030W`, `CWWKT0031W`, `CWWKT0032W`, and `CWWKT0033W`. For more details of these messages, see the link:https://www.ibm.com/support/knowledgecenter/SSEQTP_liberty/com.ibm.websphere.messages.liberty.doc/com.ibm.ws.http.channel.internal.resources.httpchannelmessages.html[Liberty messages].
+With this new `<compression>` configuration option, you can configure Open Liberty to compress HTTP responses before returning them to clients. This reduces bandwidth and the time taken for HTTP clients to get responses.
