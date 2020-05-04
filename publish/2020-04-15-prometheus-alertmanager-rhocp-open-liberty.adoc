@@ -1,0 +1,207 @@
+---
+layout: post
+title: "Get alerts from your Open Liberty apps in Slack using Prometheus Alertmanager on Red Hat OpenShift Container Platform (RHOCP) 4.3"
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/u/34190173
+author_github: https://github.com/jennifer-c
+seo-title: Get alerts from your Open Liberty apps in Slack using Prometheus Alertmanager on Red Hat OpenShift Container Platform (RHOCP) - OpenLiberty.io
+seo-description: Set up Prometheus Alertmanager on Red Hat OpenShift Container Platform (RHOCP) to fire alerts to a specified Slack channel to notify you when, for example, your app's heap usage is too high. Configure Prometheus with alerting rules to receive certain alerts from Open Liberty, then configure Prometheus Alertmanager to pass those alerts to a Slack channel.
+blog_description: "Set up Prometheus Alertmanager on Red Hat OpenShift Container Platform (RHOCP) to fire alerts to a specified Slack channel to notify you when, for example, your app's heap usage is too high. Configure Prometheus with alerting rules to receive certain alerts from Open Liberty, then configure Prometheus Alertmanager to pass those alerts to a Slack channel."
+---
+= Get alerts from your Open Liberty apps in Slack using Prometheus Alertmanager in RHOCP 4.3
+Jennifer Cheng <https://github.com/jennifer-c>
+:url-prefix:
+
+Our link:https://openliberty.io/blog/2020/01/29/alerts-slack-prometheus-alertmanager-open-liberty.html[original blog post] was well received, so we're publishing a version that'll set you up on Red Hat OpenShift Container Platform too.
+
+Every application needs a strong monitoring system to catch unexpected issues, whether it's an overloaded heap or a slow-responding servlet. link:https://openliberty.io/guides/microprofile-metrics.html[MicroProfile Metrics] provides the ability to expose metrics for your application. When used along with the link:https://prometheus.io/[Prometheus] open source monitoring system and the link:https://prometheus.io/docs/alerting/overview/[Prometheus Alertmanager], we can build a strong foundation for monitoring your system and reacting quickly to issues.
+
+In this post, we'll set up Prometheus Alertmanager on Red Hat OpenShift Container Platform (RHOCP) 4.3 using the Prometheus Operator. The Alertmanager will fire alerts to a specified Slack channel to notify you when, for example, your app's heap usage is too high. We'll configure Prometheus with alerting rules to receive certain alerts from Open Liberty. Then, we'll configure Prometheus Alertmanager to pass those alerts to a Slack channel.
+
+Already familiar with Alertmanager? Check out link:https://github.com/jennifer-c/openliberty-alertmanager[some sample rules for Open Liberty]. The repository also contains the configuration files used as an example in this blog post, in case you get stuck along the way.
+
+== What you'll need
+
+You will need an RHOCP 4.3 cluster. You can try these steps on other versions, but this blog was written on and tested with 4.3.
+
+Before we start, make sure your app is configured with an Open Liberty server with the `mpMetrics-2.0` feature enabled. Ensure that it is deployed on an RHOCP cluster and the `/metrics` endpoint is available. The link:https://github.com/OpenLiberty/open-liberty-operator/blob/master/doc/observability-deployment-rhocp4.2-4.3.md[Open Liberty Operator observability doc] has more information on how to configure your server for monitoring.
+
+You also need a Slack channel to send alerts to, as well as a link:https://api.slack.com/messaging/webhooks[Slack webhook] for that channel.
+
+== Configure Prometheus to monitor metrics from Open Liberty on RHOCP 4.3
+
+Follow the link:https://kabanero.io/guides/app-monitoring-ocp4.2/#deploy-prometheus-prometheus-operator[Kabanero guide] to set up Prometheus using the Prometheus Operator.
+
+You only need to follow the guide to Step 11. However, it is helpful to deploy Grafana so you have a visualization of your metrics.
+
+=== Creating Prometheus alerting rules
+
+Create a new `PrometheusRule` instance in the Prometheus Operator. This instance creates alerting rules in Prometheus to define which metrics will be received by the Alertmanager.
+
+. Go to the OpenShift Container Platform web console and click **Operators > Installed Operators > Prometheus Operator > Prometheus Rule**.
+. Create a **PrometheusRule** instance. Under `spec.groups`, add a new rule group called `libertyexample` to the YAML:
++
+```
+spec:
+  groups:
+    - name: ./example.rules
+      rules:
+        - alert: ExampleAlert
+          expr: vector(1)
+    - name: libertyexample
+      rules:
+      - alert: heapUsageTooHigh
+        expr: base_memory_usedHeap_bytes / base_memory_maxHeap_bytes > 0.9
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Heap usage is too high"
+          description: "{{ $labels.instance }} heap usage is too high"
+```
++
+This rule will send an alert called `heapUsageTooHigh` when the PromQL query `base_memory_usedHeap_bytes / base_memory_maxHeap_bytes` is greater than `0.9` (90%) for one minute. For testing purposes, feel free to change the threshold to something smaller, like `0.05`.
++
+If you're new to PromQL, check out link:https://prometheus.io/docs/prometheus/latest/querying/basics/[Querying Prometheus].
++
+You might've noticed that there's a rule group with the name `./example.rules` created by default. This is a rule that always fires an alert, so you can keep this for now to test your configuration.
++
+. Change the labels in your `PrometheusRule` to match the `ruleSelector` in your Prometheus YAML. For example, if you used the `prometheus.yaml` in the Kabanero guide, your Prometheus YAML would contain:
++
+```
+ruleSelector:
+    matchLabels:
+      prometheus: k8s
+      role: prometheus-rulefiles
+```
++
+So your `PrometheusRule` labels must match:
++
+```
+labels:
+    prometheus: k8s
+    role: prometheus-rulefiles
+```
++
+. Navigate to your Prometheus route and click **Status > Rules** to verify that the rules were loaded in properly.
++
+image::/img/blog/prometheusAM_rhocp_promUI_rules.png[Prometheus Rules on UI, align="left"]
++
+. To check that your alerts are firing, click **Alerts**. As we didn't remove the `./example.rules` rule group, you should already see at least one alert firing. To ensure that your custom rules are also working, generate some data or drastically lower the threshold of the PromQL query.
++
+image::/img/blog/prometheusAM_rhocp_promUI_alerts.png[Prometheus Alerts on UI, align="left"]
+
+== Create and configure Prometheus Alertmanager to pass alerts to Slack
+
+In this section, you'll create and configure the Prometheus Alertmanager to send customized messages to your Slack channel based on the alerting rules we set up earlier.
+
+=== Creating and configuring the Prometheus Alertmanager to communicate with Slack
+
+Now that Prometheus is set up with rules for our Open Liberty server, we can create an `Alertmanager` instance that has the ability to connect to Slack.
+
+. Create a file named `alertmanager.yaml`, and remember the directory, as we will be creating a secret using this file. This file is configured using the same steps from the original blog post. We'll start with a simple configuration. Your file will look like this:
++
+```
+global:
+  resolve_timeout: 5m
+  slack_api_url: <your slack webhook api url>
+
+# The root route. This route is used as the default
+# if there are no matches in the child routes.
+route:
+  group_by: [ alertname ]
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 5m
+  receiver: 'default_receiver'
+
+receivers:
+- name: 'default_receiver'
+  slack_configs:
+  - channel: 'prometheus-alertmanager-test'
+    title: "{{ range .Alerts }}{{ .Annotations.summary }}\n{{ end }}"
+    text: "*Description*: {{ .CommonAnnotations.description }}\n*Severity*: {{ .CommonLabels.severity }}"
+```
++
+In this example, we have one route that sends the alert to `default_receiver`. The receiver sends the alert to a Slack channel called `prometheus-alertmanager-test`.
+The `CommonAnnotations` come from the `annotations` you specified in your Prometheus rule. The text is written using the link:https://golang.org/pkg/text/template/[Go templating] system.
++
+. On the RHOCP web console, click **Operators > Installed Operators > Prometheus Operator > Alertmanager** and create an `Alertmanager` instance. You do not need to change the default YAML.
+. Create a secret with your `alertmanager.yaml` file. The name of the secret should be the name of your Alertmanager prefixed by `alertmanager`:
++
+```
+❯ oc create secret generic alertmanager-alertmanager-main --from-file=alertmanager.yaml
+secret/alertmanager-alertmanager-main created
+```
++
+In this example, the name of our secret is `alertmanager-alertmanager-main` because we add the `alertmanager` prefix to our Alertmanager's name, which is `alertmanager-main`.
++
+. Check that the service has started successfully.
++
+```
+❯ oc get svc -n prometheus-operator
+NAME                    TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)                      AGE
+alertmanager-operated   ClusterIP   None         <none>        9093/TCP,9094/TCP,9094/UDP   18m
+prometheus-operated     ClusterIP   None         <none>        9090/TCP                     64m
+```
++
+. Once your pods are up and running, expose the route:
++
+```
+❯ oc expose svc/alertmanager-operated -n prometheus-operator
+route.route.openshift.io/alertmanager-operated exposed
+❯ oc get route -n prometheus-operator
+NAME                    HOST/PORT                                                                  PATH   SERVICES                PORT   TERMINATION   WILDCARD
+alertmanager-operated   alertmanager-operated-prometheus-operator.apps.jenniferc.os.fyre.ibm.com          alertmanager-operated   web                  None
+prometheus-operated     prometheus-operated-prometheus-operator.apps.jenniferc.os.fyre.ibm.com            prometheus-operated     web                  None
+```
+
+You can now access the Alertmanager UI. Since we haven't yet configured Prometheus to send the Alertmanager any alerts, you won't see any alert groups at the moment. We'll do that next.
+
+=== Receiving alerts via Prometheus Alertmanager
+Now that the Alertmanager is set up, we need to configure Prometheus to talk to it.
+
+. First, we'll need to expose the Alertmanager port. On the RHOCP web console, click **Networking > Services > Create Service**. Create a ClusterIP service:
++
+```
+apiVersion: v1
+kind: Service
+metadata:
+  name: alertmanager-example-service
+  namespace: prometheus-operator
+spec:
+  type: ClusterIP
+  ports:
+  - name: web
+    port: 9093
+    protocol: TCP
+    targetPort: web
+  selector:
+    alertmanager: alertmanager-main
+```
++
+The `selector.alertmanager` must match your Alertmanager's name if you changed it from the default value.
++
+
+. On the RHOCP web console, click **Operators > Installed Operators > Prometheus Operator > Prometheus**, then click on the name of your Prometheus instance.
+. In the YAML, add your new service to the `alertmanagers` that Prometheus can talk to.
++
+```
+spec:
+  alerting:
+    alertmanagers:
+      - name: alertmanager-example-service
+        namespace: alertmanager
+        port: web
+```
++
+. Go to your Prometheus route, then click **Alerts**. Ensure that at least one alert is firing.
+. Verify that the Alertmanager has received the alert by going to the Alertmanager route.
++
+image::/img/blog/prometheusAM_rhocp_alertmanager_alerts.png[Alert viewed on Alertmanager web UI, align="left"]
++
+. Check your Slack channel to see your message.
++
+image::/img/blog/prometheusAM_rhocp_slack_alert.png[Alert on Slack, align="left"]
+
+For more advanced configurations, check out the link:/blog/2020/01/29/alerts-slack-prometheus-alertmanager-open-liberty.html#tips[additional tips for when you’re creating larger alerting systems] in the original blog post. To load in new rules, you can edit your `PrometheusRule` instance's YAML from the web console, under **Operators > Installed Operators > Prometheus Operator > Prometheus Rule**. Similarly, to update your Alertmanager configuration, simply edit your `alertmanager.yaml` and re-create the secret.
