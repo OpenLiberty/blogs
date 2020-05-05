@@ -1,0 +1,211 @@
+---
+layout: post
+title: "MicroProfile 3.3 is now available on Open Liberty 20.0.0.4"
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/tomjenningss
+author_github: https://github.com/tomjenningss
+seo-title: SEO-TITLE:-on Open Liberty 20.0.0.5
+seo-description: Open Liberty 20.0.0.5 provides  ........
+blog_description: Open Liberty 20.0.0.5 provides ........
+---
+= LATEST FEATURE TITLE is now available on Open Liberty 20.0.0.5
+Tom Jennings <https://github.com/tomjenningss>
+:imagesdir: /
+:url-prefix:
+:url-about: /about/
+
+// tag::intro[]
+Open Liberty 20.0.0.5 provides . 
+
+In link:{url-about}[Open Liberty] 20.0.0.5:
+
+* <<CLM, JAAS Custom Login Modules>>
+* <<OLL, Open Liberty Logging>>
+* <<EPT, EJB Persistent Timers>>
+
+View the list of fixed bugs in https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A20004+label%3A%22release+bug%22+[20.0.0.4].
+// end::intro[]
+
+If you're interested in what's coming soon in Open Liberty, take a look at our <<previews,current development builds>> which includes GraphQL with Open Liberty and persistent EJB Timers coordination and failover across servers.
+
+// tag::run[]
+[#run]
+
+== Run your apps using 20.0.0.5
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], here are the coordinates:
+
+[source,xml]
+----
+<dependency>
+    <groupId>io.openliberty</groupId>
+    <artifactId>openliberty-runtime</artifactId>
+    <version>20.0.0.5</version>
+    <type>zip</type>
+</dependency>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+dependencies {
+    libertyRuntime group: 'io.openliberty', name: 'openliberty-runtime', version: '[20.0.0.5,)'
+}
+----
+
+Or if you're using Docker:
+
+[source]
+----
+FROM open-liberty
+----
+//end::run[]
+
+Or take a look at our link:{url-prefix}/downloads/[Downloads page].
+
+[link=https://stackoverflow.com/tags/open-liberty]
+image::img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="center"]
+
+//tag::features[]
+
+[#CLM]
+== JAAS Custom Login Modules
+
+JAAS Custom Login Modules enables you to use this feature embedded within a resource adapter or application.
+
+The updated JAAS Custom Login Modules now means it is now possible for JAAS Custom Login Modules to remain packaged within a resource adapter. It does not have to repackage JAAS Custom Login Modules into a separate library for Liberty to configure them. Even if you are not using a resource adapter at all, it is now possible to package JAAS Custom Login Modules within your application.
+
+Enable the AppSecurity and JCA features and configure a resource adapter. Use the `classProviderRef` attribute on the `jaasLoginModule` element to reference the `id` of the resource adapter.
+
+
+[source, xml]
+----
+<server>
+  <featureManager>
+    <feature>appSecurity-2.0</feature>
+    <feature>jca-1.7</feature>
+    ... other features
+  </featureManager>
+
+  <resourceAdapter id="eciResourceAdapter" location="${shared.resource.dir}/cicseci.rar"/>
+
+  <!-- classProviderRef indicates that the login module class is found in the resource adapter -->
+  <jaasLoginModule id="identityProp" controlFlag="REQUIRED"
+      className="com.ibm.ctg.security.idprop.LoginModule"
+      classProviderRef="eciResourceAdapter">
+    <options propIdentity="Caller"/>
+  </jaasLoginModule>
+
+  <jaasLoginContextEntry id="CTGEntry" loginModuleRef="identityProp" name="CTGEntry"/>
+
+  <connectionFactory id="cf1" jndiName="eis/cf1" jaasLoginContextEntryRef="CTGEntry">
+    <properties.eciResourceAdapter ConnectionUrl="tcp://localhost" portNumber="2006" serverName="MYSERVER"/>
+  </connectionFactory>
+
+  ...
+</server>
+----
+
+The same approach can be used for JAAS Custom Login Modules that are packaged within an application. Set the `classProviderRef` to point to the `id` of the `application`, `webApplication`, or `enterpriseApplication` element that contains the login module class. When packaging JAAS Custom Login Modules within an application, in the login module within one of the following places:
+
+** Within a top level JAR of the enterprise application.
+** Within a resource adapter module of the enterprise application.
+** Within the web module of the enterprise application.
+** Within an EJB module of the enterprise application.
+** Within a web application.
+
+It should be noted that JAAS Custom Login Modules require the use of a resource reference with container managed authentication.
+
+You can find out more about [Configuring a JAAS custom login module for Liberty](https://www.ibm.com/support/knowledgecenter/SSEQTP_liberty/com.ibm.websphere.wlp.doc/ae/twlp_sec_jaas.html)
+
+[#OLL]
+=== Open Liberty logging 
+
+In Liberty, users have the option to format their server logs that appear in the console.log file in different formats, such as JSON and dev (default) formats, in their server logging configuration, using the consoleFormat logging attribute. The dev format will show messages in a basic format, where there are no timestamp or any other relevant information. It will only show the message with its log level and the message itself.
+
+For example:
+[source, xml]
+----
+consoleFormat=dev (default)
+[AUDIT ] CWWKE0001I: The server server1 has been launched.
+----
+
+This feature introduces a new option called `simple` for the consoleFormat logging server configuration attribute. This new option will configure Liberty to output logs in the same simple (default) format as the message.log file, with date/time stamps and other relevant information, to the `console.log` file or to the console (Standard-out).
+
+For example:
+
+[source, xml]
+----
+consoleFormat=simple
+[25/11/19 10:02:30:080 EST] 00000001 com.ibm.ws.kernel.launch.internal.FrameworkManager A CWWKE0001I: The server server1 has been launched.
+----
+
+You can enable failover for EJB persistent timers that are configured to persist timers to the same database. This feature adds a new configurable attribute, `missedTaskThreshold`, which specifies the maximum amount of time that you want to allow for an execution of a persistent timer to complete before allowing another server to take over and run it instead. Previously, it was only possible to partly coordinate automatic EJB persistent timers across multiple Liberty servers by configuring the EJB timer service to persist timers to the same database. This caused a single timer instance to be created on one of the servers, but without the ability to failover to another server if the original server stops or crashes.
+
+Enable the EJB persistent timers feature, or another feature implicitly enables it, such as `ejb-3.2` and configure it to use a data source. In this example, we let it use the Java/Jakarta EE default data source. This much is required regardless of whether failover is desired. To use failover, ensure that configuration for all servers is pointing at the same database and uses the same database schema. Then include a value for the `missedTaskThreshold` attribute.
+
+bootstrap.properties
+`com.ibm.ws.logging.console.format=simple`
+
+server.xml
+`<logging consoleFormat="simple"/>`
+
+server.env
+`WLP_LOGGING_CONSOLE_FORMAT=simple`
+
+[#EPT]
+=== Persistent EJB Timers coordination and failover across members
+
+You can enable fail over for EJB persistent timers that are configured to persist timers to the same database. This feature adds a new configurable attribute, `missedTaskThreshold`, which specifies the maximum amount of time that you want to allow for an execution of a persistent timer to complete before allowing another server to take over and run it instead. Previously, it was only possible to partly coordinate automatic EJB persistent timers across multiple Liberty servers by configuring the EJB timer service to persist timers to the same database. This caused a single timer instance to be created on one of the servers, but without the ability to fail over to another server if the original server stops or crashes.
+
+Enable the EJB persistent timers feature, or another feature implicitly enables it, such as `ejb-3.2` and configure it to use a data source. In this example, we let it use the Java/Jakarta EE default data source. This much is required regardless of whether fail over is desired. To use fail over, ensure that configuration for all servers is pointing at the same database and uses the same database schema. Then include a value for the `missedTaskThreshold` attribute.
+
+Add the feature to the `server.xml`
+
+[source, xml]
+----
+<server>
+  <featureManager>
+    <feature>ejbPersistentTimer-3.2</feature>
+    <feature>jdbc-4.2</feature>
+    ... other features
+  </featureManager>
+
+  <dataSource id="DefaultDataSource">
+    <jdbcDriver libraryRef="OraLib"/>
+    <properties.oracle URL="jdbc:oracle:thin:@//localhost:1521/EXAMPLEDB"/>
+    <containerAuthData user="dbuser" password="dbpwd"/>
+  </dataSource>
+  <library id="OraLib">
+    <file name="${shared.resource.dir}/jdbc/ojdbc8.jar" />
+  </library>
+
+  <!-- The following enables fail over for persistent timers -->
+  <persistentExecutor id="defaultEJBPersistentTimerExecutor" missedTaskThreshold="5m"/>
+
+  ...
+</server>
+----
+
+
+
+[#previews]
+== Previews of early implementations available in development builds
+
+You can now also try out early implementations of some new capabilities in the link:{url-prefix}/downloads/#development_builds[latest Open Liberty development builds]:
+
+* <<GraphQL, GraphQL with Open Liberty >>
+
+These early implementations are not available in 20.0.0.5 but you can try them out in our daily Docker image by running `docker pull openliberty/daily`. Let us know what you think!
+
+[#GraphQL]
+== You are now free to use GraphQL with Open Liberty!
+In our latest OpenLiberty development builds, users can now develop and deploy GraphQL applications.  GraphQL is a complement/alternative to REST that allows clients to fetch or modify remote data, but with fewer round-trips.  Liberty now supports the (still under development) MicroProfile GraphQL APIs (link:https://github.com/eclipse/microprofile-graphql[learn more]) that allow developers to create GraphQL apps using simple annotations - similar to how JAX-RS uses annotations to create a RESTful app.
+
+Developing and deploying a GraphQL app is cinch - take a look at this link:https://github.com/OpenLiberty/sample-mp-graphql[sample] to get started with these powerful APIs!
+
+
+== Get Liberty 20.0.0.4 now
+
+Available through <<run,Maven, Gradle, Docker, and as a downloadable archive>>.
