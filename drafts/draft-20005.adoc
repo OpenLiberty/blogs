@@ -1,14 +1,14 @@
 ---
 layout: post
-title: "Updates to JAAS Custom Login is now available on Open Liberty 20.0.0.5"
+title: "Updates to JAAS Custom Login Modules are now available on Open Liberty 20.0.0.5"
 categories: blog
 author_picture: https://avatars3.githubusercontent.com/tomjenningss
 author_github: https://github.com/tomjenningss
-seo-title: Open Liberty 20.0.0.5 provides enhanced, updated features to JAAS Custom Login Modules which now means you can package JAAS Custom Login Modules within your application or it can remain packaged within a resource adapter on Open Liberty 20.0.0.5
-seo-description: Open Liberty 20.0.0.5 provides enhanced, updated features to JAAS Custom Login Modules which now means you can package JAAS Custom Login Modules within your application.
-blog_description: Open Liberty 20.0.0.5 provides enhanced, updated features to JAAS Custom Login Modules which now means you can package JAAS Custom Login Modules within your application.
+seo-title: Open Liberty 20.0.0.5 provides enhanced, updated features to JAAS Custom Login Modules which means you can now use JAAS Custom Login Modules that are packaged within resource adapters on Open Liberty 20.0.0.5
+seo-description: Open Liberty 20.0.0.5 provides enhanced, updated features to JAAS Custom Login Modules which means you can now use JAAS Custom Login Modules that are packaged within resource adapters
+blog_description: Open Liberty 20.0.0.5 provides enhanced, updated features to JAAS Custom Login Modules which means you can now use JAAS Custom Login Modules that are packaged within resource adapters.
 ---
-= Updates to JAAS Custom Login is now available on Open Liberty 20.0.0.5
+= Updates to JAAS Custom Login Modules are now available on Open Liberty 20.0.0.5
 Tom Jennings <https://github.com/tomjenningss>
 :imagesdir: /
 :url-prefix:
@@ -21,6 +21,7 @@ In link:{url-about}[Open Liberty] 20.0.0.5:
 
 * <<CLM, JAAS Custom Login Modules>>
 * <<OLL, Open Liberty Logging>>
+* <<JLO, Omit specified fields from JSON logging output>>
 * <<EPT, EJB Persistent Timers>>
 
 View the list of fixed bugs in https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A20004+label%3A%22release+bug%22+[20.0.0.5].
@@ -105,7 +106,7 @@ Enable the AppSecurity and JCA features and configure a resource adapter. Use th
 </server>
 ----
 
-The same approach can be used for JAAS Custom Login Modules that are packaged within an application. Set the `classProviderRef` to point to the `id` of the `application`, `webApplication`, or `enterpriseApplication` element that contains the login module class. When packaging JAAS Custom Login Modules within an application, in the login module within one of the following places:
+The same approach can be used for JAAS Custom Login Modules that are packaged within an application. Set the `classProviderRef` to point to the `id` of the `application`, `webApplication`, or `enterpriseApplication` element that contains the login module class. When packaging JAAS Custom Login Modules within an application, include the login module within one of the following places:
 
 ** Within a top level JAR of the enterprise application.
 ** Within a resource adapter module of the enterprise application.
@@ -150,12 +151,28 @@ To configure the Liberty logs to output logs in the new simple console format, y
 ==== server.env
 `WLP_LOGGING_CONSOLE_FORMAT=simple`
 
+
+[#JLO]
+=== Omit specified fields from JSON logging output
+
+In Liberty, users have the option to format their server logs in basic or JSON format. When logs are in JSON format, users have to specify the sources (message, trace, accessLog, ffdc, audit) they want to send to messages.log or console.log/standard-out.
+
+Previously, Liberty has always had the default fields in the JSON output. Users can now specify the JSON fields they want to omit. This feature adds an option for users to omit JSON fields in the JSON logging process. The option to omit JSON field names in Liberty is extremely useful, as users may not want certain default fields provided by Liberty in their JSON output. Undesired fields add to the size of the records which wastes network I/O during record transmissions and waste space in downstream log aggregation tools. Now users have the option to only emit the fields they need so they can send to downstream log aggregation tools without using more space and I/O than necessary.
+For someone running liberty in docker containers, with a single server in each container, they may not want to include the JSON fields that represent the server name and user directory, for example.
+
+When logs are in JSON format, you can use the existing `jsonFieldMappings` attribute to omit fields. The attribute initially was only used for renaming field names. For renaming JSON field name, the format is specified as `source:defaultFieldName:newFieldName` or `defaultFieldName:newFieldName`. To omit `defaultFieldName`, leave `newFieldName` empty. For example, to omit a field for all sources, use the following format: `defaultFieldName:` . To omit a field for a specific source, use the following format: `source:defaultFieldName:` where source is the source you want to specify (such as message, trace, accessLog, ffdc, audit).
+
+An example of omitting JSON fields by adding the following to bootstrap.properties:
+`com.ibm.ws.logging.json.field.mappings=trace:ibm_userDir: ,ibm_datetime:`.
+
+You can find more information by viewing link:https://www.ibm.com/support/knowledgecenter/en/SSEQTP_liberty/com.ibm.websphere.wlp.doc/ae/rwlp_logging.html[Logging and Trace] on IBM Knowledge Center or on the link:https://www.ibm.com/support/knowledgecenter/en/SSEQTP_liberty/com.ibm.websphere.wlp.doc/ae/rwlp_logging.html[Open Liberty Logging docs]
+
 [#EPT]
 === Persistent EJB Timers coordination and failover across members
 
-Prior to this feature, it was possible to partly coordinate automatic EJB persistent timers across multiple Open Liberty servers by configuring the EJB timer service to persist timers to the same database. This caused a single timer instance to be created on one of the servers but without the ability to fail over to another server if the original server stops or crashes. To enable fail over, this feature adds a new configurable attribute, `missedTaskThreshold`, which specifies the maximum amount of time that you want to allow for an execution of a persistent timer to complete before allowing another server to take over and run it instead.
+Prior to this feature, it was possible to partly coordinate automatic EJB persistent timers across multiple Open Liberty servers by configuring the EJB timer service to persist timers to the same database. This caused a single timer instance to be created on one of the servers but without the ability to to another server if the original server stops or crashes. To enable failover, this feature adds a new configurable attribute, `missedTaskThreshold`, which specifies the maximum amount of time that you want to allow for an execution of a persistent timer to complete before allowing another server to take over and run it instead.
 
-Enable the EJB persistent timers feature, or another feature that implicitly enables it, such as `ejb-3.2` and configure it to use a data source. In this example, we let it use the Java EE or Jakarta EE default data source. This much is required regardless of whether fail over is desired. To use fail over, ensure that configuration for all servers is pointing at the same database and uses the same database schema. Then include a value for the `missedTaskThreshold` attribute.
+Enable the EJB persistent timers feature, or another feature that implicitly enables it, such as `ejb-3.2` and configure it to use a data source. In this example, we let it use the Java EE or Jakarta EE default data source. This much is required regardless of whether failover is desired. To use failover,ensure that configuration for all servers is pointing at the same database and uses the same database schema. Then include a value for the `missedTaskThreshold` attribute.
 
 Add the feature to the `server.xml`
 
@@ -177,13 +194,12 @@ Add the feature to the `server.xml`
     <file name="${shared.resource.dir}/jdbc/ojdbc8.jar" />
   </library>
 
-  <!-- The following enables fail over for persistent timers -->
+  <!-- The following enables failover for persistent timers -->
   <persistentExecutor id="defaultEJBPersistentTimerExecutor" missedTaskThreshold="5m"/>
 
   ...
 </server>
 ----
-
 
 
 [#previews]
