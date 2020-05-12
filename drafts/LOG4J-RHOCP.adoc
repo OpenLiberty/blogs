@@ -13,10 +13,9 @@ blog_description: "Add custom fields to your application's JSON logs to assist d
 Yushan Lin <https://github.com/Yushan-Lin>
 
 When developing applications, you can choose from many logging utility options, based on your needs. One of these logging utilities, Log4j 2, is commonly used for logging in applications.
-Log4j 2 has an API that you can use to output log statements to various output targets. In Open Liberty logging, only JUL (`java.util.logging`) logs are merged with Liberty logs and sent to `messages.log`/`console`. When running your application in a Docker container in OpenShift, Log4j 2 logs that are written to the file system aren't automatically picked up. In this blog, we'll show you how to get your Log4j 2 logs into RHOCP’s EFK stack so you can view and analyze them. We'll present two approaches to forward logs using a sidecar container and a third approach to forward Log4j 2 logs to JUL.
+Log4j 2 has an API that you can use to output log statements to various output targets. In Open Liberty logging, only JUL (`java.util.logging`) logs are merged with Liberty logs and sent to `messages.log/console`. When running your application in a Docker container in OpenShift, Log4j 2 logs that are written to the file system aren't automatically picked up. In this blog, we'll show you how to get your Log4j 2 logs into RHOCP’s EFK stack so you can view and analyze them. We'll present two approaches to forward logs using a sidecar container and a third approach to forward Log4j 2 logs to JUL.
 
 When deploying your application on Open Liberty, you must specify where you want to send your Log4j 2 logs. Log4j 2 logs aren't merged with Liberty server logs. You might want to visualize both your Log4j 2 application logs and Liberty logs on the same Kibana dashboard to better monitor your applications and servers.
-
 
 image::../img/blog/log4j-rhocp-diagrams/current-problem.png[]
 
@@ -25,34 +24,35 @@ image::../img/blog/log4j-rhocp-diagrams/current-problem.png[]
 In Kubernetes environments, the best practice is to send your logs to stdout. The platform will be set up to consume content from the pod's stdout and direct it to the logging facilities of the cluster.
 One of the options to send your Log4j 2 logs to RHOCP's EFK stack, is to use sidecar containers. Pods can have multiple containers that work together. While one container creates and writes to a log file, another "sidecar" container, in the same pod, can be configured to read those files from the first container [1].  In this case, the sidecar container can:
 
-1. Stream application logs to its own stdout.
+* Stream application logs to its own stdout.
 
-2. Run a logging agent, which is configured to pick up logs from an application container.
+* Run a logging agent, which is configured to pick up logs from an application container.
 
 For both options, you want to setup a shared volume for the directory of your application logs:
 
-a. For your deployed application, modify the deployment to define the shared volume:
+. For your deployed application, modify the deployment to define the shared volume:
++
+----
+volumes:
+  - name: outputlog
+    emptyDir: {}
+----
 
+. Mount the volume to your main application container:
++
+----
+volumeMounts:
+  - name: outputlog
+    mountPath: /output/logs
+----
 
-      volumes:
-        - name: outputlog
-          emptyDir: {}
-
-
-b. Mount the volume to your main application container:
-
-          volumeMounts:
-            - name: outputlog
-              mountPath: /output/logs
-
-
-**1. Stream application logs to its own stdout**
+=== Stream application logs to its own stdout
 
 image::../img/blog/log4j-rhocp-diagrams/solution-1.png[]
 By streaming the application logs to its own stdout, it separates the Liberty server logs from the application logs. In Kibana, the logs appears as if they came from the same pod, but from the sidecar container.
 
-1.
- Configure an Appender for Log4j 2 to send your logs to a File, or RollingFile:
+. Configure an Appender for Log4j 2 to send your logs to a File, or RollingFile:
++
 ```
 <Appenders>
     <File name="File" fileName="${log-path}/app.log" append="true">
@@ -68,7 +68,8 @@ By streaming the application logs to its own stdout, it separates the Liberty se
 </Appenders>
 ```
 
-Add the Appender as a reference to your Logger:
+. Add the Appender as a reference to your Logger:
++
 ```
 <Loggers>
      ...
@@ -79,11 +80,11 @@ Add the Appender as a reference to your Logger:
       ....
 </Loggers>
 ```
-2.
-Modify your application deployment to add a sidecar container that tails your application logs. You want to write the log to a persistent volume for storage:
 
-a. 
-Create another container and mount the volume of the directory where the log is located. This command will tail the logs to send them to stdout:
+. Modify your application deployment to add a sidecar container that tails your application logs. You want to write the log to a persistent volume for storage:
+
+.. Create another container and mount the volume of the directory where the log is located. This command will tail the logs to send them to stdout:
++
 ```
   - name: app-sidecar
           image: 'linyusha/java-microprofile:latest'
@@ -98,19 +99,16 @@ Create another container and mount the volume of the directory where the log is 
 ```
 
 
-3. 
-On your OpenShift Kibana, you should see the application logs under project.* index along with your other Liberty server logs:
-
+. On your OpenShift Kibana dashboard, you should see the application logs under the project.* index along with your other Liberty server logs:
++
 image::../img/blog/log4j-rhocp-diagrams/log4j-rhocp-output.png[]
 
-
-**2. Side container running as a logging agent**
+=== Side container running as a logging agent
 
 You can create a sidecar container with a separate logging agent configured specifically to forward your application's logs. This provides you the flexibility to use Fluentd to specify where you want to send your Log4j 2 logs to. In this case, we are directing our logs to stdout to send them to RHOCP EFK stack.
 
-1. 
-Create a Fluentd config map specifying the `source` (where you want Fluentd to scrape your logs) and `match` (where you want to send the logs to).
-
+. Create a Fluentd config map specifying the `source` (where you want Fluentd to scrape your logs) and `match` (where you want to send the logs to):
++
 ```
 apiVersion: v1
 kind: ConfigMap
@@ -133,11 +131,10 @@ data:
     </match>
 ```
 
-2. 
-Create a sidecar container running Fluentd. The pod mounts a volume where Fluentd can pick up its configuration data. To modify your deployment:
+. Create a sidecar container running Fluentd. The pod mounts a volume where Fluentd can pick up its configuration data. To modify your deployment:
 
-a. 
-Add the config map as a volume to your deployment.
+.. Add the config map as a volume to your deployment:
++
 ```
  volumes:
   - name: outputlog
@@ -146,8 +143,9 @@ Add the config map as a volume to your deployment.
     configMap:
       name: fluentd-config
 ```
-b. 
-Create the sidecar with Fluentd logging agent:
+
+.. Create the sidecar with Fluentd logging agent:
++
 ```
   - name: count-agent
     image: k8s.gcr.io/fluentd-gcp:1.30
@@ -169,6 +167,7 @@ Sample log in application:
         LOGGER.debug("hello liberty servlet debug message!");
         LOGGER.log(Level.WARN, "hello liberty servlet warning message!");
 ```
+
 Sample log output directed to stdout:
 ```
 {"timeMillis":1581629336498,"thread":"Default Executor-thread-20","level":"INFO","loggerName":"application.servlet.LibertyServlet","message":"hello liberty servlet info message!","endOfBatch":false,"loggerFqcn":"org.apache.logging.log4j.spi.AbstractLogger","threadId":65,"threadPriority":5}
@@ -206,8 +205,8 @@ To use this adapter, add the dependency to your `pom.xml`:
 		    <version>1.7.25</version>
 		</dependency>
 ```
-To enable JSON logging in Liberty, you can put the appropriate environment variables in `bootstrap.properties` under your server directory to enable JSON logging:
 
+To enable JSON logging in Liberty, add the appropriate environment variables in `bootstrap.properties` under your server directory to enable JSON logging:
 ```
 # generate console log in json and route the following sources
 com.ibm.ws.logging.console.source=message, trace, ffdc, audit, accessLog
@@ -234,9 +233,7 @@ As shown in this post, there are different ways to send your Log4j 2 and other n
 
 * https://community.ibm.com/community/user/imwuc/viewdocument/on-demand-using-liberty-with-elast[Using Liberty with Elastic Stack (aka ELK)]
 
-
-
-References:
+**References**
 
 [1] https://kubernetes.io/docs/concepts/workloads/pods/pod-overview/
 
