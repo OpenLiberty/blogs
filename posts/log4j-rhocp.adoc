@@ -23,9 +23,10 @@ In Open Liberty logging, JUL logs are merged with Liberty logs and sent to `mess
 Log4j 2 logs that are written to the file system aren't automatically picked up when you run your application in a Docker container in OpenShift.
 When you deploy your application on Open Liberty, you must specify where you want to send your Log4j 2 logs.
 
-image::/img/blog/log4j-rhocp-diagrams/current-problem.png[Logging problem diagram, alight="left"]
+[.img_border_light]
+image::/img/blog/log4j-rhocp-diagrams/current-problem.png[Logging problem diagram,width=50%]
 
-== Sidecar container approaches
+== Sending Log4j 2 logs to RHOCP's EFK stack using sidecar containers
 
 In Kubernetes environments, the best practice is to send your logs to stdout. The platform will be set up to consume content from the pod's stdout and direct it to the logging facilities of the cluster.
 One of the ways to send your Log4j 2 logs to RHOCP's EFK stack is by using sidecar containers. Pods can have multiple containers that work together. While one container creates and writes to a log file, another link:https://kubernetes.io/docs/concepts/workloads/pods/pod-overview/["sidecar" container], in the same pod, can be configured to read those files from the first container. In this case, the sidecar container can:
@@ -52,9 +53,10 @@ volumeMounts:
     mountPath: /output/logs
 ```
 
-== Stream application logs to the application's stdout
+=== Forward Log4j 2 logs to the application's stdout
 
-image::/img/blog/log4j-rhocp-diagrams/solution-1.png[Application stdout diagram, align="left"]
+[.img_border_light]
+image::/img/blog/log4j-rhocp-diagrams/solution-1.png[Application stdout diagram,width=50%]
 
 By streaming application logs to its own stdout, the Liberty server logs are separated from the application logs. In Kibana, the logs appear as if they came from the sidecar container of the same pod.
 
@@ -109,7 +111,8 @@ Create another container and mount the volume of the directory where the log is 
 
 . On your Kibana dashboard, you should see the application logs under the project.* index along with your other Liberty server logs:
 +
-image::/img/blog/log4j-rhocp-diagrams/log4j-rhocp-output.png[Kibana dashboard, align="left"]
+[.img_border_light]
+image::/img/blog/log4j-rhocp-diagrams/log4j-rhocp-output.png[Kibana dashboard,width=50%]
 
 The following log is an example output when you stream your Log4j 2 logs to stdout:
 
@@ -119,7 +122,7 @@ The following log is an example output when you stream your Log4j 2 logs to stdo
 {"timeMillis":1581629336646,"thread":"Default Executor-thread-20","level":"WARN","loggerName":"application.servlet.LibertyServlet","message":"hello liberty servlet warning message!","endOfBatch":false,"loggerFqcn":"org.apache.logging.log4j.spi.AbstractLogger","threadId":65,"threadPriority":5}
 ```
 
-== Run a sidecar container as a logging agent
+=== Forward Log4j 2 logs using a logging agent
 
 You can create a sidecar container with a separate logging agent that's configured specifically to forward your application's logs. This gives you the flexibility to use Fluentd to specify where you want to send your Log4j 2 logs. In this case, we are directing our logs to stdout to send them to RHOCP EFK stack.
 
@@ -183,9 +186,16 @@ The following log is an example output when you run a sidecar container as a log
         LOGGER.log(Level.WARN, "hello liberty servlet warning message!");
 ```
 
-== Forward logs using the Log4j 2 to SLF4J Adapter
+== Sending Log4j 2 logs to JUL
 
-image::/img/blog/log4j-rhocp-diagrams/solution-2.png[Log4j 2 to SLF4J Adapter diagram, alight="left"]
+In the examples that use sidecar containers, Log4j 2 logs are forwarded to RHOCP, but they aren't merged with Liberty logs.
+An alternative way to forward your Log4j 2 logs to RHOCP is by merging your Log4j 2 logs with Liberty logs.
+To merge these logs, you can use the Log4j 2 to SLF4J Adapter to send Log4j 2 logs to JUL.
+
+=== Forward Log4j 2 logs using the Log4j 2 to SLF4J Adapter
+
+[.img_border_light]
+image::/img/blog/log4j-rhocp-diagrams/solution-2.png[Log4j 2 to SLF4J Adapter diagram,width=50%]
 
 Another way to direct your Log4j 2 logs to RHOCP's EFK stack is using the link:https://logging.apache.org/log4j/2.x/log4j-to-slf4j/index.html[Log4j 2 to SLF4J Adapter]. SLF4J can be configured to use JUL as the underlying implementation. The Log4j 2 to SLF4J Adapter allows applications coded to the Log4j 2 API to be routed to SLF4J.
 
@@ -231,4 +241,4 @@ If you want to learn more about JSON logging with Open Liberty, check out this l
 
 == Summary
 
-As you've learned in this post, there are different ways to forward your Log4j 2 and other non-JUL logs to RHOCP's EFK stack. You can use a sidecar container to stream logs directly to stdout, or you can run the sidecar container as your logging agent. You can also implement the Log4j 2 to SLF4J Adapter to merge Log4j 2 logs with your Liberty logs and output them in JSON format. For more information about logging in Open Liberty, see the link:https://openliberty.io/docs/ref/general/#logging.html[Open Liberty logging documentation]. If you want to try out another step-by-step tutorial on logging in EFK, check out this link:https://kabanero.io/guides/app-logging-ocp-4-2/[Kabanero guide on Application Logging on RHOCP]. Or, if you want to learn about Open Liberty and the ELK (Elasticsearch, Logstash, Kibana) stack, check out link:https://developer.ibm.com/videos/send-open-liberty-logs-to-elastic-stack/[this video on Using Liberty with Elastic Stack (aka ELK)].
+As you've learned in this post, there are different ways to forward your Log4j 2 and other non-JUL logs to RHOCP's EFK stack. You can use a sidecar container to forward logs directly to stdout, or you can run the sidecar container as your logging agent. You can also implement the Log4j 2 to SLF4J Adapter to merge Log4j 2 logs with your Liberty logs and output them in JSON format. For more information about logging in Open Liberty, see the link:https://openliberty.io/docs/ref/general/#logging.html[Open Liberty logging documentation]. If you want to try out another step-by-step tutorial on logging in EFK, check out this link:https://kabanero.io/guides/app-logging-ocp-4-2/[Kabanero guide on Application Logging on RHOCP]. Or, if you want to learn about Open Liberty and the ELK (Elasticsearch, Logstash, Kibana) stack, check out link:https://developer.ibm.com/videos/send-open-liberty-logs-to-elastic-stack/[this video on Using Liberty with Elastic Stack (aka ELK)].
