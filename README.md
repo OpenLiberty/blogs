@@ -1,11 +1,33 @@
-# Contributing to the blog
+# Contributing to the blogs
 
-0. Create an issue in the repository for your blog post.
-1. Fork this repository and clone.
-2. Create a new blog post file in the `drafts` folder with the file name `post-title.adoc`.
-3. Write your blog post in there then create a pull request (linked to the issue you created in Step 0) with @lauracowen and anyone else as reviewer.
-4. After resolving any problems and making any edits, Laura will publish the post by moving it to the `publish` folder and renaming the file to `YYYY-MM-DD-post-title.adoc`.
+1. Create an issue for your blog post in this repository.
+2. Fork this repository and clone.
+3. Creating/Updating blog content:
+   * For a new blog post, create a new file in the [posts](./posts) directory with the post title as the file name and a `.adoc` extension, and write your post.
+      * Update the [blogs_tags.json](./blog_tags.json) by adding your blog post to the start of the `posts` array (1-2 entries per line) for each appropriate tag.
+   * For an existing blog post, simply make the change to the existing blog post file in the [posts](./posts) directory.
+      * If necessary, update the [blogs_tags.json](./blog_tags.json) by adding/removing the blog from the `posts` arrays (add to beginning, 1-2 entries per line) of the tags.
+   * Any images that you want to reference in your blog post must be placed in [img/blog](./img/blog/) directory.
+   * For more information regarding creating/editing blog post content (like multiple authors, third-party posts, etc), refer to documentation that follows this section.
+4. Once finished and verified locally (adoc editor, or ol.io blog docker image) create a pull request into the `draft` branch (linked to the issue you created in Step 1) with @lauracowen (or another admin in her absence) and anyone else as reviewer.
+5. Request a build of the draft site:
+    1. Go to [Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io)
+    2. More Options > Trigger Build > Make sure the `master` branch is selected (default) > Trigger custom build
+6. Once the build completes, check to make sure the blog renders correctly on the [draft site](https://draft-openlibertyio.mybluemix.net/blog/) and resolve any problems (like formatting/styling).
+7. Create a PR into `staging` branch renaming the file to `YYYY-MM-DD-post-title.adoc`, provide a link to your post on the [draft site](https://draft-openlibertyio.mybluemix.net/blog/) and add @lauracowen, SMEs, and/or other reviewers to get their final approval for both content and format.  Once approved, @lauracowen or another 'admin' will merge the PR into `staging` and shepherd the post through the remaining steps.  Note that since there's likely other 'draft' blog posts that have been committed, this will be either a cherry pick of the necesary commits, or a PR from the personal branch that has been, if necessary, updated to match the post content on the `draft` branch.
+8. Request a build of the staging site (same as step 5)
+    1. Go to [Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io)
+    2. More Options > Trigger Build > Make sure the `master` branch is selected (default) > Trigger custom build
+9. Once the build completes, check to make sure the blog renders correctly on the [staging site](https://staging-openlibertyio.mybluemix.net/blog/).  This is the final check before the post goes into the production site.
+10. If there are issues found on the staging site, they must be resolved quickly, either by updating the PR with a fix, or reverting it.  If you updated the PR with a fix, make sure it also gets updated in the `draft` branch.
+11. Rebuild the production site on IBM Cloud and verify the post looks as expected on openliberty.io
 
+Summary of branch flow:  
+`prod` <-PR- `staging` <-PR- `draft` <-PR- `personal branch from fork`  
+In other words, `prod` should always be a commit subset of `staging` which should be a commit subset of `draft`  
+  
+  
+### Blog structure (AsciiDoc & front matter)
 Blogs are written in [AsciiDoc](https://asciidoctor.org/docs/asciidoc-writers-guide/) format with a file extension of `.adoc`.
 
 In the blog post file the following front matter variables must be set:
@@ -21,21 +43,6 @@ In the blog post file the following front matter variables must be set:
      - Please ensure that your `seo-title` ends with ` - OpenLiberty.io`
 - seo-description: `Blog Description used in search results and on social media`
      - Please keep your `seo-description` between 50-300 characters
-
-`drafts` folder contains blog posts that are still in draft and are not ready to be published
-
-`publish` folder contains blog posts that are ready to be published
-
-`img/blog` folder contains images used in the blog `adoc` files
-
-Once approved (ask `lauracowen`, or `NottyCode` as backup, to review/approve your PR), the blog post will be moved from `drafts` to `publish`.
-
-
-### Adding tags to your blog post
-
-To add tags to your post, please open a pull request with your edits to [blog_tags.json](https://github.com/OpenLiberty/blogs/blob/master/blog_tags.json). You simply need to add the title of your post (without the date and file extension) to the `posts` array under the tags you want to use. (For example, if the file name is 2019-08-15-blog-post.adoc, you would just add `"blog-post"`).
-
-You can request a review from `lauracowen` or `ellenwyllie` if you are unsure who to ask.
 
 
 ### Blog posts with multiple authors
