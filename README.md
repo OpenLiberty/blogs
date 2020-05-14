@@ -1,4 +1,4 @@
-# Contributing to the blogs
+# Contributing to the blogs 
 
 1. Create an issue for your blog post in this repository.
 2. Fork this repository and clone.
