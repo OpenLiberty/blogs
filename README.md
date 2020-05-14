@@ -14,7 +14,7 @@
     1. Go to [Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io)
     2. More Options > Trigger Build > Make sure the `master` branch is selected (default) > Trigger custom build
 6. Once the build completes, check to make sure the blog renders correctly on the [draft site](https://draft-openlibertyio.mybluemix.net/blog/) and resolve any problems (like formatting/styling).
-7. Create a PR into `staging` branch renaming the file to `YYYY-MM-DD-post-title.adoc`, provide a link to your post on the [draft site](https://draft-openlibertyio.mybluemix.net/blog/) and add @lauracowen, SMEs, and/or other reviewers to get their final approval for both content and format.  Once approved, @lauracowen or another 'admin' will merge the PR into `staging` and shepherd the post through the remaining steps.
+7. Create a PR into `staging` branch renaming the file to `YYYY-MM-DD-post-title.adoc`, provide a link to your post on the [draft site](https://draft-openlibertyio.mybluemix.net/blog/) and add @lauracowen, SMEs, and/or other reviewers to get their final approval for both content and format.  Once approved, @lauracowen or another 'admin' will merge the PR into `staging` and shepherd the post through the remaining steps.  Note that since there's likely other 'draft' blog posts that have been committed, this will be either a cherry pick of the necesary commits, or a PR from the personal branch that has been, if necessary, updated to match the post content on the `draft` branch.
 8. Request a build of the staging site (same as step 5)
     1. Go to [Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io)
     2. More Options > Trigger Build > Make sure the `master` branch is selected (default) > Trigger custom build
