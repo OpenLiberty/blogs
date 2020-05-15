@@ -1,30 +1,34 @@
 # Contributing to the blogs
 
 1. Create an issue for your blog post in this repository.
-2. Fork this repository and clone.
+2. Fork this repository and clone.  Note that you're working off of the default `prod` branch.
 3. Creating/Updating blog content:
-   * For a new blog post, create a new file in the [posts](./posts) directory with the post title as the file name and a `.adoc` extension, and write your post.
-      * Update the [blogs_tags.json](./blog_tags.json) by adding your blog post to the start of the `posts` array (1-2 entries per line) for each appropriate tag.
-   * For an existing blog post, simply make the change to the existing blog post file in the [posts](./posts) directory.
-      * If necessary, update the [blogs_tags.json](./blog_tags.json) by adding/removing the blog from the `posts` arrays (add to beginning, 1-2 entries per line) of the tags.
+   * For a new blog post, create a new file in the [posts](./posts) directory with the name in the format `YYYY-MM-DD-post-title.adoc` where the date represents the expected publication date (e.g. `2021-11-21-open-liberty-is-awesome.adoc`) and write your post.
+     * Update the [blogs_tags.json](./blog_tags.json) by adding your blog post to the start of the `posts` array (1-2 entries per line) for each appropriate tag.
+   * For an existing, published blog post, simply make the change to the existing blog post file in the [posts](./posts) directory.
+     * If necessary, update the [blogs_tags.json](./blog_tags.json) by adding/removing the blog from the `posts` arrays (add to beginning, 1-2 entries per line) of the tags.
+   * For an existing blog post that has not been published, you'll need to either cherry pick the commits from the `draft` branch, or work off of the branch/fork that was used to deliver those commits.
+     * If necessary, update the [blogs_tags.json](./blog_tags.json) by adding/removing the blog from the `posts` arrays (add to beginning, 1-2 entries per line) of the tags.
    * Any images that you want to reference in your blog post must be placed in [img/blog](./img/blog/) directory.
    * For more information regarding creating/editing blog post content (like multiple authors, third-party posts, etc), refer to documentation that follows this section.
-4. Once finished and verified locally (adoc editor, or ol.io blog docker image) create a pull request into the `draft` branch (linked to the issue you created in Step 1) with @lauracowen (or another admin in her absence) and anyone else as reviewer.
-5. Request a build of the draft site:
+4. Once finished and verified locally (adoc editor or blog docker image) create a pull request into the `draft` branch (linked to the issue you created in Step 1) with @lauracowen or anyone else as reviewer, and merge upon approval.
+5. Request a build of the [draft site](https://draft-openlibertyio.mybluemix.net/blog/):
     1. Go to [Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io)
     2. More Options > Trigger Build > Make sure the `master` branch is selected (default) > Trigger custom build
-6. Once the build completes, check to make sure the blog renders correctly on the [draft site](https://draft-openlibertyio.mybluemix.net/blog/) and resolve any problems (like formatting/styling).
-7. Create a PR into `staging` branch renaming the file to `YYYY-MM-DD-post-title.adoc`, provide a link to your post on the [draft site](https://draft-openlibertyio.mybluemix.net/blog/) and add @lauracowen, SMEs, and/or other reviewers to get their final approval for both content and format.  Once approved, @lauracowen or another 'admin' will merge the PR into `staging` and shepherd the post through the remaining steps.  Note that since there's likely other 'draft' blog posts that have been committed, this will be either a cherry pick of the necesary commits, or a PR from the personal branch that has been, if necessary, updated to match the post content on the `draft` branch.
-8. Request a build of the staging site (same as step 5)
+6. Once the build completes, check to make sure the blog renders correctly on the [draft site](https://draft-openlibertyio.mybluemix.net/blog/) and resolve any problems (like formatting/styling).  Resolve the issue first in the personal branch and create another PR into `draft` branch and repeat steps 4, 5, & 6 until all issues are resolved.
+6. Once everything is 
+7. Create a PR from your personal branch into `staging` branch renaming the file to match today's date  `YYYY-MM-DD-post-title.adoc`, provide a link to your post on the [draft site](https://draft-openlibertyio.mybluemix.net/blog/) and add @lauracowen, SMEs, and/or other reviewers to get their final approval for both content and format.  To make any changes, update the PR with new commit and repeat step 5 & 6 until all issues are resolved.  Once approved, @lauracowen (or another admin) will merge the PR into `staging` and shepherd the post through the remaining steps.
+8. Request a build of the [staging site](https://staging-openlibertyio.mybluemix.net/blog/) (same as step 5)
     1. Go to [Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io)
     2. More Options > Trigger Build > Make sure the `master` branch is selected (default) > Trigger custom build
-9. Once the build completes, check to make sure the blog renders correctly on the [staging site](https://staging-openlibertyio.mybluemix.net/blog/).  This is the final check before the post goes into the production site.
-10. If there are issues found on the staging site, they must be resolved quickly, either by updating the PR with a fix, or reverting it.  If you updated the PR with a fix, make sure it also gets updated in the `draft` branch.
-11. Rebuild the production site on IBM Cloud and verify the post looks as expected on openliberty.io
+9. Once the build completes, check to make sure the blog renders correctly on the [staging site](https://staging-openlibertyio.mybluemix.net/blog/).  This is the final check before the post goes into the [production site](https://openliberty.io/blog/).
+10. If there are issues found on the [staging site](https://staging-openlibertyio.mybluemix.net/blog/), they must be resolved quickly, either by merging a new PR with a fix, or reverting it.  If you pushed a new PR with the fix, make sure it also gets pushed to the `draft` branch.
+11. Create a PR from `staging` branch into `prod` branch an admin approver.  Once approved, merge into `prod`.
+12. Rebuild the [production site](https://openliberty.io/blog/) on IBM Cloud and verify the post looks as expected on openliberty.io
 
-Summary of branch flow:  
+Summary of commit flow through branches:  
 `prod` <-PR- `staging` <-PR- `draft` <-PR- `personal branch from fork`  
-In other words, `prod` should always be a commit subset of `staging` which should be a commit subset of `draft`  
+In other words, `prod` should always be a commit subset of `staging` which should be a commit subset of `draft`.  Note, however, that you're not actually, normally, doing a PR from `draft` to `staging` but instead from your `personal branch from fork` into `staging`, but only after it already has been in `draft`.
   
   
 ### Blog structure (AsciiDoc & front matter)
