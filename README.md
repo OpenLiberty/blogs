@@ -16,8 +16,8 @@
     1. Go to [Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io)
     2. More Options > Trigger Build > Make sure the `master` branch is selected (default) > Trigger custom build
 6. Once the build completes, check to make sure the blog renders correctly on the [draft site](https://draft-openlibertyio.mybluemix.net/blog/) and resolve any problems (like formatting/styling).  Resolve the issue first in the personal branch and create another PR into `draft` branch and repeat steps 4, 5, & 6 until all issues are resolved.
-6. Once everything is 
-7. Create a PR from your personal branch into `staging` branch renaming the file to match today's date  `YYYY-MM-DD-post-title.adoc`, provide a link to your post on the [draft site](https://draft-openlibertyio.mybluemix.net/blog/) and add @lauracowen, SMEs, and/or other reviewers to get their final approval for both content and format.  To make any changes, update the PR with new commit and repeat step 5 & 6 until all issues are resolved.  Once approved, @lauracowen (or another admin) will merge the PR into `staging` and shepherd the post through the remaining steps.
+6. Once everything is [BROZ]
+7. Create a PR from your `personal branch` into `staging` branch renaming the file to match today's date  `YYYY-MM-DD-post-title.adoc`, provide a link to your post on the [draft site](https://draft-openlibertyio.mybluemix.net/blog/) and add @lauracowen, SMEs, and/or other reviewers to get their final approval for both content and format.  To make any changes, update the PR with new commit and repeat step 5 & 6 until all issues are resolved.  Once approved, @lauracowen (or another admin) will merge the PR into `staging` and shepherd the post through the remaining steps.
 8. Request a build of the [staging site](https://staging-openlibertyio.mybluemix.net/blog/) (same as step 5)
     1. Go to [Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io)
     2. More Options > Trigger Build > Make sure the `master` branch is selected (default) > Trigger custom build
