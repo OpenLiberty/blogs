@@ -1,7 +1,7 @@
 # Contributing to the blogs
 
 1. Create an issue for your blog post in this repository.
-2. Clone the repo and create your feature branch off of the default `prod` branch.  Alternatively, you can fork this repo and create your personal branch in your fork, but this may make collaboration with others, including reviewers like @lauracowen, more problematic for some in certain situations.
+2. Clone the repo and create your feature branch off of the default `prod` branch.  Alternatively, you can fork this repo and create your personal branch in your fork, but this may make collaboration with others, including reviewers like @lauracowen, more problematic.
 3. Creating/Updating blog content:
    * For a new blog post, create a new file in the [posts](./posts) directory with the name in the format `YYYY-MM-DD-post-title.adoc` where the date represents the expected publication date (e.g. `2021-11-21-open-liberty-is-awesome.adoc`) and write your post.
      * Update the [blogs_tags.json](./blog_tags.json) by adding your blog post to the start of the `posts` array (1-2 entries per line) for each appropriate tag.
@@ -26,9 +26,6 @@
 12. Rebuild the [production site](https://openliberty.io/blog/) on IBM Cloud and verify the post looks as expected on openliberty.io.  If the post used a future date, it will not render on the production site until that day or later (and will need the site to be rebuild to publish).
 13. Now that the contents of the feature branch has been successfully delivered to & tested on `draft`, `staging`, and `prod`, delete the feature branch.
 
-Summary of commit flow through branches:  
-`prod` <-PR- `staging` <-PR- `draft` <-PR- `feature/personal branch from fork`  
-In other words, `prod` should always be a commit subset of `staging` which should be a commit subset of `draft`.  Note, however, that you're not actually, normally, doing a PR from `draft` to `staging` but instead from your `feature/personal branch from fork` into `staging`, but only after it already has been in `draft`.
   
   
 ### Blog structure (AsciiDoc & front matter)
