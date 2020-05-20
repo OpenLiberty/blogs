@@ -1,0 +1,139 @@
+---
+layout: post
+title: "How to Analyze Open Liberty Logs with Splunk"
+categories: blog
+author_picture: https://avatars0.githubusercontent.com/u/29461649
+author_github: https://github.com/pgunapal
+seo-title: How to Analyze Open Liberty Logs with Splunk - OpenLiberty.io
+seo-description: When asked to identify which log analysis tool they use with Open Liberty, Splunk is one of the most common responses from our users.  Log analysis is undoubtedly a key part of monitoring your applications.  Collecting log data from Docker containers running Open Liberty in one place and monitoring, searching, and visualizing those logs in real-time results in reduced time, to find and troubleshoot problems – let’s take a look at analyzing logs from an Open Liberty Docker container, using Splunk. 
+blog_description: When asked to identify which log analysis tool they use with Open Liberty, Splunk is one of the most common responses from our users.  Log analysis is undoubtedly a key part of monitoring your applications.  Collecting log data from Docker containers running Open Liberty in one place and monitoring, searching, and visualizing those logs in real-time results in reduced time, to find and troubleshoot problems – let’s take a look at analyzing logs from an Open Liberty Docker container, using Splunk. 
+---
+= How to Analyze Open Liberty Logs with Splunk
+Prashanth Gunapalasingam <https://github.com/pgunapal>
+
+When asked to identify which log analysis tool they use with Open Liberty, Splunk is one of the most common responses from our users.  Log analysis is undoubtedly a key part of monitoring your applications. Collecting log data from running servers in one place and monitoring, searching, and visualizing those logs in real-time results in reduced time to find and troubleshoot problems. There are many tools available to aggregate and analyze the log events of your application – let’s take a look at analyzing logs from an Open Liberty Docker container, using Splunk.
+
+== Docker container monitoring
+
+We can use the `docker logs <container_ID>` command to see the stdout/stderr logs generated from your application/server running inside your Docker container. However, this approach does not scale well when we have multiple applications/servers running in multiple different containers.  
+
+Docker has a logging mechanism called *logging drivers*, which helps facilitate log aggregation from running containers. Each Docker daemon has a default logging driver, which each container uses.  You can configure it to use a different logging driver, such as `json-file` (default), `syslog`, `fluentd`, `splunk`, etc. When you start a container, you can configure it to use a different logging driver, by using the `--log-driver` flag, in your command. In this blog, we will use the Splunk logging driver to help aggregate the logs from the running containers. For more information about the Splunk Docker logging driver, take a look link:https://docs.docker.com/config/containers/logging/splunk/[here].
+
+== Splunk
+
+Splunk captures, indexes, and correlates real-time data in a searchable repository, from which it can generate graphs, reports, alerts, dashboards, and visualizations. It provides you with an engine that helps in monitoring, searching, analyzing, and visualizing your log events. 
+
+The Splunk logging driver sends container logs to Splunk using the link:https://dev.splunk.com/enterprise/docs/dataapps/httpeventcollector/[HTTP Event Collector (HEC)], introduced in Splunk 6.3. HEC offers a quick way to send high volume events/data over HTTP/HTTPS directly to Splunk from a particular application or container, in an efficient and secure manner. It is a token-based JSON API, so the Splunk credentials do not need to be hard-coded. The Splunk logging driver uses the HEC to collect your Docker logs, without the need of a forwarder. 
+
+== Open Liberty logging
+
+Open Liberty is capable of emitting logging events to standard-out/console in link:https://openliberty.io/docs/ref/general/#logging.html[JSON format]. This format makes log parsing easy for monitoring stacks such as Splunk. In this case, log events from Open Liberty will be sent in JSON format to Splunk’s HTTP Event Collector.
+
+== Getting Started
+_Ensure Docker version 1.10 or higher is installed._
+
+=== Setting up the Splunk Enterprise Docker image
+For demonstration purposes, let’s use the Splunk Enterprise Docker image to run Splunk. As part of Splunk’s free license, the Splunk Enterprise Docker image allows 500 MB per day of data indexing. The official GitHub repository for the Splunk Enterprise can be found link:https://github.com/splunk/docker-splunk/[here], which contains Dockerfiles that can be used to build the Splunk Docker images.
+
+
+. Pull the latest Splunk Enterprise Docker image, from DockerHub. _Ensure, the Splunk version is 6.3 or later, to have the HTTP Event Collector support._
+[source]
+----
+   docker pull splunk/splunk
+----
+
+[start=2]
+. Run the Splunk image to start the Splunk server with the following command:
+[source]
+----
+   docker run -d -p 8000:8000 -p "8088:8088" -e "SPLUNK_START_ARGS=--accept-license" -e "SPLUNK_USER=admin" -e "SPLUNK_PASSWORD=passw0rd" --name splunk splunk/splunk:latest
+----
+
+Breakdown of the above command::
+
+* Expose port mapping for port 8000, for the Splunk Web Interface UI
+* Expose port mapping for port 8088, for Splunk’s HTTP Event Collector and its services
+* Accept the license agreement with `SPLUNK_START_ARGS=--accept-license` environment variable
+* Specify a custom username and password using the environment variables, `SPLUNK_USER` and `SPLUNK_PASSWORD`
+
+[start=3]
+. Access the Splunk Web Interface UI with the following URL, in a web browser. Log in to the Splunk server using the specified username and password from the command, in Step 2.
+http://localhost:8000
+
+=== Configuring the HTTP Event Collector
+
+. Create the Splunk HTTP Event Collector data input token. Go to *Settings -> Data Inputs -> HTTP Event Collector -> New Token* in the Splunk Web Interface. Enter the name of the HTTP Event Collector, leave the other fields, as-is, and click *Next*.
+
+image::/img/blog/blog_splunk_add_data_input.png[Splunk Data Input, align="center"]
+
+[start=2]
+. In the Input Settings, ensure the Source type field is set to “Automatic”, leave the other fields, as-is, and click *Review*.
+
+image::/img/blog/blog_splunk_input_settings.png[Splunk Input Settings, align="center"]
+
+[start=3]
+. The HTTP Event Collector token is now created successfully.  Take note of the generated Token Value for later use.
+
+image::/img/blog/blog_splunk_token_created.png[Splunk Token Generated, align="center"]
+
+[start=4]
+. Enable access to the HTTP Event Collector, if it is disabled, by going to *Settings -> Data Inputs -> HTTP Event Collector -> Global Settings*, and click *Enabled* for the All Tokens field and check the *Enable SSL* checkbox. This will ensure the port 8088 for HTTP Event Collector is secured and is using the Splunk default certificate.
+
+image::/img/blog/blog_splunk_global_settings.png[Splunk Global Settings, align="center"]
+
+=== Running the Open Liberty Docker Image
+
+We’ll use the Open Liberty Docker image from Docker Hub. The official Docker GitHub repository for Open Liberty can be found link:https://github.com/OpenLiberty/ci.docker/[here]. You can follow instructions on how to build an application image, with your application, using the Open Liberty Docker image from https://github.com/OpenLiberty/ci.docker#building-an-application-image
+
+. Run the Open Liberty Docker image to start the Open Liberty server, with the following command.  This configures Open Liberty to emit JSON formatted logs and uses the Splunk logging driver with the HTTP Event Collector:
+[source]
+----
+   docker run -d -p 80:9080 -p 443:9443 --log-driver=splunk --log-opt splunk-url=https://localhost:8088 --log-opt splunk-token=<REPLACE_WITH_SPLUNK_HEC_TOKEN> --log-opt splunk-insecureskipverify=true --log-opt splunk-format=json -e WLP_LOGGING_CONSOLE_FORMAT=JSON -e WLP_LOGGING_CONSOLE_LOGLEVEL=info -e WLP_LOGGING_CONSOLE_SOURCE=message,trace,accessLog,ffdc,audit open-liberty:latest
+----
+
+Breakdown of the above command::
+
+* *--log-driver=splunk* : Configures the Open Liberty container to use the Splunk log driver.
+* *--log-opt splunk-url* : The host of your Splunk Enterprise Docker container, with the port and scheme of the configured HTTP Event Collector.
+* *--log-opt splunk-token* : The Splunk HTTP Event Collector token. Ensure that *<REPLACE_WITH_SPLUNK_HEC_TOKEN>* value from the above command is replaced by the generated HEC token from Step 3 from the “Configuring the HTTP Event Collector” section.
+* *--log-opt splunk-insecureskipverify=true* : Ignores the server certificate validation, as the Splunk Enterprise container instance is using a default self-signed certificate.
+* *--log-opt splunk-format* : Specifies the message format that will get sent to Splunk’s HTTP Event Collector.
+* *WLP_LOGGING_CONSOLE_FORMAT* : An environment variable that specifies the format for the Open Liberty runtime console.
+* *WLP_LOGGING_CONSOLE_LOGLEVEL* : An environment variable which is a filter that controls the granularity of messages that go to the console.
+* *WLP_LOGGING_CONSOLE_SOURCE* : An environment variable which consists of a comma-separated list of sources that route to the console.
+
+=== Analyzing the Open Liberty container logs in Splunk
+
+In the Splunk Web Interface, navigate to *App -> Search & Reporting*.  Find the log entries aggregated from the running Open Liberty runtime container by searching with the following query, which searches for all the log entries that are from the HTTP Event Collector named `liberty` with the `line.` prefix removed from the interesting fields. The log events can be further filtered with the desired timeframe and the log information fields, as needed.
+[source, align="center"]
+----
+   source="http:liberty"  | rename line.* as *
+----
+
+image::/img/blog/blog_splunk_search.png[Splunk Search, align="center"]
+
+=== Visualizing the Open Liberty container logs in Splunk
+
+The aggregated log events from the Open Liberty Docker container can also be visualized in a collection of visualizations, which provides real-time information at a glance. I created a sample Open Liberty Splunk dashboard that can be downloaded from GitHub. This dashboard can be used with the logging data collected from JSON logging in Open Liberty. This sample dashboard visualizes message, trace, and FFDC information.
+
+. Download the sample Open Liberty Splunk dashboard from the following GitHub repository:
+https://github.com/WASdev/sample.dashboards/tree/master/Splunk%208
+
+. In Search & Reporting page, from the Splunk Web Interface, click on the *Dashboards* tab, and click *Create New Dashboard*.  In the new window that pops up, enter a title for your new dashboard and click *Create Dashboard* with the remaining fields left as-is.
+
+image::/img/blog/blog_splunk_new_dashboard.png[Splunk New Dashboard, align="center"]
+
+[start=3]
+. From the Dashboards Editor, click the *Source* tab, and replace the contents of the source editor with the contents of the sample Open Liberty Splunk Dashboard that was downloaded from Step 1, and click *Save*.
+
+image::/img/blog/blog_splunk_edit_dashboard.png[Splunk Edit Dashboard, align="center"]
+
+[start=4]
+. You can now view a collection of visualizations for each message, trace, and first failure data capture (FFDC) logging event from the Open Liberty container.  This provides real-time information about the running container. The Time Filter input can be modified to filter the log event data displayed on your dashboard, according to your desired timeframe.
+
+image::/img/blog/blog_splunk_dashboard_problems.png[Splunk Problems Dashboard, align="center"]
+
+== Conclusion
+
+We have now seen how to aggregate the logs from Docker containers running Open Liberty and how to analyze and visualize them using Splunk. Having the ability to aggregate and analyze your log events, and work with them in dashboards, will help you spot potential problems faster from your Open Liberty server and applications.
+
