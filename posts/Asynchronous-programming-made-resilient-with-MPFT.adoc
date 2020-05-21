@@ -48,21 +48,21 @@ public CompletionStage<String> serviceA() {
 }
 ----
 
-The example uses `CompletableFuture.completedFuture()` to make the result compatible with the `CompletionStage` return type (https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/CompletableFuture.html[CompletableFuture] is an implementation of the `CompletionStage` and `Future` Interfaces).
+Note: The example uses `CompletableFuture.completedFuture()` to make the result compatible with the `CompletionStage` return type (https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/CompletableFuture.html[CompletableFuture] is an implementation of the `CompletionStage` and `Future` Interfaces).
 
-What does this do when we call the method?
+What happens when the `serviceA()` method is called?
 
-Well, usually when you call a method, you call it, and then it returns a result. However, when we use the `@Asynchronous` annotation, Fault Tolerance gets in between. When you call the method, Fault Tolerance first schedules your method to run later on a different thread, then it returns you a `CompletionStage` or `Future`. This isn't the `CompletionStage` or `Future` that's returned from your method, because your method hasn't run yet, it's an object created entirely by Fault Tolerance. 
+Well, usually when a method is called it returns a result. However, when the `@Asynchronous` annotation is used, Fault Tolerance gets in between. When the method is called, Fault Tolerance first schedules the method to run later on a different thread, then it returns a `CompletionStage` or `Future`. This isn't the `CompletionStage` or `Future` that's returned from the method, because the method hasn't run yet, it's an object created entirely by Fault Tolerance. 
 
 image::/img/blog/FT-basic-asynchronous-execution.png[Fault Tolerance asynchronous execution flow]
 
-Sometime later, your method runs and returns a `CompletionStage` or `Future`. Now, Fault Tolerance will go and complete the `CompletionStage` or `Future` object which was returned to the caller earlier, with the value that was returned from your method. You might be wondering *_"What if the returned result is an exception? What can I do?"_*.  Read along.
+Sometime later, the method runs and returns a `CompletionStage` or `Future`. Now, Fault Tolerance will go and complete the `CompletionStage` or `Future` object which was returned to the caller earlier, with the value that was returned from the method. You might be wondering *_"What if the returned result is an exception? What can I do?"_*.  Read along.
 
 == `@Asynchronous` Use cases 
 So `@Asynchronous` sounds great, right? But how can you use it to make your asynchronous programs resilient? Let's go through 2 use cases:
 
 1. <<Applying-to-asynch-api, Applying Fault Tolerance to an API call which is already asynchronous>>
-2. <<Running-methods-in-parallel, Using the `@Asynchronous` annotation to do two things in parallel with resilience>>
+2. <<Running-methods-in-parallel, Using the `@Asynchronous` annotation to do multiple things in parallel with resilience>>
 
 [#Applying-to-asynch-api]
 === 1. Applying Fault Tolerance to an asynchronous API call
@@ -126,7 +126,7 @@ You can also use https://download.eclipse.org/microprofile/microprofile-fault-to
 
 [#Running-methods-in-parallel]
 === 2. Let’s go parallel!
-To run two methods in parallel, you can write methods which call two other services, annotate them both with the `@Asynchronous` annotation, then call them like this:
+To run multiple methods in parallel, we can write methods which call other services, annotate them with the `@Asynchronous` annotation, then call them like this:
 
 [source,java]
 ----
@@ -148,7 +148,7 @@ public CompletionStage<String> callServicesAsynchronously()  {
 
 First, `serviceA()` is called, and then `serviceB()`. However, because both services are annotated with `@Asynchronous`, they are executed simultaneously, on different threads, rather than sequentially. 
 
-Any other Fault Tolerance annotations can also be used. For example, a Retry can be added to `serviceA()` and a Timeout to `serviceB()`:
+Any other Fault Tolerance annotations can also be used. For example, we can add a Retry to `serviceA()` and a Timeout to `serviceB()`:
 
 [source,java]
 ----
@@ -193,7 +193,7 @@ This last section isn't critical for knowing how to use `@Asynchronous`, but it'
 We've covered running things in parallel and applying Fault Tolerance to asynchronous methods, now let's look at the way using the `@Asynchronous` annotations impacts other Fault Tolerance annotations.
 
 ==== Timeout
-When you use the `@Asynchronous` and `@Timeout` annotations together, the `CompletionStage` or `Future` returned to the caller can be completed as soon as the timeout expires, even if the method is still running. This is because the method is running on another thread, so even though that thread is still occupied, we can signal that the result is ready to another thread which might be waiting for it.
+When you use the `@Asynchronous` and `@Timeout` annotations together, the `CompletionStage` or `Future` returned to the caller can be completed as soon as the timeout expires, even if the method is still running. This is because the method is running on another thread, so even though that thread is still occupied, you can signal that the result is ready to another thread which might be waiting for it.
 
 The thread running the method is still interrupted, so it can stop what it's working on and save resources, but if you need to apply a timeout to a long running operation which doesn't respond to being interrupted, you can use the `@Asynchronous` annotation. 
 
