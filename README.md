@@ -10,7 +10,7 @@ These steps are to be completed by the author of the blog post.
 
     Do _all_ your editing in this branch.
 
-3. Create your blog post using asciidoc markup (use an editor such as [VSCode with the Asciidoc plugin](https://marketplace.visualstudio.com/items?itemName=joaompinto.asciidoctor-vscode)):
+3. Create your blog post using [Asciidoc](https://asciidoctor.org/docs/asciidoc-syntax-quick-reference/) markup (use an editor such as [VSCode with the Asciidoc plugin](https://marketplace.visualstudio.com/items?itemName=joaompinto.asciidoctor-vscode)):
 
     * **Blog post** (probably what you're doing)
     
@@ -140,17 +140,21 @@ If a published post on OpenLiberty.io/blog contains an error or needs updating i
 
 
 
-# Troubleshooting
+# Troubleshooting Asciidoc
 
 Certain characters (eg apostrophe ' ) in the main heading are displayed incorrectly. To fix, escape with a backslash (`\`).
 eg `= Minimise turnaround times with Open Liberty\'s dev mode`
+
+See also:
+* [Asciidoc quick syntax](https://asciidoctor.org/docs/asciidoc-syntax-quick-reference/)
+* [Asciidoc user manual (more detailed)](https://asciidoctor.org/docs/user-manual/)
 
 # Docker container for local preview
 
 Github.com does a pretty good job of rendering asciidoc so you can preview your file there, but to see exactly what it will
 look like you can run the website locally. 
 
-### Running the website on your local machine
+## Running the website on your local machine
 ```
 git clone https://github.com/OpenLiberty/blogs.git
 git clone https://github.com/OpenLiberty/openliberty.io.git
@@ -164,7 +168,7 @@ docker run --rm --name website -it -p 4000:4000 -v currentFolder/openliberty.io:
 # docker run --name website -it -p 4000:4000 -v /Users/bruce/projects/blog/website/openliberty.io:/home/jekyll kinueng/openliberty.io
 ```
 
-### Update the running container with your edits
+## Update the running container with your edits
 Before your new or updated blog entry will appear on the website, you will need to run the script below to update the container with your latest changes, then wait for the container to finish processing them.  Then you can see your changes at http://localhost:4000/blog/
 
 Note that blogs named with dates in the future, e.g. 2099-01-05, will not be shown, so don't do that. 
@@ -173,7 +177,7 @@ Note that blogs named with dates in the future, e.g. 2099-01-05, will not be sho
 ./blogs/scripts/refresh_docker_image.sh
 ```
 
-### How to know when your changes are rendered by the container
+## How to know when your changes are rendered by the container
 You will see `Jekyll` detect your new files and regenerate the blog files.  You will want to wait for the line "...done in XXXX seconds."
 
 ```
