@@ -14,15 +14,19 @@ These steps are to be completed by the author of the blog post.
 
     * **Blog post** (probably what you're doing)
     
-      Copy the [post_template.adoc](./templates/post_template.adoc) file to the [posts](./posts) directory and rename the file using the format `YYYY-MM-DD-post-title.adoc`, where the date represents the expected publication date (e.g. `2021-11-21-open-liberty-is-awesome.adoc`).
+      Copy the [post-single-author.adoc](./templates/post-single-author.adoc) file (or [post-multiple-authors.adoc](./templates/post-multiple-authors.adoc) for multiple authors) to the [posts](./posts) directory and rename the file using the format `YYYY-MM-DD-post-title.adoc`, where the date represents the expected publication date (e.g. `2021-11-21-open-liberty-is-awesome.adoc`).
 
       Place any images in [img/blog](./img/blog/). For multiple authors, third-party posts, etc, see the documentation at the end of this README.
   
-    * **Release blog post** (only for Open Liberty release announcements)
+    * **Release blog post** (Open Liberty release announcements only)
 
-      Copy the [release_template.adoc](./templates/release_template.adoc) file to the [posts](./posts) directory and rename the file using the format `YYYY-MM-DD-post-title.adoc`, where the date represents the expected publication date (e.g. `2021-11-21-open-liberty-is-awesome-210011.adoc`).
+      Copy the [release-post.adoc](./templates/release-post.adoc) file to the [posts](./posts) directory and rename the file using the format `YYYY-MM-DD-post-title.adoc`, where the date represents the expected publication date (e.g. `2021-11-21-open-liberty-is-awesome-210011.adoc`).
 
       Place any images in [img/blog](./img/blog/). For multiple authors, see the documentation at the end of this README.
+
+    * **Third-party blog post** (externally hosted posts only)
+
+      Copy the [third-party-blog-post.adoc](./templates/third-party-blog-post.adoc) file to the [posts](./posts) directory and rename the file using the format `YYYY-MM-DD-post-title.adoc`, where the date represents the expected publication date (e.g. `2021-11-21-open-liberty-is-awesome-210011.adoc`).
 
 4. When you have finished the post, check that it renders correctly. If you have a preview function in your editor, use that (eg the Asciidoc plugin in VSCode). Alternatively, you can use the Docker image to run a local build of the file.
 
@@ -136,56 +140,15 @@ If a published post on OpenLiberty.io/blog contains an error or needs updating i
 
 
 
-### Blog structure (AsciiDoc & front matter)
-Blogs are written in [AsciiDoc](https://asciidoctor.org/docs/asciidoc-writers-guide/) format with a file extension of `.adoc`.
-
-In the blog post file the following front matter variables must be set:
-- layout: post
-- title: `title of the blog post`
-- categories: blog
-- author_picture: `secure url to author picture`
-     - If a picture cannot be found, the openliberty.io logo can be used instead https://avatars3.githubusercontent.com/u/28316667
-- author_github: `secure url to author github`
-- blog_description: `Description of blog post used in the preview card on openliberty.io/blog`
-     - Please keep your `blog_description` to around 60 words
-- seo-title: `Blog Title used in search results and on social media - OpenLiberty.io`
-     - Please ensure that your `seo-title` ends with ` - OpenLiberty.io`
-- seo-description: `Blog Description used in search results and on social media`
-     - Please keep your `seo-description` between 50-300 characters
-
-
-### Blog posts with multiple authors
-
-If you would like to publish a blog post with more than 1 author, you can add the ```additional_authors``` attribute to the liquid front matter. Any number of additional authors can be specified using the following format:
-```
-additional_authors: 
- - name: author 2 first and last name
-   github: secure url to author 2 github
-   image: secure url to author 2 picture
- - name:  author 3 first and last name
-   github: secure url to author 3 github
-   image: secure url to author 3 picture
-```
-
-### Contributing a third party blog post
-
-If you would like to add a blog post that is actually a link to an existing third party blog post, you can follow the normal steps described above for creating a blog post. You simply need to add the following attributes to the liquid front matter: 
-- redirect_link: secure_url_to_3rd_party_post
-- permalink: /blog/redirected.html
-
-Also provide a level 1 heading eg:
-
-`= Creating a cool app with MicroProfile`
-
-### Troubleshooting
+# Troubleshooting
 
 Certain characters (eg apostrophe ' ) in the main heading are displayed incorrectly. To fix, escape with a backslash (`\`).
 eg `= Minimise turnaround times with Open Liberty\'s dev mode`
 
-# Docker container for development
+# Docker container for local preview
 
 Github.com does a pretty good job of rendering asciidoc so you can preview your file there, but to see exactly what it will
-look like you'll need to install the website software and run it. 
+look like you can run the website locally. 
 
 ### Running the website on your local machine
 ```
