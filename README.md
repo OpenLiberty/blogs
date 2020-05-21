@@ -1,5 +1,12 @@
 # Writing and publishing blog posts on the OpenLiberty.io blog
 
+* [Authors: creating a new blog post](#Authors-creating-a-new-blog-post)
+* [Editors: editing and publishing a post](#Editors-editing-and-publishing-a-post)
+* [Authors and Editors: updating a published post](#Authors-and-Editors-updating-a-published-post)
+* [Troubleshooting Asciidoc](#Troubleshooting-Asciidoc)
+* [Running a Docker container for local preview](#Running-a-Docker-container-for-local-preview)
+
+
 ## Authors: creating a new blog post
 
 These steps are to be completed by the author of the blog post.
@@ -61,7 +68,7 @@ You've written a post!
 The editors will now review and edit the post. Please respond to any questions they ask or suggestions they make. Their aim is to make the post readable and useful to its target audience.
 
 
-== Editor: editing and publishing a post
+## Editors: editing and publishing a post
 
 These steps are completed by the editors of the blog. They might ask questions or make suggestions to the author of the post. They might also make edits directly in the post to prepare it for publishing.
 
@@ -118,7 +125,7 @@ You've published a post!
 
 
 
-== Authors and Editors: updating a published post
+## Authors and Editors: updating a published post
 
 If a published post on OpenLiberty.io/blog contains an error or needs updating in any way, anyone can create a PR to get it fixed.
 
@@ -140,7 +147,7 @@ If a published post on OpenLiberty.io/blog contains an error or needs updating i
 
 
 
-# Troubleshooting Asciidoc
+## Troubleshooting Asciidoc
 
 Certain characters (eg apostrophe ' ) in the main heading are displayed incorrectly. To fix, escape with a backslash (`\`).
 eg `= Minimise turnaround times with Open Liberty\'s dev mode`
@@ -149,12 +156,14 @@ See also:
 * [Asciidoc quick syntax](https://asciidoctor.org/docs/asciidoc-syntax-quick-reference/)
 * [Asciidoc user manual (more detailed)](https://asciidoctor.org/docs/user-manual/)
 
-# Docker container for local preview
+
+
+## Running a Docker container for local preview
 
 Github.com does a pretty good job of rendering asciidoc so you can preview your file there, but to see exactly what it will
 look like you can run the website locally. 
 
-## Running the website on your local machine
+### Running the website on your local machine
 ```
 git clone https://github.com/OpenLiberty/blogs.git
 git clone https://github.com/OpenLiberty/openliberty.io.git
@@ -168,7 +177,7 @@ docker run --rm --name website -it -p 4000:4000 -v currentFolder/openliberty.io:
 # docker run --name website -it -p 4000:4000 -v /Users/bruce/projects/blog/website/openliberty.io:/home/jekyll kinueng/openliberty.io
 ```
 
-## Update the running container with your edits
+### Update the running container with your edits
 Before your new or updated blog entry will appear on the website, you will need to run the script below to update the container with your latest changes, then wait for the container to finish processing them.  Then you can see your changes at http://localhost:4000/blog/
 
 Note that blogs named with dates in the future, e.g. 2099-01-05, will not be shown, so don't do that. 
@@ -177,7 +186,7 @@ Note that blogs named with dates in the future, e.g. 2099-01-05, will not be sho
 ./blogs/scripts/refresh_docker_image.sh
 ```
 
-## How to know when your changes are rendered by the container
+### How to know when your changes are rendered by the container
 You will see `Jekyll` detect your new files and regenerate the blog files.  You will want to wait for the line "...done in XXXX seconds."
 
 ```
