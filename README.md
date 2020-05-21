@@ -31,6 +31,8 @@ These steps are to be completed by the author of the blog post.
 
       Place any images in [img/blog](./img/blog/). For multiple authors, see the documentation at the end of this README.
 
+      Ensure that the tags (e.g. `// tag::intro[]` and `// end::intro[]`) in the template are retained around the relevant parts of the release post. The release post will contain GA and beta content but the tags will be used to build GA-only versions of the post content.
+
     * **Third-party blog post** (externally hosted posts only)
 
       Copy the [third-party-blog-post.adoc](./templates/third-party-blog-post.adoc) file to the [posts](./posts) directory and rename the file using the format `YYYY-MM-DD-post-title.adoc`, where the date represents the expected publication date (e.g. `2021-11-21-open-liberty-is-awesome.adoc`).
