@@ -91,7 +91,7 @@ These steps are completed by the editors of the blog. They might ask questions o
 
    For edits such as punctuation, formatting, highlighting, adding SEO details, or larger changes discussed with the author, the editor can make the edits directly in the author's branch and push the changes to `draft` branch, then rebuild the [draft site from Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io) to check them.
    
-   To check out the author's branch locally: `git fetch origin` then `git checkout -b branch_name origin/branch_name`, which creates a new local branch that's linked to their remote branch.
+   To check out the author's branch locally: `git fetch origin` then `git checkout -b branch_name origin/branch_name`, which creates a new local branch that's linked to their remote branch. When you've made changes, push them back to `origin/branch_name`.
 
 2. Add tags to the blog post:
 
