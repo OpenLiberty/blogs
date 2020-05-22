@@ -90,6 +90,8 @@ These steps are completed by the editors of the blog. They might ask questions o
    Ask the author to make changes by adding review comments to the PR.
 
    For edits such as punctuation, formatting, highlighting, adding SEO details, or larger changes discussed with the author, the editor can make the edits directly in the author's branch and push the changes to `draft` branch, then rebuild the [draft site from Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io) to check them.
+   
+   To check out the author's branch locally: `git fetch origin` then `git checkout -b branch_name origin/branch_name`, which creates a new local branch that's linked to their remote branch.
 
 2. Add tags to the blog post:
 
