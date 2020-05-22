@@ -56,3 +56,7 @@ Red Hat Developer blog is authored in Wordpress so you must convert the asciidoc
 - [ ] Preview the post and check that it displays correctly and makes sense (e.g. doesn't contain any beta content).
 - [ ] Save the post, then email a link to `contributors@redhat.com` to let them know that it's ready for review.
 - [ ] Work with the Red Hat Developer blog editors to finalise the post. They might ask for additional clarfications or minor changes. They will also make edits directly in the post. When they are happy, they'll check with you then schedule the post to publish on the Tuesday morning after the Open Liberty release.
+
+## All done?
+
+Check that you've completed every task above. Select each check box to confirm that you have before closing this issue.
