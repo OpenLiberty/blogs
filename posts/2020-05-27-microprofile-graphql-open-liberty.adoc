@@ -1,0 +1,346 @@
+---
+layout: post
+title: "Have it your way with MicroProfile GraphQL!"
+categories: blog
+author_picture: https://avatars.githubusercontent.com/andymc12
+author_github: https://github.com/andymc12
+seo-title: Have it your way with MicroProfile GraphQL!
+seo-description: MicroProfile GraphQL enables developers to quick and easily write GraphQL applications with MicroProfile. Now available in Open Liberty 20.0.0.6.
+blog_description: MicroProfile GraphQL enables developers to quick and easily write GraphQL applications with MicroProfile. Now available in Open Liberty 20.0.0.6.
+---
+= Have it your way with MicroProfile GraphQL!
+Andy McCright <https://github.com/andymc12>
+:imagesdir: /
+:url-prefix:
+:url-about: /about/
+
+// tag::intro[]
+Open Liberty 20.0.0.6 introduces a new feature, MicroProfile GraphQL, which enables developers to quick and easily write GraphQL applications with MicroProfile.
+
+If you're here reading about GraphQL in Open Liberty, then chances are that you already know a bit about GraphQL. In short, GraphQL is a remote data access API that addresses
+issues like under-fetching and over-fetching that are inherent in most RESTful applications. It allows clients to
+specify the exact data they want - to "have it their way". If
+you would like to learn more about GraphQL, I recommend checking out the 
+link:https://graphql.org/learn/[tutorial at GraphQL.org].
+
+GraphQL applications use a schema that acts as a description of the data provided by the server and as a contract
+between the client and server. Most GraphQL programming models require developers to dual-maintain their schema and the
+application code that supports it. MicroProfile GraphQL takes a "code first" approach which allows developers to write
+Java code using annotations to mark GraphQL schema elements, and then the MicroProfile GraphQL implementation generates the schema
+at runtime.
+
+The Open Liberty feature Microprofile GraphQL (`mpGraphQL-1.0`) implements the 
+link:https://github.com/eclipse/microprofile-graphql/releases/tag/1.0.2[MicroProfile GraphQL 1.0] specification. 
+
+In this blog post, we'll explore how easy it is to create GraphQL applications using this 
+link:https://github.com/OpenLiberty/sample-mp-graphql[sample].
+// end::intro[]
+
+// tag::setup[]
+== Setup
+
+To set up your Maven environment for developing a MP GraphQL application, you'll need a dependency like:
+
+[source,xml]
+----
+<dependency>
+    <groupId>org.eclipse.microprofile.graphql</groupId>
+    <artifactId>microprofile-graphql-api</artifactId>
+    <version>1.0.2</version>
+    <scope>provided</scope>
+</dependency>
+----
+
+I recommend using the link:/guides/maven-intro.html[Liberty Maven plugin], but it's not strictly
+necessary so long as you generate a Web Archive (WAR) file for deployment.
+
+When configuring the Liberty server for deployment, make sure that the `featureManager` element in the `server.xml` file
+contains the `mpGraphQL-1.0` feature. For example:
+
+[source,xml]
+----
+<server>
+  <featureManager>
+    <feature>mpGraphQL-1.0</feature>
+    <feature>mpMetrics-2.3</feature>
+  </featureManager>
+  <!-- ... -->
+</server>
+----
+
+The `mpMetrics-2.3` feature is not required, but will track the number of GraphQL query/mutation invocations and
+cumulative time when enabled.
+
+Now that we've got things set up, let's look at the code.
+// end::setup[]
+
+// tag::coding[]
+== Coding a MicroProfile GraphQL application
+
+A MicroProfile GraphQL application should have at least one root-level query and/or mutation. To create a query or
+mutation, you start with a public Java class annotated with `@GraphQLApi`. Then you add public methods that are
+annotated with `@Query` or `@Mutation` for query or mutation, respectively. The query/mutation methods must always
+return a non-void type. These methods can return simple types like `String`, `int`, `double`, `boolean`, etc. which will
+be mapped to GraphQL scalars such as `String`, `Int`, `Float`, `Boolean`, etc. Alternatively, these methods could return
+custom Java types - the types would be mapped to GraphQL types and defined in the generated schema.
+
+For example, in the
+sample application, the `currentConditions` query method returns a type called `Conditions` - that type has properties
+such as `temperatureF`, `temperatureC`, `precipitationType`, `weatherText`, etc. The following schema is generated
+from the query and its return value:
+
+[source]
+----
+type Conditions {
+  dayTime: Boolean!
+  epochTime: BigInteger!
+  hasPrecipitation: Boolean!
+  "ISO-8601"
+  localObservationDateTime: DateTime
+  location: String
+  precipitationType: PrecipType
+  temperatureC: Float!
+  temperatureF: Float!
+  weatherText: String
+  wetBulbTempF: Float!
+}
+
+"Query root"
+type Query {
+  currentConditions(location: String): Conditions
+  currentConditionsList(locations: [String]): [Conditions]
+}
+...
+----
+
+The `currentConditions` query has an argument, called `location`. In the Java code, the argument is represented by a
+method parameter. Like output types, arguments/parameters can be simple Java types (mapping to GraphQL scalars) or
+custom types, which would be mapped to input types in the generated schema.
+
+When mapping custom types, it is possible to change the name used in the schema by using the `@Name`
+annotation. For example, if we wanted to change the schema to display `tempInFahrenheit` instead of `temperatureF`, we
+could just add `@Name("tempInFahrenheit")` to the `temperatureF` field in the `Conditions` class.
+
+If your application uses JSON-B, then `@JsonbProperty`, `@JsonbDateFormat`, and `@JsonbNumberFormat` annotations can be
+used instead of `@Name`, `@DateFormat` or `@NumberFormat`. When both sets of annotations are used, the annotations from
+the MicroProfile GraphQL APIs take precedence over the JSON-B APIs when used for schema generation or query/mutation execution.
+
+Another useful annotation is `@Source`. This annotation can be used to add a field to an entity object that might be
+expensive to look up or calculate, and so you might not want to spend the resources on the server side to compute that
+field when the client doesn't want it anyway.  Here's an example from the sample:
+
+[source,java]
+----
+    public double wetBulbTempF(@Source @Name("conditions") Conditions conditions) {
+        // TODO: pretend like this is a really expensive operation
+        // ...
+        return conditions.getTemperatureF() - 3.0;
+    }
+----
+
+This example is a little contrived, but it shows us that the `wetBulbTempF` field will only be computed if the client
+requests that field. This method is in a class annotated with `@GraphQLApi` (in this example, `WeatherService`) and it
+contains a parameter annotated with `@Source` that takes the entity object, `Conditions`. When a client issues a query
+or mutation that would return the `Conditions` entity, and that query/mutation specifies the `wetBulbTempF` field, the `wetBulbTempF(Conditions conditions)` method is invoked by the GraphQL implementation, passing in the
+`Conditions` object that was returned from the query/mutation method.
+// end::coding[]
+
+// tag::running[]
+== Running the MicroProfile GraphQL app
+
+To run and test the GraphQL application, you simply need to deploy it as a WAR file. The Liberty Maven
+Plugin makes it easy to build, deploy, and test using Apache Maven. After you have cloned the sample from GitHub
+(`git clone git@github.com:OpenLiberty/sample-mp-graphql.git`) or downloaded the source ZIP file, just run:
+`mvn clean package liberty:run`
+
+This builds, packages, and deploys the GraphQL application to the latest Open Liberty server runtime and starts the 
+server and app. Then you can use the pre-packaged GraphiQL HTML interface to send queries or mutations at:
+`http://localhost:9080/mpGraphQLSample/graphiql.html`
+
+Here are a few sample queries and mutations that you could use to get started - you may see some interesting results:
+
+[source,graphql]
+----
+#Temperature (Fahrenheit) for Las Vegas
+query LasVegas {
+  currentConditions(location: "Las Vegas") {
+    temperatureF
+  }
+}
+----
+
+[source,graphql]
+----
+#Is it really always sunny in Philadelphia?
+query SunnyInPhilly {
+  currentConditions(location: "Philadelphia") {
+    weatherText
+  }
+}
+----
+
+[source,graphql]
+----
+# Weather conditions for three locations - one roundtrip
+query threeLocations {
+  atlanta: currentConditions(location: "Atlanta") {
+        hasPrecipitation
+        temperatureF
+        weatherText
+        precipitationType
+    }
+  newyork: currentConditions(location: "New York") {
+        hasPrecipitation
+        temperatureF
+        weatherText
+        precipitationType
+  }
+  chicago: currentConditions(location: "Chicago") {
+        hasPrecipitation
+        temperatureF
+        weatherText
+        precipitationType
+    }
+}
+----
+
+[source,graphql]
+----
+# See partial results when one portion of the query fails
+query fourLocations {
+  atlanta: currentConditions(location: "Atlanta") {
+        hasPrecipitation
+        temperatureF
+        weatherText
+        precipitationType
+        wetBulbTempF
+    }
+  nowhere: currentConditions(location: "Nowhere") {
+    hasPrecipitation
+        temperatureF
+        weatherText
+        precipitationType
+  }
+  newyork: currentConditions(location: "New York") {
+        hasPrecipitation
+        temperatureF
+        weatherText
+        precipitationType
+  }
+  chicago: currentConditions(location: "Chicago") {
+        hasPrecipitation
+        temperatureF
+        weatherText
+        precipitationType
+        wetBulbTempF
+    }
+}
+----
+
+[source,graphql]
+----
+# Reset the stored weather conditions
+mutation {
+  reset
+}
+----
+
+// end:: running[]
+
+// tag::authorization[]
+== Authorizing access to certain queries/mutations
+
+It may be necessary to restrict access to certain queries/mutations to certain authenticated users. While it is not part
+of the MicroProfile GraphQL 1.0 specification (it is under consideration for a future version of the spec), Open Liberty
+makes authorization checks possible by using the `@DenyAll`, `@PermitAll`, and `@RolesAllowed` annotations. These
+annotations must be placed on the class or method of classes annotated with `@GraphQLApi`.
+
+When implementing authorization with MicroProfile GraphQL, you need to enable the `appSecurity-3.0` (or `appSecurity-2.0`) feature in the
+server configuration. You also need to set up the user registry and web container metadata for authentication and
+authorization.
+
+In the sample, we use the basic user registry which defines two users, one for each of two roles:
+
+[source,xml]
+----
+  <basicRegistry id="basic" realm="sample-mp-graphql">
+     <user name="user1" password="user1pwd" />
+     <user name="user2" password="user2pwd" />
+     <group name="Role1">
+       <member name="user1"/>
+     </group>
+     <group name="Role2">
+       <member name="user2"/>
+     </group>
+   </basicRegistry>
+----
+
+This means that `user1` is part of `Role1` and `user2` is part of `Role2`. The `web.xml` declares these roles, and also sets up
+form-based authentication so that, when the Application Security feature is enabled, clients are prompted to log in using a
+web-based form before accessing the GraphiQL HTML page.  It also allows the application to prevent users other than
+those in `Role2` to invoke the `reset` mutation method:
+
+[source,java]
+----
+    @RolesAllowed("Role2")
+    @Mutation
+    @Description("Reset the cached conditions so that new queries will return newly randomized weather data." +
+                 "Returns number of entries cleared.")
+    public int reset() {
+        int cleared = currentConditionsMap.size();
+        currentConditionsMap.clear();
+        return cleared;
+    }
+----
+
+
+// end::authorization[]
+
+// tag::metrics[]
+== Integration with MicroProfile Metrics
+
+If you enable the `mpMetrics-2.3` feature with `mpGraphQL-1.0`, Open Liberty tracks the number of times a particular
+query or mutation method is invoked--and the cumulative time spent in that method. These metrics can be useful for
+determining what data is being accessed, how often, and where time is spent in execution.
+
+Metrics collection and reporting for GraphQL applications is not mentioned in either the MicroProfile GraphQL 1.0 spec or the
+MicroProfile Metrics 2.3 spec, so the actual stats are collected and reported under the "vendor" category. To see these stats,
+you can browse to:
+`http://localhost:9080/metrics/vendor`
+
+The stats are prefixed with `vendor_mp_graphql_` and should look something like this:
+
+[source]
+----
+# TYPE vendor_mp_graphql_Query_currentConditions_total counter
+vendor_mp_graphql_Query_currentConditions_total 27
+# TYPE vendor_mp_graphql_Query_currentConditions_elapsedTime_seconds gauge
+vendor_mp_graphql_Query_currentConditions_elapsedTime_seconds 0.10273818800000001
+# TYPE vendor_mp_graphql_Conditions_wetBulbTempF_total counter
+vendor_mp_graphql_Conditions_wetBulbTempF_total 4
+# TYPE vendor_mp_graphql_Conditions_wetBulbTempF_elapsedTime_seconds gauge
+vendor_mp_graphql_Conditions_wetBulbTempF_elapsedTime_seconds 0.031866015000000004
+# TYPE vendor_mp_graphql_Mutation_reset_total counter
+vendor_mp_graphql_Mutation_reset_total 3
+# TYPE vendor_mp_graphql_Mutation_reset_elapsedTime_seconds gauge
+vendor_mp_graphql_Mutation_reset_elapsedTime_seconds 0.007540145000000001
+----
+// end::metrics[]
+
+// tag::summary[]
+== Summary
+
+GraphQL is a powerful and popular query language for remote data access. MicroProfile GraphQL makes it easy to develop
+GraphQL applications in Java. And now you use GraphQL in Open Liberty!
+// end::summary[]
+
+// tag::references[]
+== References
+
+- Learn GraphQL: https://graphql.org/learn/
+- MicroProfile GraphQL GitHub Project: https://github.com/eclipse/microprofile-graphql
+- MicroProfile GraphQL 1.0.2 Specification: https://download.eclipse.org/microprofile/microprofile-graphql-1.0.2/microprofile-graphql.html
+- MicroProfile GraphQL 1.0.2 API Docs: https://download.eclipse.org/microprofile/microprofile-graphql-1.0.2/apidocs/
+- Sample Application: https://github.com/OpenLiberty/sample-mp-graphql
+- Open Liberty: https://openliberty.io
+// end::references[]
