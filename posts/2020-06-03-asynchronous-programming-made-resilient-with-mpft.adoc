@@ -65,7 +65,7 @@ So `@Asynchronous` sounds great, right? But how can you use it to make your asyn
 === 1. Applying Fault Tolerance to an asynchronous API call
 One use of `@Asynchronous` is to apply Fault Tolerance to an asynchronous API call, which returns a `CompletionStage`. Without `@Asynchronous`, you wouldn't be able to apply Fault Tolerance to the call. Let's see why.
 
-In this example, we'll use the JAX-RS client API, which was introduced in JAX-RS 2.1, for calling remote REST services. We can build up a request to fetch a String from a given URL with a GET request, where the return type is a `CompletionStage` of String:
+In this example, we'll use reactive methods in the JAX-RS client API for calling remote REST services asynchronously. These methods were were introduced in JAX-RS 2.1. We can build up a request to fetch a String from a given URL with a GET request, where the return type is a `CompletionStage` of String:
 
 [source,java]
 ----
@@ -91,7 +91,7 @@ response.thenAccept(System.out::println);
 --> responseText
 ----
 
-However, if we want to use the `@Retry` annotation to retry any failed requests, the method isn't retried.
+If we wanted to retry any failed requests, we might add the `@Retry` annotation to the method, but surprisingly this wouldn't work!
 
 Even if the HTTP request fails, the request doesn't get retried because Fault Tolerance acts around method calls. Normally, if you annotate a method with `@Retry` and it throws an exception, then it gets retried. However, when we do an HTTP request through this JAX-RS client API, it can't throw an exception if there's a problem with a request. The request is processed asynchronously, so when the method returns, the request probably hasn't started yet, let alone found out that it failed. If an exception does occur, it's propagated  to the `CompletionStage` and can be handled there. The result is that the method will never throw an exception, even if the request fails, meaning that the request will never be retried.
 
