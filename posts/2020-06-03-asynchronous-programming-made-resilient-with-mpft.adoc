@@ -4,9 +4,9 @@ title: "Asynchronous programming made resilient with MicroProfile Fault Toleranc
 categories: blog
 author_picture: https://avatars2.githubusercontent.com/u/55994281?s=460&u=e02b856ba160c3a4275f760606f679811c90a1af&v=4
 author_github: https://github.com/Joseph-Cass
-seo-title: Using MicroProfile Fault Tolerance @Asynchronous Open Liberty - OpenLiberty.io
+seo-title: Using MicroProfile Fault Tolerance @Asynchronous - OpenLiberty.io
 seo-description: MicroProfile Fault Tolerance @Asynchronous allows you to add additional functionality to @Timeout and @Bulkhead annotations and allows you to use the other Fault Tolerance annotations with other asynchronous APIs.
-blog_description: "MicroProfile Fault Tolerance @Asynchronous allows you to add additional functionality to @Timeout and @Bulkhead annotations and allows you to use the other Fault Tolerance annotations with other asynchronous APIs"
+blog_description: "MicroProfile Fault Tolerance @Asynchronous allows you to add additional functionality to @Timeout and @Bulkhead annotations and allows you to use the other Fault Tolerance annotations with other asynchronous APIs."
 additional_authors:
  - name: Andrew Rouse
    github: https://github.com/Azquelt
@@ -32,7 +32,7 @@ Adding the `@Asynchronous` annotation to a method does two things:
 1. Runs the method asynchronously
 2. If the method returns a `CompletionStage`, applies other Fault Tolerance strategies to the result of the `CompletionStage`, rather than to the result of the method
 
-Adding the `@Asynchronous` annotation to a method makes the method run asynchronously, meaning that rather than the annotated method running straight away on the main thread when it's called, it will run sometime later, usually on another thread. To use it, you need to add the `@Asynchronous` annotation to a method, and it must return either a https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/CompletionStage.html[`CompletionStage`] or a https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/Future.html[`Future`]. You cannot apply Fault Tolerance to a returned `Future` (see why <<CS-preference, here>>), so a `CompletionStage` is preferred.
+Adding the `@Asynchronous` annotation to a method makes the method run asynchronously, meaning that rather than the annotated method running straight away on the main thread when it's called, it will run sometime later, usually on another thread. To use it, you need to add the `@Asynchronous` annotation to a method, and it must return either a https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/CompletionStage.html[`CompletionStage`] or a https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/Future.html[`Future`]. You cannot apply Fault Tolerance to a returned `Future`, so a `CompletionStage` is preferred.
 
 [source,java]
 ----
@@ -122,7 +122,7 @@ To recap, to use Fault Tolerance with an asynchronous method you must:
 
 When you do these two things, all the other Fault Tolerance logic is applied when the `CompletionStage` completes, rather than when the method returns.
 
-You can also use https://download.eclipse.org/microprofile/microprofile-fault-tolerance-2.1/microprofile-fault-tolerance-spec.html#_interactions_with_other_fault_tolerance_annotations[other Fault Tolerance annotations with `@Asynchronous`] to make your asynchronous method resilient. See the <<FT-interactions, Interactions with other Fault Tolerance annotation>> section for more detail about how the annotations interact.
+You can also use https://download.eclipse.org/microprofile/microprofile-fault-tolerance-2.1/microprofile-fault-tolerance-spec.html#_interactions_with_other_fault_tolerance_annotations[other Fault Tolerance annotations with `@Asynchronous`] to make your asynchronous method resilient. Look for more details on that in a future blog post.
 
 [#Running-methods-in-parallel]
 === 2. Let’s go parallel!
@@ -181,71 +181,5 @@ public class RequestScopedClass2 {
 
 If `serviceA()` needs several retries, then a call to retrieve the result, such as `CompletionStage.thenAccept()`, won't return until all the retries are complete.
 
-== Deep dive
-This last section isn't critical for knowing how to use `@Asynchronous`, but it's useful to know when working with MicroProfile Fault Tolerance. It covers how `@Asynchronous`:
-
-* <<FT-interactions, Interacts with the other Fault Tolerance annotations>>
-* <<Asynch-execution-flow, Changes the flow of Fault Tolerance execution>>
-* <<CS-preference, Is limited when returning a `Future` rather than a `CompletionStage`>>
-
-[#FT-interactions]
-=== Interactions with other Fault Tolerance annotations
-We've covered running things in parallel and applying Fault Tolerance to asynchronous methods, now let's look at the way using the `@Asynchronous` annotations impacts other Fault Tolerance annotations.
-
-==== Timeout
-When you use the `@Asynchronous` and `@Timeout` annotations together, the `CompletionStage` or `Future` returned to the caller can be completed as soon as the timeout expires, even if the method is still running. This is because the method is running on another thread, so even though that thread is still occupied, you can signal that the result is ready to another thread which might be waiting for it.
-
-The thread running the method is still interrupted, so it can stop what it's working on and save resources, but if you need to apply a timeout to a long running operation which doesn't respond to being interrupted, you can use the `@Asynchronous` annotation.
-
-Note: Be aware that the operation may still run to completion, even though the timeout has expired and you've received the TimeoutException.
-
-
-==== Bulkhead
-When you use the `@Asynchronous` and `@Bulkhead` annotations together, Fault Tolerance provides the option to queue up executions if the maximum number of executions are already running. This is allowed because any calling code has been written with the knowledge that the method is asynchronous and won't return immediately.
-
-When you call the method, if there are less than the maximum concurrent executions running then your method is scheduled to run immediately, otherwise it's added to a queue. When one execution of the method finishes, if there are any on the queue then the first execution from the queue is started. If the queue itself is full, then the method fails with a `BulkheadException`.
-
-Just like the number of concurrent executions, the size of the queue can also be configured using the `waitingTaskQueue` parameter on the `@Bulkhead` annotation.
-
-[#Asynch-execution-flow]
-=== Asynchronous flow of execution
-
-Let's first look at how the Fault Tolerance annotations (`@Retry`, `@Timeout`, `@CircuitBreaker`, `@Bulkhead`,  and `@Fallback`) work together *without* the presence of `@Asynchronous` :
-
-image::/img/blog/FT-synchronous-execution-flow.png[Fault Tolerance synchronous execution flow]
-
-When the method is annotated with `@Asynchronous` a few things change. The differences from synchronous execution are highlighted in dark green, and discussed below:
-
-[caption="Accurate for mpFaultTolerance-2.0"]
-image::/img/blog/FT-asynchronous-execution-flow.png[Fault Tolerance asynchronous execution flow]
-
-The first difference compared to the synchronous flow of execution is that a `CompletionStage` or `Future` is returned before the method runs. When the method has actually returned, the result from the method is then propagated into the `CompletionStage` or `Future` so that the caller can get it.
-
-The next difference comes in the Bulkhead. As well as either accepting or rejecting the execution, the Bulkhead can also queue it to be run later. If the method is accepted by the Bulkhead, it is then scheduled to be run on another thread, rather than run immediately.
-
-Another difference occurs with Timeout. When used with @Asynchronous, if the Timeout expires, the method is interrupted, and the execution skips forwards to the point highlighted in the diagram (From the "Timeout Expires" block). The result is then processed as if the method had finished with a TimeoutException.
-
-The last difference is that if there's a Fallback, it also runs asynchronously, so it's scheduled to run on another thread as well.
-
-[#CS-preference]
-=== Limitations of using `Future`
-
-Whilst `@Asynchronous` can still make methods returning a `Future` run asynchronously, Fault Tolerance can only be applied to asynchronous methods returning a `CompletionStage` and not a `Future` (https://download.eclipse.org/microprofile/microprofile-fault-tolerance-2.1/microprofile-fault-tolerance-spec.html#_interactions_when_returning_a_code_future_code[described here]).
-
-But why is this?
-
-`Future` fundamentally has two ways of getting the result of its method: blocking and waiting with `get()`, and polling with `isDone()`. To implement Fault Tolerance around an asynchronous result, a callback is needed so that this can be done without having a second thread which just waits or polls for the result. `CompletionStage` facilitates for this callback.
-
-Without a callback, Fault Tolerance is applied around the *method call*, not around the *method result*. This means that for a `Future`:
-
-* The Timeout ends when the method returns (even if not completed).
-* The Bulkhead is released when the method returns (even if not completed).
-* The Method call is considered successful as soon as the Future is returned, even if the result of the `Future` ends up being an exception.
-
-These are not desired behaviours.
-
-This means that using a `Future` is only really suitable for running operations in parallel. In these situations, your method usually ends with return `CompletableFuture.completedFuture(result);` - i.e. there's no possibility of returning a `Future` which completes exceptionally; either your method throws an exception, or returns a successful `Future`.
-
-
 == Thanks for reading!
-We hope you've learned how to use Fault Tolerance to make your asynchronous programming resilient. If you want to learn more about Fault Tolerance, https://openliberty.io/guides/?search=fault%20tolerance[check out some Open Liberty Fault Tolerance guides]. If you want to get involved in MicroProfile Fault Tolerance, https://github.com/eclipse/microprofile-fault-tolerance[check out the Git repo].
+We hope you've learned how to use Fault Tolerance to make your asynchronous programming resilient. If you want to learn more about Fault Tolerance, https://openliberty.io/guides/?search=fault%20tolerance[check out some Open Liberty Fault Tolerance guides]. If you want to get involved in MicroProfile Fault Tolerance, https://github.com/eclipse/microprofile-fault-tolerance[check out the Git repo]. Look out for our upcoming blog post for more detail about using `@Asynchronous`, including how `@Asynchronous` interacts with other Fault Tolerance annotations and the limitations of using a `Future`.
