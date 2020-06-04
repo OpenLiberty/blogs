@@ -48,13 +48,13 @@ These steps are to be completed by the author of the blog post.
 
 4. If you are not employed by IBM, in at least one of your commits, sign off the commit using [the Developer Certificate process](./CONTRIBUTING.md).
 
-4. When you have finished the post, check that it renders correctly. If you have a preview function in your editor, use that (eg the Asciidoc plugin in VSCode). Alternatively, you can use the Docker image to run a local build of the file.
+4. When you have finished the post, check that it renders correctly. If you have a preview function in your editor, use that (eg the Asciidoc plugin in VSCode). Alternatively, you can use the [Docker image to run a local build of the file](#running-a-docker-container-for-local-preview).
 
 5. Push the file to GitHub, then create a pull request (PR) into the `draft` branch.
 
    Link the PR to the issue you created in Step 1.
 
-5. Request a build of the [draft OpenLiberty.io site](https://draft-openlibertyio.mybluemix.net/blog/):
+5. Request a build of the [draft openliberty.io site](https://draft-openlibertyio.mybluemix.net/blog/):
     1. Sign in to [Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io) with your GitHub account.
     2. Click **More Options > Trigger Build**. Make sure the `master` branch is selected, then click **Trigger custom build**.
     
@@ -74,7 +74,7 @@ These steps are to be completed by the author of the blog post.
    
    As before, make any changes in your branch, push the changes to the `draft` branch, then run the [draft site build from Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io) again to check that they are fine on the [draft site](https://draft-openlibertyio.mybluemix.net/blog/).
 
-   This automatically updates the PR going from `draft` to `staging`.
+   This automatically updates the PR to `staging`.
 
 You've written a post!
 
@@ -112,9 +112,10 @@ These steps are completed by the editors of the blog. They might ask questions o
 3. On the day of publication (or the day before):
 
    a. Approve the PR.
+   
    b. Ask @lauracowen (or another admin) to merge the PR into `staging`.
    
-4. Request a build of the [staging OpenLiberty.io site from Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io).
+4. Request a build of the [staging openliberty.io site from Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io).
 
 5. When the build has finished, check to make sure the blog renders correctly on the [staging site](https://staging-openlibertyio.mybluemix.net/blog/). 
 
@@ -130,9 +131,9 @@ These steps are completed by the editors of the blog. They might ask questions o
 
 12. Rebuild the [production site from the IBM Cloud console](https://console.bluemix.net/devops/pipelines/fcc7c3e9-9c40-4a58-8a7f-09c08413ab7d?env_id=ibm:yp:us-south).
 
-    When the build has finished, check that the post looks as expected on [OpenLiberty.io/blog](https://openliberty.io/blog/).
+    When the build has finished, check that the post looks as expected on [openliberty.io/blog](https://openliberty.io/blog/).
 
-    If the post's file name uses a future date, the post will not display on the production site until that the production site is rebuilt on that day or later.
+    If the post's file name uses a future date, the post will not exist on the production site until at least that date and the production site has been rebuilt.
 
 13. When the post is published, and any changes you made are in all three branches (`draft`, `staging`, and `prod`), delete the author's branch.
 
@@ -142,9 +143,9 @@ You've published a post!
 
 ## Authors and Editors: updating a published post
 
-If a published post on OpenLiberty.io/blog contains an error or needs updating in any way, anyone can create a PR to get it fixed.
+If a published post on openliberty.io/blog contains an error or needs updating in any way, anyone can create a PR to get it fixed.
 
-1. As for creating a new post (see above), clone the `blogs` repo and create a new branch based on the `prod` branch. You will do all your work in this branch.
+1. As when creating a new post (see above), clone the `blogs` repo and create a new branch based on the `prod` branch. You will do all your work in this branch.
 
 2. Open the file in an editor (e.g. [VSCode with the Asciidoc plugin](https://marketplace.visualstudio.com/items?itemName=joaompinto.asciidoctor-vscode)) and make any changes needed.
 
@@ -156,9 +157,9 @@ If a published post on OpenLiberty.io/blog contains an error or needs updating i
 
 5. When the post is ready to publish, create a PR from your branch to `staging branch` (not from `draft` branch) and add @lauracowen as reviewer.
 
-6. When approved, @lauracowen (or other admin) will merge to `staging`, then run the [build for the staging site from Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io) and check that it looks fine [staging site](https://staging-openlibertyio.mybluemix.net/blog/).
+6. When approved, @lauracowen (or other admin) will merge to `staging`, then run the [build for the staging site from Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io) and check that it looks fine on the [staging site](https://staging-openlibertyio.mybluemix.net/blog/).
 
-7. The approver will then create a PR from `staging` to `prod`, then merge and [rebuild the production site from the IBM Cloud console](https://console.bluemix.net/devops/pipelines/fcc7c3e9-9c40-4a58-8a7f-09c08413ab7d?env_id=ibm:yp:us-south) to publish the updates on the [OpenLiberty.io/blog](https://openliberty.io/blog/).
+7. The approver will then create a PR from `staging` to `prod`, then merge and [rebuild the production site from the IBM Cloud console](https://console.bluemix.net/devops/pipelines/fcc7c3e9-9c40-4a58-8a7f-09c08413ab7d?env_id=ibm:yp:us-south) to publish the updates on the [openliberty.io/blog](https://openliberty.io/blog/).
 
 
 
