@@ -5,11 +5,11 @@ categories: blog
 author_picture: https://avatars3.githubusercontent.com/yasmin-aumeeruddy
 author_github: https://github.com/yasmin-aumeeruddy
 seo-title: Control your application start order in Open Liberty 20.0.0.6
-seo-description: Open Liberty 20.0.0.6 now allows developers to control the start up order of their applications using the `server.xml`. In addition, there is now official support for GraphQL to allow the development of "code-first" GraphQL applications.
-blog_description: Open Liberty 20.0.0.6 now allows developers to control the start up order of their applications using the `server.xml`. In addition, there is now official support for GraphQL to allow the development of "code-first" GraphQL applications.
+seo-description: Open Liberty 20.0.0.6 now provides developers with here is now official support for GraphQL to allow the development of "code-first" GraphQL applications. In addition, users can now control the start up order of their applications using the server.xml.
+blog_description: Open Liberty 20.0.0.6 now provides developers with here is now official support for GraphQL to allow the development of "code-first" GraphQL applications. In addition, users can now control the start up order of their applications using the server.xml.
 ---
 
-= Control your application start order in Open Liberty 20.0.0.6
+= Support for GraphQL with Open Liberty 20.0.0.6
 Yasmin Aumeeruddy <https://github.com/yasmin-aumeeruddy>
 :imagesdir: /
 :url-prefix:
@@ -17,16 +17,15 @@ Yasmin Aumeeruddy <https://github.com/yasmin-aumeeruddy>
 
 // tag::intro[]
 
-Open Liberty 20.0.0.6 now allows developers to control the start up order of their applications using the `server.xml`. In addition, there is now official support for GraphQL to allow the development of "code-first" GraphQL applications.
+Open Liberty 20.0.0.6 now provides developers with here is now official support for GraphQL to allow the development of "code-first" GraphQL applications. In addition, users can now control the start up order of their applications using the `server.xml`.
 
 In link:{url-about}[Open Liberty] 20.0.0.6:
 
-* <<ORDER, Control application start order in Open Liberty >>
-* <<GRA, REST visualizations and hover-over descriptions in Open Liberty Grafana Dashboards >>
-* <<STA, Server startup route changes in Open Liberty >>
 * <<GQL, Use GraphQL with Open Liberty >>
 * <<MVN, Support provisioning features from maven repository >>
-* <<CDI, Allow stack products to provide CDI extensions as part of a user feature >>
+* <<ORDER, Control application start order in Open Liberty >>
+* <<GRA, REST visualizations and hover-over descriptions in Open Liberty Grafana Dashboards >>
+* <<STA, Web application startup changes in Open Liberty >>
 
 View the list of fixed bugs in link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A20006+label%3A%22release+bug%22+[20.0.0.6].
 
@@ -73,6 +72,110 @@ image::img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="cent
 
 //tag::features[]
 
+[#GQL]
+== Use GraphQL with Open Liberty
+
+Open Liberty officially supports link:https://github.com/eclipse/microprofile-graphql[MicroProfile GraphQL]. This allows users to write "code-first" GraphQL applications putting clients in control of the data they receive. Use annotations like `@Query` and `@Mutation` to turn POJOs into HTTP-based GraphQL endpoints. Those query/mutation methods can then return existing entity objects and the client can specify which fields it is interested in - reducing network bandwidth and client-side processing.
+
+Here’s an example:
+
+[source,java]
+----
+@GraphQLApi
+public class MovieService {
+    AtomicInteger nextId = new AtomicInteger();
+    Map<Integer, Movie> movieDB = new HashMap<>();
+
+    @Query("movieById")
+    public Movie getMovieByID(int id) throws UnknownMovieException {
+        return Optional.ofNullable(movieDB.get(id)).orElseThrow(UnknownMovieException::new);
+    }
+
+    @Query("allMoviesDirectedBy")
+    public List<Movie> getAllMoviesWithDirector(String directorName) {
+        return movieDB.values().stream()
+                               .filter(m -> m.getDirector().equals(directorName))
+                               .collect(Collectors.toList());
+    }
+
+    @Mutation("newMovie")
+    public int createNewMovie(@Name("movie") Movie movie) {
+        int id = nextId.incrementAndGet();
+        movie.setId(id);
+        movieDB.put(id, movie);
+        return id;
+    }
+}
+----
+
+This will create a GraphQL application with two queries ("movieById" and "allMoviesDirectedBy") and a mutation ("newMovie"). This will allow a client to execute a query like:
+
+[source]
+----
+query {
+  allMoviesDirectedBy(directorName: "Roland Emmerich") {
+    id, title, actors
+  }
+}
+----
+
+and see a result like:
+
+[source, json]
+----
+{
+  "data": {
+    "allMoviesDirectedBy": [
+      {
+        "id": 1,
+        "title": "Independence Day",
+        "actors": [
+          "Will Smith",
+          "Bill Pullman",
+          "Jeff Goldblum",
+          ...
+        ]
+      },
+      ...
+    ]
+  }
+}
+----
+Liberty’s GraphQL APIs were developed within the MicroProfile community and has broad industry support. The implementation is based on SmallRye GraphQL. Liberty’s GraphQL feature goes beyond the MicroProfile specification and adds support for metrics collection, authorization checks, and request/response logging of query and mutation methods.
+
+Next week, we will be releasing a blog post with more details on how to use MicroProfile GraphQL in Open Liberty. Until then, check out link:https://github.com/OpenLiberty/sample-mp-graphql[this sample] to get started - and join the growing link:https://landscape.graphql.org/[landscape of GraphQL adopters] and write your first GraphQL application today!
+
+[#MVN]
+== Support provisioning features from maven repository
+
+Users are now able to install desired features onto their Open Liberty runtimes from Maven Central or an on-premises Maven repository, such as one served on Artifactory or Nexus, using a convenient command line tool. 
+
+Use the `wlp/bin/featureUtility` command to find, get information about, and install assets that are in a Maven repository.
+
+|===
+|**Command** |**Description**
+|`featureUtility help installFeature`
+|Display help information for the installFeature action
+|`featureUtility installFeature mpHealth-2.2` or `featureUtility installFeature io.openliberty.features:mpHealth-2.2`
+|Install the MicroProfile Health 2.2 feature from Maven Central
+|`featureUtility installServerFeatures myserver`
+|Install server features for the myserver server
+|`featureUtility installFeature mpHealth-2.2 --noCache`
+|Install the MicroProfile Health 2.2 feature without caching the feature to the local Maven repository
+|`featureUtility installServerFeatures myserver --noCache`
+|Install server features for the myserver server without caching the features to the local Maven repository
+|`featureUtility installFeature adminCenter-1.0 --acceptLicense`
+|Install the Admin Center feature from Maven Central
+|`featureUtility installServerFeatures defaultServer --verbose`
+|Install features for the myserver server with debug enabled
+|`featureUtility viewSettings`
+|View a template of your featureUtility.properties file
+|`featureUtility find mpHealth-2.2`
+|Search for the MicroProfile Health 2.2 feature from Maven Central and all configured Maven repositories
+|`featureUtility find`
+|Search for all available features from Maven Central and all configured Maven repositories
+|===
+
 [#ORDER]
 == Control application start order in Open Liberty
 
@@ -84,15 +187,16 @@ Application dependencies can be defined in the configuration using the `startAft
 
 [source, xml]
 ----
-<application id="frontend" location="myFrontend.war" startAfter="backend1, backend2"/>
-<application id="backend1" location="myBackend.ear"/>
-<application id="backend2" location="myUtilities.ear"/>
+<webApplication id="frontend" location="myFrontend.war" startAfter="backend1, backend2"/>
+<enterpriseApplication id="backend1" location="myBackend.ear"/>
+<enterpriseApplication id="backend2" location="myUtilities.ear"/>
+ 
 ----
 
 [#GRA]
 == REST visualizations and hover-over descriptions in Open Liberty Grafana Dashboards 
 
-The Grafana dashboard provides a wide range of time-series visualizations of MicroProfile Metrics data such as CPU, REST, Servlet, Connection Pool, and Garbage Collection metrics. It is powered by a Prometheus datasource which is configured to ingest data from one or more Opem Liberty servers' `/metrics` endpoint, enabling users to view on Grafana dashboards in near real-time.
+The Grafana dashboard provides a wide range of time-series visualizations of MicroProfile Metrics data such as CPU, REST, Servlet, Connection Pool, and Garbage Collection metrics. It is powered by a Prometheus datasource which is configured to ingest data from one or more Open Liberty servers' `/metrics` endpoint, enabling users to view on Grafana dashboards in near real-time.
 
 With the release of `mpMetrics-2.3` and its addition of JAX-RS metrics, we've introduced a new set of visualizations to our Open Liberty Grafana dashboards under a new tab labelled "REST". In addition, hover-over descriptions have been added to help provide a short summary about each visualization and their function. These updates apply to OKD, RHOCP, and Standalone Open Liberty instances.
 
@@ -100,13 +204,9 @@ If you do not already have Grafana and Prometheus setup, there are Kabanero guid
 
 Grafana dashboards for Liberty on OKD or RHOCP can be found in our link:https://github.com/OpenLiberty/open-liberty-operator/tree/master/deploy/dashboards/metrics[open-liberty-operator repository].
 
-[#GQL]
-== Use GraphQL with Open Liberty
-
-Open Liberty officially supports link:https://github.com/eclipse/microprofile-graphql[MicroProfile GraphQL]. This allows users to write "code-first" GraphQL applications putting clients in control of the data they receive. Join the growing link:https://landscape.graphql.org/[landscape of GraphQL adopters] and write your first GraphQL application today! Use link:https://github.com/OpenLiberty/sample-mp-graphql[this] sample to get started.
 
 [#STA]
-== Server startup route changes in Open Liberty 
+== Web application startup changes in Open Liberty
 
 Open Liberty has been updated to consider Web Applications started after calls to the `ServletContainerInitializers` and `ServletContextListeners` have completed. This has the effect of moving more of the application initialization into the server startup route and may make applications and the server appear to take longer to start. It doesn't affect how long it takes for applications to start processing requests, it just moves it to run prior to the ports opening. In addition, you can now configure the `server.xml` so a failure in a `ServletContextListener` will cause application startup to fail. To do so, add the following:
 
@@ -117,63 +217,8 @@ Open Liberty has been updated to consider Web Applications started after calls t
 
 Find out more about application properties link:https://openliberty.io/docs/ref/config/#application.html[here].
 
-[#MVN]
-== Support provisioning features from maven repository
-
-Users are now able to install desired features onto their Open Liberty runtimes from Maven Central or an on-premises Maven repository, such as one served on Artifactory or Nexus, using a convenient command line tool. 
-
-Use the `wlp/bin/featureUtility` command to find, get information about, and install assets that are in a Maven repository.
-
-|===
-|**Desired outcome** |**Command**
-|Display help information for the installFeature action
-|`featureUtility help installFeature`
-|Install the MicroProfile Health 2.2 feature from Maven Central
-|`featureUtility installFeature mpHealth-2.2` or `featureUtility installFeature io.openliberty.features:mpHealth-2.2`
-|Install server features for the myserver server
-|`featureUtility installServerFeatures myserver`
-|Install the MicroProfile Health 2.2 feature without caching the feature to the local Maven repository
-|`featureUtility installFeature mpHealth-2.2 --noCache`
-|Install server features for the myserver server without caching the features to the local Maven repository
-|`featureUtility installServerFeatures myserver --noCache`
-|Install the Admin Center feature from Maven Central
-|`featureUtility installFeature adminCenter-1.0 --acceptLicense`
-|Install features for the myserver server with debug enabled
-|`featureUtility installServerFeatures defaultServer --verbose`
-|View a template of your featureUtility.properties file
-|`featureUtility viewSettings`
-|Search for the MicroProfile Health 2.2 feature from Maven Central and all configured Maven repositories
-|`featureUtility find mpHealth-2.2`
-|Search for all available features from Maven Central and all configured Maven repositories
-|`featureUtility find`
-|===
-
-[#CDI]
-== Allow stack products to provide CDI extensions as part of a user feature 
-
-Open Liberty now has a new SPI through which user features can register CDI Extensions which can interact with the CDI lifecycle events for all applications on the server. You can find documentation on Open Liberty user features here and documentation on CDI Extensions here. Javadoc for Liberty SPIs can be found link:https://www.ibm.com/support/knowledgecenter/SSD28V_liberty/com.ibm.websphere.javadoc.liberty.doc/spi_ndz.html[here].
-
-Previously, CDI Extensions could only be implemented in application code. This new SPI will allow users to create a module that benefits from the deeper integration with Open Liberty, available to a user-feature and expose that module to applications via CDI.
-
-In your user feature, implement the interface `io.openliberty.cdi.spi.CDIExtensionMetadata` and annotate your implementation class with `org.osgi.service.component.annotations.Component`:
-
-[source, java]
-----
-import io.openliberty.cdi.spi.CDIExtensionMetadata;
-
-@Component(service = CDIExtensionMetadata.class, configurationPolicy = IGNORE)
-public class SPIMetaData implements CDIExtensionMetadata {
-----
-
-Implement the method `public Set<Class<? extends Extension>> getExtensions()` so it returns your CDI extension or extensions. Now every time an application starts on a server with your user feature enabled, your CDI extensions will receive it’s CDI lifecycle events.
-
-Syntactic sugar is also provided for common use cases via the method `public Set<Class<?>> getBeanClasses()`. A class returned from that method will be registered with CDI. You can then `@Inject` it as with any other class. If it is a CDI producer, you can `@Inject` the classes it produces and if it is an interceptor, it will intercept CDI beans.
-
-You can implement one or both of `getBeanClasses()` and `getExtensions()` depending on your needs.
-
-
 //end::features[]
 
 == Get Open Liberty 20.0.0.6 now
 
-Available through <<run,Maven, Gradle, Docker, and as a downloadable archive>>.
+Available through <<run, Maven, Gradle, Docker, and as a downloadable archive>>.
