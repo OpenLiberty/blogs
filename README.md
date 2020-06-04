@@ -95,7 +95,7 @@ These steps are completed by the editors of the blog. They might ask questions o
 
 2. Add tags to the blog post:
 
-   a. In the author's branch, update the [blogs_tags.json](./blog_tags.json) file by adding the slug of the blog post (not including the date part of the file name) to the start of the `posts` array (1-2 entries per line) for each appropriate tag. Do this in an editor (such as VSCode) and make sure the syntax is correct.
+   a. In the author's branch, update the [blogs_tags.json](./blog_tags.json) file by adding the slug of the blog post (the file name without the date part or the `.adoc`) to the start of the `posts` array (1-2 entries per line) for each appropriate tag. Do this in an editor (such as VSCode) and make sure the syntax is correct.
 
    b. Push the changes to `draft` branch as before and check that they get built correctly on the [draft site](https://draft-openlibertyio.mybluemix.net/blog/).
 
