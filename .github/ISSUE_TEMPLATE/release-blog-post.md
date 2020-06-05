@@ -21,17 +21,17 @@ The Open Liberty release blog post is written in asciidoc and pushed to the [Ope
 
 Follow the instructions in the README and the template file to complete the following tasks:
 
-- [ ] Create a draft release blog post in asciidoc, build to the draft site, and create a PR to `staging` with a link to the post on the draft site. Record all the reviews/approvals in the PR.
+- [ ] Create a draft release blog post in asciidoc, build to [the draft site](https://draft-openlibertyio.mybluemix.net/blog/), and create a PR to the `staging` branch with a link to the post on [the draft site](https://draft-openlibertyio.mybluemix.net/blog/). Add all the reviewers (see below) to the PR so that they can add all their review feedback and approvals in the PR.
 - [ ] Get the draft post reviewed by:
   - [ ] All the people who contributed the content to the blog post.
-  - [ ] At least one of the following people: @lauracowen, @mbroz2,@NottyCode
+  - [ ] At least one of the following people: @lauracowen, @mbroz2, @NottyCode
 - [ ] Agree with @lauracowen, @mbroz2, or @NottyCode which feature will lead this blog post, then write a title, slug, summary first paragraph, and SEO front matter appropriately.
 - [ ] Get the post approved by @lauracowen, @mbroz2, or @NottyCode.
 - [ ] On release day (usually a Friday), @lauracowen, @mbroz2, or @NottyCode will publish the post.
 
 ## 2. Red Hat Runtimes release notes for Open Liberty
 
-The release notes are automatically built from the asciidoc release blog post. This is done by using the appropriate tags in the asciidoc source and then the Red Hat documentation build includes the tagged sections in the release notes.
+The release notes are automatically built from the asciidoc release blog post. This is done by using the appropriate tags in the asciidoc source and then the Red Hat documentation build includes the tagged sections in the release notes. The tags ensure that information in the blog post that is not relevant to the Red Hat Runtimes release are omitted from the Red Hat Runtimes release notes.
 
 - [ ] In the asciidoc source of the draft release blog post, check that the include tags are in the correct places in the asciidoc source file:
   - [ ] `// tag::intro[]` (before the first paragraph)
