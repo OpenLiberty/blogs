@@ -55,6 +55,7 @@ These steps are to be completed by the author of the blog post.
    Link the PR to the issue you created in Step 1.
 
 5. Request a build of the [draft openliberty.io site](https://draft-openlibertyio.mybluemix.net/blog/):
+
     1. Sign in to [Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io) with your GitHub account.
     2. Click **More Options > Trigger Build**. Make sure the `master` branch is selected, then click **Trigger custom build**.
     
