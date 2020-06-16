@@ -151,11 +151,11 @@ If a published post on openliberty.io/blog contains an error or needs updating i
 
 3. If the tags need correcting, update the [blogs_tags.json](./blog_tags.json) file. If you add new tags, make sure to add the blog post's slug to the beginning of the `posts` arrays (1-2 entries per line) for each tag.
 
-4. Create a PR from your branch to the `draft` branch, then run the [draft site build from Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io) to check that the changes are fine on the [draft site](https://draft-openlibertyio.mybluemix.net/blog/).
+4. Create a PR from your branch to the `draft` branch, then (when the PR has been merged) run the [draft site build from Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io) to check that the changes are fine on the [draft site](https://draft-openlibertyio.mybluemix.net/blog/).
 
    Make any changes in your branch then push to `draft` branch again rebuild.
 
-5. When the post is ready to publish, create a PR from your branch to `staging branch` (not from `draft` branch) and add @lauracowen as reviewer.
+5. Create a PR from your branch to `staging branch` (not from `draft` branch) and add @lauracowen as reviewer. You can create this PR at any point because any new changes you make in your branch are automatically added to the PR.
 
 6. When approved, @lauracowen (or other admin) will merge to `staging`, then run the [build for the staging site from Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io) and check that it looks fine on the [staging site](https://staging-openlibertyio.mybluemix.net/blog/).
 
