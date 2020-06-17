@@ -19,7 +19,7 @@ These steps are to be completed by the author of the blog post.
 
    * **Release blog posts** (Open Liberty release announcements only)
 
-    Create an issue using the `Open Liberty release notes` issue template. Make sure to select each task in the issue as you complete it to show progress.
+     Create an issue using the `Open Liberty release notes` issue template. Make sure to select each task in the issue as you complete it to show progress.
     
 
 2. Clone the repo and create your feature branch off of the default `prod` branch. From the `prod` branch, run: `git branch -b branch_name`, where `branch_name` is a name you give your new branch.
