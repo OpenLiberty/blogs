@@ -25,7 +25,7 @@ Frank Ji <https://github.com/fwji>
 // Example post: 2020-04-02-generate-microprofile-rest-client-code.adoc
 // // // // // // // //
 
-With the ever growing adoption of cloud native application development and microservice architecture, the applications being deployed to the cloud are now comprised of from a few to hundreds of microservices. In order to track the inter communication between each individual microservices, distributed tracing has been implemented to help DevOps teams to keep track of requests being relayed from one service to another. Among all the distributed tracing frameworks, Jaeger and Zipkin are the most popular stack loved by the developers. In the context of Red Hat OpenShift (we will simply refer it to OpenShift from this point on), Jaeger is arguably the more popular choice as it is the distributed tracing component of the Red Hat OpenShift Service Mesh framework. If you are interested in an all-in-one bundled observability approach including tracing, visualization, security and networking for your microservice on OpenShift, take a look at the link:https://docs.openshift.com/container-platform/4.4/service_mesh/service_mesh_arch/understanding-ossm.html[Red Hat OpenShift Service Mesh] documents. For developers who are interested only in the distributed tracing side of the equation, the following sections will explain in detail on how to deploy and configure Jaeger and the microservice applications properly for tracing.
+With the ever growing adoption of cloud native application development and microservice architecture, the applications being deployed to the cloud are now comprised of from a few to hundreds of microservices. In order to track the inter communication between each individual microservices, distributed tracing has been implemented to help DevOps teams to keep track of requests being relayed from one service to another. Among all the distributed tracing frameworks, Jaeger and Zipkin are the most popular stack loved by the DevOps teams. In the context of Red Hat OpenShift (we will simply refer it to OpenShift from this point on), Jaeger is arguably the more popular choice as it is the distributed tracing component of the Red Hat OpenShift Service Mesh framework. If you are interested in an all-in-one bundled observability approach including tracing, visualization, security and networking for your microservice on OpenShift, take a look at the link:https://docs.openshift.com/container-platform/4.4/service_mesh/service_mesh_arch/understanding-ossm.html[Red Hat OpenShift Service Mesh] documents. For developers who are interested only in the distributed tracing side of the equation, the following sections will explain in detail on how to deploy and configure Jaeger and the microservice applications properly for tracing.
 
 == Install Jaeger Operator
 
@@ -37,9 +37,7 @@ Before the installation, let's first create a new project on our OpenShift clust
 oc new-project jaegertracing
 ----
 
-Next, we'll first install Elasticsearch Operator and then Jaeger Operator. This is so that the Jaeger Operator can self provision any existing Elasticsearch Opeartor with their generated certificates stored as the Kubernetes Secrets.
-
-To install Elasticsearch Operator, navigate to the Operator Hub and search for Elasticsearch. Follow the prompt to install the operator and make sure that it is installed to the jaegertracing project created earlier.
+Next, we'll first install Elasticsearch Operator and then Jaeger Operator. To install Elasticsearch Operator, navigate to the Operator Hub and search for Elasticsearch. Follow the prompt to install the operator and make sure that it is installed to the jaegertracing project created earlier.
 
 [.img_border_light]
 image::/img/blog/blog_jaeger_es_operator.png[Figure 1:  Elasticsearch Operator installation via Operator Hub, align="center"]
@@ -68,7 +66,7 @@ After the installation of both Elasticsearch Operator and Jaeger Operator, navig
 
 == Configure Jaeger Operator
 
-Before creating a Jaeger instance, let's recap on the Jaeger components. Jaeger is comprised of agent, collector and query three main components. Additionally, there is also Jaeger client which is part of your application responsible for instrumenting the application and creating spans. And finally, Jaeger makes use of third party storage solutions such as Cassandra and Elasticsearch for data persistence. The overall architecture is illustrated in the diagram below.
+Before creating a Jaeger instance, let's recap on the Jaeger components. Jaeger is comprised of agent, collector and query -- three main components. Additionally, there is also Jaeger client which is part of your application responsible for instrumenting the application and creating spans. And finally, Jaeger makes use of third party storage solutions such as Cassandra and Elasticsearch for data persistence. The overall architecture is illustrated in the diagram below.
 
 [.img_border_light]
 image::/img/blog/blog_jaeger_architecture.png[Figure 3: Typical production grade Jaeger architecture, align="center"]
@@ -81,7 +79,7 @@ Next, we need to figure out which deployment strategy to use. A deployment strat
 
 As tempting as one might want to use the default allInOne strategy, its extremely limited capability makes it not suitable for even some serious test/development settings. As the name suggests, allInOne strategy packs the agent, collector and query in a single pod. It's an easy way to start and manage all Jaeger components for some POC works. However there are two limitations that severely handicap the potential of this setup. For one, the allInOne strategy is using memory as its backend storage, so there is no real data persistence as killing the pod will wipe out all the previously collected trace spans. And secondly, allInOne does not allow any scaling as the replica count is locked to 1.
 
-Production strategy in contrast deploys the collector and query processes individually as separate pods on OpenShift, and can be scaled individually on demand. In addition, it supports secured connection with backend storage services like Cassandra and Elasticsearch, which fits our need perfectly. Streaming strategy is essentially production strategy with added support for streaming platform like Kafka, which we will ignore for now for the sake of simplicity.
+Production strategy in contrast deploys the collector and query processes individually as separate pods on OpenShift, and can be scaled individually on demand. In addition, it supports secured connection with backend storage services like Cassandra and Elasticsearch, which fits our need perfectly. Streaming strategy is essentially production strategy with added support for streaming platform like Kafka, which proves to be beneficial during high loading scenario where the trace spans can be queued inside the streaming platform and wait for their turn to be written to the datastore. We'll discuss some other benefits of streaming strategy in the later section. For the sake of simplicity, we'll use production strategy in our example. 
 
 Let's proceed to create the jaeger yaml file
 
@@ -176,4 +174,4 @@ The above example provided a typical Jaeger setup on OpenShift. However dependin
 
 == Summary
 
-Distributed tracing has become an essential in the world of observability for microservices. With Jaeger Operator, averages users can now start doing distributed tracing on OpenShift with minimum manual configuration. Yet it still offers tons of configurables for advanced users to leverage the full potential of Jaeger. To view the sample deployments used in the blog post, please check the sample-directory folder. If you want to learn more about Jaeger, the link:https://www.jaegertracing.io[Jaeger] home page is still the best resource for Jaeger and Jaeger Operator contents.
+Distributed tracing has become an essential in the world of observability for microservices. With Jaeger Operator, averages users can now start doing distributed tracing on OpenShift with minimum manual configuration. Yet it still offers tons of configurables for advanced users to leverage the full potential of Jaeger. To view the sample deployments used in the blog post, please check the link:https://github.com/fwji/Openshift-Jaeger/tree/master/sample-deployments[sample-directory] folder. If you want to learn more about Jaeger, the link:https://www.jaegertracing.io[Jaeger] home page is still the best resource for Jaeger and Jaeger Operator contents.
