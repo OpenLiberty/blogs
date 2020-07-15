@@ -11,7 +11,7 @@ blog_description: "The new simple timer metric debuted with the release of Micro
 = New simple timer metric with MicroProfile Metrics 2.3
 David Chan <https://github.com/Channyboy>
 
-The new simple timer metric debuted with the release of https://github.com/eclipse/microprofile-metrics/tree/960eb82c00e8fb6753bf1af74ae11bc5951dcaa7[MicroProfile Metrics 2.3].
+The new simple timer metric debuted with the release of https://github.com/eclipse/microprofile-metrics/tree/960eb82c00e8fb6753bf1af74ae11bc5951dcaa7[MicroProfile Metrics 2.3], which is available to use in link:https://openliberty.io/downloads/[Open Liberty].
 The simple timer is a lightweight alternative to the existing timer metric and will satisfy most use cases for timers.
 A simple timer is practical if your metric data is intended to be fed into the <<Viewing-data-with-Prometheus-and-Grafana,Prometheus monitoring tool>> because using https://prometheus.io/docs/prometheus/latest/querying/functions/[PromQL functions] is an effective way to formulate additional values from raw metric data.
 
@@ -20,9 +20,9 @@ Unlike the timer metric, which reports 14 different values, the simple timer rep
 In this post, we'll highlight the benefits of using the simple timer with Prometheus.
 
 Four of the 14 metric values that are provided by the timer represent the mean, 1-minute, 5-minute, and 15-minute rates.
-These calculations can be easily deferred to the Prometheus client side with the use of the https://prometheus.io/docs/prometheus/latest/querying/functions/#rate)[PromQL `rate()` function] and https://prometheus.io/docs/prometheus/latest/querying/basics/#range-vector-selectors[range vector selectors].
+These calculations can be easily deferred to the Prometheus client side with the use of the https://prometheus.io/docs/prometheus/latest/querying/functions/#rate[PromQL `rate()` function] and https://prometheus.io/docs/prometheus/latest/querying/basics/#range-vector-selectors[range vector selectors].
 
-The simple timer also has the ability to report the total elapsed timing duration, which the the timer currently lacks.
+The simple timer also has the ability to report the total elapsed timing duration, which the the existing timer currently lacks.
 If all you want to do is _simply_ time something, then the simple timer should be your metric of choice.
 
 == Simple timer usage
@@ -42,7 +42,7 @@ Before we begin, configure Open Liberty with the link:/docs/ref/feature/#mpMetri
 
 Like all metrics available in MicroProfile Metrics, the simple timer can be instrumented into your application with annotations or instrumented and manipulated programmatically.
 In this blog, we'll use annotations.
-For more information about using the simple timer programatically, see the https://github.com/eclipse/microprofile-metrics/blob/960eb82c00e8fb6753bf1af74ae11bc5951dcaa7/api/src/main/java/org/eclipse/microprofile/metrics/SimpleTimer.java[Java API documentation].
+For more information about using the simple timer programmatically, see the https://github.com/eclipse/microprofile-metrics/blob/960eb82c00e8fb6753bf1af74ae11bc5951dcaa7/api/src/main/java/org/eclipse/microprofile/metrics/SimpleTimer.java[Java API documentation].
 
 The annotation for the simple timer is `@SimplyTimed`.
 The following example shows how to use the simple timer annotation with the available annotation parameters:
@@ -110,7 +110,7 @@ Prometheus is an open source monitoring tool that's used for retrieving and inde
 Grafana, which is also an open source monitoring tool, can utilize that data and display it with graphs and visualizations.
 
 We'll use the REST section of the **mpMetrics 2.x** Grafana dashboard, which is provided by the Open Liberty team, to illustrate a few possible visualizations that can be created from simple timer metric data.
-To download this dashboard, go to the link:https://grafana.com/grafana/dashboards/11706[Grafana website].
+Download this dashboard from the link:https://grafana.com/grafana/dashboards/11706[Grafana website].
 
 First, let's look at a quick explanation of the underlying runtime and application environment:
 
@@ -133,16 +133,12 @@ These values are defined by the dashboard.
 The default is `all` instances with a duration of `10m` (10 minutes).
 For ease of readability, the `{instance=~"\[[instance]]"}` label scope is omitted and the `\[[dur]]` variable was substituted with `10m`.
 
-'''
-
 === REST Request Count Over Last [10m]
 
 PromQL Query: `increase(base_REST_request_total[10m])`
 
 This graph visualization queries and calculates the request count for each REST method resource for the last 10 minutes by using the REST simple timer `count` value.
 To effectively show this data, we use the https://prometheus.io/docs/prometheus/latest/querying/functions/#increase[`increase()` function] with a range vector selector of `10m`.
-
-'''
 
 === Request Count by REST Resource Over Last [10m]
 
@@ -154,8 +150,6 @@ However, now we are aggregating the metric data of matching metrics, which are m
 This aggregation is accomplished by calling the https://prometheus.io/docs/prometheus/latest/querying/operators/#aggregation-operators[`sum()` aggregation operator] to add up the metric values that are acquired from using the `by` clause.
 Our use of the `by` clause in this query limits the metric dimension to only the `class` and `method` labels, which allows us to aggregate across the `instance` label dimension.
 
-'''
-
 [#avg-time-per-request]
 === Average Response Time per REST Request Over Last [10m]
 
@@ -163,8 +157,6 @@ PromQL Query: `rate(base_REST_request_elapsedTime_seconds[10m]) / rate(base_REST
 
 This graph visualization queries and calculates the average response time for each REST method resource for the last 10 minutes by using the simple timer `elapsedTime` and `count` metric values.
 The `rate()` function is necessary for use with the range vector selector.
-
-'''
 
 === Average Response Time per Request Over Last [10m] by REST Resource
 
@@ -175,8 +167,6 @@ We are calculating the average response time of REST endpoints for the last 10 m
 However, now we are aggregating the metric data of matching metrics, which are metrics with matching REST method resources, across multiple applications or container instances and combining them into one.
 This aggregation is accomplished by calling the https://prometheus.io/docs/prometheus/latest/querying/operators/#aggregation-operators[`avg()` aggregation operator] to calculate the average of the metric values acquired with the `by` clause.
 Our use of the `by` clause in this query limits the metric dimension to only the `class` and `method` labels, which allows us to aggregate across the `instance` label dimension.
-
-'''
 
 === Slowest REST Resources Over Last [10m] by Average Response Time
 PromQL Query: `avg(rate(base_REST_request_elapsedTime_seconds[10m]) / rate(base_REST_request_total{instance=[10m])) by (class, method) > 0`
