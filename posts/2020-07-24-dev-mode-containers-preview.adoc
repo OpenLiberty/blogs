@@ -1,0 +1,68 @@
+---
+layout: post
+title: "Fast iterative development with Open Liberty dev mode and containers"
+categories: blog
+author_picture: https://avatars2.githubusercontent.com/u/29640130
+author_github: https://github.com/ericglau
+seo-title: Fast iterative development with Open Liberty dev mode and containers - OpenLiberty.io
+seo-description: Open Liberty's dev mode with container support allows you to iteratively develop cloud-native Java applications with your server running in a Docker container.
+blog_description: "Open Liberty's dev mode with container support allows you to iteratively develop cloud-native Java applications with your server running in a Docker container."
+---
+= Fast iterative development with Open Liberty dev mode and containers
+Eric Lau <https://github.com/ericglau>
+
+When developing an application that will eventually be brought to production, potential issues can be avoided by ensuring that your development and production environments are as similar as possible.  This aligns with link:/blog/2019/09/05/12-factor-microprofile-kubernetes.html[Twelve Factor App] methodology, particularly factor 10 which calls for dev/prod parity.  For cloud-native applications, part of this is addressed by using containers where your environment can be codified to give consistency in development and production.
+
+In this post, we introduce a technology preview for container support in Open Liberty dev mode.  This lets you develop applications on your local environment while your Open Liberty server runs in a container.  The development container image is kept as similar as possible to the production image while allowing for iterative development, so that your code changes are automatically hot deployed to the container and picked up by the running server.  Additionally, dev mode lets you run tests either automatically or on demand, and you can attach a debugger at any time to debug your application.
+
+Note that since container support is in technology preview, its features and parameters are subject to change in future milestones or releases of the Liberty Maven or Gradle plugins. We invite you to try it out and let us know your thoughts so that we can make it even more useful for your development scenarios.
+
+== Iterative development
+
+With container support for Open Liberty dev mode, you can use the same Dockerfile for both development and production.  This means you use the same base image and customizations, and specify the exact configuration files that you need for your application in your Dockerfile so that you don't get any surprises when you proceed to deploy your application into production.  Dev mode makes some changes in the way that the image is built and run in order to enable iterative development, so the images are identical except for how the application and configuration files are mounted into the container.  With dev mode, simply save a source file in any text editor or IDE, and it will be recompiled and picked up without needing to rebuild the image or restart the server.
+
+== Starting dev mode with container support
+
+For Maven projects, specify the Liberty Maven Plugin with version `3.3-M2` in your project’s `pom.xml` file.
+[source,xml]
+----
+    <plugin>
+        <groupId>io.openliberty.tools</groupId>
+        <artifactId>liberty-maven-plugin</artifactId>
+        <version>3.3-M2</version>
+    </plugin>
+----
+
+For Gradle projects, specify the Liberty Gradle Plugin with version `3.1-M1` in your `build.gradle` file.
+[source,groovy]
+----
+apply plugin: 'liberty'
+
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'io.openliberty.tools:liberty-gradle-plugin:3.1-M1'
+    }
+}
+----
+
+Create a Dockerfile in your project root directory as shown in link:https://github.com/OpenLiberty/ci.docker#building-an-application-image[Building an Application Image], including COPY commands for your application and configuration files.
+
+Start dev mode with container support by running one of following commands in your project:
+
+* Maven: `mvn liberty:devc`
+* Gradle: `gradle libertyDevc`
+
+This compiles your application, builds the development image, and runs the server in the container.  You can continue to make changes to your source code or configuration files while dev mode is running.  Press Enter in the terminal to run tests, or attach a debugger to port `7777` at any time to debug your application.  Quit dev mode by pressing CTRL+C in the terminal, or type `q` and press Enter.
+
+== Additional resources
+
+For a more comprehensive demo, see the link:https://github.com/OpenLiberty/demo-devmode/tree/devc[devc branch of the demo-devmode project].
+
+For more details on dev mode with container support, see the documentation for the link:https://github.com/OpenLiberty/ci.maven/blob/master/docs/dev.md#devc-container-mode[devc goal of the Liberty Maven Plugin] or the link:https://github.com/OpenLiberty/ci.gradle/blob/master/docs/libertyDev.md#libertydevc-task-container-mode[libertyDevc task of the Liberty Gradle Plugin].
+
+== Next steps
+
+As this is a tech preview, functionality can change and we are open to any comments or suggestions.  We aim to iteratively provide additional previews for feedback, so give it a try and let us know what works or doesn't work for you.  You can post in the link:https://gitter.im/OpenLiberty/developer-experience[Open Liberty developer experience chat] or open issues in the link:https://github.com/OpenLiberty/ci.maven[Liberty Maven Plugin] or link:https://github.com/OpenLiberty/ci.gradle[Liberty Gradle Plugin] repositories.
