@@ -1,0 +1,235 @@
+---
+layout: post
+title: "Access HTTP log fields in JSON logs and write JSON directly to system.out without wrapping on Open Liberty 20.0.0.8"
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/jakub-pomykala
+author_github: https://github.com/jakub-pomykala
+seo-title: Access HTTP log fields in JSON logs and write JSON directly to system.out without wrapping on Open Liberty 20.0.0.8 - OpenLiberty.io
+seo-description: With Open Liberty 20.0.0.8 you can now access HTTP log fields in JSON logs and also write JSON directly to system.out without wrapping in the liberty_message event.
+blog_description: With Open Liberty 20.0.0.8 you can now access HTTP log fields in JSON logs and also write JSON directly to system.out without wrapping in the liberty_message event.
+---
+= Access HTTP log fields in JSON logs and write JSON directly to system.out without wrapping on Open Liberty 20.0.0.8
+Jakub Pomykala <https://github.com/jakub-pomykala>
+:imagesdir: /
+:url-prefix:
+:url-about: /about/
+
+
+// tag::intro[]
+
+
+With Open Liberty 20.0.0.8 you can now access HTTP log fields in JSON logs which allows you to include fields from the `accessLogging logFormat` attribute in your JSON logs. The update also allows for JSON to be written directly to `system.out` without wrapping in the `liberty_message` event.
+
+
+In link:{url-about}[Open Liberty] 20.0.0.8:
+
+* <<accessJSON, HTTP access log fields in JSON logs>>
+* <<JSONtoSystemOut, Allow JSON written to System.out to pass without wrapping>>
+
+
+View the list of fixed bugs in link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A20008+label%3A%22release+bug%22+[20.0.0.8].
+// end::intro[]
+
+// tag::run[]
+[#run]
+
+== Run your apps using 20.0.0.8
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], here are the coordinates:
+[source,xml]
+----
+<dependency>
+    <groupId>io.openliberty</groupId>
+    <artifactId>openliberty-runtime</artifactId>
+    <version>20.0.0.8</version>
+    <type>zip</type>
+</dependency>
+----
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle]:
+[source,gradle]
+----
+dependencies {
+    libertyRuntime group: 'io.openliberty', name: 'openliberty-runtime', version: '[20.0.0.8,)'
+}
+----
+Or if you're using Docker:
+[source]
+----
+FROM open-liberty
+----
+//end::run[]
+
+Or take a look at our link:{url-prefix}/downloads/[Downloads page].
+[link=https://stackoverflow.com/tags/open-liberty]
+image::img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="center"]
+
+//tag::features[]
+[#accessJSON]
+=== HTTP access log fields in JSON logs
+
+In Open Liberty, you have the option to format your server logs in either basic or JSON format. When logs are in JSON format, you have to specify the sources (`message`, `trace`, `accessLog`, `ffdc`, `audit`) you want to send to `messages.log` or `console.log` and `standard-out`. Open Liberty 20.0.0.8 adds the option for you to include fields from the `accessLogging logFormat` attribute in the JSON logs. Previously, only selected fields would be printed in JSON logs. You are now able to include other NCSA (National Center for Supercomputing Applications) access log fields in your JSON logs.
+
+Also, you now have the ability to define which JSON access log fields you want from the `accessLogging logFormat` attribute, which can then be sent to a log analysis tool, such as the ELK (Elasticsearch, Logstash, Kibana) stack. With this new feature, you can receive more informative logs that suit your needs. For example, you are able to specify that you want the user ID and request time fields in your JSON access logs -- then, these can be filtered by user ID in Kibana and track performance on a user-by-user basis.
+When logs are in JSON format, you can use the new `jsonAccessLogFields` logging attribute to specify whether you want your access logs to have the default set of fields or a custom set of fields based on the HTTP `accessLogging logFormat` attribute. In order to receive access logs, the property `accessLogging` or `httpAccessLogging` must be set. For example, you can set the following attributes in your `server.xml`:
+
+[source, xml]
+----
+<httpEndpoint id="defaultHttpEndpoint" httpPort="9080" httpsPort="9443" host="*">
+    <accessLogging logFormat='%R{W} %u %{my_cookie}C %s'/>
+</httpEndpoint>
+<logging messageFormat="json" messageSource="message,accessLog" jsonAccessLogFields="logFormat"/>
+----
+
+Now, in the `messages.log` file, your access logs will contain the four fields specified in the 
+`accessLogging logFormat` attribute (elapsed time, user ID, cookie, and response code).
+
+[source, javascript]
+----
+{
+    "type": "liberty_accesslog",
+    "host": "192.168.1.15",
+    "ibm_userDir": "/you/jennifer.zhen.chengibm.com/libertyGit/open-liberty/dev/build.image/wlp/usr/",
+    "ibm_serverName": "defaultServer",
+    "ibm_cookie_my_cookie": "example_cookie",
+    "ibm_responseCode": 200,
+    "ibm_datetime": "2020-06-18T09:30:47.693-0400",
+    "ibm_sequence": "1592487047653_0000000000001"
+}
+----
+
+
+This new functionality is also available for the logstashCollector-1.0 feature by adding the following to your `server.xml`:
+
+[source, xml]
+----
+<featureManager>
+    <feature>logstashCollector-1.0</feature>
+</featureManager>
+
+<logstashCollector
+    jsonAccessLogFields="logFormat">
+</logstashCollector>
+----
+
+This table describes the new fields available with the corresponding `logFormat` token: 
+
+|===
+|Field|Description|logFormat Token
+
+|ibm_remoteIP	
+
+|Remote IP address, e.g. 127.0.0.1	
+
+|%a
+
+|ibm_bytesSent
+
+|Response size in bytes excluding headers.
+
+|%b
+
+|ibm_cookie_{cookiename}
+
+|Cookie value from the request.
+
+|%{cookieName}C or %C
+
+|ibm_requestElapsedTime
+
+|The elapsed time of the request - millisecond accuracy, microsecond precision.
+
+|%D
+
+|ibm_requestHeader_{headername}
+
+|Header value from the request.
+
+|%{headerName}i
+
+|ibm_responseHeader_{headername}
+
+|Header value from the response.
+
+|%{headerName}o
+
+|ibm_requestFirstLine
+
+|First line of the request.
+
+|%r
+
+|ibm_requestStartTime
+
+|The start time of the request, in NCSA format.
+
+|%t
+
+|ibm_accessLogDatetime
+
+|The time when the message to the access log is queued to be logged, in normal NCSA format.
+
+|%{t}W
+
+|ibm_remoteUserID
+
+|Remote user according to the WebSphere Application Server specific $WSRU header
+
+|%u
+
+|===
+
+For more information:
+
+* link:{url-prefix}/docs/ref/config/#logging.html[Open Liberty Logging]
+
+* link:{url-prefix}/docs/20.0.0.7/log-trace-configuration.html[Open Liberty Log and Trace Configuration]
+
+
+[#JSONtoSystemOut]
+=== Allow JSON written to System.out to pass without wrapping
+
+In Open Liberty, you have the option to format your server logs in basic or JSON format. When logs are in JSON format, you have to specify the sources (message, trace, accessLog, ffdc, audit) you want to send to `messages.log` or `console.log` and `standard-out`. This feature adds a new option for you to write pre-formatted JSON application logs directly to `System.out` or `System.err`. Previously, when Open Liberty was running with JSON logging enabled, Open Liberty embeds anything written to `System.out` or `System.err` into the message field of a `liberty_message` event. Now, you can write JSON directly to `System.out` or `System.err` without wrapping in the `liberty_message` event.
+
+You can now write your JSON application logs directly to `System.out` or `System.err`, which can then be sent to a log analysis tool, such as the ELK (Elasticsearch, Logstash, Kibana) stack. Previously, when JSON logging was enabled, pre-formatted JSON application logs would look like this:
+
+[source, javascript]
+----
+{
+    "type":"liberty_message",
+    "host":"192.168.0.119",
+    "ibm_userDir":"\/you\/yushan.lin@ibm.com\/Documents\/archived-guide-log4j\/finish\/target\/liberty\/wlp\/usr\
+    ",
+    "ibm_serverName":"log4j.sampleServer",
+    "message":"{\n   \"timeMillis\" : 1587666082123,\n  
+            \"thread\" : \"Default Executor-thread-8\",\n  
+            \"level\" : \"WARN\",\n  
+            \"loggerName\" : \"application.servlet.LibertyServlet\",\n  
+            \"message\" : \"hello liberty servlet warning message!\",\n  
+            \"endOfBatch\" : false,\n  
+            \"loggerFqcn\" : \"org.apache.logging.log4j.spi.AbstractLogger\",\n  
+            \"threadId\" : 53,\n  
+            \"threadPriority\" : 5\n}\r",
+    "ibm_threadId":"00000035",
+    "ibm_datetime":"2020-04-23T14:21:22.124-0400",
+    "module":"SystemOut",
+    "loglevel":"SystemOut",
+    "ibm_methodName":"",
+    "ibm_className":"",
+    "ibm_sequence":"1587666082124_000000000001B",
+    "ext_thread":"Default Executor-thread-8”
+}
+----
+
+
+Now you can output the logs so that pre-formatted JSON logs are not wrapped in `liberty_message` events. Visualization tools such as Kibana can be used to analyze certain fields in your JSON logs. You can analyze both custom-formatted JSON application logs and Liberty JSON logs in the same visualization.
+
+You can enable this functionality by setting `appsWriteJson="true"` in the logging element of the `server.xml`, or you can have it set from the moment the server starts by setting in bootstrap.properties:
+`com.ibm.ws.logging.apps.write.json=true`.
+
+For more information:
+
+* link:{url-prefix}/docs/ref/config/#logging.html[Open Liberty Logging]
+
+// end::features[]
+
+== Get Open Liberty 20.0.0.8 now
+Available through <<run,Maven, Gradle, Docker, and as a downloadable archive>>.
