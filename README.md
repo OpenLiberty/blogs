@@ -53,7 +53,7 @@ These steps are to be completed by the author of the blog post.
 5. Push the file to GitHub, then create a pull request (PR) into the `draft` branch.
 
    Link the PR to the issue you created in Step 1.
-   Anyone can review the PR but @lauracowen (or other admin) need to merge it.
+   Anyone can review/approve the PR before you merge it.
 
    (If you've been working in a fork for some reason, create a feature branch [see Step 2] and push your changes to the feature branch, then create a PR to the `draft` branch from there.)
 
