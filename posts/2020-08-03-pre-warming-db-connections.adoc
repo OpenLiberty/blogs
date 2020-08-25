@@ -1,0 +1,137 @@
+---
+layout: post
+title: "Pre-populating Database Connections"
+categories: blog
+author_picture: https://avatars1.githubusercontent.com/aguibert
+author_github: https://github.com/aguibert
+seo-title: Pre-populating Database Connections - OpenLiberty.io
+seo-description: Pre-warm the database connection pool for your applications by obtaining several connections at startup time, so that when your application starts receiving requests the database connections are already available.
+blog_description: "Pre-populate the database connection pool for your applications by obtaining several connections at startup time, so that when your application starts receiving requests the database connections are already available."
+---
+= Pre-populating Database Connections
+Andy Guibert <https://github.com/aguibert>
+
+In modern cloud environments we often use lightweight and disposable instances of our applications, as opposed to long-lived instances. This methodology is sometimes called "scale up vs. scale out", and sometimes it is called "cattle, not pets". The main idea here is that we should expect application instances to be disposed of if they stop working or are no longer needed, or more importantly, that we can easily make more instances if we need more.
+
+When we apply the "cattle, not pets" methodology to applications that use database connections, we realize that the default behavior of lazily getting new connections as requests come in may not provide the best response times for our users.
+
+== CDI to the rescue!
+
+To alleviate this problem, we can "pre-populate" the database connection pool by eagerly obtaining a number of connections immediately once the application instance starts. Some frameworks have proprietary ways of doing this, but there is also a standard way of doing so that will work for any Java EE or MicroProfile complaint runtime.
+
+[source,java]
+----
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
+
+import javax.annotation.Resource;
+import javax.enterprise.context.ApplicationScoped;
+import javax.enterprise.context.Initialized;
+import javax.enterprise.event.Observes;
+import javax.inject.Inject;
+import javax.sql.DataSource;
+
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+
+@ApplicationScoped
+public class ConnectionWarmer {
+  
+  @Inject
+  @ConfigProperty(name = "DB_PREWARM_CONNECTIONS", defaultValue = "5")
+  int preWarmConnections;
+  
+  @Resource(lookup = "jdbc/myDB", shareable = false)
+  DataSource ds;
+  
+  private volatile boolean isWarm = false;
+  
+  public boolean isWarm() {
+    return isWarm;
+  }
+  
+  public void warmConnections(@Observes @Initialized(ApplicationScoped.class) Object context) throws Exception {
+    if (preWarmConnections < 1)
+      return;
+    
+    System.out.println("Pre-populating " + preWarmConnections + " DB connections");
+    
+    List<Connection> connections = new ArrayList<>();
+    try {
+      for (int i = 0; i < preWarmConnections; i++) {
+        connections.add(ds.getConnection());
+      }
+    } finally {
+      connections.forEach(this::closeQuietly);
+    }
+    
+    isWarm = true;
+    System.out.println("Done pre-populating " + preWarmConnections + " connections");
+  }
+  
+  private void closeQuietly(Connection con) {
+    try {
+      con.close();
+    } catch (SQLException ignore) {
+    }
+  }
+}
+----
+
+To accomplish this we are using a few tricks:
+1. Using `@Observes @Initialized(ApplicationScoped.class)` from CDI, we can create a method that will be triggered as soon as the application starts.
+2. Using `@ConfigProperty(name = "DB_PREWARM_CONNECTIONS", defaultValue = "5")` from MicroProfile Config, we define externalized configuration for how many connections to pre-populate, with a default value of `5` connections to pre-populate.
+3. Using `@Resource(lookup = "jdbc/myDB", shareable = false)` from Common Annotations, we can inject the datasource used by our application and define it as `shareable = false` which will ensure that each `getConnection()` request in the sequence will obtain a new physical database connection. The default value is `shareable = true` which would cause all 5 connections to re-use the same physical database connection (normally efficient, but not what we want in this case).
+
+== Waiting to serve requests until connection pool is warm
+
+Getting a number of connections right away when the application starts is only half of the solution. We also want our application to wait to report that it's ready until the necessary number of connections have been pre-populateed. To accomplish this, we can add a readiness check from MicroProfile Health like so:
+
+[source,java]
+----
+import javax.enterprise.context.ApplicationScoped;
+import javax.inject.Inject;
+
+import org.eclipse.microprofile.health.HealthCheck;
+import org.eclipse.microprofile.health.HealthCheckResponse;
+import org.eclipse.microprofile.health.Readiness;
+
+@Readiness
+@ApplicationScoped
+public class WarmConnectionsReady implements HealthCheck {
+  
+  @Inject
+  ConnectionWarmer warmer;
+
+  @Override
+  public HealthCheckResponse call() {
+    return HealthCheckResponse.named("DB connections warm")
+        .state(warmer.isWarm())
+        .build();
+  }
+
+}
+----
+
+Using this readiness check, the entire application/container will wait to report it is ready until the DB connections have been pre-populateed when the cloud infrastructure polls the readiness URL of: link:http://localhost:9080/health/ready[http://localhost:9080/health/ready]
+
+== Try it out!
+
+The complete code mentioned in this post can be found at link:https://github.com/aguibert/basic-liberty-mvn/tree/datasource-prewarm[my sample repository]
+
+[source]
+----
+# clone the repo
+$ git clone git@github.com:aguibert/basic-liberty-mvn.git -b datasource-prewarm
+cd basic-liberty-mvn
+
+# in a separate terminal window, start DB2
+cd /path/to/basic-liberty-mvn
+./startDB2.sh
+
+# in the original terminal window run the app
+mvn liberty:dev
+----
+
+
