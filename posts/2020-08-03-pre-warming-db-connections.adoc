@@ -1,14 +1,14 @@
 ---
 layout: post
-title: "Pre-populating Database Connections"
+title: "Pre-populating database connections for better response times in the cloud"
 categories: blog
 author_picture: https://avatars1.githubusercontent.com/aguibert
 author_github: https://github.com/aguibert
-seo-title: Pre-populating Database Connections - OpenLiberty.io
-seo-description: Pre-warm the database connection pool for your applications by obtaining several connections at startup time, so that when your application starts receiving requests the database connections are already available.
+seo-title: Pre-populating database connections for better response times in the cloud - OpenLiberty.io
+seo-description: Pre-populate the database connection pool for your applications by obtaining several connections at startup time, so that when your application starts receiving requests the database connections are already available.
 blog_description: "Pre-populate the database connection pool for your applications by obtaining several connections at startup time, so that when your application starts receiving requests the database connections are already available."
 ---
-= Pre-populating Database Connections
+= Pre-populating database connections for better response times in the cloud
 Andy Guibert <https://github.com/aguibert>
 
 In modern cloud environments we often use lightweight and disposable instances of our applications, as opposed to long-lived instances. This methodology is sometimes called "scale up vs. scale out", and sometimes it is called "cattle, not pets". The main idea here is that we should expect application instances to be disposed of if they stop working or are no longer needed, or more importantly, that we can easily make more instances if we need more.
@@ -17,7 +17,7 @@ When we apply the "cattle, not pets" methodology to applications that use databa
 
 == CDI to the rescue!
 
-To alleviate this problem, we can "pre-populate" the database connection pool by eagerly obtaining a number of connections immediately once the application instance starts. Some frameworks have proprietary ways of doing this, but there is also a standard way of doing so that will work for any Java EE or MicroProfile complaint runtime.
+To alleviate this problem, we can "pre-populate" (or "pre-warm") the database connection pool by eagerly obtaining a number of connections immediately once the application instance starts. Some frameworks have proprietary ways of doing this, but there is also a standard way of doing so that will work for any Java EE or MicroProfile complaint runtime:
 
 [source,java]
 ----
@@ -80,11 +80,12 @@ public class ConnectionWarmer {
 ----
 
 To accomplish this we are using a few tricks:
-1. Using `@Observes @Initialized(ApplicationScoped.class)` from CDI, we can create a method that will be triggered as soon as the application starts.
+
+1. Using `@Observes @Initialized(ApplicationScoped.class)` from CDI, we can create a method that is triggered as soon as the application starts.
 2. Using `@ConfigProperty(name = "DB_PREWARM_CONNECTIONS", defaultValue = "5")` from MicroProfile Config, we define externalized configuration for how many connections to pre-populate, with a default value of `5` connections to pre-populate.
 3. Using `@Resource(lookup = "jdbc/myDB", shareable = false)` from Common Annotations, we can inject the datasource used by our application and define it as `shareable = false` which will ensure that each `getConnection()` request in the sequence will obtain a new physical database connection. The default value is `shareable = true` which would cause all 5 connections to re-use the same physical database connection (normally efficient, but not what we want in this case).
 
-== Waiting to serve requests until connection pool is warm
+== Waiting to serve requests until the connection pool is warm
 
 Getting a number of connections right away when the application starts is only half of the solution. We also want our application to wait to report that it's ready until the necessary number of connections have been pre-populateed. To accomplish this, we can add a readiness check from MicroProfile Health like so:
 
@@ -114,11 +115,11 @@ public class WarmConnectionsReady implements HealthCheck {
 }
 ----
 
-Using this readiness check, the entire application/container will wait to report it is ready until the DB connections have been pre-populateed when the cloud infrastructure polls the readiness URL of: link:http://localhost:9080/health/ready[http://localhost:9080/health/ready]
+Using this readiness check, the entire application/container waits to report it is ready until the DB connections have been pre-populateed when the cloud infrastructure polls the readiness URL of: link:http://localhost:9080/health/ready[http://localhost:9080/health/ready]
 
 == Try it out!
 
-The complete code mentioned in this post can be found at link:https://github.com/aguibert/basic-liberty-mvn/tree/datasource-prewarm[my sample repository]
+The complete code mentioned in this post can be found in link:https://github.com/aguibert/basic-liberty-mvn/tree/datasource-prewarm[my sample repository]:
 
 [source]
 ----
