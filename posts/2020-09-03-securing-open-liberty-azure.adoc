@@ -12,14 +12,14 @@ blog_description: Reza Rahman explains how to secure Open Liberty applications w
 Reza Rahman <https://github.com/m-reza-rahman>
 
 
-Long gone are the days when you had to create your own user account management, authentication, and authorization for your web delivered software. Instead, contemporary applications leverage these functions (Identity and Access Management or IAM for short) from an external provider. As a full-featured Java application runtime, Open Liberty has great options for externally provided IAM.
+Long gone are the days when you had to create your own user account management, authentication, and authorization for your web delivered software. nstead, contemporary applications make use of Identity and Access Management (IAM) services from external providers. As a full-featured Java application runtime, Open Liberty has great options for externally provided IAM.
 
-Open Liberty supports IAM mainstays, such as Social Media Login, SAML Web Single Sign-on, and OpenID Connect Client. In Bruce Tiffany’s blog post link:https://openliberty.io/blog/2019/08/29/securing-microservices-social-login-jwt.html[“Securing Open Liberty apps and micro-services with MicroProfile JWT and Social Media login,”] you have a solid example on how to use the Open Liberty Social Media Login feature to authenticate users using their existing social media credentials. In this blog post, let’s take a look at another example on how to configure the Liberty social login feature as an OpenID Connect client to secure Java applications with Azure Active Directory.
+Open Liberty supports IAM mainstays, such as Social Media Login, SAML Web Single Sign-on, and OpenID Connect Client. In Bruce Tiffany’s blog post link:https://openliberty.io/blog/2019/08/29/securing-microservices-social-login-jwt.html[“Securing Open Liberty apps and micro-services with MicroProfile JWT and Social Media login,”] you have a solid example of how to use the Open Liberty Social Media Login feature to authenticate users using their existing social media credentials. In this blog post, let’s take a look at another example of how to configure the Liberty Social Media Login feature as an OpenID Connect client to secure Java applications with Azure Active Directory.
 
 The sample code used in this blog is hosted on this link:https://github.com/Azure-Samples/liberty-aad-oidc[GitHub repository]. Feel free to check it out and follow its user guide to run the Java EE demo application before or after reading this blog.
 
 * <<setupAzure, Set up Azure Active Directory>>
-* <<sociallogin, Configure social login as OpenID Connect client>>
+* <<sociallogin, Configure social media login as OpenID Connect client>>
 * <<openid, Use OpenID Connect to authenticate users>>
 * <<workflow, Workflow>>
 * <<secureRest, Secure internal REST calls using JWT RBAC>>
@@ -40,9 +40,9 @@ Learn how to set up Azure AD from these articles:
 
 
 [#sociallogin]
-== Configure social login as OpenID Connect client
+== Configure social media login as OpenID Connect client
 
-The following sample code shows how an application running on an Open Liberty server is configured with the socialLogin-1.0 feature as an OpenID Connect client to authenticate a user from an OpenID Connect Provider, with Azure AD as the designated security provider.
+The following sample code shows how an application running on an Open Liberty server is configured with the `socialLogin-1.0` feature as an OpenID Connect client to authenticate a user from an OpenID Connect Provider, with Azure AD as the designated security provider.
 
 The relevant server configuration in `server.xml`:
 [source, xml]
@@ -123,21 +123,20 @@ The relevant server configuration in `server.xml`:
     </webApplication>
 </server>
 ----
-link:https://github.com/Azure-Samples/liberty-aad-oidc/blob/master/javaee-cafe/src/main/liberty/config/server.xml[Above code sample in GitHub repository]
+(Find this link:https://github.com/Azure-Samples/liberty-aad-oidc/blob/master/javaee-cafe/src/main/liberty/config/server.xml[code sample] in GitHub.)
 
+The `oidcLogin` element has a large number of available configuration options in Open Liberty. With Azure AD, most of them are not required and you can use only the few options used in the code example. This is because Azure AD supports discovery endpoints as is shown in the code example. Discovery endpoints allow for most OpenID Connect configuration to be automatically retrieved by the client, significantly simplifying configuration. In addition, Azure AD instances follow a known pattern for discovery endpoint URLs, allowing us to parameterize the URL using a tenant ID. In addition to that, a client ID and secret are needed. RS256 must be used as the signature algorithm with Azure AD.
 
-The oidcLogin element has a large number of available configuration options in Open Liberty. With Azure AD, most of them are not required and you can use only the few options used in the code example. This is because Azure AD supports discovery endpoints as is shown in the code example. Discovery endpoints allow for most OpenID Connect configuration to be automatically retrieved by the client, significantly simplifying configuration. In addition, Azure AD instances follow a known pattern for discovery endpoint URLs, allowing us to parameterize the URL using a tenant ID. In addition to that, a client ID and secret are needed. RS256 must be used as the signature algorithm with Azure AD.
+The `userNameAttribute` parameter is used to map a token value from Azure AD to a unique subject identity in Liberty. There are  link:https://docs.microsoft.com/en-gb/azure/active-directory/develop/access-tokens[a number of Azure AD token values] you can use. Do be cautious, as the required tokens that exist for v1.0 and v2.0 differ (with v2.0 not supporting some v1.0 tokens). Either `preferred_username` or `oid` can be safely used, although in most cases you will probably want to use the `preferred_username`.
 
-The userNameAttribute parameter is used to map a token value from Azure AD to a unique subject identity in Liberty. There are a number of Azure AD token values you can use that are link:https://docs.microsoft.com/en-gb/azure/active-directory/develop/access-tokens[listed here]. Do be cautious, as the required tokens that exist for v1.0 and v2.0 differ (with v2.0 not supporting some v1.0 tokens). Either preferred_username or oid can be safely used, although in most cases you will probably want to use the preferred_username.
-
-Using Azure AD allows your application to use a certificate with a root CA signed by Microsoft’s public certificate. This certificate is added to the default cacerts of the JVM. Trusting the JVM default cacerts ensures a successful SSL handshake between the OIDC Client and Azure AD (i.e., setting the defaultSSLConfig trustDefaultCerts value to true).
+Using Azure AD allows your application to use a certificate with a root CA signed by Microsoft’s public certificate. This certificate is added to the default cacerts of the JVM. Trusting the JVM default cacerts ensures a successful SSL handshake between the OIDC Client and Azure AD (i.e., setting the `defaultSSLConfig` `trustDefaultCerts` value to `true`).
 
 In our case, we assign all users authenticated via Azure AD the users role. More complex role mappings are possible with Liberty if desired.
 
 [#openid]
 == Use OpenID Connect to authenticate users
 
-The sample application exposes a JSF client, which defines a Java EE security constraint that only users with the role users can access.
+The sample application exposes a JSF client, which defines a Java EE security constraint that only users with the role `users` can access.
 
 The relevant configuration in `web.xml`:
 [source, xml]
@@ -194,14 +193,14 @@ The relevant configuration in `web.xml`:
     </security-constraint>
 </web-app>
 ----
-link:https://github.com/Azure-Samples/liberty-aad-oidc/blob/master/javaee-cafe/src/main/webapp/WEB-INF/web.xml[Above code sample in GitHub repository]
+(Find this link:https://github.com/Azure-Samples/liberty-aad-oidc/blob/master/javaee-cafe/src/main/webapp/WEB-INF/web.xml[code sample] in GitHub.)
 
 
 [#workflow]
 == Workflow
 
 image::/img/blog/workflow-MSAzure.png[OpenID Connect sign-in and token acquisition flow,width=70%,align="center"]
-Picture 1: OpenID Connect sign-in and token acquisition flow from link:https://docs.microsoft.com/en-gb/azure/active-directory/develop/v2-protocols-oidc#protocol-diagram-access-token-acquisition[Microsoft identity platform and OpenID Connect protocol]
+OpenID Connect sign-in and token acquisition flow from link:https://docs.microsoft.com/en-gb/azure/active-directory/develop/v2-protocols-oidc#protocol-diagram-access-token-acquisition[Microsoft identity platform and OpenID Connect protocol]
 
 This is standard Java EE security. When an unauthenticated user attempts to access the JSF client, they are redirected to Microsoft to provide their Azure AD credentials. Upon success, the browser gets redirected back to the client with an authorization code. The client then contacts Microsoft again with the authorization code, client ID and secret to obtain an ID token and access token, and finally create an authenticated user on the client, which then gets access to the JSF client.
 
@@ -221,13 +220,13 @@ public class Cafe implements Serializable {
     }
 }
 ----
-link:https://github.com/Azure-Samples/liberty-aad-oidc/blob/master/javaee-cafe/src/main/java/cafe/web/view/Cafe.java[Above code sample in GitHub repository]
+Find this link:https://github.com/Azure-Samples/liberty-aad-oidc/blob/master/javaee-cafe/src/main/java/cafe/web/view/Cafe.java[code sample] in GitHub.)
 
 
 [#secureRest]
 == Secure internal REST calls using JWT RBAC
 
-The `Cafe` bean depends on `CafeResource`, a REST service built with JAX-RS, to create, read, update and delete coffees. The CafeResource implements RBAC (role-based access control) using MicroProfile JWT to verify the groups claim of the token.
+The `Cafe` bean depends on `CafeResource`, a REST service built with JAX-RS, to create, read, update and delete coffees. The CafeResource service implements RBAC (role-based access control) using MicroProfile JWT to verify the `groups` claim of the token.
 
 [source, java]
 ----
@@ -265,9 +264,9 @@ public class CafeResource {
     }
 }
 ----
-link:https://github.com/Azure-Samples/liberty-aad-oidc/blob/master/javaee-cafe/src/main/java/cafe/web/rest/CafeResource.java[Above code sample in GitHub repository]
+(Find this link:https://github.com/Azure-Samples/liberty-aad-oidc/blob/master/javaee-cafe/src/main/java/cafe/web/rest/CafeResource.java[code sample] in GitHub.)
 
-The `admin.group.id` is injected into the application using MicroProfile Config at the application startup using the `ConfigProperty` annotation. MicroProfile JWT enables you to `@Inject` the JWT (JSON Web Token). The `CafeResource` REST endpoint receives the JWT with the `preferred_username` and groups claims from the ID Token issued by Azure AD in the OpenID Connect authorization workflow. The ID Token can be retrieved using the `com.ibm.websphere.security.social.UserProfileManager and com.ibm.websphere.security.social.UserProfile` APIs.
+The `admin.group.id` is injected into the application using MicroProfile Config at the application startup using the `ConfigProperty` annotation. MicroProfile JWT enables you to `@Inject` the JWT (JSON Web Token). The `CafeResource` REST endpoint receives the JWT with the `preferred_username` and `groups` claims from the ID Token issued by Azure AD in the OpenID Connect authorization workflow. The ID Token can be retrieved using the `com.ibm.websphere.security.social.UserProfileManager and com.ibm.websphere.security.social.UserProfile` APIs.
 
 Here is the relevant configuration snippet in `server.xml`:
 [source, xml]
@@ -296,9 +295,9 @@ Here is the relevant configuration snippet in `server.xml`:
     </authFilter>
 </server>
 ----
-link:https://github.com/Azure-Samples/liberty-aad-oidc/blob/master/javaee-cafe/src/main/liberty/config/server.xml[Above code sample in GitHub repository]
+(Find this link:https://github.com/Azure-Samples/liberty-aad-oidc/blob/master/javaee-cafe/src/main/liberty/config/server.xml[code sample] in GitHub.)
 
-Note, the groups claim is not propagated by default and requires additional Azure AD configuration. To add a groups claim into the ID token, you will need to create a group with type as ‘Security’ and add one or more members to it in Azure AD. In the application registration created as part of Azure AD configuration, you will also need to: find ‘Token configuration’ > select ‘Add groups claim’ > select ‘Security groups’ as group types to include in ID token > expand ‘ID’ and select ‘Group ID’ in ‘Customize token properties by type’ section. Learn more details from these articles:
+Note, the `groups` claim is not propagated by default and requires additional Azure AD configuration. To add a `groups` claim into the ID token, you need to create a group with type as `Security` and add one or more members to it in Azure AD. In the application registration created as part of Azure AD configuration, you also need to find **Token configuration > Add groups claim > Security groups** as group types to **include ID token > expand ID > Group ID Customize token properties by type** section. Learn more details from these articles:
 
 * link:https://docs.microsoft.com/en-gb/azure/active-directory/fundamentals/active-directory-groups-create-azure-portal[Create a new group and add members]
 
