@@ -1,0 +1,255 @@
+---
+layout: post
+title: "Disable default LTPA cookies for TAI/SPNEGO or default JWT cookies for JWT SSO on Open Liberty 20.0.0.7"
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/tomjenningss
+author_github: https://github.com/tomjenningss
+seo-title: Disable default LTPA cookies for TAI/SPNEGO or default JWT cookies for JWT SSO on Open Liberty 20.0.0.7 - OpenLiberty.io
+seo-description: With Open Liberty 20.0.0.7 users have the availability to configure the return LTPA cookie for TAI/SPNEGO or JWT SSO cookie configurations.
+blog_description: With Open Liberty 20.0.0.7 users have the availability to configure the return LTPA cookie for TAI/SPNEGO or JWT SSO cookie configurations.
+---
+= Disable default LTPA cookies for TAI/SPNEGO or default JWT cookies for JWT SSO on Open Liberty 20.0.0.7
+Tom Jennings <https://github.com/tomjenningss>
+:imagesdir: /
+:url-prefix:
+:url-about: /about/
+
+// tag::intro[]
+
+With Open Liberty 20.0.0.7, you can now disable the default LTPA cookies being returned during authentication when using TAI or SPNEGO authentication, and disable JWT cookies being returned when using the JWT Single Sign-on feature.
+
+In link:{url-about}[Open Liberty] 20.0.0.7:
+
+* <<LTPA-cookie, Choose to disable LTPA cookies for TAI or SPNEGO>>
+* <<JWT-cookie, Choose to disable JWT cookies>>
+* <<significant-bug-fixes, Significant bugs fixed in this release>>
+
+// end::intro[]
+
+If you're interested in what's coming soon in Open Liberty, take a look at our <<previews,current development builds>> which include gRPC with Open Liberty.
+
+
+// tag::run[]
+[#run]
+
+== Run your apps using 20.0.0.7
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], here are the coordinates:
+
+[source,xml]
+----
+<dependency>
+    <groupId>io.openliberty</groupId>
+    <artifactId>openliberty-runtime</artifactId>
+    <version>20.0.0.7</version>
+    <type>zip</type>
+</dependency>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+dependencies {
+    libertyRuntime group: 'io.openliberty', name: 'openliberty-runtime', version: '[20.0.0.7,)'
+}
+----
+
+Or if you're using Docker:
+
+[source]
+----
+FROM open-liberty
+----
+
+Or take a look at our link:{url-prefix}/downloads/[Downloads page], where we now also have the Kernel package available to download as a ZIP file. You can then use the link:{url-prefix}/blog/2020/06/05/graphql-open-liberty-20006.html#MVN[featureUtility command] to add the features that you need to the kernel.
+
+
+//end::run[]
+
+[link=https://stackoverflow.com/tags/open-liberty]
+image::img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="center"]
+
+//tag::features[]
+
+[#LTPA-cookie]
+=== Choose to disable LTPA cookies for TAI or SPNEGO
+
+LTPA cookies contain an encrypted authentication token with user identity and expiration information and can be used for single sign-on (SSO). You can now decide whether to receive the LTPA cookie when using TAI and SPNEGO authentication.
+
+When a client (like a browser) is authenticated with an Open Liberty server, the default response is to receive an SSO LTPA cookie in the HTTP servlet. When the same client accesses another protected resource in the Open Liberty server that shares the same LTPA configuration, authentication with the SSO LTPA cookie happens first, before any other authentication mechanism. This can potentially cause unintended results if another authentication mechanism is to be used. You can now disable the creation of LTPA cookies when using TAI and SPNEGO authentication.
+
+Disable LTPA cookies for TAI in the `server.xml`:
+
+[source, xml]
+----
+<server>
+  <featureManager>
+    <feature>appSecurity-2.0</feature>
+  </featureManager>
+  <trustAssociation id="sample" disableLtpaCookie="true" />
+</server>
+----
+
+Disable LTPA cookies for SPNEGO in the `server.xml`:
+
+[source, xml]
+----
+<server>
+  <featureManager>
+    <feature>spnego-1.0</feature>
+  </featureManager>
+  <spnego id="sample" disableLtpaCookie="true" />
+</server>
+----
+
+[#JWT-cookie]
+=== Choose to disable JWT SSO cookie 
+
+When a client (like a browser) is authenticated with an Open Liberty server through the JSON Web Tokens (JWT) single sign-on (SSO) feature (`jwtSso-1.0`), the default response is a JWT SSO cookie in the HTTP servlet. When the same client accesses another protected resource in the same or in a different Open Liberty server, authentication with the JWT cookie happens first, before any other authentication mechanism. This can potentially cause unintended results if another authentication mechanism is to be used. You can now disable JWT cookies when using the JWT SSO feature.
+
+Disable JWT cookies for JWT SSO in the `server.xml`:
+
+[source, xml]
+----
+<server>
+  <featureManager>
+    <feature>jwtSso-1.0</feature>
+  </featureManager>
+  <jwtSso id="sample" disableJwtCookie="true" />
+</server>
+----
+
+[#significant-bug-fixes]
+== Significant bugs fixed in this release
+
+We’ve spent some time fixing bugs. The following sections describe just some of the issues we resolved in this release. If you’re interested, here's the full list of link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A20007+label%3A%22release+bug%22+[fixed bugs in 20.0.0.7].
+
+=== Notable bug fixes and enhancements in JAX-RS 2.1
+
+If you've been seeing a `NullPointerException` when writing multipart form data in your JAX-RS response, we've got good news for you - we fixed that in issue link:https://github.com/OpenLiberty/open-liberty/issues/8048[8048]!
+
+One of our users needed a clever way to restrict JSON field serialization by a user's security role. By using a `ContextResolver` for specifying the JSON-B visibility strategy and injecting the `SecurityContext`, they were able to make this work. Only one problem - the injection into the ContextResolver wasn't working… We fixed that too! Check out issue https://github.com/OpenLiberty/open-liberty/issues/12715[12715]. It's a pretty cool use case!
+
+=== Improvements to HTTP/2 Implementation 
+
+A scenario was reported where excess CPU consumption is seen when a client does not terminate a HTTP/2 connection gracefully.  We've resolved this in issue link:https://github.com/OpenLiberty/open-liberty/issues/12599[12599].
+
+In some specific cases, Liberty does not update its HTTP/2 read window quickly enough, causing the flow control window to stall.  We have improved Liberty's flow control behavior with link:https://github.com/OpenLiberty/open-liberty/issues/12399[12399].
+
+=== Fault Tolerance 2.1 missing dependency
+
+Depending on the MicroProfile Fault Tolerance 2.1 feature in a maven or gradle build did not automatically add a dependency on the MicroProfile Fault Tolerance 2.1 API, potentially causing the error message `The import org.eclipse.microprofile.faulttolerance cannot be resolved` to appear when writing or compiling an application which uses this API. We've resolved this in issue link:https://github.com/OpenLiberty/open-liberty/issues/12567[12567].
+
+
+//end::features[]
+
+[#previews]
+== Previews of early implementations available in development builds
+
+You can now also try out early implementations of some new capabilities in the link:https://openliberty.io/downloads/#development_builds[latest Open Liberty development builds]:
+
+* <<grpc, Try out the new grpc-1.0 and grpcClient-1.0 features>>
+* <<AJWW, Allow JSON written to System.out to pass without wrapping>>
+* <<ALFJ, HTTP access log fields in JSON logs>>
+
+These early implementations are not available in 20.0.0.7, but you can try them out in our daily Docker image by running `docker pull openliberty/daily`. Let us know what you think!
+
+[#grpc]
+=== Try out the new grpc-1.0 and grpcClient-1.0 features
+
+You can now try out the new gRPC and gRPC client.
+
+For details, see the more recently published link:/blog/2020/08/05/jakarta-grpc-beta-20009.html[Open Liberty 20.0.0.9 beta] blog post.
+
+[#AJWW]
+=== Allow JSON written to System.out to pass without wrapping
+
+Open Liberty provides developers with the option to format their server logs in basic or JSON format. When the logs are in JSON format, developers have to specify the sources (`message`, `trace`, `accessLog`, `ffdc`, `audit`) they want to send to `messages.log` or `console.log/standard-out`.
+
+Prior to this change, when Open Liberty ran with JSON logging enabled, it embedded anything written to `System.out/System.err` into the message field of a `liberty_message` event. Now, developers can write JSON directly to `System.out/err` without wrapping in the `liberty_message` event. The JSON can be sent to a log analysis tool, such as the ELK (Elasticsearch, Logstash, Kibana) stack. 
+
+Enable this functionality any time by setting `appsWriteJson="true"` in the logging element of the `server.xml`, or can have it set from the moment the server starts by setting it in the `bootstrap.properties`:
+`com.ibm.ws.logging.apps.write.json=true`
+
+Previously, when JSON logging is enabled, pre-formatted JSON application logs would look like this:
+[source, javascript]
+---
+{
+     "type":"liberty_message",
+     "host":"192.168.0.119",
+     "ibm_userDir":"\/Users\/yushan.lin@ibm.com\/Documents\/archived-guide-log4j\/finish\/target\/liberty\/wlp\/usr\/",
+     "ibm_serverName":"log4j.sampleServer",
+     "message":"{\n   \"timeMillis\" : 1587666082123,\n  
+             \"thread\" : \"Default Executor-thread-8\",\n  
+             \"level\" : \"WARN\",\n  
+              \"loggerName\" : \"application.servlet.LibertyServlet\",\n  
+              \"message\" : \"hello liberty servlet warning message!\",\n  
+              \"endOfBatch\" : false,\n  
+              \"loggerFqcn\" : \"org.apache.logging.log4j.spi.AbstractLogger\",\n  
+              \"threadId\" : 53,\n  
+              \"threadPriority\" : 5\n}\r",
+     "ibm_threadId":"00000035",
+     "ibm_datetime":"2020-04-23T14:21:22.124-0400",
+     "module":"SystemOut",
+     "loglevel":"SystemOut",
+     "ibm_methodName":"",
+     "ibm_className":"",
+     "ibm_sequence":"1587666082124_000000000001B",
+     "ext_thread":"Default Executor-thread-8”
+}
+---
+
+Visualization tools such as Kibana can be used to analyze certain fields in the JSON logs. Users can analyze both custom-formatted JSON application logs and Open Liberty JSON logs in the same visualization. To learn more about JSON logging, link:https://openliberty.io/docs/ref/config/#logging.html[view the documentation.]
+
+[#ALFJ]
+=== HTTP access log fields in JSON logs
+
+Open Liberty provides options to format server logs in basic or JSON format. Choosing logs in JSON format means developers have to specify the sources they want to send to `messages.log` or `console.log/standard-out`. Previously, only select fields would be printed in JSON access logs. The ability to include NCSA access log fields from the accessLogging logFormat property is now available. The ability to include other NCSA access log fields in the JSON logs is now available. 
+
+Users can now define which JSON access log fields they want from the `accessLogging logFormat` property, which can then be sent to a log analysis tool, such as the ELK (Elasticsearch, Logstash, Kibana) stack. This allows more informative logs suiting the users needs. Users can specify that they want the user ID and request time fields in the JSON access logs allowing a filter by user ID feature in Kibana and track performance on a user-by-user basis. 
+
+When logs are in JSON format, use the new `jsonAccessLogFields` logging attribute to specify whether you want your access logs to have the default set of fields, or a custom set of fields based on the HTTP `accessLogging logFormat` attribute. To receive access logs, the property `accessLogging` or `httpAccessLogging` has to be set. 
+
+Set the following attributes in the `server.xml`:
+
+[source, xml]
+----
+<httpEndpoint id="defaultHttpEndpoint" httpPort="9080" httpsPort="9443" host="*">
+  <accessLogging logFormat='%R{W} %u %{my_cookie}C %s'/>
+</httpEndpoint>
+<logging messageFormat="json" messageSource="message,accessLog" jsonAccessLogFields="logFormat"/>
+----
+
+Now, in the `messages.log` file, the access logs will contain the four fields specified in the `accessLogging logFormat` attribute (elapsed time, user ID, cookie, and response code):
+
+[source, javascript]
+----
+{
+  "type": "liberty_accesslog",
+  "host": "192.168.1.15",
+  "ibm_userDir": "/Users/jennifer.zhen.chengibm.com/libertyGit/open-liberty/dev/build.image/wlp/usr/",
+  "ibm_serverName": "defaultServer",
+  "ibm_cookie_my_cookie": "example_cookie",
+  "ibm_responseCode": 200,
+  "ibm_datetime": "2020-06-18T09:30:47.693-0400",
+  "ibm_sequence": "1592487047653_0000000000001"
+}
+----
+
+The new functionality is also available for the `logstashCollector-1.0` feature by adding the following to the `server.xml`:
+
+[source,xml]
+----
+    <featureManager>
+        <feature>logstashCollector-1.0</feature>
+    </featureManager>
+
+    <logstashCollector 
+        jsonAccessLogFields="logFormat">
+----
+
+== Get Open Liberty 20.0.0.7 now
+
+Available through <<run,Maven, Gradle, Docker, and as a downloadable archive>>.
+
