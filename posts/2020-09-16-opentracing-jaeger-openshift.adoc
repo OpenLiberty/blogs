@@ -22,7 +22,7 @@ We recently published a new link:/guides/microprofile-opentracing-jaeger.html[Op
 
 == Install Jaeger and Elasticsearch to collect and store the logs on OpenShift
 
-The foolproof way to deploy Jaeger on OpenShift is using the Jaeger Operator, which is easy to install on OpenShift from OperatorHub. The Jaeger Operator helps to automate the setup of many security-related configurations. In this article, we'll also install link:https://www.elastic.co/what-is/elasticsearch[Elasticsearch], using the Elasticsearch Operator, to store and persist the data collected by Jaeger.
+The foolproof way to deploy Jaeger on OpenShift is using the Jaeger Operator, which is easy to install from OperatorHub. The Jaeger Operator helps to automate the setup of many security-related configurations. In this article, we'll also install link:https://www.elastic.co/what-is/elasticsearch[Elasticsearch], using the Elasticsearch Operator, to store and persist the data collected by Jaeger.
 
 Before the installation, let's first create a new project on our OpenShift cluster called `jaegertracing`:
 
@@ -31,7 +31,7 @@ Before the installation, let's first create a new project on our OpenShift clust
 oc new-project jaegertracing
 ----
 
-Next, install the Elasticsearch Operator then the Jaeger Operator from OperatorHub into the `jaegertracing` project. There are two Jaeger Operator offered by the OperatorHub, a Red Hat Jaeger Operator and a Community Jaeger Operator. The Red Hat one is the only one supported by Red Hat if you are a paid customer, and it's usually a couple releases behind the community ones in terms of the version number. So choose the flavour that suits your organizational needs the best. For this blog, we will be using the Community Jaeger Operator.
+Next, install the Elasticsearch Operator then the Jaeger Operator from OperatorHub into the `jaegertracing` project. There are two Jaeger Operators offered by OperatorHub, a Red Hat Jaeger Operator and a Community Jaeger Operator. The Red Hat one is the only one supported by Red Hat if you are a paid customer, and it's usually a couple releases behind the community ones in terms of the version number. So choose the flavour that suits your organizational needs the best. For this blog post, we will use the Community Jaeger Operator.
 
 After the installation of both the Elasticsearch Operator and the Jaeger Operator, check on the Installed Operators page that both are installed successfully.
 
@@ -68,7 +68,7 @@ spec:
 
 There is barely any detailed configuration for Elasticsearch in the `jaeger.yaml` file. This is because the Jaeger Operator is able to detect any existing Elasticsearch instance that has been deployed by the Elasticsearch Operator, and auto-provision the secured communication between the Elasticsearch and Jaeger processes.
 
-Create the Jaeger instance using Jaeger Operator page on Openshift console or by running the following `oc` command:
+Create the Jaeger instance using the Jaeger Operator page in the Openshift console or by running the following `oc` command:
 
 [source, bash]
 ----
@@ -89,7 +89,7 @@ simple-prod-query-864dfd87b4-wxrps                             2/2     Running  
 
 Now we need to deploy a sample application that can create some trace spans for us to test. Open Liberty supports OpenTracing and Jaeger natively so you can write applications using MicroProfile OpenTracing which automatically generate traces using annotations, as described in Open Liberty's link:/guides/microprofile-opentracing-jaeger.html[Enabling distributed tracing in microservices with Jaeger] guide.
 
-I used the system and inventory apps from the Open Liberty guide and created two deployment YAML files for OpenShift deployment. The YAML files can be found in the link:https://github.com/fwji/Openshift-Jaeger/tree/master/sample-deployments[sample-directory] folder. Before deploying both the apps to your OpenShift cluster, let's take a closer look at the system service's Deployment object spec from the system.yaml file shown below. 
+I used the system and inventory apps from the Open Liberty guide and created two deployment YAML files for OpenShift deployment. The YAML files can be found in the link:https://github.com/fwji/Openshift-Jaeger/tree/master/sample-deployments[sample-deployments] folder. Before deploying both the apps to your OpenShift cluster, let's take a closer look at the system service's Deployment object spec from the `system.yaml` file: 
 
 ----
 apiVersion: apps/v1
@@ -133,12 +133,12 @@ spec:
 status: {}
 ----
 
-In the YAML file, the Deployment controller is annotated with `sidecar.jaegertracing.io/inject: `"true"` so that the agent is injected as a sidecar container within the application pod. If there are multiple Jaeger instances defined in the working namespace, you have to replace "true" with the Jaeger instance name to specify which Jaeger instance you want your application to be associated with.
+In the YAML file, the Deployment controller is annotated with `sidecar.jaegertracing.io/inject: "true"` so that the agent is injected as a sidecar container within the application pod. If there are multiple Jaeger instances defined in the working namespace, you have to replace `"true"` with the Jaeger instance name to specify which Jaeger instance you want your application to be associated with.
 
 The image `frankji/system-image` is a Java application running on Open Liberty with the MicroProfile OpenTracing feature enabled. The configuration also defines some environment variables that are used by the Jaeger client in the sample application. Of the environment variables used, `JAEGER_SAMPLER_TYPE=1` and `JAEGER_SAMPLER_PARAM='const'` are set to make sure that every trace generated by the Jaeger client is sampled by the Jaeger collector. `JAEGER_REPORTER_LOG_SPANS='true'` is set to turn on the logging of the Jaeger client in the Java microservice, so that we know that a trace has been generated.
 
-Now it's time to deploy both the system application and the inventory application to the OpenShift cluster. Download the system.yaml and inventory.yaml from the github repo and run the following command. Before running the command, make sure to replace the namespace and the host name with your own value in the Route object spec in both files
-. 
+Now it's time to deploy both the system application and the inventory application to the OpenShift cluster. Download the `system.yaml` and `inventory.yaml` from the link:https://github.com/OpenLiberty/guide-microprofile-opentracing-jaeger/tree/master/finish[GitHub repo]. Replace the namespace and the host name with your own values in the Route object spec in both files, then run the following commands:
+
 [source, bash]
 ----
 oc create -n jaegertracing -f system.yaml
