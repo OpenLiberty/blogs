@@ -1,6 +1,6 @@
 ---
 layout: post
-title: "Install a signed certificate with ACME Certificate Authority on Open Liberty 20.0.0.10"
+title: "Install a signed certificate with Automatic Certificate Management Environment Support 2.0 in Open Liberty 20.0.0.10"
 categories: blog
 author_picture: https://avatars3.githubusercontent.com/jakub-pomykala
 author_github: https://github.com/jakub-pomykala
@@ -8,19 +8,21 @@ seo-title: Install a signed certificate with ACME Certificate Authority on Open 
 seo-description: With Open Liberty 20.0.0.10 you can now install a signed certificate with ACME Certificate Authority with acmeCA-2.0 plus significant bug fixes
 blog_description: With Open Liberty 20.0.0.10 you can now install a signed certificate with ACME Certificate Authority with acmeCA-2.0 plus significant bug fixes
 ---
-= Install a signed certificate with ACME Certificate Authority with acmeCA-2.0
+= Install a signed certificate with Automatic Certificate Management Environment Support 2.0 in Open Liberty 20.0.0.10
 Jakub Pomykala <https://github.com/jakub-pomykala>
 :imagesdir: /
 :url-prefix:
 :url-about: /
 // tag::intro[]
 
-With Open Liberty 20.0.0.10 you can now install a signed certificate with ACME certifiace Authority with acmeCA-2.0 for improved testing or user experience. Also in this release there are a number of significant bug fixes.
+With Open Liberty 20.0.0.10 you can now install a certificate signed by a Certificate Authority (CA) using the Automatic Certificate Management Environment (ACME) protocol for improved testing or user experience. Also in this release there are a number of significant bug fixes.
 
 In link:{url-about}[Open Liberty] 20.0.0.10:
 
-* <<acme, Install a signed certificate with ACME Certificate Authority (acmeCA-2.0)>>
-View the list of fixed bugs in link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A20009+label%3A%22release+bug%22+[20.0.0.10].
+* <<acme, Install a signed certificate with Automatic Certificate Management Environment Support 2.0 (acmeCA-2.0)>>
+* <<bugs, Significant bugs fixed in this release >>
+
+View the list of fixed bugs in link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A200010+label%3A%22release+bug%22+[20.0.0.10].
 // end::intro[]
 // tag::run[]
 [#run]
@@ -54,11 +56,11 @@ Or take a look at our link:{url-prefix}/downloads/[Downloads page].
 image::img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="center"]
 //tag::features[]
 [#acme]
-=== Install a signed certificate with ACME Certificate Authority (acmeCA-2.0)
+=== Install a signed certificate with Automatic Certificate Management Environment Support 2.0 (acmeCA-2.0)
 
-For default Transport Security (SSL/TLS) support, Open Liberty provides a self-signed certificate. With the ACME feature, a Certificate Authority signed certificate can be installed, providing a trusted certificate for an improved testing or user experience.The self-signed certificate from Open Liberty allows you to enable transport security right away, but the certificate is marked as insecure and you have to accept the warnings when accessing a website with a self-signed certificate. A signed certificate can be costly and may not be available during testing. Getting a Certificate Authority signed certificate (for example, Lets Encrypt), provides a middle ground of a trusted certificate.
+For default Transport Security (SSL/TLS) support, Open Liberty provides a self-signed certificate. With the With the Automatic Certificate Management Environment (ACME) Support 2.0 feature, a Certificate Authority (CA) signed certificate can be installed, providing a trusted certificate for an improved testing or user experience. The self-signed certificate from Open Liberty allows you to enable transport security right away, but most browsers will mark the certificate as insecure and provide a warning or error to the user when accessing a website with a self-signed certificate. Although a signed certificate solves this problem, it can be costly and may not be available during development and testing. Getting a CA signed certificate (for example, Lets Encrypt), provides a middle ground of a trusted certificate.
 
-To use the ACME feature, provide the directory URI for the ACME Certificate Authority (CA) and the domain name for the server. Public ACME providers call back on port 80 to verify domain ownership before issuing a certificate. When the Open Liberty server starts, the provided CA directory URI will be used to request a certificate. The CA signed certificate is installed in the keystore and acts as the default certificate.
+To use the With the Automatic Certificate Management Environment (ACME) Support 2.0 feature, provide the directory URI for the ACME CA and the domain name for the server. Public ACME providers call back on port 80 to verify domain ownership before issuing a certificate. When the Open Liberty server starts, the provided CA directory URI will be used to request a certificate. The CA signed certificate is installed in the keystore and acts as the default certificate.
 
 Add the feature to the `server.xml`:
 [source, xml]
@@ -69,7 +71,7 @@ Add the feature to the `server.xml`:
 
 <acmeCA directoryURI="https://acme.host.com/directory" >
     <domain>theDomainThatIOwn.com</domain>
-   <accountContact>mailto:my_email_addr@theDomainThatIOwn.com</accountContact>
+    <accountContact>mailto:my_email_addr@theDomainThatIOwn.com</accountContact>
 </acmeCA>
 
 <httpEndpoint host="*" httpPort="80" httpsPort="443" id="defaultHttpEndpoint"/>
@@ -90,13 +92,13 @@ We’ve spent some time fixing bugs. The following sections describe just some o
 
 === Enabling openTracing with no tracer class configured
 
-When the MicroProfile 3.x feature is enabled, `mpOpenTracing-1.3` is also enabled even if you have no intention of using OpenTracing. Most likely the tracer fails to load because there is a classloader leak in the OpenTracerManager. Previously, mpOpenTracing-1.3 code tried to load the tracer on every JAX-RS request. This issue has been fixed by loading the tracer only once. A dummy tracer is stored in the tracer map when the initial loading of the tracer fails. Subsequent requests do not load the tracer again when the map has a dummy tracer. Also `AppStateListener` is added to the listener when the application stops. The corresponding entry in the tracer map is removed. The `AppStateListener` also listens to `<Library />`` changes. All entries in the tracer map is cleared.
+When the MicroProfile 3.x feature is enabled, `mpOpenTracing-1.3` is also enabled even if you have no intention of using OpenTracing. Most likely the tracer fails to load because it is not added to the classpath. Previously, `mpOpenTracing-1.3` code tried to load the tracer on every JAX-RS request. This logic has been improved by loading the tracer only once to improve efficiency. Subsequent requests do not load the tracer again. Also the tracer loaded for the application will be removed when the application stops.
 
 Resolved in issue link:https://github.com/OpenLiberty/open-liberty/issues/12613[12613]
 
 === Readiness check reports UP when application fails to start
 
-The MicroProfile Health Check reports `UP` when application fails to start. This bug was fixed by implementing a new test class, which now tests for:
+The MicroProfile Health Check reports `UP` when application fails to start. This bug was fixed by changing the implementation to test for the following:
 
 * Proper state changes when a failing to start app is deployed before server start.
 * Proper state changes when apps are deployed before server start.
@@ -108,13 +110,13 @@ Resolved in issue link:https://github.com/OpenLiberty/open-liberty/issues/11722[
 
 === Support IIOP transmission of Supplemental Multilingual Plane characters (such as emoji) in (wide) Strings
 
-Thanks to the update of Yoko ORB which was used by Open liberty to one that supports the transmission of 2 byte values you can now use emoji in your IIOP transmission. &#128512;
+Have you ever wished you could send &#128512;{nbsp} in your IIOP transmission?  Probably not, but now you can!  All thanks to the update of Yoko ORB which was used by Open Liberty to one that supports the transmission of Supplemental Multilingual Plane Unicode text characters, which are encoded as 2 16-byte values.
 
 Resolved in issue link:https://github.com/OpenLiberty/open-liberty/issues/13613[13613]
 
 === PostgreSQL tables are not automatically generated for transaction recovery
 
-It's possible to configure Liberty to use a database for its transaction logs as documented link:https://www.ibm.com/support/knowledgecenter/SSEQTP_liberty/com.ibm.websphere.wlp.doc/ae/twlp_store_logs_in_rdb.html[here]. PostgreSQL used to be one of the databases for which the necessary tables had to be created manually using the documented DDL as a guide. Now, Liberty can automatically create these tables for postgreSQL.
+It's possible to configure Liberty to use a database for its transaction logs as documented link:https://www.ibm.com/support/knowledgecenter/SSEQTP_liberty/com.ibm.websphere.wlp.doc/ae/twlp_store_logs_in_rdb.html[here]. PostgreSQL used to be one of the databases for which the necessary tables had to be created manually using the documented DDL as a guide. Now, Liberty can automatically create these tables for PostgreSQL.
 
 Resolved in issue link:https://github.com/OpenLiberty/open-liberty/issues/13817[13817]
 
