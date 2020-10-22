@@ -24,7 +24,7 @@ These steps are to be completed by the author of the blog post.
 
 2. Clone the repo and create your feature branch off of the default `prod` branch. From the `prod` branch, run: `git branch -b branch_name`, where `branch_name` is a name you give your new branch.
 
-    Do _all_ your editing in this branch.
+    Do _all_ your editing in this branch in the `blogs` repo (not in a fork).
 
 3. Create your blog post using [Asciidoc](https://asciidoctor.org/docs/asciidoc-syntax-quick-reference/) markup (use an editor such as [VSCode with the Asciidoc plugin](https://marketplace.visualstudio.com/items?itemName=joaompinto.asciidoctor-vscode)):
 
@@ -53,16 +53,20 @@ These steps are to be completed by the author of the blog post.
 5. Push the file to GitHub, then create a pull request (PR) into the `draft` branch.
 
    Link the PR to the issue you created in Step 1.
+   Anyone can review/approve the PR before you merge it.
+
+   (If you've been working in a fork for some reason, create a feature branch [see Step 2] and push your changes to the feature branch, then create a PR to the `draft` branch from there.)
 
 5. Request a build of the [draft openliberty.io site](https://draft-openlibertyio.mybluemix.net/blog/):
-    1. Sign in to [Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io) with your GitHub account.
-    2. Click **More Options > Trigger Build**. Make sure the `master` branch is selected, then click **Trigger custom build**.
+
+    1. Sign in to [Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io/branches) with your GitHub account.
+    2. Click **More Options > Trigger Build**. Type `draft` in the **Branch** field, then click **Trigger custom build**.
     
           The draft site build starts running.
 
 6. When the build is finished, check that the blog renders correctly on the [draft site](https://draft-openlibertyio.mybluemix.net/blog/).
 
-  If you see any problems (e.g. formatting or typos), resolve them first in your branch, create another PR into `draft` branch (link the PR to the issue again), then run the [draft site build from Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io) again.
+  If you see any problems (e.g. formatting or typos), resolve them first in your branch, create another PR into `draft` branch (link the PR to the issue again), then run the [draft site build from Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io/branches) again.
 
 7. When you're happy with the post, create a PR from your branch (_not_ from the `draft` branch) to the `staging` branch.
 
@@ -72,7 +76,7 @@ These steps are to be completed by the author of the blog post.
    
    Add @lauracowen, your technical reviewer, and any other reviewers to get their final approval for both content and format.
    
-   As before, make any changes in your branch, push the changes to the `draft` branch, then run the [draft site build from Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io) again to check that they are fine on the [draft site](https://draft-openlibertyio.mybluemix.net/blog/).
+   As before, make any changes in your branch, push the changes to the `draft` branch, then run the [draft site build from Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io/branches) again to check that they are fine on the [draft site](https://draft-openlibertyio.mybluemix.net/blog/).
 
    This automatically updates the PR to `staging`.
 
@@ -89,7 +93,7 @@ These steps are completed by the editors of the blog. They might ask questions o
 
    Ask the author to make changes by adding review comments to the PR.
 
-   For edits such as punctuation, formatting, highlighting, adding SEO details, or larger changes discussed with the author, the editor can make the edits directly in the author's branch and push the changes to `draft` branch, then rebuild the [draft site from Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io) to check them.
+   For edits such as punctuation, formatting, highlighting, adding SEO details, or larger changes discussed with the author, the editor can make the edits directly in the author's branch and push the changes to `draft` branch, then rebuild the [draft site from Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io/branches) to check them.
    
    To check out the author's branch locally: `git fetch origin` then `git checkout -b branch_name origin/branch_name`, which creates a new local branch that's linked to their remote branch. When you've made changes, push them back to `origin/branch_name`.
 
@@ -115,7 +119,7 @@ These steps are completed by the editors of the blog. They might ask questions o
    
    b. Ask @lauracowen (or another admin) to merge the PR into `staging`.
    
-4. Request a build of the [staging openliberty.io site from Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io).
+4. Request a build  of the [staging openliberty.io site from Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io/branches) (type `staging` in the **Branch** field of the dialog).
 
 5. When the build has finished, check to make sure the blog renders correctly on the [staging site](https://staging-openlibertyio.mybluemix.net/blog/). 
 
@@ -151,13 +155,13 @@ If a published post on openliberty.io/blog contains an error or needs updating i
 
 3. If the tags need correcting, update the [blogs_tags.json](./blog_tags.json) file. If you add new tags, make sure to add the blog post's slug to the beginning of the `posts` arrays (1-2 entries per line) for each tag.
 
-4. Create a PR from your branch to the `draft` branch, then (when the PR has been merged) run the [draft site build from Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io) to check that the changes are fine on the [draft site](https://draft-openlibertyio.mybluemix.net/blog/).
+4. Create a PR from your branch to the `draft` branch, then (when the PR has been merged) run the [draft site build from Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io/branches) to check that the changes are fine on the [draft site](https://draft-openlibertyio.mybluemix.net/blog/).
 
    Make any changes in your branch then push to `draft` branch again rebuild.
 
 5. Create a PR from your branch to `staging branch` (not from `draft` branch) and add @lauracowen as reviewer. You can create this PR at any point because any new changes you make in your branch are automatically added to the PR.
 
-6. When approved, @lauracowen (or other admin) will merge to `staging`, then run the [build for the staging site from Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io) and check that it looks fine on the [staging site](https://staging-openlibertyio.mybluemix.net/blog/).
+6. When approved, @lauracowen (or other admin) will merge to `staging`, then run the [build for the staging site from Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io/branches) and check that it looks fine on the [staging site](https://staging-openlibertyio.mybluemix.net/blog/).
 
 7. The approver will then create a PR from `staging` to `prod`, then merge and [rebuild the production site from the IBM Cloud console](https://console.bluemix.net/devops/pipelines/fcc7c3e9-9c40-4a58-8a7f-09c08413ab7d?env_id=ibm:yp:us-south) to publish the updates on the [openliberty.io/blog](https://openliberty.io/blog/).
 
