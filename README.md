@@ -24,7 +24,7 @@ These steps are to be completed by the author of the blog post.
 
 2. Clone the repo and create your feature branch off of the default `prod` branch. From the `prod` branch, run: `git branch -b branch_name`, where `branch_name` is a name you give your new branch.
 
-    Do _all_ your editing in this branch.
+    Do _all_ your editing in this branch in the `blogs` repo (not in a fork).
 
 3. Create your blog post using [Asciidoc](https://asciidoctor.org/docs/asciidoc-syntax-quick-reference/) markup (use an editor such as [VSCode with the Asciidoc plugin](https://marketplace.visualstudio.com/items?itemName=joaompinto.asciidoctor-vscode)):
 
@@ -53,8 +53,12 @@ These steps are to be completed by the author of the blog post.
 5. Push the file to GitHub, then create a pull request (PR) into the `draft` branch.
 
    Link the PR to the issue you created in Step 1.
+   Anyone can review/approve the PR before you merge it.
+
+   (If you've been working in a fork for some reason, create a feature branch [see Step 2] and push your changes to the feature branch, then create a PR to the `draft` branch from there.)
 
 5. Request a build of the [draft openliberty.io site](https://draft-openlibertyio.mybluemix.net/blog/):
+
     1. Sign in to [Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io/branches) with your GitHub account.
     2. Click **More Options > Trigger Build**. Type `draft` in the **Branch** field, then click **Trigger custom build**.
     
