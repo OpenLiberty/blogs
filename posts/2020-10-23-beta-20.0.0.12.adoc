@@ -71,14 +71,14 @@ For more information about the MicroProfile updates included in this milestone, 
 [#conf]
 === Support for MicroProfile Config 2.0
 
-link:https://github.com/eclipse/microprofile-config[MicroProfile] Config is a specification which Open Liberty implements to allow application configuration from different locations (ConfigSources). In the previous versions, Open Liberty has implemented the specification in its own codebase. However, for MicroProfile Config 2.0 it consumes link:https://github.com/smallrye/smallrye-config[SmallRye's implementation] of the specification.
+link:https://github.com/eclipse/microprofile-config[MicroProfile Config] is a specification which Open Liberty implements to allow application configuration from different locations (ConfigSources). In the previous versions, Open Liberty has implemented the specification in its own codebase. However, for MicroProfile Config 2.0 it consumes link:https://github.com/smallrye/smallrye-config[SmallRye's implementation] of the specification.
 
-MicroProfile Config 2.0 is a major version release (from 1.4) which introduces API/SPI changes and functional changes.
+MicroProfile Config 2.0 is a major version release (from 1.4) which introduces API/SPI and functional changes.
 
 ==== Functional Changes
 
 * Provides a way to retrieve a number of related configuration properties with a specified prefix into a CDI bean, using the link:https://github.com/eclipse/microprofile-config/blob/master/api/src/main/java/org/eclipse/microprofile/config/inject/ConfigProperties.java[@ConfigProperties] annotation.
-
++
 [source, java]
 ----
 @ConfigProperties(prefix="customer")
@@ -88,9 +88,9 @@ public static class BeanOne {
    int age;
 }
 ----
-
++
 The code above retrieves the following defined properties for the `name` and `age` fields:
-
++
 [source, java]
 ----
 customer.name=Bob
@@ -98,7 +98,7 @@ customer.age=24
 ----
 
 * Allows you to easily determine which was the "winning" `ConfigSource` (the `ConfigSource` with the highest ordinal) for a specified property via link:https://github.com/eclipse/microprofile-config/blob/master/api/src/main/java/org/eclipse/microprofile/config/ConfigValue.java[ConfigValue]. A `ConfigValue` object holds information about the configuration property name, configuration value, the ConfigSource name from where the configuration property was loaded and the ordinal of the `ConfigSource`. You can access these values with the following method:
-
++
 [source, java]
 ----
 ConfigValue cv = Config.getConfigValue(String propertyName);
@@ -106,45 +106,45 @@ cv.getSourceName() // the config source that supplies the configure value for th
 ----
 
 * Enables an application to include configuration for different environments and development stages while only one of them is active (e.g. `dev`, `test`, `prod`) via Configuration Profiles. The Config profile can be specified via the `mp.config.profile` property, which can be set in any of the configuration sources. Once it is set, the corresponding properties associated with the active profile are used. The value can also be set at application start-up, for example:
-
++
 [source, xml]
 ----
 java -jar myapp.jar -Dmp.config.profile=testing
 ----
-
++
 The `mp.config.profile` property works on both the property level and config file level:
-
++
 On the property level profiles can be utilised by setting Config property values specific to the selected profile. For example, the `vehicle.name` property in the following example would be set to `bike` from the previous Config start up command:
-
++
 [source, java]
 ----
 %dev.vehicle.name=car
 %testing.vehicle.name=bike
 vehicle.name=lorry
 ----
-
++
 If `mp.config.profile` was not set, `vehicle.name` would be set to `lorry`.
-
++
 On the config file (`microprofile-config.property`) level the property `mp.config.profile` also activates the corresponding `microprofile-config-<mp.config.profile>.properties` with `microprofile-config.properties` as the fallback.
 
 * Supports link:https://download.eclipse.org/microprofile/microprofile-config-2.0-RC1/microprofile-config-spec.html#property-expressions[Property Expressions], which provide a way to set and expand variables in property values. For example, in the following configuration properties, the property `server.url` will be resolved to `http://example.org/endpoint`:
-
++
 [source, java]
 ----
 server.url=http://${server.host}/endpoint
 server.host=example.org
 ----
-
++
 *Note*: Previous working configurations may behave differently (if configuration in use contains values with Property Expressions syntax).
 
 * Two new methods have been introduced to link:https://github.com/eclipse/microprofile-config/blob/master/api/src/main/java/org/eclipse/microprofile/config/Config.java[Config.java]:
 ** `Config.getValues(String propertyName, Class<T> propertyType)`
 ** `Config.getOptionalValues(String propertyName, Class<T> propertyType)`
-
++
 The methods have been added to allow users to retrieve multi-valued properties as lists instead of arrays. The methods return the resolved property values with the specified `propertyType` for the specified `propertyName`.
 
 * `OptinalInt`, `OptionalLong` and `OptionalDouble` are now provided as built-in link:https://download.eclipse.org/microprofile/microprofile-config-2.0-RC1/microprofile-config-spec.html#converter[Converters]. The new Converters can be used like any of the other built-in Converters, converting injected Config property values to a defined type:
-
++
 [source, java]
 ----
 @Inject
@@ -157,7 +157,7 @@ private OptionalInt optionalIntProperty;
 If you move up from MicroProfile Config 1.x to 2.0, please take care of the following incompatible changes:
 
 * `ConfigSource.getPropertyNames` is no longer a default method. The implementation of a `ConfigSource` must implement this method.
-* Previous versions of the specification would not evaluate Property Expressions. As such, previous working configuration may behave differently (if the used configuration contains values with Property Expressions syntax). Set the property `mp.config.property.expressions.enabled` with the value of `false`.
+* Previous versions of the specification would not evaluate Property Expressions. As such, previous working configuration may behave differently (if the used configuration contains values with Property Expressions syntax). Property Expressions can be disabled by setting the property `mp.config.property.expressions.enabled` with the value of `false`.
 * Empty values or other special characters are no longer valid Config property values. This means that `Config.getValue(String propertyName, Class<T> propertyType)` will never return `null`; a `NoSuchElementException` will be thrown if either a Config property value is not defined, is defined as an empty string, or its converter returns `null`. In the previous release, the empty value was returned as an empty value. For more information, please refer to this link:https://download.eclipse.org/microprofile/microprofile-config-2.0-RC1/microprofile-config-spec.html#_config_value_conversion_rules[section].
 
 To enable the new beta features in your app, add them to your `server.xml`:
@@ -229,9 +229,15 @@ link:https://github.com/eclipse/microprofile-jwt-auth/blob/master/spec/src/main/
 [#lra]
 === Support for MicroProfile LRA
 
-Long Running Actions (LRA) provide a cloud native transaction model based on a compensating Saga system. This allows loosely coupled services to coordinate long running activities, guaranteeing eventual data consistency without the need to put locks on data.
+Long Running Actions (LRA) provide a cloud native transaction model based on a link:https://developer.ibm.com/depmodels/microservices/articles/use-saga-to-solve-distributed-transaction-management-problems-in-a-microservices-architecture#saga[compensating Saga system]. This allows loosely coupled services to coordinate long running activities, guaranteeing eventual data consistency without the need to put locks on data.
 
-The features provide a Coordinator, to which LRAs along with any corresponding method are registered, and the participant which allows annotated microservice methods to create a new or join an existing LRA.
+Two features have been provided for LRA support, a Coordinator feature and a Participant feature:
+
+* The Coordinator is a dedicated service that participant microservices implicitly register their LRA’s through the use of annotations and has the responsibility of driving actions such as completing or compensating on an LRA. 
+
+* A Participatant is a JAX-RS microservice that wishes to participate in an LRA and has been annotated appropriately.
+
+In order for an LRA to be used a single instance of the Coordinator feature must be enabled which will start a Coordinator application. Then a participating mircoservice must be written with the Participant feature enabled to allow the LRA annotations to be used.
 
 To start or join an LRA use the `@LRA` annotation. Depending on the type provided it may create a new LRA, join the existing LRA or continue outside one if none is provided. A full list of options can be found in the Microprofile Long Running Actions link:https://github.com/eclipse/microprofile-lra/blob/master/spec/src/main/asciidoc/microprofile-lra-spec.adoc[specification].
 
@@ -301,7 +307,11 @@ To enable the LRA Participants feature in your app, add the following to your `s
     <feature>jaxrs-2.1</feature>
     <feature>mpLRA-1.0</feature>
 </featureManager>
+
+<lra port=“<port>” host=<hostname> path="lrac" />
 ----
+
+Where `<port>` is the default `HTTP` port of the Open Liberty server with the Coordinator feature is enabled, and `<hostname>` is the hostname provided for that Open Liberty server.
 
 It should be noted that MicroProfile Long Running Actions is not a part of the <<mp4, MicroProfile 4.0>> specification, and so needs to be explicitly added as a feature to be used.
 
@@ -343,6 +353,7 @@ The main change visible to developers in Jakarta EE is the names of packages cha
 
 This Open Liberty beta introduces the following Jakarta EE 9 features which now possess their all-new Jakarta EE 9 package names:
 
+* Jakarta WebSocket 2.0 (`websocket-2.0`; now with full CDI integration)
 * Enterprise Beans Remote Client 2.0 (`ejbRemoteClient-2.0`)
 * RESTful Web Services 3.0 (`restfulWS-3.0` and `restfulWSClient-3.0`)
 * Jakarta Server Faces 3.0 (`faces-3.0`)
@@ -351,7 +362,7 @@ This Open Liberty beta introduces the following Jakarta EE 9 features which now 
 These join the Jakarta EE 9 features in link:https://openliberty.io/blog/?search=beta&key=tag[previous Open Liberty betas]:
 
 * Jakarta Enterprise Beans Remote 4.0 (`ejbRemote-4.0`)
-* Jakarta EE Application Client 9.0 (`javaeeClient-9.0`) (now supports Jakarta Enterprise Beans Remote Client 4.0)
+* Jakarta EE Application Client 9.0 (`javaeeClient-9.0`)
 * Jakarta Authentication 2.0 (`jaspic-2.0`)
 * Jakarta Authorization 2.0 (`jacc-2.0`)
 * Jakarta Persistence 3.0 (includes Eclipselink 3.0-RC1.) (`jpa-3.0`)
@@ -362,7 +373,6 @@ These join the Jakarta EE 9 features in link:https://openliberty.io/blog/?search
 * Jakarta Enterprise Beans Lite 4.0 (`ejbLite-4.0`)
 * Jakarta Bean Validation 3.0 (`beanValidation-3.0`)
 * Jakarta Contexts and Dependency Injection 3.0 (`cdi-3.0`)
-* Jakarta WebSocket 2.0 (`websocket-2.0`; currently the integration with CDI is not complete)
 * JDBC 4.2 & 4.3 (`jdbc-4.2` & `jdbc-4.3`)
 * Jakarta Transactions 2.0 (`transaction-2.0`)
 * Jakarta JSON Binding 2.0 (`jsonb-2.0`)
