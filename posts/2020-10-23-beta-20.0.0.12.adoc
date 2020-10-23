@@ -1,0 +1,452 @@
+---
+layout: post
+title: "MicroProfile Updates, New Jakarta EE 9 Packages and more in Open Liberty 20.0.0.12-beta"
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/austin0
+author_github: https://github.com/austin0
+seo-title: MicroProfile Updates, New Jakarta EE 9 Packages and more in Open Liberty 20.0.0.12-beta - OpenLiberty.io
+seo-description: OpenLiberty updates for a number of commonly used MicroProfile features and four new Jakarta EE 9 packages, now available in Open Liberty 20.0.0.12-beta.
+blog_description: Updates for a number of commonly used MicroProfile features and four new Jakarta EE 9 packages.
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+---
+= MicroProfile Updates, New Jakarta EE 9 Packages and more in Open Liberty 20.0.0.12-beta
+Austin Bailey <https://github.com/austin0>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+
+Open Liberty 20.0.0.12-beta comes complete with a range of previews for MicroProfile updates, including support for MicroProfile 4.0 and accompanying updates to MicroProfile Config (2.0) and MicroProfile JWT (1.2). Also available for preview are a multitude of Jakarta EE 9 features amongst which are changes to the Jakarta RESTful Web Services specification and the addition of message-driven bean support.
+
+We have two beta packages for link:{url-about}[Open Liberty]:
+
+* <<allbeta, All Beta Features>>: a larger package that contains all Open Liberty beta features (including Jakarta EE 9 beta features) and GA features and functions.
+* <<jakarta, Jakarta EE 9 Beta Features>>: a lightweight package that contains only the Jakarta EE 9 features.
+
+This means that you can now try out our in-development Open Liberty features by just adding the relevant coordinates to your build tools.
+
+If you try either package, <<feedback, let us know what you think>>.
+[#allbeta]
+== All Beta Features package
+
+The All Beta Features package includes the following beta features:
+
+* <<mp4, Support for MicroProfile 4.0>>
+* <<conf, Support for MicroProfile Config 2.0>>
+* <<jwt, Support for MicroProfile JWT 1.2>>
+* <<lra, Support for MicroProfile LRA>>
+* <<java15, Support for Java SE 15>>
+
+[#mp4]
+=== Support for MicroProfile 4.0
+
+The Open Liberty 20.0.0.12-beta provides most feature updates for MicroProfile 4.0-M1, this includes updates to MicroProfile Config, Fault Tolerance, Metrics, Health, Open Tracing, Open API and JWT, detailed below. While MicroProfile Rest Client is part of the MicroProfile 4.0-M1 specification, this feature narrowly missed the beta train and is scheduled for delivery in milestone 2.
+
+MicroProfile 4.0 brings the following feature updates to Open Liberty:
+
+* Config 2.0
+* Fault Tolerance 3.0
+* Metrics 3.0
+* Health 3.0
+* Open API 2.0
+* JWT 1.2
+* Open Tracing 2.0
+
+To enable the new beta features in your app, add them to your `pom.xml`:
+
+[source, xml]
+----
+    <dependencies>
+        <dependency>
+            <groupId>org.eclipse.microprofile</groupId>
+            <artifactId>microprofile</artifactId>
+            <version>4.0</version>
+            <type>pom</type>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+----
+
+For more information about the MicroProfile updates included in this milestone, visit the link:https://download.eclipse.org/microprofile/microprofile-4.0-M1/microprofile-spec-4.0-M1.html#microprofile4.0-M1[release page].
+
+[#conf]
+=== Support for MicroProfile Config 2.0
+
+link:https://github.com/eclipse/microprofile-config[MicroProfile Config] is a specification which Open Liberty implements to allow application configuration from different locations (ConfigSources). In the previous versions, Open Liberty has implemented the specification in its own codebase. However, for MicroProfile Config 2.0 it consumes link:https://github.com/smallrye/smallrye-config[SmallRye's implementation] of the specification.
+
+MicroProfile Config 2.0 is a major version release (from 1.4) which introduces API/SPI and functional changes.
+
+==== Functional Changes
+
+* Provides a way to retrieve a number of related configuration properties with a specified prefix into a CDI bean, using the link:https://github.com/eclipse/microprofile-config/blob/master/api/src/main/java/org/eclipse/microprofile/config/inject/ConfigProperties.java[@ConfigProperties] annotation.
++
+[source, java]
+----
+@ConfigProperties(prefix="customer")
+@Dependent
+public static class BeanOne {
+   private String name;
+   int age;
+}
+----
++
+The code above retrieves the following defined properties for the `name` and `age` fields:
++
+[source, java]
+----
+customer.name=Bob
+customer.age=24
+----
+
+* Allows you to easily determine which was the "winning" `ConfigSource` (the `ConfigSource` with the highest ordinal) for a specified property via link:https://github.com/eclipse/microprofile-config/blob/master/api/src/main/java/org/eclipse/microprofile/config/ConfigValue.java[ConfigValue]. A `ConfigValue` object holds information about the configuration property name, configuration value, the ConfigSource name from where the configuration property was loaded and the ordinal of the `ConfigSource`. You can access these values with the following method:
++
+[source, java]
+----
+ConfigValue cv = Config.getConfigValue(String propertyName);
+cv.getSourceName() // the config source that supplies the configure value for the above property
+----
+
+* Enables an application to include configuration for different environments and development stages while only one of them is active (e.g. `dev`, `test`, `prod`) via Configuration Profiles. The Config profile can be specified via the `mp.config.profile` property, which can be set in any of the configuration sources. Once it is set, the corresponding properties associated with the active profile are used. The value can also be set at application start-up, for example:
++
+[source, xml]
+----
+java -jar myapp.jar -Dmp.config.profile=testing
+----
++
+The `mp.config.profile` property works on both the property level and config file level:
++
+On the property level profiles can be utilised by setting Config property values specific to the selected profile. For example, the `vehicle.name` property in the following example would be set to `bike` from the previous Config start up command:
++
+[source, java]
+----
+%dev.vehicle.name=car
+%testing.vehicle.name=bike
+vehicle.name=lorry
+----
++
+If `mp.config.profile` was not set, `vehicle.name` would be set to `lorry`.
++
+On the config file (`microprofile-config.property`) level the property `mp.config.profile` also activates the corresponding `microprofile-config-<mp.config.profile>.properties` with `microprofile-config.properties` as the fallback.
+
+* Supports link:https://download.eclipse.org/microprofile/microprofile-config-2.0-RC1/microprofile-config-spec.html#property-expressions[Property Expressions], which provide a way to set and expand variables in property values. For example, in the following configuration properties, the property `server.url` will be resolved to `http://example.org/endpoint`:
++
+[source, java]
+----
+server.url=http://${server.host}/endpoint
+server.host=example.org
+----
++
+*Note*: Previous working configurations may behave differently (if configuration in use contains values with Property Expressions syntax).
+
+* Two new methods have been introduced to link:https://github.com/eclipse/microprofile-config/blob/master/api/src/main/java/org/eclipse/microprofile/config/Config.java[Config.java]:
+** `Config.getValues(String propertyName, Class<T> propertyType)`
+** `Config.getOptionalValues(String propertyName, Class<T> propertyType)`
++
+The methods have been added to allow users to retrieve multi-valued properties as lists instead of arrays. The methods return the resolved property values with the specified `propertyType` for the specified `propertyName`.
+
+* `OptinalInt`, `OptionalLong` and `OptionalDouble` are now provided as built-in link:https://download.eclipse.org/microprofile/microprofile-config-2.0-RC1/microprofile-config-spec.html#converter[Converters]. The new Converters can be used like any of the other built-in Converters, converting injected Config property values to a defined type:
++
+[source, java]
+----
+@Inject
+@ConfigProperty(name = "my.optional.int.property")
+private OptionalInt optionalIntProperty;
+----
+
+=== Incompatible changes
+
+If you move up from MicroProfile Config 1.x to 2.0, please take care of the following incompatible changes:
+
+* `ConfigSource.getPropertyNames` is no longer a default method. The implementation of a `ConfigSource` must implement this method.
+* Previous versions of the specification would not evaluate Property Expressions. As such, previous working configuration may behave differently (if the used configuration contains values with Property Expressions syntax). Property Expressions can be disabled by setting the property `mp.config.property.expressions.enabled` with the value of `false`.
+* Empty values or other special characters are no longer valid Config property values. This means that `Config.getValue(String propertyName, Class<T> propertyType)` will never return `null`; a `NoSuchElementException` will be thrown if either a Config property value is not defined, is defined as an empty string, or its converter returns `null`. In the previous release, the empty value was returned as an empty value. For more information, please refer to this link:https://download.eclipse.org/microprofile/microprofile-config-2.0-RC1/microprofile-config-spec.html#_config_value_conversion_rules[section].
+
+To enable the new beta features in your app, add them to your `server.xml`:
+
+[source, xml]
+----
+<featureManager>
+   <feature>mpConfig-2.0</feature>
+</featureManager>
+----
+
+For more information:
+
+link:https://download.eclipse.org/microprofile/microprofile-config-2.0-RC1/microprofile-config-spec.html#release_notes_20[Release Notes for MicroProfile Config 2.0]
+
+link:https://github.com/eclipse/microprofile-config/milestone/8?closed=1[MicroProfile Config 2.0 Milestone]
+
+[#jwt]
+=== Support for MicroProfile JWT 1.2
+
+The MicroProfile JSON Web Token 1.2 specification allows using a JWT token for authenticating and authorizing requests to a service. The specification simplifies the configuration for managing the validation of the JWT by introducing new MicroProfile Config properties. Enhanced signature algorithm support is added in this Open Liberty beta.
+
+Version 1.2 of the MicroProfile JSON Web Token specification adds the following MicroProfile Config properties to control different aspects of the JWT validation.
+
+==== mp.jwt.token.header
+
+The `mp.jwt.token.header` property allows you to control the HTTP request header which is expected to contain a JWT token. You can specify either Authorization (default) or Cookie values.
+
+==== mp.jwt.token.cookie
+
+The `mp.jwt.token.cookie` property allows you to specify the name of the cookie which is expected to contain a JWT token. The default value is `Bearer` if not specified.
+
+==== mp.jwt.verify.audiences
+
+The `mp.jwt.verify.audiences` property allows you to create list of allowable audience (`aud`) values. At least one of these must be found in the claim. Previously, this had to be configured in the `server.xml` file. Now, you can configure the audiences in the MicroProfile Config property as follows:
+
+[source, java]
+----
+mp.jwt.verify.audiences=conferenceService
+----
+
+==== mp.jwt.verify.publickey.algorithm
+
+The `mp.jwt.verify.publickey.algorithm` property allows you to control the Public Key Signature Algorithm that is supported by the MicroProfile JWT endpoint. The default value is RSA256 if not specified. Previously, this had to be configured in the `server.xml` file. Now, you can configure the public key algorithm used for verification of the JWT in the MicroProfile Config property as follows:
+
+[source, java]
+----
+mp.jwt.verify.publickey.algorithm=ES256
+----
+
+The specification also adds support for the ES256 signature algorithm, while this Open Liberty beta supports using the RS384, RS512, HS384, HS512, ES256, ES384, and the ES512 signature algorithms.
+
+
+To enable the the MicroProfile JWT 1.2 feature in your app, add the following to your `server.xml`:
+
+[source, xml]
+----
+   <featureManager>
+       <feature>mpJwt-1.2</feature>
+   </featureManager>
+----
+
+For more information:
+
+link:https://github.com/eclipse/microprofile-jwt-auth/blob/master/spec/src/main/asciidoc/release-notes.asciidoc#release-notes-for-microprofile-jwt-12[Release Notes for MicroProfile JWT 1.2]
+
+link:https://github.com/eclipse/microprofile-jwt-auth/blob/master/spec/src/main/asciidoc/microprofile-jwt-auth-spec.asciidoc[MicroProfile JWT 1.2 Specification]
+
+[#lra]
+=== Support for MicroProfile LRA
+
+Long Running Actions (LRA) provide a cloud native transaction model based on a link:https://developer.ibm.com/depmodels/microservices/articles/use-saga-to-solve-distributed-transaction-management-problems-in-a-microservices-architecture#saga[compensating Saga system]. This allows loosely coupled services to coordinate long running activities, guaranteeing eventual data consistency without the need to put locks on data.
+
+Two features have been provided for LRA support, a Coordinator feature and a Participant feature:
+
+* The Coordinator is a dedicated service that participant microservices implicitly register their LRA’s through the use of annotations and has the responsibility of driving actions such as completing or compensating on an LRA. 
+
+* A Participatant is a JAX-RS microservice that wishes to participate in an LRA and has been annotated appropriately.
+
+In order for an LRA to be used a single instance of the Coordinator feature must be enabled which will start a Coordinator application. Then a participating mircoservice must be written with the Participant feature enabled to allow the LRA annotations to be used.
+
+To start or join an LRA use the `@LRA` annotation. Depending on the type provided it may create a new LRA, join the existing LRA or continue outside one if none is provided. A full list of options can be found in the Microprofile Long Running Actions link:https://github.com/eclipse/microprofile-lra/blob/master/spec/src/main/asciidoc/microprofile-lra-spec.adoc[specification].
+
+An example of always creating a new LRA when called would be:
+
+[source, java]
+----
+    @LRA(LRA.Type.REQUIRES_NEW)
+    @Path(“/start”)
+    @PUT
+    public Response startAction(@HeaderParam(LRA_HTTP_CONTEXT_HEADER) URI lraId)
+    {
+        /*
+         * Business logic that may call upon other services to participate in this Long Running Action
+         */
+         return Response.ok().build();
+    } 
+----
+
+Once the LRA has been successfully finished all participating services will have their `@Complete` annotated methods called to perform the necessary cleanup:
+
+[source, java]
+----
+    @Complete
+    @Path("/complete")
+    @PUT
+    public Response completeAction(@HeaderParam(LRA_HTTP_CONTEXT_HEADER) URI lraId)
+    {
+        /*
+         * Business logic to cleanup resources once the LRA has closed successfully
+         */
+         return Response.ok().build();
+    }  
+----
+
+Should a service in an LRA be canceled or timeout, the `@Compensate` methods for each participating service in the LRA will be called:
+
+[source, java]
+----
+    @Compensate
+    @Path("/compensate")
+    @PUT
+    public Response compensateAction(@HeaderParam(LRA_HTTP_CONTEXT_HEADER) URI lraId)
+    {
+        /*
+         * As the LRA has been canceled business logic to compensate any changes is necessary
+         */
+         return Response.ok().build();
+    } 
+----
+
+To enable the LRA Coordinator feature in your app, add the following to your `server.xml`:
+[source, xml]
+----
+<featureManager>
+    <feature>cdi-2.0</feature>
+    <feature>jaxrs-2.1</feature>
+    <feature>mpLRACoordinator-1.0</feature>
+</featureManager>
+----
+
+To enable the LRA Participants feature in your app, add the following to your `server.xml`:
+[source, xml]
+----
+<featureManager>
+    <feature>cdi-2.0</feature>
+    <feature>jaxrs-2.1</feature>
+    <feature>mpLRA-1.0</feature>
+</featureManager>
+
+<lra port=“<port>” host=<hostname> path="lrac" />
+----
+
+Where `<port>` is the default `HTTP` port of the Open Liberty server with the Coordinator feature is enabled, and `<hostname>` is the hostname provided for that Open Liberty server.
+
+It should be noted that MicroProfile Long Running Actions is not a part of the <<mp4, MicroProfile 4.0>> specification, and so needs to be explicitly added as a feature to be used.
+
+For more information:
+
+link:https://github.com/eclipse/microprofile-lra/blob/master/spec/src/main/asciidoc/microprofile-lra-spec.adoc[Microprofile Long Running Actions Specification]
+
+=== Try it now 
+
+To try out these features, just update your build tools to pull the Open Liberty All Beta Features package instead of the main release. The beta works with Java SE 15, Java SE 11, or Java SE 8.
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], here are the coordinates:
+
+[source,xml]
+----
+<dependency>
+  <groupId>io.openliberty.beta</groupId>
+  <artifactId>openliberty-runtime</artifactId>
+  <version>20.0.0.12-beta</version>
+  <type>pom</type>
+</dependency>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+dependencies {
+    libertyRuntime group: 'io.openliberty.beta', name: 'openliberty-runtime', version: '[20.0.0.12-beta,)'
+}
+----
+
+Or take a look at our link:{url-prefix}/downloads/#runtime_betas[Downloads page].
+
+[#jakarta]
+== Jakarta EE 9 Beta Features package
+
+The main change visible to developers in Jakarta EE is the names of packages changing to accommodate the new `jakarta.*` namespace. In this Open Liberty beta, we have a number of new API Release Candidates to join the expanding library of supported Jakarta packages.
+
+This Open Liberty beta introduces the following Jakarta EE 9 features which now possess their all-new Jakarta EE 9 package names:
+
+* Jakarta WebSocket 2.0 (`websocket-2.0`; now with full CDI integration)
+* Enterprise Beans Remote Client 2.0 (`ejbRemoteClient-2.0`)
+* RESTful Web Services 3.0 (`restfulWS-3.0` and `restfulWSClient-3.0`)
+* Jakarta Server Faces 3.0 (`faces-3.0`)
+* Jakarta Connectors 2.0 (`connectors-2.0`)
+
+These join the Jakarta EE 9 features in link:https://openliberty.io/blog/?search=beta&key=tag[previous Open Liberty betas]:
+
+* Jakarta Enterprise Beans Remote 4.0 (`ejbRemote-4.0`)
+* Jakarta EE Application Client 9.0 (`javaeeClient-9.0`)
+* Jakarta Authentication 2.0 (`jaspic-2.0`)
+* Jakarta Authorization 2.0 (`jacc-2.0`)
+* Jakarta Persistence 3.0 (includes Eclipselink 3.0-RC1.) (`jpa-3.0`)
+* Jakarta XML Binding 3.0 (`jaxb-3.0`)
+* Jakarta Managed Beans 2.0 (`managedBeans-2.0`)
+* Jakarta Concurrency 2.0 (`concurrent-2.0`)
+* Jakarta Enterprise Beans Home 4.0 (`ejbHome-4.0`)
+* Jakarta Enterprise Beans Lite 4.0 (`ejbLite-4.0`)
+* Jakarta Bean Validation 3.0 (`beanValidation-3.0`)
+* Jakarta Contexts and Dependency Injection 3.0 (`cdi-3.0`)
+* JDBC 4.2 & 4.3 (`jdbc-4.2` & `jdbc-4.3`)
+* Jakarta Transactions 2.0 (`transaction-2.0`)
+* Jakarta JSON Binding 2.0 (`jsonb-2.0`)
+* Jakarta JSON Processing 2.0 (`jsonp-2.0`)
+* Jakarta Servlet 5.0 (`servlet-5.0`)
+* Jakarta Server Pages 3.0 (`jsp-3.0`)
+* Jakarta Expression Language 4.0 (`el-4.0`)
+
+Enable the Jakarta EE 9 beta features in your app's `server.xml`. You can enable the individual features you want or you can just add the Jakarta EE 9 convenience feature to enable all of the Jakarta EE 9 beta features at once:
+
+=== Try it now
+
+To try out these Jakarta EE 9 features on Open Liberty in a lightweight package, just update your build tools to pull the Open Liberty Jakarta EE 9 Beta Features package instead of the main release. The beta works with Java SE 15, Java SE 11, or Java SE 8.
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], here are the coordinates:
+
+[source,xml]
+----
+<dependency>
+    <groupId>io.openliberty.beta</groupId>
+    <artifactId>openliberty-jakartaee9</artifactId>
+    <version>20.0.0.12-beta</version>
+    <type>zip</type>
+</dependency>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+dependencies {
+    libertyRuntime group: 'io.openliberty.beta', name: 'openliberty-jakartaee9', version: '[20.0.0.12-beta,)'
+}
+----
+Or take a look at our link:{url-prefix}/downloads/#runtime_betas[Downloads page].
+
+[source, xml]
+----
+  <featureManager>
+    <feature>jakartaee-9.0</feature>
+  </featureManager>
+----
+
+Or you can add the Web Profile convenience feature to enable all of the Jakarta EE 9 Web Profile beta features at once:
+
+[source, xml]
+----
+  <featureManager>
+    <feature>webProfile-9.0</feature>
+  </featureManager>
+----
+
+[#java15]
+== Support for Java SE 15
+
+Any official Java SE 15 release from link:https://adoptopenjdk.net?variant=openjdk15&jvmVariant=openj9[AdoptOpenJDK], link:https://jdk.java.net/15/[Oracle], or other OpenJDK vendor will work with Open Liberty. Java SE 15 is not a long-term supported release, with standard support scheduled to end in March 2021.
+
+Keep in mind, Eclipse OpenJ9 link:{url-prefix}/blog/2019/10/30/faster-startup-open-liberty.html[typically offers faster startup times] than Hotspot.
+
+The primary features added in this release include:
+
+* link:https://openjdk.java.net/jeps/379[JEP 379] Shenandoah: A Low-Pause-Time Garbage Collector
+* link:https://openjdk.java.net/jeps/377[JEP 377] ZGC: A Scalable Low-Latency Garbage Collector
+* link:https://openjdk.java.net/jeps/378[JEP 378] Text Blocks
+* link:https://openjdk.java.net/jeps/384[JEP 384] Records (Second Preview)
+* link:https://openjdk.java.net/jeps/360[JEP 360] Sealed Classes (Preview)
+
+For more information on downloading a version of Java 15, please visit link:https://adoptopenjdk.net/index.html?variant=openjdk15&jvmVariant=openj9[AdoptOpenJDK.net], link:https://www.eclipse.org/openj9/[Eclipse.org] or link:https://openjdk.java.net/groups/hotspot[OpenJDK.java.net].
+
+For working with the `server.env` file in Open Liberty, please visit the `Configuration Files` section of the Open Liberty link:{url-prefix}/docs/latest/reference/config/server-configuration-overview.html[Server Configuration Overview documentation].
+
+For more information on new features available in Java 15, please visit link:https://openjdk.java.net/projects/jdk/15/[OpenJDK].
+
+[#feedback]
+== Your feedback is welcomed
+
+Let us know what you think on link:https://groups.io/g/openliberty[our mailing list]. If you hit a problem, link:https://stackoverflow.com/questions/tagged/open-liberty[post a question on StackOverflow]. If you hit a bug, link:https://github.com/OpenLiberty/open-liberty/issues[please raise an issue].
