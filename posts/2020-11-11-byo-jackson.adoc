@@ -1,0 +1,70 @@
+---
+layout: post
+title: "JAX-RS and Open Liberty: BYO Jackson"
+categories: blog
+author_picture: https://avatars2.githubusercontent.com/u/21365299
+author_github: https://github.com/andymc12
+seo-title: JAX-RS and Open Liberty: BYO Jackson
+seo-description: Jackson is the JSON implementation for JAX-RS 2.0 in Liberty but does not expose it to user apps. To use cool features in Jackson, you need to package the Jackson JARs in your app.
+blog_description: Jackson is the JSON implementation for JAX-RS 2.0 in Liberty but does not expose it to user apps. To use cool features in Jackson, you need to package the Jackson JARs in your app.
+---
+=  JAX-RS and Open Liberty: BYO Jackson
+Andy McCright <https://github.com/andymc12>
+
+Chances are that if you use JAX-RS 2.0 in Open Liberty you use JSON to format your data.
+If so, it is equally likely that you are using Jackson to do it.
+Liberty’s JAX-RS 2.0 implementation actually uses Jackson as its default JSON provider.
+_That’s pretty cool,_ you say, _but how can I take advantage of that in my application?_
+
+Good question!
+Liberty uses Jackson but intentionally does not expose it to user applications.
+So if you want to use some of the https://github.com/FasterXML/jackson-core/wiki/JsonParser-Features[cool features in Jackson], like annotating fields to ignore or providing serialization processing instructions, you just can’t do it...or can you?
+
+Sure you can, just bring your own Jackson!
+In other words, package the Jackson JAX-RS provider JAR files in your application (in your WAR file).
+The JARs you’ll need are:
+
+* https://mvnrepository.com/artifact/com.fasterxml.jackson.jaxrs/jackson-jaxrs-json-provider[jackson-jaxrs-json-provider]
+* https://mvnrepository.com/artifact/com.fasterxml.jackson.core/jackson-core[jackson-core]
+* https://mvnrepository.com/artifact/com.fasterxml.jackson.jaxrs/jackson-jaxrs-base[jackson-jaxrs-base]
+* https://mvnrepository.com/artifact/com.fasterxml.jackson.core/jackson-databind[jackson-databind]
+* https://mvnrepository.com/artifact/com.fasterxml.jackson.module/jackson-module-jaxb-annotations[jackson-module-jaxb-annotations]
+* https://mvnrepository.com/artifact/com.fasterxml.jackson.core/jackson-annotations[jackson-annotations] – for the cool annotations!
+
+The Jackson JAX-RS JSON provider class is automatically registered if all of the JAR files are in the WAR’s WEB-INF/lib directory.
+However, if you specify any classes in your Application subclass using the getClasses() or getSingletons() methods, you need to register the provider class, like so:
+
+[source,java]
+----
+public class HelloWorldApplication extends Application {
+    @Override
+    public Set<Class<?>> getClasses() {
+        Set<Class<?>> classes = new HashSet<>();
+        // ...
+        classes.add(JacksonJaxbJsonProvider.class);
+        return classes;
+    }
+}
+----
+
+Automatic discovery and registration is not available in the JAX-RS Client APIs, so you would need to explicitly register the provider class, like so:
+
+[source,java]
+----
+Client client = ClientBuilder.newClient().register(JacksonJsonProvider.class);
+----
+
+That’s it!
+Now Liberty’s JAX-RS implementation will use the Jackson provider from your application instead of
+the one built-in to Liberty.
+This means that your application can now use those cool Jackson features.
+
+_Do I need to do any classloading tricks? Like parentLast?_
+Nope, because the Liberty server does not expose the Jackson API packages, your application can load only the Jackson classes that you provide.
+It also means that the application works regardless of the delegation policy – so you can use parentLast if you really want to.
+
+_Do you have a sample application that might help me understand how this works?_
+You bet.
+Check out the https://github.com/WASdev/sample.BYOJackson[sample.BYOJackson app] at the WASdev GitHub repo!
+
+Thanks!
