@@ -1,0 +1,97 @@
+---
+layout: post
+title: "How custom access logs in Open Liberty can be used to improve user experience"
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/Yushan-Lin
+author_github: https://github.com/Yushan-Lin
+seo-title: How custom access logs in Open Liberty can be used to improve user experience - OpenLiberty.io
+seo-description: Customize your server's JSON access logs to analyze requests and improve user experience
+blog_description: "Customize your server's JSON access logs to analyze requests and improve user experience"
+---
+= How custom access log in Open Liberty can be used to improve user experience
+Yushan Lin <https://github.com/Yushan-Lin>
+
+
+How can you improve your web application to serve your clients with better user experience? Let's take an example of an e-commerce web application. Maybe you want to determine the most active users so you can invite them to try the beta of a new part of the site.  Maybe if your website goes down, you want to check the users who were active around that time and send them coupons to encourage them to come back. This is where access logs come into play!
+
+When clients make requests to your servers, including additional information about the request in your logs can be useful for analyzing your application servers. Open Liberty has the ability to write access logs, in JSON format, to either your messages.log or server's console output. This makes it easy for your log analysis solution to ingest and visualize patterns in your access logs. In 20.0.0.8+, we have extended that capability so that you can configure your JSON access logs to have the same set of fields as your http_access.log file. You can customize your access log in a way that will suit your needs for sending it into log aggregation and analysis tools that consume JSON, like Elastic Stack.
+
+== Enable access logging in Liberty
+Server configuration for access logging is done in the server.xml. You can set an accessLogging element inside your httpEndpoint and specify the logFormat you want to include in your access log by including a list of tokens, based on the NCSA options. This configuration only pertains to a single endpoint. Referring to our e-commerce website, if you want to check out which user's sending the request, you can add `%u` to your logFormat and the username of the client will be included in your access log output.
+```
+<httpEndpoint id="defaultHttpEndpoint" httpPort="9080" httpsPort="9443" host="*">
+    <accessLogging logFormat="%h %p %m %s"/>
+</httpEndpoint>
+```
+
+You can also create a global httpAccessLogging element that is referenced by multiple httpEndpoints.
+
+```
+<httpAccessLogging id="access_log" logFormat="%h %p %m %s"/>
+
+<httpEndpoint id="defaultHttpEndpoint” accessLoggingRef="access_log"
+                  host="*"
+                  httpPort="9092"
+                  httpsPort="9493" />
+
+<httpEndpoint id="adminHttpEndpoint” accessLoggingRef="access_log"
+                  host="*"
+                  httpPort="9093"
+                  httpsPort="9494"/>
+```
+You can check out more information about customizing your access logFormat link:https://openliberty.io/docs/20.0.0.10/access-logging.html[here].
+
+== Enabling JSON format
+To enable Liberty to log in JSON format, set `com.ibm.ws.logging.console.format` property to JSON in your server's bootstrap.properties file. 
+
+Add access log as one of the sources in the `com.ibm.ws.logging.console.source` property. By default, the server's JSON access log has a fixed set of fields. To customize your access log fields, you can set `com.ibm.ws.logging.json.access.log.fields` to `logFormat` so only the tokens you specified in your `logFormat` attribute will show up in your access log. This is an example configuration to add to your `bootstrap.properties` file:
+
+```
+com.ibm.ws.logging.console.format=json
+com.ibm.ws.logging.console.log.level=info
+com.ibm.ws.logging.console.source=message,trace,accessLog,ffdc,audit
+com.ibm.ws.logging.json.access.log.fields=logFormat
+```
+
+An example JSON access log output:
+```
+{
+     "type":"liberty_accesslog",
+     "host":"localhost",
+     "ibm_userDir":"\/root\/wlp\/usr\/",
+     "ibm_serverName":"defaultServer",
+     "ibm_remoteUserID":"steve",
+     "ibm_remoteHost":"127.0.0.1",
+     "ibm_requestMethod":"GET",
+     "ibm_requestPort":"9443",
+     "ibm_responseCode":200,
+     "ibm_datetime":"2020-11-02T10:45:36.917-0500",
+     "ibm_sequence":"1604331936911_0000000000002"
+}
+
+```
+Most commonly you would configure log analysis tools to consume and forward either the server's console output or the messages.log output from Liberty. For cases where you prefer to have Liberty directly forward logs to Logstash there is a feature called Logstash Collector. When enabled, it sends your events directly to your Logstash server. Similar to JSON logging, you specify the log events that you want to send to Logstash and set your jsonAccessLogFields to logFormat to customize your server logs being sent to Logstash.
+
+== Visualize your data
+Going back to our e-commerce website, let's address how we can improve user experience by analyzing user's usage pattern. You can send your logs to log analysis tools such as Elastic Stack, and create dashboards to analyze the requests coming into your servers.
+
+If you wanted to determine your most active users and allow them to access a new beta feature, you can create a table to determine your top users:
+
+image::/img/blog/blog_custom_access_active_users.png[Most Active Users,width=70%,align="center"]
+
+You can determine which users were online in a particular time period (such as when the site went down) by filtering on `ibm_datetime`:
+
+image::/img/blog/blog_custom_access_number_of_requests.png[Users Online,width=70%,align="center"]
+
+Overall, the freedom to customize your access log fields with additional information you need in your logs can be useful for analyzing user patterns. You could compare servers and check which servers are slower at taking requests using the `elapsedTime` field (`%D` token in logFormat) to identify latencies in certain servers. You could also check the average bytes transferred over time using `bytesSent` field (`%b` token). You could use `userAgent` field (`%{user-agent}i` token) to check which browsers users are using if they report problems. As shown, the ability to customize your access log fields can help you make decisions to improve your web applications, leading to happy customers!
+
+=== Additional links
+link:https://developer.ibm.com/videos/use-json-logging-in-open-liberty[How to use JSON logging in Open Liberty]
+
+link:https://developer.ibm.com/videos/send-open-liberty-logs-to-elastic-stack/[How to send open liberty logs to Elastic Stack]
+
+link:https://www.ibm.com/support/knowledgecenter/SSEQTP_liberty/com.ibm.websphere.wlp.doc/ae/twlp_analytics_logstash.html[How to use Logstash Collector]
+
+link:https://www.ibm.com/support/knowledgecenter/SSEQTP_liberty/com.ibm.websphere.wlp.doc/ae/twlp_elk_stack.html[Analyzing logs with Elastic Stack]
+link:https://openliberty.io/docs/20.0.0.9/access-logging.html[Access logging in Liberty]
+link:https://openliberty.io/docs/20.0.0.9/log-trace-configuration.html[Logging configurations]
