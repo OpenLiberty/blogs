@@ -3,7 +3,7 @@ name: Open Liberty GA release blog post
 about: Checklist that must be completed to create and publish Open Liberty release notes.
 title: Open Liberty GA release blog post for VERSION_NUMBER
 labels: release
-assignees: lauracowen
+assignees: jakub-pomykala, austin0
 
 ---
 
@@ -24,10 +24,10 @@ Follow the instructions in the README and the template file to complete the foll
 - [ ] Create a draft release blog post in asciidoc, build to [the draft site](https://draft-openlibertyio.mybluemix.net/blog/), and create a PR to the `staging` branch with a link to the post on [the draft site](https://draft-openlibertyio.mybluemix.net/blog/). Add all the reviewers (see below) to the PR so that they can add all their review feedback and approvals in the PR.
 - [ ] Get the draft post reviewed by:
   - [ ] All the people who contributed the content to the blog post.
-  - [ ] At least one of the following people: @lauracowen, @mbroz2, @NottyCode
-- [ ] Agree with @lauracowen, @mbroz2, or @NottyCode which feature will lead this blog post, then write a title, slug, summary first paragraph, and SEO front matter appropriately.
-- [ ] Get the post approved by @lauracowen, @mbroz2, or @NottyCode.
-- [ ] On release day (usually a Friday), @lauracowen, @mbroz2, or @NottyCode will publish the post.
+  - [ ] At least one of the following people: @mbroz2
+- [ ] Agree with @mbroz2 which feature will lead this blog post, then write a title, slug, summary first paragraph, and SEO front matter appropriately.
+- [ ] Get the post approved by @mbroz2.
+- [ ] On release day (usually a Friday) @mbroz2 will publish the post.
 
 ## 2. Red Hat Runtimes release notes for Open Liberty
 
