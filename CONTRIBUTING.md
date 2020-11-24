@@ -1,4 +1,4 @@
-= Signing off your work when contributing a blog post to Open Liberty
+# Signing off your work when contributing a blog post to Open Liberty
 
 If you'd like to write a blog post for OpenLiberty.io, see [README](./README.md) for instructions.
 
