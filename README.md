@@ -63,6 +63,8 @@ These steps are to be completed by the author of the blog post.
 
    Link the PR to the issue you created in Step 1.
 
+   If you find there are a load of merge conflicts at this stage, see [Troubleshooting GitHub workflow](#troubleshooting-github-workflow).
+
 5. Request a build of the [draft openliberty.io site](https://draft-openlibertyio.mybluemix.net/blog/):
     1. Sign in to [Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io/branches) with your GitHub account.
     2. Click **More Options > Trigger Build**. Type `draft` in the **Branch** field, then click **Trigger custom build**.
@@ -179,7 +181,11 @@ See also:
 * [Asciidoc quick syntax](https://asciidoctor.org/docs/asciidoc-syntax-quick-reference/)
 * [Asciidoc user manual (more detailed)](https://asciidoctor.org/docs/user-manual/)
 
+## Troubleshooting GitHub workflow
 
+When you create a PR from your feature branch to the `draft` branch, you might find that you have some conflicts. If you use the Web UI to resolve the conflicts and commit those changes, you will find that GitHub has merged _everything_ from the `draft` branch into your feature branch, including other people's drafts. You _must not_ try to merge all those changes to `staging` or else you'll end up publishing a load of half-finished work. Instead, create a new feature branch off `prod` and use the `git cherry-pick` command to select only the files that you want to publish from the `draft` branch. Then use this new feature branch to create the PR to `staging`.
+
+For more about the `git cherry-pick` command, see [StackOverflow](https://stackoverflow.com/questions/9339429/what-does-cherry-picking-a-commit-with-git-mean) (or search online for more help). You might need some practice to get the hang of it but it's a useful skill to acquire if you do much in GitHub.
 
 ## Running a Docker container for local preview
 
