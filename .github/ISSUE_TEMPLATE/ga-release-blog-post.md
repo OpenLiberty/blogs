@@ -1,7 +1,7 @@
 ---
-name: Open Liberty release notes
+name: Open Liberty GA release blog post
 about: Checklist that must be completed to create and publish Open Liberty release notes.
-title: Release notes for VERSION_NUMBER
+title: Open Liberty GA release blog post for VERSION_NUMBER
 labels: release
 assignees: lauracowen
 
