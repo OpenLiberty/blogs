@@ -25,7 +25,7 @@ These steps are to be completed by the author of the blog post.
 
      Create a normal issue. In the title, make clear that it's for the beta release and which release version.
 
-2. Clone the repo and create your feature branch off of the default `prod` branch. From the `prod` branch, run: `git checkout -b branch_name`, where `branch_name` is a name you give your new branch.
+2. Clone the repo and create a branch off the default `prod` branch. From the `prod` branch, run: `git checkout -b branch_name`, where `branch_name` is a name you give your new branch.
 
     Do _all_ your editing in this branch so that the blog editors can make any necessary edits directly in the branch before publishing your post.
 
@@ -35,21 +35,21 @@ These steps are to be completed by the author of the blog post.
     
       Copy the [post-single-author.adoc](./templates/post-single-author.adoc) file (or [post-multiple-authors.adoc](./templates/post-multiple-authors.adoc) for multiple authors) to the [posts](./posts) directory and rename the file using the format `YYYY-MM-DD-post-title.adoc`, where the date represents the expected publication date (e.g. `2021-11-21-open-liberty-is-awesome.adoc`).
 
-      Place any images in [img/blog](./img/blog/). For multiple authors, third-party posts, etc, see the documentation at the end of this README.
+      Place any images in [img/blog](./img/blog/).
   
     * **GA release blog post** (Open Liberty GA release announcements only)
 
       Copy the [ga-release-post.adoc](./templates/ga-release-post.adoc) file to the [posts](./posts) directory and rename the file using the format `YYYY-MM-DD-post-title.adoc`, where the date represents the expected publication date and the end of the file name is the release version number without periods (e.g. `2021-11-21-open-liberty-is-awesome-210011.adoc`).
 
-      Place any images in [img/blog](./img/blog/). For multiple authors, see the documentation at the end of this README.
+      Place any images in [img/blog](./img/blog/).
 
       Ensure that the Asciidoc tags (e.g. `// tag::intro[]` and `// end::intro[]`) in the template are retained around the relevant parts of the release post. These Asciidoc tags will be used to build alternative versions of the post content.
    
     * **Beta release blog post** (Open Liberty beta release announcements only)
 
-      Copy the [beta-release-post.adoc](./templates/beta-release-post.adoc) file to the [posts](./posts) directory and rename the file using the format `YYYY-MM-DD-post-title.adoc`, where the date represents the expected publication date and the end of the file name is the beta release version number without periods (e.g. `2021-11-21-new-awesomeness-coming-soon-beta-210012.adoc`).
+      Copy the [beta-release-post.adoc](./templates/beta-release-post.adoc) file to the [posts](./posts) directory and rename the file using the format `YYYY-MM-DD-post-title.adoc`, where the date represents the expected publication date and the end of the post title is the beta release version number without periods or hyphens (e.g. `2021-11-21-new-awesomeness-coming-soon-210012beta.adoc`).
 
-      Place any images in [img/blog](./img/blog/). For multiple authors, see the documentation at the end of this README.
+      Place any images in [img/blog](./img/blog/).
 
     * **Third-party blog post** (externally hosted posts only)
 
@@ -57,7 +57,7 @@ These steps are to be completed by the author of the blog post.
 
 4. If you are not employed by IBM, in at least one of your commits, sign off the commit using [the Developer Certificate process](./CONTRIBUTING.md).
 
-4. When you have finished the post, check that it renders correctly. If you have a preview function in your editor, use that (eg the Asciidoc plugin in VSCode). Alternatively, you can use the [Docker image to run a local build of the file](#running-a-docker-container-for-local-preview).
+4. When you have finished the post, check that it renders correctly. If you have a preview function in your editor, use that (eg the Asciidoc plugin in VSCode).
 
 5. Push the file to GitHub, then create a pull request (PR) into the `draft` branch.
 
@@ -186,45 +186,3 @@ See also:
 When you create a PR from your feature branch to the `draft` branch, you might find that you have some conflicts. If you use the Web UI to resolve the conflicts and commit those changes, you will find that GitHub has merged _everything_ from the `draft` branch into your feature branch, including other people's drafts. You _must not_ try to merge all those changes to `staging` or else you'll end up publishing a load of half-finished work. Instead, create a new feature branch off `prod` and use the `git cherry-pick` command to select only the files that you want to publish from the `draft` branch. Then use this new feature branch to create the PR to `staging`.
 
 For more about the `git cherry-pick` command, see [StackOverflow](https://stackoverflow.com/questions/9339429/what-does-cherry-picking-a-commit-with-git-mean) (or search online for more help). You might need some practice to get the hang of it but it's a useful skill to acquire if you do much in GitHub.
-
-## Running a Docker container for local preview
-
-Github.com does a pretty good job of rendering asciidoc so you can preview your file there, but to see exactly what it will
-look like you can run the website locally. 
-
-### Running the website on your local machine
-```
-git clone https://github.com/OpenLiberty/blogs.git
-git clone https://github.com/OpenLiberty/openliberty.io.git
-docker pull kinueng/openliberty.io
-```
-Replace "currentFolder" in the following command with the full path to the folder you are in. 
-```
-docker run --rm --name website -it -p 4000:4000 -v currentFolder/openliberty.io:/home/jekyll kinueng/openliberty.io
-
-# example when current directory is /Users/bruce/projects/blog/website:
-# docker run --name website -it -p 4000:4000 -v /Users/bruce/projects/blog/website/openliberty.io:/home/jekyll kinueng/openliberty.io
-```
-
-### Update the running container with your edits
-Before your new or updated blog entry will appear on the website, you will need to run the script below to update the container with your latest changes, then wait for the container to finish processing them.  Then you can see your changes at http://localhost:4000/blog/
-
-Note that blogs named with dates in the future, e.g. 2099-01-05, will not be shown, so don't do that. 
-
-```
-./blogs/scripts/refresh_docker_image.sh
-```
-
-### How to know when your changes are rendered by the container
-You will see `Jekyll` detect your new files and regenerate the blog files.  You will want to wait for the line "...done in XXXX seconds."
-
-```
-      Regenerating: 101 file(s) changed at 2018-10-29 18:53:10
-      ...
-      Jekyll Feed: Generating feed for posts
-      ...
-            ...done in 121.8705398 seconds.
-```
-
-
-
