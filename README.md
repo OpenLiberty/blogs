@@ -4,7 +4,7 @@
 * [Editors: editing and publishing a post](#Editors-editing-and-publishing-a-post)
 * [Authors and Editors: updating a published post](#Authors-and-Editors-updating-a-published-post)
 * [Troubleshooting Asciidoc](#Troubleshooting-Asciidoc)
-* [Running a Docker container for local preview](#Running-a-Docker-container-for-local-preview)
+* [Troubleshooting GitHub workflow](#troubleshooting-github-workflow)
 
 
 ## Authors: creating a new blog post
@@ -57,7 +57,7 @@ These steps are to be completed by the author of the blog post.
 
 4. If you are not employed by IBM, in at least one of your commits, sign off the commit using [the Developer Certificate process](./CONTRIBUTING.md).
 
-4. When you have finished the post, check that it renders correctly. If you have a preview function in your editor, use that (eg the Asciidoc plugin in VSCode).
+4. When you have finished the post, check that it renders correctly. If you have a preview function in your editor, use that (eg the Asciidoc plugin in VSCode). Otherwise, you can check that GitHub renders it properly when you push to GitHub in the next step.
 
 5. Push the file to GitHub, then create a pull request (PR) into the `draft` branch.
 
@@ -73,7 +73,7 @@ These steps are to be completed by the author of the blog post.
 
 6. When the build is finished, check that the blog renders correctly on the [draft site](https://draft-openlibertyio.mybluemix.net/blog/).
 
-  If you see any problems (e.g. formatting or typos), resolve them first in your branch, create another PR into `draft` branch (link the PR to the issue again), then run the [draft site build from Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io/branches) again.
+    If you see any problems (e.g. formatting or typos), resolve them first in your branch, create another PR into `draft` branch (link the PR to the issue again), then run the [draft site build from Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io/branches) again.
 
 7. When you're happy with the post, create a PR from your branch (_not_ from the `draft` branch) to the `staging` branch.
 
