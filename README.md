@@ -17,14 +17,17 @@ These steps are to be completed by the author of the blog post.
 
      Create a normal issue. In the description, give a simple outline of the purpose of the blog post. If there is a specific date by which the post must be available, mention that in the description too.
 
-   * **Release blog posts** (Open Liberty release announcements only)
+   * **GA release blog posts** (Open Liberty GA release announcements only)
 
      Create an issue using the `Open Liberty release notes` issue template. Make sure to select each task in the issue as you complete it to show progress.
-    
 
-2. Clone the repo and create your feature branch off of the default `prod` branch. From the `prod` branch, run: `git branch -b branch_name`, where `branch_name` is a name you give your new branch.
+   * **Beta release blog posts** (Open Liberty beta release announcements only)
 
-    Do _all_ your editing in this branch.
+     Create a normal issue. In the title, make clear that it's for the beta release and which release version.
+
+2. Clone the repo and create your feature branch off of the default `prod` branch. From the `prod` branch, run: `git checkout -b branch_name`, where `branch_name` is a name you give your new branch.
+
+    Do _all_ your editing in this branch so that the blog editors can make any necessary edits directly in the branch before publishing your post.
 
 3. Create your blog post using [Asciidoc](https://asciidoctor.org/docs/asciidoc-syntax-quick-reference/) markup (use an editor such as [VSCode with the Asciidoc plugin](https://marketplace.visualstudio.com/items?itemName=joaompinto.asciidoctor-vscode)):
 
@@ -34,13 +37,19 @@ These steps are to be completed by the author of the blog post.
 
       Place any images in [img/blog](./img/blog/). For multiple authors, third-party posts, etc, see the documentation at the end of this README.
   
-    * **Release blog post** (Open Liberty release announcements only)
+    * **GA release blog post** (Open Liberty GA release announcements only)
 
-      Copy the [release-post.adoc](./templates/release-post.adoc) file to the [posts](./posts) directory and rename the file using the format `YYYY-MM-DD-post-title.adoc`, where the date represents the expected publication date (e.g. `2021-11-21-open-liberty-is-awesome-210011.adoc`).
+      Copy the [ga-release-post.adoc](./templates/ga-release-post.adoc) file to the [posts](./posts) directory and rename the file using the format `YYYY-MM-DD-post-title.adoc`, where the date represents the expected publication date and the end of the file name is the release version number without periods (e.g. `2021-11-21-open-liberty-is-awesome-210011.adoc`).
 
       Place any images in [img/blog](./img/blog/). For multiple authors, see the documentation at the end of this README.
 
-      Ensure that the tags (e.g. `// tag::intro[]` and `// end::intro[]`) in the template are retained around the relevant parts of the release post. The release post will contain GA and beta content but the tags will be used to build GA-only versions of the post content.
+      Ensure that the Asciidoc tags (e.g. `// tag::intro[]` and `// end::intro[]`) in the template are retained around the relevant parts of the release post. These Asciidoc tags will be used to build alternative versions of the post content.
+   
+    * **Beta release blog post** (Open Liberty beta release announcements only)
+
+      Copy the [beta-release-post.adoc](./templates/beta-release-post.adoc) file to the [posts](./posts) directory and rename the file using the format `YYYY-MM-DD-post-title.adoc`, where the date represents the expected publication date and the end of the file name is the beta release version number without periods (e.g. `2021-11-21-new-awesomeness-coming-soon-beta-210012.adoc`).
+
+      Place any images in [img/blog](./img/blog/). For multiple authors, see the documentation at the end of this README.
 
     * **Third-party blog post** (externally hosted posts only)
 
