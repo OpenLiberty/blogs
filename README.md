@@ -94,7 +94,7 @@ The editors will now review and edit the post. Please respond to any questions t
 
 ## Editors: editing and publishing a post
 
-These steps are completed by the editors of the blog. They might ask questions or make suggestions to the author of the post. They might also make edits directly in the post to prepare it for publishing.
+These steps are completed by the editors of the blog. As editor, you might ask questions or make suggestions to the author of the post. You might also make edits directly in the post to prepare it for publishing.
 
 1. Review the post on the [draft site](https://draft-openlibertyio.mybluemix.net/blog/) as linked from the issue.
 
@@ -114,7 +114,7 @@ These steps are completed by the editors of the blog. They might ask questions o
 
 2. Add blog tags to the blog post:
 
-   a. In the `staging` branch, update the [blogs_tags.json](./blog_tags.json) file by adding the slug of the blog post (the file name without the date part or the `.adoc`) to the start of the `posts` array (1-2 entries per line) for each appropriate tag. You can do this in the web UI editor as long as you're careful with the syntax.
+   a. In the `staging` branch, update the [blogs_tags.json](./blog_tags.json) file by adding the slug of the blog post (the file name without the date part or the `.adoc`) to the start of the `posts` array (1-2 entries per line) for each appropriate tag. You can do this in the web UI editor as long as you're careful with the syntax. This is done in staging to reduce the number of merge conflicts in the `draft` branch later.
 
    b. Merge the changes to `staging` branch. You can do this in advance of the post being ready (as long as the post's file name doesn't change). It's fine if this file gets merged to `prod` earlier than the post itself.
 
