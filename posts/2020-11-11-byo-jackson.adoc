@@ -1,0 +1,71 @@
+---
+layout: post
+title: "JAX-RS and Open Liberty - BYO Jackson"
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/andymc12
+author_github: https://github.com/andymc12
+seo-title: JAX-RS and Open Liberty - BYO Jackson
+seo-description: Jackson is the JSON implementation for JAX-RS 2.0 in Open Liberty, but Open Liberty doesn't expose Jackson to user applications. To use cool features in Jackson, you need to package the Jackson JAR files in your application.
+blog_description: "Jackson is the JSON implementation for JAX-RS 2.0 in Open Liberty, but Open Liberty doesn't expose Jackson to user applications. To use cool features in Jackson, you need to package the Jackson JAR files in your application."
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+---
+= JAX-RS and Open Liberty: BYO Jackson
+Andy McCright <https://github.com/andymc12>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+
+Chances are that if you use JAX-RS 2.0 or 2.1 in Open Liberty, then you use JSON to format your data.
+If so, it's equally likely that you use Jackson as your JSON provider.
+Open Liberty’s JAX-RS 2.0 implementation uses Jackson as its default JSON provider.
+
+You might be wondering, _That’s pretty cool, but how can I take advantage of Jackson in my application?_
+
+Good question!
+Open Liberty uses Jackson but intentionally doesn't expose Jackson to user applications.
+If you want to use some of https://github.com/FasterXML/jackson-core/wiki/JsonParser-Features[the cool features in Jackson], such as annotating fields to ignore or providing serialization processing instructions, just bring your own Jackson.
+In other words, package the Jackson JAX-RS provider JAR files in the WAR file of your application.
+You need the following JAR files:
+
+* https://mvnrepository.com/artifact/com.fasterxml.jackson.jaxrs/jackson-jaxrs-json-provider[jackson-jaxrs-json-provider]
+* https://mvnrepository.com/artifact/com.fasterxml.jackson.core/jackson-core[jackson-core]
+* https://mvnrepository.com/artifact/com.fasterxml.jackson.jaxrs/jackson-jaxrs-base[jackson-jaxrs-base]
+* https://mvnrepository.com/artifact/com.fasterxml.jackson.core/jackson-databind[jackson-databind]
+* https://mvnrepository.com/artifact/com.fasterxml.jackson.module/jackson-module-jaxb-annotations[jackson-module-jaxb-annotations]
+* https://mvnrepository.com/artifact/com.fasterxml.jackson.core/jackson-annotations[jackson-annotations]
+
+The `JacksonJsonProvider` class is automatically registered if all of these JAR files are in the `WEB-INF/lib` directory of your WAR file.
+However, if you specify any classes in your `Application` subclass by using the `getClasses()` method or the `getSingletons()` method, as shown in the following example, then you need to register the `JacksonJsonProvider` class:
+
+[source,java]
+----
+public class HelloWorldApplication extends Application {
+    @Override
+    public Set<Class<?>> getClasses() {
+        Set<Class<?>> classes = new HashSet<>();
+        // ...
+        classes.add(JacksonJaxbJsonProvider.class);
+        return classes;
+    }
+}
+----
+
+Automatic discovery and registration isn't available in the JAX-RS Client APIs, so you need to explicitly register the `JacksonJsonProvider` class:
+
+[source,java]
+----
+Client client = ClientBuilder.newClient().register(JacksonJsonProvider.class);
+----
+
+That’s it!
+Now Open Liberty’s JAX-RS implementation uses the Jackson provider from your application instead of the Jackson provider that's built into Open Liberty.
+Your application can now use those cool Jackson features.
+
+You don't even need to do any classloading tricks, such as specifying your delegation as `parentLast`.
+The Open Liberty server doesn't expose the Jackson API packages, so your application can load only the Jackson classes that you provide.
+The application also works regardless of the delegation policy, so https://openliberty.io/docs/latest/reference/config/classloader.html[you can use a parentLast delegation] if you really want to.
+
+If you're interested in learning more about Jackson with Open Liberty, check out the https://github.com/WASdev/sample.BYOJackson[sample.BYOJackson app] at the WASdev GitHub repo.
+By the way, Jackson isn't the only Java-to-JSON converter that you can choose.
+If you're using JAX-RS 2.1, then you can also use JSON-B to get Java-to-JSON (and vice versa) conversion magic provided by Open Liberty.
+To enable JSON-B, see the https://openliberty.io/docs/latest/reference/feature/jsonb-1.0.html[JavaScript Object Notation Binding 1.0 feature documentation].
