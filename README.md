@@ -77,9 +77,9 @@ These steps are to be completed by the author of the blog post.
 
    Link the PR to the issue.
 
-   In the PR, provide a link to your post on the [draft site](https://draft-openlibertyio.mybluemix.net/blog/).
+   In the PR, provide a link to your post on the [draft site](https://draft-openlibertyio.mybluemix.net/blog/). And, ideally, take a screenshot of the whole post so that reviewers can see what they reviewed after you've made changes.
    
-   Add @lauracowen, your technical reviewer, and any other reviewers to get their final approval for both content and format.
+   Add @GraceJansen, as well as your technical reviewer and any other reviewers to get their final approval for both content and format.
    
    As before, make any changes in your branch, push the changes to the `draft` branch, then run the [draft site build from Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io/branches) again to check that they are fine on the [draft site](https://draft-openlibertyio.mybluemix.net/blog/).
 
@@ -122,7 +122,7 @@ These steps are completed by the editors of the blog. They might ask questions o
 
    a. Approve the PR.
    
-   b. Ask @lauracowen (or another admin) to merge the PR into `staging`.
+   b. Merge the PR into `staging`.
    
 4. Request a build  of the [staging openliberty.io site from Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io/branches) (type `staging` in the **Branch** field of the dialog).
 
@@ -134,7 +134,7 @@ These steps are completed by the editors of the blog. They might ask questions o
    
    Make any changes in the author's branch, and push to both `draft` and `staging`.
    
-6. To publish the post, create a PR from `staging` branch to `prod` branch and add @lauracowen (or other admin) as approver.
+6. To publish the post, create a PR from `staging` branch to `prod` branch and add the author of the post as approver so that they can confirm they're happy with any changes.
 
 7. When the PR is approved, merge it into `prod`.
 
@@ -164,9 +164,9 @@ If a published post on openliberty.io/blog contains an error or needs updating i
 
    Make any changes in your branch then push to `draft` branch again rebuild.
 
-5. Create a PR from your branch to `staging branch` (not from `draft` branch) and add @lauracowen as reviewer. You can create this PR at any point because any new changes you make in your branch are automatically added to the PR.
+5. Create a PR from your branch to `staging branch` (not from `draft` branch) and add @GraceJansen as reviewer. You can create this PR at any point because any new changes you make in your branch are automatically added to the PR.
 
-6. When approved, @lauracowen (or other admin) will merge to `staging`, then run the [build for the staging site from Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io/branches) and check that it looks fine on the [staging site](https://staging-openlibertyio.mybluemix.net/blog/).
+6. When approved, the editor will merge to `staging`, then run the [build for the staging site from Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io/branches) and check that it looks fine on the [staging site](https://staging-openlibertyio.mybluemix.net/blog/).
 
 7. The approver will then create a PR from `staging` to `prod`, then merge and [rebuild the production site from the IBM Cloud console](https://console.bluemix.net/devops/pipelines/fcc7c3e9-9c40-4a58-8a7f-09c08413ab7d?env_id=ibm:yp:us-south) to publish the updates on the [openliberty.io/blog](https://openliberty.io/blog/).
 
