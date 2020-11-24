@@ -102,21 +102,19 @@ These steps are completed by the editors of the blog. They might ask questions o
    
    To check out the author's branch locally: `git fetch origin` then `git checkout -b branch_name origin/branch_name`, which creates a new local branch that's linked to their remote branch. When you've made changes, push them back to `origin/branch_name`.
 
-2. Add tags to the blog post:
-
-   a. In the author's branch, update the [blogs_tags.json](./blog_tags.json) file by adding the slug of the blog post (the file name without the date part or the `.adoc`) to the start of the `posts` array (1-2 entries per line) for each appropriate tag. Do this in an editor (such as VSCode) and make sure the syntax is correct.
-
-   b. Push the changes to `draft` branch as before and check that they get built correctly on the [draft site](https://draft-openlibertyio.mybluemix.net/blog/).
-
 2. When a publishing date has been decided:
 
    * Check that the post looks fine.
    
    * Check that the author's details and the SEO details, including front matter, the title, and the filename slug, are appropriate for the post.
-   
-   * Check that the post has tags defined in the `blogs_tags.json` file in the same PR.
 
    * If necessary, rename the file with the planned publication date.
+
+2. Add blog tags to the blog post:
+
+   a. In the `staging` branch, update the [blogs_tags.json](./blog_tags.json) file by adding the slug of the blog post (the file name without the date part or the `.adoc`) to the start of the `posts` array (1-2 entries per line) for each appropriate tag. You can do this in the web UI editor as long as you're careful with the syntax.
+
+   b. Merge the changes to `staging` branch. You can do this in advance of the post being ready (as long as the post's file name doesn't change). It's fine if this file gets merged to `prod` earlier than the post itself.
 
 3. On the day of publication (or the day before):
 
@@ -126,15 +124,15 @@ These steps are completed by the editors of the blog. They might ask questions o
    
 4. Request a build  of the [staging openliberty.io site from Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io/branches) (type `staging` in the **Branch** field of the dialog).
 
-5. When the build has finished, check to make sure the blog renders correctly on the [staging site](https://staging-openlibertyio.mybluemix.net/blog/). 
+5. When the build has finished, check to make sure the blog with its blog tags render correctly on the [staging site](https://staging-openlibertyio.mybluemix.net/blog/). 
 
    This is the final check before the post is published live on the [production site](https://openliberty.io/blog/).
 
-   If there are any problems found on the [staging site](https://staging-openlibertyio.mybluemix.net/blog/), you must resolve them quickly or revert the PR.
+   If there are any problems found on the [staging site](https://staging-openlibertyio.mybluemix.net/blog/), you must resolve them quickly or revert the PR (the post must not stay in `staging` longer than a couple of hours or you risk someone accidentally publishing it for you).
    
    Make any changes in the author's branch, and push to both `draft` and `staging`.
    
-6. To publish the post, create a PR from `staging` branch to `prod` branch and add the author of the post as approver so that they can confirm they're happy with any changes.
+6. To publish the post, create a PR from `staging` branch to `prod` branch and add the author of the post or another editor as approver.
 
 7. When the PR is approved, merge it into `prod`.
 
@@ -158,7 +156,7 @@ If a published post on openliberty.io/blog contains an error or needs updating i
 
 2. Open the file in an editor (e.g. [VSCode with the Asciidoc plugin](https://marketplace.visualstudio.com/items?itemName=joaompinto.asciidoctor-vscode)) and make any changes needed.
 
-3. If the tags need correcting, update the [blogs_tags.json](./blog_tags.json) file. If you add new tags, make sure to add the blog post's slug to the beginning of the `posts` arrays (1-2 entries per line) for each tag.
+3. If the blog tags need correcting, update the [blogs_tags.json](./blog_tags.json) file. If you add new tags, make sure to add the blog post's slug to the beginning of the `posts` arrays (1-2 entries per line) for each tag.
 
 4. Create a PR from your branch to the `draft` branch, then (when the PR has been merged) run the [draft site build from Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io/branches) to check that the changes are fine on the [draft site](https://draft-openlibertyio.mybluemix.net/blog/).
 
