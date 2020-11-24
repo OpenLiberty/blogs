@@ -69,6 +69,7 @@ These steps are to be completed by the author of the blog post.
    If you find there are a load of merge conflicts at this stage, see [Troubleshooting GitHub workflow](#troubleshooting-github-workflow).
 
 5. Request a build of the [draft openliberty.io site](https://draft-openlibertyio.mybluemix.net/blog/):
+
     1. Sign in to [Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io/branches) with your GitHub account.
     2. Click **More Options > Trigger Build**. Type `draft` in the **Branch** field, then click **Trigger custom build**.
     
