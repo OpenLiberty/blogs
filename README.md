@@ -4,7 +4,7 @@
 * [Editors: editing and publishing a post](#Editors-editing-and-publishing-a-post)
 * [Authors and Editors: updating a published post](#Authors-and-Editors-updating-a-published-post)
 * [Troubleshooting Asciidoc](#Troubleshooting-Asciidoc)
-* [Running a Docker container for local preview](#Running-a-Docker-container-for-local-preview)
+* [Troubleshooting GitHub workflow](#troubleshooting-github-workflow)
 
 
 ## Authors: creating a new blog post
@@ -17,14 +17,17 @@ These steps are to be completed by the author of the blog post.
 
      Create a normal issue. In the description, give a simple outline of the purpose of the blog post. If there is a specific date by which the post must be available, mention that in the description too.
 
-   * **Release blog posts** (Open Liberty release announcements only)
+   * **GA release blog posts** (Open Liberty GA release announcements only)
 
      Create an issue using the `Open Liberty release notes` issue template. Make sure to select each task in the issue as you complete it to show progress.
-    
 
-2. Clone the repo and create your feature branch off of the default `prod` branch. From the `prod` branch, run: `git checkout -b branch_name`, where `branch_name` is a name you give your new branch.
+   * **Beta release blog posts** (Open Liberty beta release announcements only)
 
-    Do _all_ your editing in this branch in the `blogs` repo (not in a fork).
+     Create a normal issue. In the title, make clear that it's for the beta release and which release version.
+
+2. Clone the repo and create a branch off the default `prod` branch. From the `prod` branch, run: `git checkout -b branch_name`, where `branch_name` is a name you give your new branch.
+
+    Do _all_ your editing in this branch so that the blog editors can make any necessary edits directly in the branch before publishing your post.
 
 3. Create your blog post using [Asciidoc](https://asciidoctor.org/docs/asciidoc-syntax-quick-reference/) markup (use an editor such as [VSCode with the Asciidoc plugin](https://marketplace.visualstudio.com/items?itemName=joaompinto.asciidoctor-vscode)):
 
@@ -32,15 +35,21 @@ These steps are to be completed by the author of the blog post.
     
       Copy the [post-single-author.adoc](./templates/post-single-author.adoc) file (or [post-multiple-authors.adoc](./templates/post-multiple-authors.adoc) for multiple authors) to the [posts](./posts) directory and rename the file using the format `YYYY-MM-DD-post-title.adoc`, where the date represents the expected publication date (e.g. `2021-11-21-open-liberty-is-awesome.adoc`).
 
-      Place any images in [img/blog](./img/blog/). For multiple authors, third-party posts, etc, see the documentation at the end of this README.
+      Place any images in [img/blog](./img/blog/).
   
-    * **Release blog post** (Open Liberty release announcements only)
+    * **GA release blog post** (Open Liberty GA release announcements only)
 
-      Copy the [release-post.adoc](./templates/release-post.adoc) file to the [posts](./posts) directory and rename the file using the format `YYYY-MM-DD-post-title.adoc`, where the date represents the expected publication date (e.g. `2021-11-21-open-liberty-is-awesome-210011.adoc`).
+      Copy the [ga-release-post.adoc](./templates/ga-release-post.adoc) file to the [posts](./posts) directory and rename the file using the format `YYYY-MM-DD-post-title.adoc`, where the date represents the expected publication date and the end of the file name is the release version number without periods (e.g. `2021-11-21-open-liberty-is-awesome-210011.adoc`).
 
-      Place any images in [img/blog](./img/blog/). For multiple authors, see the documentation at the end of this README.
+      Place any images in [img/blog](./img/blog/).
 
-      Ensure that the tags (e.g. `// tag::intro[]` and `// end::intro[]`) in the template are retained around the relevant parts of the release post. The release post will contain GA and beta content but the tags will be used to build GA-only versions of the post content.
+      Ensure that the Asciidoc tags (e.g. `// tag::intro[]` and `// end::intro[]`) in the template are retained around the relevant parts of the release post. These Asciidoc tags will be used to build alternative versions of the post content.
+   
+    * **Beta release blog post** (Open Liberty beta release announcements only)
+
+      Copy the [beta-release-post.adoc](./templates/beta-release-post.adoc) file to the [posts](./posts) directory and rename the file using the format `YYYY-MM-DD-post-title.adoc`, where the date represents the expected publication date and the end of the post title is the beta release version number without periods or hyphens (e.g. `2021-11-21-new-awesomeness-coming-soon-210012beta.adoc`).
+
+      Place any images in [img/blog](./img/blog/).
 
     * **Third-party blog post** (externally hosted posts only)
 
@@ -48,7 +57,7 @@ These steps are to be completed by the author of the blog post.
 
 4. If you are not employed by IBM, in at least one of your commits, sign off the commit using [the Developer Certificate process](./CONTRIBUTING.md).
 
-4. When you have finished the post, check that it renders correctly. If you have a preview function in your editor, use that (eg the Asciidoc plugin in VSCode). Alternatively, you can use the [Docker image to run a local build of the file](#running-a-docker-container-for-local-preview).
+4. When you have finished the post, check that it renders correctly. If you have a preview function in your editor, use that (eg the Asciidoc plugin in VSCode). Otherwise, you can check that GitHub renders it properly when you push to GitHub in the next step.
 
 5. Push the file to GitHub, then create a pull request (PR) into the `draft` branch.
 
@@ -56,6 +65,8 @@ These steps are to be completed by the author of the blog post.
    Anyone can review/approve the PR before you merge it.
 
    (If you've been working in a fork for some reason, create a feature branch [see Step 2] and push your changes to the feature branch, then create a PR to the `draft` branch from there.)
+
+   If you find there are a load of merge conflicts at this stage, see [Troubleshooting GitHub workflow](#troubleshooting-github-workflow).
 
 5. Request a build of the [draft openliberty.io site](https://draft-openlibertyio.mybluemix.net/blog/):
     1. Sign in to [Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io/branches) with your GitHub account.
@@ -71,9 +82,9 @@ These steps are to be completed by the author of the blog post.
 
    Link the PR to the issue.
 
-   In the PR, provide a link to your post on the [draft site](https://draft-openlibertyio.mybluemix.net/blog/).
+   In the PR, provide a link to your post on the [draft site](https://draft-openlibertyio.mybluemix.net/blog/). And, ideally, take a screenshot of the whole post so that reviewers can see what they reviewed after you've made changes.
    
-   Add @lauracowen, your technical reviewer, and any other reviewers to get their final approval for both content and format.
+   Add @GraceJansen, as well as your technical reviewer and any other reviewers to get their final approval for both content and format.
    
    As before, make any changes in your feature branch, create a PR `draft` branch, get it merged, then run the [draft site build from Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io/branches) again to check that they are fine on the [draft site](https://draft-openlibertyio.mybluemix.net/blog/).
 
@@ -86,7 +97,7 @@ The editors will now review and edit the post. Please respond to any questions t
 
 ## Editors: editing and publishing a post
 
-These steps are completed by the editors of the blog. They might ask questions or make suggestions to the author of the post. They might also make edits directly in the post to prepare it for publishing.
+These steps are completed by the editors of the blog. As editor, you might ask questions or make suggestions to the author of the post. You might also make edits directly in the post to prepare it for publishing.
 
 1. Review the post on the [draft site](https://draft-openlibertyio.mybluemix.net/blog/) as linked from the issue.
 
@@ -96,39 +107,37 @@ These steps are completed by the editors of the blog. They might ask questions o
    
    To check out the author's branch locally: `git fetch origin` then `git checkout -b branch_name origin/branch_name`, which creates a new local branch that's linked to their remote branch. When you've made changes, push them back to `origin/branch_name`.
 
-2. Add tags to the blog post:
-
-   a. In the author's branch, update the [blogs_tags.json](./blog_tags.json) file by adding the slug of the blog post (the file name without the date part or the `.adoc`) to the start of the `posts` array (1-2 entries per line) for each appropriate tag. Do this in an editor (such as VSCode) and make sure the syntax is correct.
-
-   b. Push the changes to `draft` branch as before and check that they get built correctly on the [draft site](https://draft-openlibertyio.mybluemix.net/blog/).
-
 2. When a publishing date has been decided:
 
    * Check that the post looks fine.
    
    * Check that the author's details and the SEO details, including front matter, the title, and the filename slug, are appropriate for the post.
-   
-   * Check that the post has tags defined in the `blogs_tags.json` file in the same PR.
 
    * If necessary, rename the file with the planned publication date.
+
+2. Add blog tags to the blog post:
+
+   a. In the `staging` branch, update the [blogs_tags.json](./blog_tags.json) file by adding the slug of the blog post (the file name without the date part or the `.adoc`) to the start of the `posts` array (1-2 entries per line) for each appropriate tag. You can do this in the web UI editor as long as you're careful with the syntax. This is done in staging to reduce the number of merge conflicts in the `draft` branch later.
+
+   b. Merge the changes to `staging` branch. You can do this in advance of the post being ready (as long as the post's file name doesn't change). It's fine if this file gets merged to `prod` earlier than the post itself.
 
 3. On the day of publication (or the day before):
 
    a. Approve the PR.
    
-   b. Ask @lauracowen (or another admin) to merge the PR into `staging`.
+   b. Merge the PR into `staging`.
    
 4. Request a build  of the [staging openliberty.io site from Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io/branches) (type `staging` in the **Branch** field of the dialog).
 
-5. When the build has finished, check to make sure the blog renders correctly on the [staging site](https://staging-openlibertyio.mybluemix.net/blog/). 
+5. When the build has finished, check to make sure the blog with its blog tags render correctly on the [staging site](https://staging-openlibertyio.mybluemix.net/blog/). 
 
    This is the final check before the post is published live on the [production site](https://openliberty.io/blog/).
 
-   If there are any problems found on the [staging site](https://staging-openlibertyio.mybluemix.net/blog/), you must resolve them quickly or revert the PR.
+   If there are any problems found on the [staging site](https://staging-openlibertyio.mybluemix.net/blog/), you must resolve them quickly or revert the PR (the post must not stay in `staging` longer than a couple of hours or you risk someone accidentally publishing it for you).
    
    Make any changes in the author's branch, and push to both `draft` and `staging`.
    
-6. To publish the post, create a PR from `staging` branch to `prod` branch and add @lauracowen (or other admin) as approver.
+6. To publish the post, create a PR from `staging` branch to `prod` branch and add the author of the post or another editor as approver.
 
 7. When the PR is approved, merge it into `prod`.
 
@@ -152,15 +161,15 @@ If a published post on openliberty.io/blog contains an error or needs updating i
 
 2. Open the file in an editor (e.g. [VSCode with the Asciidoc plugin](https://marketplace.visualstudio.com/items?itemName=joaompinto.asciidoctor-vscode)) and make any changes needed.
 
-3. If the tags need correcting, update the [blogs_tags.json](./blog_tags.json) file. If you add new tags, make sure to add the blog post's slug to the beginning of the `posts` arrays (1-2 entries per line) for each tag.
+3. If the blog tags need correcting, update the [blogs_tags.json](./blog_tags.json) file. If you add new tags, make sure to add the blog post's slug to the beginning of the `posts` arrays (1-2 entries per line) for each tag.
 
 4. Create a PR from your branch to the `draft` branch, then (when the PR has been merged) run the [draft site build from Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io/branches) to check that the changes are fine on the [draft site](https://draft-openlibertyio.mybluemix.net/blog/).
 
    Make any changes in your branch then push to `draft` branch again rebuild.
 
-5. Create a PR from your branch to `staging branch` (not from `draft` branch) and add @lauracowen as reviewer. You can create this PR at any point because any new changes you make in your branch are automatically added to the PR.
+5. Create a PR from your branch to `staging branch` (not from `draft` branch) and add @GraceJansen as reviewer. You can create this PR at any point because any new changes you make in your branch are automatically added to the PR.
 
-6. When approved, @lauracowen (or other admin) will merge to `staging`, then run the [build for the staging site from Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io/branches) and check that it looks fine on the [staging site](https://staging-openlibertyio.mybluemix.net/blog/).
+6. When approved, the editor will merge to `staging`, then run the [build for the staging site from Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io/branches) and check that it looks fine on the [staging site](https://staging-openlibertyio.mybluemix.net/blog/).
 
 7. The approver will then create a PR from `staging` to `prod`, then merge and [rebuild the production site from the IBM Cloud console](https://console.bluemix.net/devops/pipelines/fcc7c3e9-9c40-4a58-8a7f-09c08413ab7d?env_id=ibm:yp:us-south) to publish the updates on the [openliberty.io/blog](https://openliberty.io/blog/).
 
@@ -175,46 +184,8 @@ See also:
 * [Asciidoc quick syntax](https://asciidoctor.org/docs/asciidoc-syntax-quick-reference/)
 * [Asciidoc user manual (more detailed)](https://asciidoctor.org/docs/user-manual/)
 
+## Troubleshooting GitHub workflow
 
+When you create a PR from your feature branch to the `draft` branch, you might find that you have some conflicts. If you use the Web UI to resolve the conflicts and commit those changes, you will find that GitHub has merged _everything_ from the `draft` branch into your feature branch, including other people's drafts. You _must not_ try to merge all those changes to `staging` or else you'll end up publishing a load of half-finished work. Instead, create a new feature branch off `prod` and use the `git cherry-pick` command to select only the files that you want to publish from the `draft` branch. Then use this new feature branch to create the PR to `staging`.
 
-## Running a Docker container for local preview
-
-Github.com does a pretty good job of rendering asciidoc so you can preview your file there, but to see exactly what it will
-look like you can run the website locally. 
-
-### Running the website on your local machine
-```
-git clone https://github.com/OpenLiberty/blogs.git
-git clone https://github.com/OpenLiberty/openliberty.io.git
-docker pull kinueng/openliberty.io
-```
-Replace "currentFolder" in the following command with the full path to the folder you are in. 
-```
-docker run --rm --name website -it -p 4000:4000 -v currentFolder/openliberty.io:/home/jekyll kinueng/openliberty.io
-
-# example when current directory is /Users/bruce/projects/blog/website:
-# docker run --name website -it -p 4000:4000 -v /Users/bruce/projects/blog/website/openliberty.io:/home/jekyll kinueng/openliberty.io
-```
-
-### Update the running container with your edits
-Before your new or updated blog entry will appear on the website, you will need to run the script below to update the container with your latest changes, then wait for the container to finish processing them.  Then you can see your changes at http://localhost:4000/blog/
-
-Note that blogs named with dates in the future, e.g. 2099-01-05, will not be shown, so don't do that. 
-
-```
-./blogs/scripts/refresh_docker_image.sh
-```
-
-### How to know when your changes are rendered by the container
-You will see `Jekyll` detect your new files and regenerate the blog files.  You will want to wait for the line "...done in XXXX seconds."
-
-```
-      Regenerating: 101 file(s) changed at 2018-10-29 18:53:10
-      ...
-      Jekyll Feed: Generating feed for posts
-      ...
-            ...done in 121.8705398 seconds.
-```
-
-
-
+For more about the `git cherry-pick` command, see [StackOverflow](https://stackoverflow.com/questions/9339429/what-does-cherry-picking-a-commit-with-git-mean) (or search online for more help). You might need some practice to get the hang of it but it's a useful skill to acquire if you do much in GitHub.
