@@ -1,22 +1,22 @@
 ---
 layout: post
-title: "Microprofile Long Running Actions in Open Liberty"
+title: "MicroProfile Long Running Actions in Open Liberty"
 categories: blog
 author_picture: https://avatars3.githubusercontent.com/yongja79
 author_github: https://github.com/yongja79
-seo-title: Microprofile Long Running Actions in Open Liberty
-seo-description: Try Microprofile Long Running Actions in the Open Liberty 20.0.0.12-beta
-blog_description: "Try Microprofile Long Running Actions in the Open Liberty 20.0.0.12-beta"
+seo-title: MicroProfile Long Running Actions in Open Liberty
+seo-description: Try MicroProfile Long Running Actions in the Open Liberty 20.0.0.12-beta
+blog_description: "Try MicroProfile Long Running Actions in the Open Liberty 20.0.0.12-beta"
 open-graph-image: https://openliberty.io/img/twitter_card.jpg
 ---
-= Microprofile Long Running Actions in Open Liberty
+= MicroProfile Long Running Actions in Open Liberty
 Jason Yong <https://github.com/yongja79>
 
-In the 20.0.0.12-beta release of Open Liberty a new capability was introduced to support loosely-coupled transaction semantics for Java microservice. This is an implementation of a new MicroProfile specification for Long Running Actions (LRAs).  
+In the 20.0.0.12-beta release of Open Liberty a new capability was introduced to support loosely-coupled transaction semantics for Java microservice. This is an implementation of a new MicroProfile specification for Long Running Actions (MicroProfile LRAs).  
 
-== What is a LRA?
+== What is a MicroProfile LRA?
 
-Long Running Actions is a MicroProfile specification that provides a simple, loosely-coupled transaction model for microservices and is based on the Saga pattern for distributed transactions . It relaxes some of the constraints of ACID transactions to enable independent microservices to more easily participate in a potentially long-running orchestrated activity, with each microservice contributing the encapsulated business logic required to align with the overall outcome of the activity or "transaction". 
+MicroProfile LRA is a MicroProfile specification that provides a simple, loosely-coupled transaction model for microservices and is based on the Saga pattern for distributed transactions . It relaxes some of the constraints of ACID transactions to enable independent microservices to more easily participate in a potentially long-running orchestrated activity, with each microservice contributing the encapsulated business logic required to align with the overall outcome of the activity or "transaction". 
 
 == So how does MicroProfile LRA help? 
 
@@ -34,15 +34,26 @@ The LRA model relies on having compensating actions for all business interaction
 
 In Open Liberty there are 2 parts to the using LRA:
 
-* LRA Coordinator which manages the LRA processing. It handles the initialisation of the LRAs, enlisting in LRAs and the completion or compensating of LRAs. This is enabled through standard Liberty configuration.
 * LRA Participants which are applications using MicroProfile LRA annotations that cause them to become involved in the LRA
+* LRA Coordinator which manages the LRA processing. It handles the initialisation of the LRAs, enlisting in LRAs and the completion or compensating of LRAs. This is enabled through standard Liberty configuration.
 
 The typical setup would be to have a single coordinator on its own Open Liberty server, coordinating multiple participants which may be in a single Open Liberty server or across different servers.
 
 image::/img/blog/lra_typical_setup.png[LRA coordinator and participant setup,width=50%,align="center"]
 
-=== Starting a Microprofile LRA Coordinator in Open Liberty
-To try LRA in Open Liberty you need to download and extract the latest link:https://openliberty.io/downloads/#runtime_betas[beta driver]
+=== Starting a MicroProfile LRA Coordinator in Open Liberty
+To try LRA in Open Liberty you need to download and extract the latest link:https://openliberty.io/downloads/#runtime_betas[beta driver].
+The beta is also in Maven central and can be added as a dependency:
+
+[source, xml]
+----
+    <runtimeArtifact>
+        <groupId>io.openliberty.beta</groupId>
+        <artifactId>openliberty-runtime</artifactId>
+        <version>20.0.0.12-beta</version>
+        <type>zip</type>
+    </runtimeArtifact>
+----
 
 Create a new Open Liberty server to act as the coordinator by running the following command:
 
@@ -96,9 +107,9 @@ It is now ready to coordinate LRAs.
 An LRA is started by the Liberty LRA coordinator when a participant service is annotated to require one. The coordinator creates a unique id for the LRA and makes it available to every participant in the LRA, enabling a participant to later register a compensating action for that specific LRA. All participant interactions with the LRA are done via annotations on participant methods.                                                                                                                                                                                       
 The most basic of LRAs has a single participant which needs 3 annotated methods:
 
-. Join/Create LRA method and do any business logic required.
-. A complete method to be called once the LRA has completed successfully and do any business logic required.
-. A compensate method to be called should the LRA fail for any reason and include any logic required to revert any changes the join/create method did.
+. Join/Create LRA method using @LRA and do any business logic required.
+. A complete method using @Complete, to be called once the LRA has completed successfully and do any business logic required.
+. A compensate method using @Compensate, to be called should the LRA fail for any reason and include any logic required to revert any changes the join/create method did.
 
 
 Let's have a look at a simple example of an LRA enabled service that has some basic logic to determine whether it succeeds or fails. For the full source code for the example please go to this link:https://github.com/yongja79/lra-blog-example[github repository].
@@ -130,7 +141,7 @@ This uses the @LRA annotation to register the method with the coordinator. The L
 * REQUIRED: An LRA context is required so if called in an LRA it will join it, but if called outside an LRA it will start a new one
 * MANDATORY: A LRA context is required but it will not create a new one. So if called within a LRA it will join but if called outside an LRA the method will fail.
 
-Further information on other LRA.Type's can be found in the link:https://download.eclipse.org/microprofile/microprofile-lra-1.0-M1/microprofile-lra-spec.html[Microprofile LRA Specifications].
+Further information on other LRA.Type's can be found in the link:https://download.eclipse.org/microprofile/microprofile-lra-1.0-M1/microprofile-lra-spec.html[MicroProfile LRA Specifications].
 
 So as this method has the the LRA.Type.REQUIRED, if it is called as part of a LRA it will join it, otherwise it will start a new LRA. It knows which LRA to join by the LRAid passed to it via LRA_HTTP_CONTEXT_HEADER header or when it registers with the coordinator as a new LRA it will be supplied with a new LRAid. The simple business logic determines the success purely on the destination variable passed to the method.
 
@@ -172,7 +183,7 @@ While these 3 annotations form the basics of a LRA there are several more that c
 * @Status - When invoked a method with this annotation will return the status of the LRA
 * @AfterLRA - When an LRA is in its final state, the method with this annotation is called
 
-Again more details can be found in the link:https://download.eclipse.org/microprofile/microprofile-lra-1.0-M1/microprofile-lra-spec.html[Microprofile LRA Specifications].
+Again more details can be found in the link:https://download.eclipse.org/microprofile/microprofile-lra-1.0-M1/microprofile-lra-spec.html[MicroProfile LRA Specifications].
 
 === Running a participant service in Open Liberty
 To try this example out you will need to enable the participant feature in an Open Liberty server via its server.xml. We will be assuming that the participants will be in a separate Open Liberty server from the coordinator so you will need to create a new Open Liberty server:
@@ -309,7 +320,7 @@ The BookHotel method looks like:
 ----
 As an example of another LRA.Type the BookHotel has been set to MANDATORY which mean that it has to be called as part of an LRA and should it be called outside of an LRA it will automatically fail. So while the BookFlight service could be called outside of an LRA, as it would start its own, the BookHotel would return an error if that was attempted.
 
-It is usually best practice for each service to be deployed on a separate Open Liberty servers, but for convenience, deploy the BookHoliday.war and BookHotel.war to LRAParticipant and add the following lines to the server.xml
+It is usually best practice for each service to be deployed on a separate Open Liberty server, but for convenience, deploy the BookHoliday.war and BookHotel.war to LRAParticipant and add the following lines to the server.xml
 [source,xml]
 ----
     <webApplication location="BookHoliday.war" contextRoot="/holiday" />
@@ -381,7 +392,7 @@ It shows all 3 services starting and the BookFlight being successful, however as
 == Conclusion
 The example detailed in this blog shows how to setup an LRA coordinator on Open Liberty, a simple multi-participant LRA, and demonstrates how the LRA flow works through the @Complete and @Compensate annotations work.
 
-Far more can been done with LRA and detailed information can be found by going to the link:https://download.eclipse.org/microprofile/microprofile-lra-1.0-M1/microprofile-lra-spec.html[Microprofile LRA Specifications].
+Far more can been done with LRA and detailed information can be found by going to the link:https://download.eclipse.org/microprofile/microprofile-lra-1.0-M1/microprofile-lra-spec.html[MicroProfile LRA Specifications].
 
 == What next?
 To try MicroProfile LRA on Open Liberty download the latest link:https://openliberty.io/downloads/#runtime_betas[Open Liberty beta]. Should you want to try the example detailed in this blog you can get all the code from this link:https://github.com/yongja79/lra-blog-example[github repository].
