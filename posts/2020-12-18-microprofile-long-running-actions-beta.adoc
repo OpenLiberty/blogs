@@ -20,7 +20,8 @@ MicroProfile LRA is a MicroProfile specification that provides a simple, loosely
 
 == Why do we need MicroProfile LRA? 
 
-In traditional applications, the well-known transaction model is ACID, where the most commonly used atomic commit protocol is 2-phase commit. In an ACID transaction, tightly-coupled XA resources can be directed to "rollback" by a coordinating transaction manager. This introduces resource locking and global rollback, which does not scale well and therefore not suitable for microservice architecture. As a consequence, SAGA pattern was defined for microservice transaction architecture. A SAGA is a sequence of transactions. If one transaction fails, the saga undoes all of the preceding transactions. It aims for eventual consistence. MicroProfile LRA is an implementation of the SAGA pattern.
+In traditional applications, the well-known transaction model is ACID, where the most commonly used atomic commit protocol is 2-phase commit. In an ACID transaction, tightly-coupled XA resources can be directed to "rollback" by a coordinating transaction manager. This introduces resource locking and global rollback, which does not scale well and therefore not suitable for microservice architecture. As a consequence, link:https://developer.ibm.com/depmodels/microservices/articles/use-saga-to-solve-distributed-transaction-management-problems-in-a-microservices-architecture#saga[SAGA pattern] was defined for microservice transaction architecture. A SAGA is a sequence of transactions. If one transaction fails, the saga undoes all of the preceding transactions. It aims for eventual consistence. MicroProfile LRA is an implementation of the SAGA pattern.
+
 The goals of LRA are: 
 
 * to have no strong coupling between services
@@ -104,12 +105,13 @@ It is now ready to coordinate LRAs.
 
 === Creating a participant service
 
-An LRA is started by the Liberty LRA coordinator when a participant service is annotated to require one. The coordinator creates a unique id for the LRA and makes it available to every participant in the LRA, enabling a participant to later register a compensating action for that specific LRA. All participant interactions with the LRA are done via annotations on participant methods.                                                                                                                                                                                       
-The most basic of LRAs has a single participant which needs 3 annotated methods:
+An LRA is started by the Liberty LRA coordinator when a participant service is annotated to require one. The coordinator creates a unique id for the LRA and makes it available to every participant in the LRA, enabling a participant to later register a compensating action for that specific LRA. All participant interactions with the LRA are done via annotations on participant methods.
 
-. Join/Create LRA method using @LRA and do any business logic required.
-. A complete method using @Complete, to be called once the LRA has completed successfully and do any business logic required.
-. A compensate method using @Compensate, to be called should the LRA fail for any reason and include any logic required to revert any changes the join/create method did.
+The most basic of LRAs has a single participant which needs 3 annotated methods
+
+. Join/Create LRA method using `@LRA` and do any business logic required.
+. A complete method using `@Complete`, to be called once the LRA has completed successfully and do any business logic required.
+. A compensate method using `@Compensate`, to be called should the LRA fail for any reason and include any logic required to revert any changes the join/create method did.
 
 
 Let's have a look at a simple example of an LRA enabled service that has some basic logic to determine whether it succeeds or fails. For the full source code for the example please go to this link:https://github.com/yongja79/lra-blog-example[github repository].
@@ -135,7 +137,7 @@ We will first look at a single service called BookFlight, which has a simple POS
         }
     }
 ----
-This uses the @LRA annotation to register the method with the coordinator. The LRA.Type denotes whether the method needs to be part of an LRA to run. The most commonly used are:
+This uses the `@LRA` annotation to register the method with the coordinator. The LRA.Type denotes whether the method needs to be part of an LRA to run. The most commonly used are:
 
 * REQUIRES_NEW: A new LRA is always started when this method is called. So if this method is called outside an LRA context it will start one and should it be invoked within a running LRA it will start a new one.
 * REQUIRED: An LRA context is required so if called in an LRA it will join it, but if called outside an LRA it will start a new one
@@ -158,7 +160,7 @@ The completion method for the BookFight service looks like this:
         return Response.ok(ParticipantStatus.Completed).build();
     }
 ----
-This @Complete annotation is used to register this method to be called should the LRA complete successfully. It should be noted that the Path does not have to be /complete and can be whatever you want.
+This `@Complete` annotation is used to register this method to be called should the LRA complete successfully. It should be noted that the Path does not have to be /complete and can be whatever you want.
 
 
 Finally the compensate method looks like this:
@@ -174,14 +176,14 @@ Finally the compensate method looks like this:
         return Response.ok(ParticipantStatus.Compensated.name()).build();
     }
 ----
-Very similar to the complete method except with the @Compensate annotation. This will be called should any service in the LRA fail and so should include any business logic that will roll back any changes to the services data that had been made by the @LRA method and return it to its original state. It falls on the service developer to know how to roll this back and the LRA implementation plays no part in it but will ensure that the logic is run should the LRA fail.
+Very similar to the complete method except with the `@Compensate` annotation. This will be called should any service in the LRA fail and so should include any business logic that will roll back any changes to the services data that had been made by the `@LRA` method and return it to its original state. It falls on the service developer to know how to roll this back and the LRA implementation plays no part in it but will ensure that the logic is run should the LRA fail.
 
 While these 3 annotations form the basics of a LRA there are several more that can be used
 
-* @Forget - Called if the complete or compensate methods failed and you want to release any resources allocated to the LRA
-* @Leave - Called if the class is no longer interested in the LRA
-* @Status - When invoked a method with this annotation will return the status of the LRA
-* @AfterLRA - When an LRA is in its final state, the method with this annotation is called
+* `@Forget` - Called if the complete or compensate methods failed and you want to release any resources allocated to the LRA
+* `@Leave` - Called if the class is no longer interested in the LRA
+* `@Status` - When invoked a method with this annotation will return the status of the LRA
+* `@AfterLRA` - When an LRA is in its final state, the method with this annotation is called
 
 Again more details can be found in the link:https://download.eclipse.org/microprofile/microprofile-lra-1.0-M1/microprofile-lra-spec.html[MicroProfile LRA Specifications].
 
@@ -390,7 +392,7 @@ Hotel Booking compensated with LRA with id: http://localhost:9080/lrac/lra-coord
 It shows all 3 services starting and the BookFlight being successful, however as the BookHotel fails the LRA fails and all 3 compensation methods are called.
 
 == Conclusion
-The example detailed in this blog shows how to setup an LRA coordinator on Open Liberty, a simple multi-participant LRA, and demonstrates how the LRA flow works through the @Complete and @Compensate annotations work.
+The example detailed in this blog shows how to setup an LRA coordinator on Open Liberty, a simple multi-participant LRA, and demonstrates how the LRA flow works through the `@Complete` and `@Compensate` annotations work.
 
 Far more can been done with LRA and detailed information can be found by going to the link:https://download.eclipse.org/microprofile/microprofile-lra-1.0-M1/microprofile-lra-spec.html[MicroProfile LRA Specifications].
 
