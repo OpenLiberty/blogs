@@ -12,7 +12,7 @@ open-graph-image: https://openliberty.io/img/twitter_card.jpg
 = MicroProfile Long Running Actions in Open Liberty
 Jason Yong <https://github.com/yongja79>
 
-In the 20.0.0.12-beta release of Open Liberty a new capability was introduced to support loosely-coupled transaction semantics for Java microservice. This is an implementation of a new MicroProfile specification for Long Running Actions (MicroProfile LRAs).  
+In the 20.0.0.12-beta release of Open Liberty a new capability was introduced to support loosely-coupled transaction semantics for Java microservice. This is an implementation of a new MicroProfile specification for Long Running Actions (MicroProfile LRA).  
 
 == What is a MicroProfile LRA?
 
@@ -36,7 +36,7 @@ The LRA model relies on having compensating actions for all business interaction
 In Open Liberty there are 2 parts to the using LRA:
 
 * LRA Participants which are applications using MicroProfile LRA annotations that cause them to become involved in the LRA
-* LRA Coordinator which manages the LRA processing. It handles the initialisation of the LRAs, enlisting in LRAs and the completion or compensating of LRAs. This is enabled through standard Liberty configuration.
+* LRA Coordinator which manages the LRA processing. It handles the initialisation of the LRA, enlisting in a LRA and the completion or compensating of a LRA. This is enabled through standard Liberty configuration.
 
 The typical setup would be to have a single coordinator on its own Open Liberty server, coordinating multiple participants which may be in a single Open Liberty server or across different servers.
 
@@ -101,13 +101,13 @@ When you start the Open Liberty server you will see the following in the server'
 [AUDIT   ] CWWKT0016I: Web application available (default_host): http://localhost:9080/lrac/
 [AUDIT   ] CWWKZ0001I: Application mpLRACoordinator started in 8.045 seconds.
 ----
-It is now ready to coordinate LRAs.
+It is now ready to coordinate LRA.
 
 === Creating a participant service
 
 An LRA is started by the Liberty LRA coordinator when a participant service is annotated to require one. The coordinator creates a unique id for the LRA and makes it available to every participant in the LRA, enabling a participant to later register a compensating action for that specific LRA. All participant interactions with the LRA are done via annotations on participant methods.
 
-The most basic of LRAs has a single participant which needs 3 annotated methods
+The most basic of LRA has a single participant which needs 3 annotated methods
 
 . Join/Create LRA method using `@LRA` and do any business logic required.
 . A complete method using `@Complete`, to be called once the LRA has completed successfully and do any business logic required.
@@ -141,11 +141,11 @@ This uses the `@LRA` annotation to register the method with the coordinator. The
 
 * REQUIRES_NEW: A new LRA is always started when this method is called. So if this method is called outside an LRA context it will start one and should it be invoked within a running LRA it will start a new one.
 * REQUIRED: An LRA context is required so if called in an LRA it will join it, but if called outside an LRA it will start a new one
-* MANDATORY: A LRA context is required but it will not create a new one. So if called within a LRA it will join but if called outside an LRA the method will fail.
+* MANDATORY: A LRA context is required but it will not create a new one. So if called within an LRA it will join but if called outside an LRA the method will fail.
 
 Further information on other LRA.Type's can be found in the link:https://download.eclipse.org/microprofile/microprofile-lra-1.0-M1/microprofile-lra-spec.html[MicroProfile LRA Specifications].
 
-So as this method has the the LRA.Type.REQUIRED, if it is called as part of a LRA it will join it, otherwise it will start a new LRA. It knows which LRA to join by the LRAid passed to it via LRA_HTTP_CONTEXT_HEADER header or when it registers with the coordinator as a new LRA it will be supplied with a new LRAid. The simple business logic determines the success purely on the destination variable passed to the method.
+So as this method has the the LRA.Type.REQUIRED, if it is called as part of an LRA it will join it, otherwise it will start a new LRA. It knows which LRA to join by the LRAid passed to it via LRA_HTTP_CONTEXT_HEADER header or when it registers with the coordinator as a new LRA it will be supplied with a new LRAid. The simple business logic determines the success purely on the destination variable passed to the method.
 
 The completion method for the BookFight service looks like this:
 
@@ -183,7 +183,7 @@ While these 3 annotations form the basics of a LRA there are several more that c
 * `@Forget` - Called if the complete or compensate methods failed and you want to release any resources allocated to the LRA
 * `@Leave` - Called if the class is no longer interested in the LRA
 * `@Status` - When invoked a method with this annotation will return the status of the LRA
-* `@AfterLRA` - When an LRA is in its final state, the method with this annotation is called
+* `@AfterLRA` - When a LRA is in its final state, the method with this annotation is called
 
 Again more details can be found in the link:https://download.eclipse.org/microprofile/microprofile-lra-1.0-M1/microprofile-lra-spec.html[MicroProfile LRA Specifications].
 
@@ -237,7 +237,7 @@ After a few moments you should see the following in the LRAParicipant server's m
 ----
 CWWKT0016I: Web application available (default_host): http://localhost:9081/flight/
 ----
-We now have an LRA participant being orchestrated by the LRA Coordinator.
+We now have a LRA participant being orchestrated by the LRA Coordinator.
 
 image::/img/blog/lra_single_participant.png[Single particiapant example,width=50%,align="center"]
 
@@ -254,7 +254,7 @@ Flight booked
 Flight Booking completed with LRA with id: http://localhost:9080/lrac/lra-coordinator/0_ffffc0a80002_d936_5fbf8f16_73 
 ----
 
-This shows that the method was successfully called and an LRA started with an LRAid of http://localhost:9080/lrac/lra-coordinator/0_ffffc0a80002_d936_5fbf8f16_73. 
+This shows that the method was successfully called and a LRA started with a LRAid of http://localhost:9080/lrac/lra-coordinator/0_ffffc0a80002_d936_5fbf8f16_73. 
 The business logic was successfully run and the complete method called when success response returned.
 
 To see a failing case run the following
@@ -273,7 +273,7 @@ Flight Booking compensated with LRA with id: http://localhost:9080/lrac/lra-coor
 Again it shows the successful start of the LRA but as the business logic failed and the method returned an error response, the compensate method is automatically called and run.
 
 === Extending the example
-While a single service in an LRA is useful, it is more common to have multiple services in an LRA, so we can extend the example by having a service, BookHoliday, call the BookFlight service and another new service called BookHotel.
+While a single service in a LRA is useful, it is more common to have multiple services in a LRA, so we can extend the example by having a service, BookHoliday, call the BookFlight service and another new service called BookHotel.
 
 
 The BookHoliday LRA method looks like this:
@@ -320,7 +320,7 @@ The BookHotel method looks like:
         }
     }
 ----
-As an example of another LRA.Type the BookHotel has been set to MANDATORY which mean that it has to be called as part of an LRA and should it be called outside of an LRA it will automatically fail. So while the BookFlight service could be called outside of an LRA, as it would start its own, the BookHotel would return an error if that was attempted.
+As an example of another LRA.Type the BookHotel has been set to MANDATORY which mean that it has to be called as part of a LRA and should it be called outside of a LRA it will automatically fail. So while the BookFlight service could be called outside of a LRA, as it would start its own, the BookHotel would return an error if that was attempted.
 
 It is usually best practice for each service to be deployed on a separate Open Liberty server, but for convenience, deploy the BookHoliday.war and BookHotel.war to LRAParticipant and add the following lines to the server.xml
 [source,xml]
@@ -392,7 +392,7 @@ Hotel Booking compensated with LRA with id: http://localhost:9080/lrac/lra-coord
 It shows all 3 services starting and the BookFlight being successful, however as the BookHotel fails the LRA fails and all 3 compensation methods are called.
 
 == Conclusion
-The example detailed in this blog shows how to setup an LRA coordinator on Open Liberty, a simple multi-participant LRA, and demonstrates how the LRA flow works through the `@Complete` and `@Compensate` annotations work.
+The example detailed in this blog shows how to setup a LRA coordinator on Open Liberty, a simple multi-participant LRA, and demonstrates how the LRA flow works through the `@Complete` and `@Compensate` annotations work.
 
 Far more can been done with LRA and detailed information can be found by going to the link:https://download.eclipse.org/microprofile/microprofile-lra-1.0-M1/microprofile-lra-spec.html[MicroProfile LRA Specifications].
 
