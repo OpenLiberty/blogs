@@ -24,13 +24,13 @@ To send logs from OpenShift to Splunk, the Log Forwarding API must first send th
 If you would rather set up the Log Forwarding API, Fluentd forwarder, and Splunk locally within your OpenShift cluster, see link:https://www.openshift.com/blog/forwarding-logs-to-splunk-using-the-openshift-log-forwarding-api[Forwarding Logs to Splunk Using the OpenShift Log Forwarding API] on the OpenShift blog. After you complete those steps, proceed to the <<integrating-open-liberty-json-logs,Integrating Open Liberty JSON Logs>> and <<setting-up-splunk-dashboard,Setting Up Splunk-Dashboard>> sections of this blog post to complete your setup.
 
 
-== Configuring the Log Forwarding API
+== Before you begin
 
 . Ensure that your cluster logging instance is created and all pods are fully operational. For more information, see the link:https://docs.openshift.com/container-platform/4.6/logging/cluster-logging-deploying.html[Deploying cluster logging] documentation for your OpenShift version.
-
++
 *Note:* The cluster logging instance sample that is provided in the OpenShift documentation leaves the _storage class_ value for the reader to configure. In test environments, you can omit the storage section and the cluster logging instance uses in-memory storage. However, this configuration is not suitable for production.
 
-. [[keycert-secret]]*(Optional: Security)* It is recommended that you secure your connection between the Fluentd servers on your OpenShift cluster and the external Fluentd server. This step creates a _secret_ that is used by the Log Forwarding API in step 3 to achieve a secure connection. This procedure assumes that the necessary key and certificate files, for example `tls.crt` and `tls.key`, are already created. The instructions for creating the keys and certificates are not within the scope of this blog post. The key and certificate are also used when you <<keycert-fluentd, deploy the external Fluentd server>>.
+. [[keycert-secret]]*Optional:* It is recommended that you secure the connection between the Fluentd servers on your OpenShift cluster and the external Fluentd server. This step creates a _secret_ that is used by the Log Forwarding API to achieve a secure connection. This procedure assumes that the necessary key and certificate files, for example `tls.crt` and `tls.key`, are already created. The instructions for creating the keys and certificates are not within the scope of this blog post. The key and certificate are also used when you <<keycert-fluentd, deploy the external Fluentd server>>.
 +
 --
 .. Switch to the `openshift-logging` project
@@ -39,7 +39,7 @@ If you would rather set up the Log Forwarding API, Fluentd forwarder, and Splunk
 ----
 oc project openshift-logging
 ----
-.. Create the secret that contains the key and certificate. You also need to specify a _shared_key_, which is a string password that is used as an extra layer of authentication between the Fluentd servers on the OpenShift cluster and the external Fluentd server. The examples in this blog post use _secure-forward_ for the secret name and  _"secretpassword"_ for the shared key. Change the paths in the following example as necessary:
+.. Create a secret that contains your key and certificate. You also need to specify a _shared_key_, which is a string password that is used as an extra layer of authentication between the Fluentd servers on the OpenShift cluster and the external Fluentd server. The examples in this blog post use _secure-forward_ for the secret name and  _"secretpassword"_ for the shared key. Change the paths in the following example as necessary:
 +
 [source]
 ----
@@ -47,22 +47,15 @@ oc create secret generic secure-forward --from-file=ca-bundle.crt=/path/to/tls.c
 ----
 --
 
+== Configuring the Log Forwarding API
+
 . Create the `log-forward-instance.yaml` file. Configure the outputs and pipelines.
 +
 --
-* Outputs can be either `elasticsearch` or `forward`. The `elasticsearch` output routes logs to an internal or external Elasticsearch cluster. The `forward` output forwards logs to an external log aggregation solution through the Fluentd forward protocols.
-* Pipelines can be  `logs.app`, `logs.infra`, or `logs.audit`. For more information, see link:https://docs.openshift.com/container-platform/4.6/logging/cluster-logging-external.html#cluster-logging-collector-log-forward-fluentd_cluster-logging-external[Forwarding logs using the Fluentd forward protocol].
-* If you are using a *secure* connection, specify the name of the secret that you created in step 2:
+* The `outputs` section of the file specifies where to send the logs. To establish a secure connection to an output, you must specify a secret, such as the one that you created in <<keycert-secret,step 2b of the *Before you begin* section>>. If you want to use an insecure connection for test purposes, you can omit the secret from your output configuration.
+* The `pipelines` section of the file specifies which log types are sent to the configured outputs..
 +
-```
-   - name: fluentd-forward
-     type: "forward"
-     endpoint: splunk-fluentd-forward.offcluster.com:24224 # substitute with FQDN or IP address
-     secret:
-        name: secure-forward
-```
-+
-The following sample `log-forward-instance.yaml` file uses a *secure* connection:
+The following sample `log-forward-instance.yaml` file uses secure connections and defines two outputs: `elasticsearch`, which routes to an internal Elasticsearch instance, and `fluentd-forward`, which routes to the instance of Fluentd that forwards the logs to Splunk. Each log type and its corresponding output reference is defined in the `pipelines` section:
 +
 ```
 apiVersion: "logging.openshift.io/v1alpha1"
@@ -99,61 +92,7 @@ spec:
      - elasticsearch
 ```
 +
-* If you are using an *insecure* connection, specify the `insecure: true` configuration instead:
-+
-```
-   - name: fluentd-forward
-     type: "forward"
-     endpoint: splunk-fluentd-forward.offcluster.com:24224 # substitute with FQDN or IP address
-     insecure: true
-```
-+
-The following sample `log-forward-instance.yaml` file uses an *insecure* connection:
-+
-```
-apiVersion: "logging.openshift.io/v1alpha1"
-kind: "LogForwarding"
-metadata:
-  name: instance
-  namespace: openshift-logging
-spec:
-  disableDefaultForwarding: true
-  outputs:
-   - name: elasticsearch
-     type: "elasticsearch"
-     endpoint: elasticsearch.openshift-logging.svc:9200
-     secret:
-        name: fluentd
-   - name: fluentd-forward
-     type: "forward"
-     endpoint: splunk-fluentd-forward.offcluster.com:24224 # substitute with FQDN or IP address
-     insecure: true
-  pipelines:
-   - name: container-logs
-     inputSource: logs.app
-     outputRefs:
-     - elasticsearch
-     - fluentd-forward
-   - name: infra-logs
-     inputSource: logs.infra
-     outputRefs:
-     - elasticsearch
-   - name: audit-logs
-     inputSource: logs.audit
-     outputRefs:
-     - elasticsearch
-```
-
-* These sample configuration files define two outputs: `elasticsearch`, which routes to an internal Elasticsearch instance and `fluent-forward`, which routes to an instance of Fluentd. Each log type is defined under pipelines with its configured output references. For the `forward` output, substitute the `splunk-fluentd-forward.offcluster.com` value with the fully qualified domain name (FQDN) or the IP address of your external machine, as shown in the following example:
-+
-
-```
-   - name: fluentd-forward
-     type: "forward"
-     endpoint: 1.23.456.789:24224
-     secret:
-        name: secure-forward
-```
+For more information, see link:https://docs.openshift.com/container-platform/4.6/logging/cluster-logging-external.html#cluster-logging-collector-log-forward-fluentd_cluster-logging-external[Forwarding logs using the Fluentd forward protocol]. Make sure to consult the documentation for your version of OpenShift, as the pipeline configuration for version 4.6 is slightly different from the preceding versions.
 --
 . Create the Log Forwarding instance inside your OpenShift cluster:
 +
@@ -163,7 +102,7 @@ spec:
 ----
 +
 
-. **OpenShift 4.3 to 4.5 only** Annotate the ClusterLogging instance to enable the Log Forwarding API.
+. **OpenShift 4.3 to 4.5 only:** Annotate the ClusterLogging instance to enable the Log Forwarding API.
 +
 [source]
 ----
