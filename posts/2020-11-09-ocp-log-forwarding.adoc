@@ -53,43 +53,45 @@ oc create secret generic secure-forward --from-file=ca-bundle.crt=/path/to/tls.c
 +
 --
 * The `outputs` section of the file specifies where to send the logs. To establish a secure connection to an output, you must specify a secret, such as the one that you created in <<keycert-secret,step 2b of the *Before you begin* section>>. If you want to use an insecure connection for test purposes, you can omit the secret from your output configuration.
-* The `pipelines` section of the file specifies which log types are sent to the configured outputs..
+* The `pipelines` section of the file specifies which log types are sent to the configured outputs.
 +
-The following sample `log-forward-instance.yaml` file uses secure connections and defines two outputs: `elasticsearch`, which routes to an internal Elasticsearch instance, and `fluentd-forward`, which routes to the instance of Fluentd that forwards the logs to Splunk. Each log type and its corresponding output reference is defined in the `pipelines` section:
+The following sample `log-forward-instance.yaml` file defines a secure connections to a Fluentd server named `fluentd-server-secure` and an insecure connection to another Fluentd server named `fluentd-server-insecure`. Note the different protocols that are defined for both in the _url_ (i.e tls vs tcp) . Remove the output type that you do not wish to use in your file. Each log type and its corresponding output reference is defined in the `pipelines` section. The `default` output reference points to the internal OpenShift Container Platform Elasticsearch instance:
 +
 ```
-apiVersion: "logging.openshift.io/v1alpha1"
-kind: "LogForwarding"
+apiVersion: logging.openshift.io/v1
+kind: ClusterLogForwarder
 metadata:
   name: instance
   namespace: openshift-logging
 spec:
   disableDefaultForwarding: true
   outputs:
-   - name: elasticsearch
-     type: "elasticsearch"
-     endpoint: elasticsearch.openshift-logging.svc:9200
-     secret:
-        name: fluentd
-   - name: fluentd-forward
-     type: "forward"
-     endpoint: splunk-fluentd-forward.offcluster.com:24224 # substitute with FQDN or IP address
+   - name: fluentd-server-secure
+     type: fluentdForward
+     url: 'tls://fluntdserver.security.example.com:24224' # Substitute with FQDN or IP address
      secret:
         name: secure-forward
+   - name: fluentd-server-insecure
+     type: fluentdForward
+     url: 'tcp://fluntdserver.home.example.com:24224' # Substitute with FQDN or IP address
   pipelines:
    - name: container-logs
-     inputSource: logs.app
+     inputRefs:
+     - application
      outputRefs:
-     - elasticsearch
-     - fluentd-forward
+     - default
+     - fluentd-server-secure
    - name: infra-logs
-     inputSource: logs.infra
+     inputRefs:
+     - infrastructure
      outputRefs:
-     - elasticsearch
+     - default
    - name: audit-logs
-     inputSource: logs.audit
+     inputRefs:
+     - audit
      outputRefs:
-     - elasticsearch
+     - default
+
 ```
 +
 For more information, see link:https://docs.openshift.com/container-platform/4.6/logging/cluster-logging-external.html#cluster-logging-collector-log-forward-fluentd_cluster-logging-external[Forwarding logs using the Fluentd forward protocol]. Make sure to consult the documentation for your version of OpenShift, as the pipeline configuration for version 4.6 is slightly different from the preceding versions.
@@ -284,16 +286,16 @@ The Fluentd image that is used in this blog post has Fluent's Splunk HEC output 
 +
 
 
-. [[splunk-token]]Create the Splunk HTTP Event Collector data input token. Visit Splunk at `http://localhost:8000` and log in with `admin` and the password that is specified in your `docker-compose.yaml` file. Go to *Settings* > *Data Inputs* > *HTTP Event Collector* > *New Token*. Set `Name` as "openshift". In Input Settings, set `Source Type` as "Automatic" and `App Context` as "Search & Reporting (search)". Under `Index`, click `Create a new index` and set `Index Name` as "openshift".
+. [[splunk-token]]Create the Splunk HTTP Event Collector data input token. Visit Splunk at `http://localhost:8000` and log in with `admin` and the password that is specified in your `docker-compose.yaml` file. Go to *Settings* > *Data Inputs* > *HTTP Event Collector* > *New Token*. Set `Name` as "openshift" and hit next. In Input Settings, set `Source Type` as "Automatic" and `App Context` as "Search & Reporting (search)". Under `Index`, click `Create a new index` and set `Index Name` as "openshift".
 +
 image::/img/blog/splunk-index.png[Splunk Index,width=70%,align="center"]
 +
-Select the "openshift" index in the  Available item(s) box.
+Select the "openshift" index in the `Available item(s)` box. This will move the index into the `Selected itm(s)` box.
 +
 image::/img/blog/splunk-openshift-index.png[Splunk Openshift Index,width=70%,align="center"]
 +
-Leave the other fields unchanged and click *Create a new index*. Copy the generated token value to use in the <<fluent-conf, fluent.conf file>>
-
+Proceed to the `Review` section and submit. Copy the generated token value to use in the <<fluent-conf, fluent.conf file>>
++
 . Deploy Fluentd by running the following command:
 +
 [source]
@@ -305,7 +307,7 @@ Leave the other fields unchanged and click *Create a new index*. Copy the genera
 
 == Integrating Open Liberty JSON Logs
 
-Since Open Liberty application pods output logs in JSON format, it is recommended to set Fluentd to parse the JSON fields from the message body. To enable JSON parsing, change the cluster logging instance's *managementState* field from *"Managed"* to *"Unmanaged"*:
+Since Open Liberty application pods output logs in JSON format, it is recommended to set Fluentd to parse the JSON fields from the message body. To enable JSON parsing, first change the cluster logging instance's *managementState* field from *"Managed"* to *"Unmanaged"*:
 
 ```
 [root@ocp ~]# oc edit ClusterLogging instance
@@ -320,14 +322,35 @@ metadata:
 spec:
   managementState: "Unmanaged"
 ```
-*Note:* After you set this value to *"Unmanaged"*, any further changes to the _ClusterLogging_ or _LogForwarding_ instances are not automatically detected. To automatically detect changes, you must change the *managementState* field back to *"Managed"*.
 
-Next, set the *MERGE_JSON_LOG* environment variable to *true*.
+Alternatively, you can modify this file on the web console. Ensure you are in the `openshift-logging` project namespace and go to `Administration > Custom Resource Definitions > ClusterLogging > Instances > Instance > YAML`
 
+Next, we'll need to change the  *merge_json_log* attribute of the `kubernetes.var.log.containers.**` filter to *true* in the Fluentd's config map.
+
+```
+[root@ocp ~]# oc edit configmap fluentd
+
+apiVersion: v1
+data:
+...
+  <filter kubernetes.var.log.containers.**>
+    @type parse_json_field
+    merge_json_log 'true'
+    preserve_json_log 'true'
+    json_fields 'log,MESSAGE'
+  </filter>
+...
+```
+
+Finally we need to force restart the Fluentd pods to pick up this new change:
 [source]
 ----
-[root@ocp ~]# oc set env ds/fluentd MERGE_JSON_LOG=true
+oc delete pod --selector logging-infra=fluentd
 ----
+
+Alternatively, you can modify this file on the web console. Ensure you are in the `openshift-logging` project namespace and go to `Workloads > Config Maps > fluentd > YAML`
+
+*Note:* After you set this value to *"Unmanaged"*, any further changes to the _ClusterLogging_ or _ClusterLogForwarder_ instances are not automatically detected. To automatically detect changes, you must change the *managementState* field back to *"Managed"*. By switching back to *"Managed"* the Cluster Logging instance will revert the Fluentd's config map back to the original settings.
 
 == Setting up the Splunk dashboard and viewing logs
 
