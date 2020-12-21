@@ -55,7 +55,7 @@ oc create secret generic secure-forward --from-file=ca-bundle.crt=/path/to/tls.c
 * The `outputs` section of the file specifies where to send the logs. To establish a secure connection to an output, you must specify a secret, such as the one that you created in <<keycert-secret,step 2b of the *Before you begin* section>>. If you want to use an insecure connection for test purposes, you can omit the secret from your output configuration.
 * The `pipelines` section of the file specifies which log types are sent to the configured outputs.
 +
-The following sample `log-forward-instance.yaml` file defines a secure connections to a Fluentd server named `fluentd-server-secure` and an insecure connection to another Fluentd server named `fluentd-server-insecure`. Note the different protocols that are defined for both in the _url_ (i.e tls vs tcp) . Remove the output type that you do not wish to use in your file. Each log type and its corresponding output reference is defined in the `pipelines` section. The `default` output reference points to the internal OpenShift Container Platform Elasticsearch instance:
+The following sample `log-forward-instance.yaml` file defintes two `outputs`: a secure connections to a Fluentd server named `fluentd-server-secure` and an insecure connection to another Fluentd server named `fluentd-server-insecure`. Note the different protocols that are defined for both in the _url_ (tls vs tcp) . Remove the output type that you do not wish to use in your file. Each log type and its corresponding output reference is defined in the `pipelines` section. The `default` output reference points to the internal OpenShift Container Platform Elasticsearch instance:
 +
 ```
 apiVersion: logging.openshift.io/v1
@@ -290,11 +290,11 @@ The Fluentd image that is used in this blog post has Fluent's Splunk HEC output 
 +
 image::/img/blog/splunk-index.png[Splunk Index,width=70%,align="center"]
 +
-Select the "openshift" index in the `Available item(s)` box. This will move the index into the `Selected itm(s)` box.
+Select the "openshift" index in the `Available item(s)` box to move the index into the `Selected itm(s)` box.
 +
 image::/img/blog/splunk-openshift-index.png[Splunk Openshift Index,width=70%,align="center"]
 +
-Proceed to the `Review` section and submit. Copy the generated token value to use in the <<fluent-conf, fluent.conf file>>
+Proceed to the `Review` section and submit. Copy the generated token value to use in the <<fluent-conf, fluent.conf file>>.
 +
 . Deploy Fluentd by running the following command:
 +
@@ -307,7 +307,7 @@ Proceed to the `Review` section and submit. Copy the generated token value to us
 
 == Integrating Open Liberty JSON Logs
 
-Since Open Liberty application pods output logs in JSON format, it is recommended to set Fluentd to parse the JSON fields from the message body. To enable JSON parsing, first change the cluster logging instance's *managementState* field from *"Managed"* to *"Unmanaged"*:
+Open Liberty application pods output logs in JSON format. To enable Fluentd to parse the JSON fields from the message body, first change the cluster logging instance's managementState field from "Managed" to "Unmanaged":
 
 ```
 [root@ocp ~]# oc edit ClusterLogging instance
@@ -323,9 +323,9 @@ spec:
   managementState: "Unmanaged"
 ```
 
-Alternatively, you can modify this file on the web console. Ensure you are in the `openshift-logging` project namespace and go to `Administration > Custom Resource Definitions > ClusterLogging > Instances > Instance > YAML`
+Alternatively, you can modify this file on the web console. Ensure you are in the `openshift-logging` project namespace and go to `Administration > Custom Resource Definitions > ClusterLogging > Instances > Instance > YAML`. Change the `managementState` field from "Managed" to "Unmanaged".
 
-Next, we'll need to change the  *merge_json_log* attribute of the `kubernetes.var.log.containers.**` filter to *true* in the Fluentd's config map.
+Next, we'll need to change the  *merge_json_log* attribute of the `kubernetes.var.log.containers.**` filter to *true* in the Fluentd's config map. If you are running on Open Shift 4.3 to 4.5 this step will be different. See below for the appropriate steps.
 
 ```
 [root@ocp ~]# oc edit configmap fluentd
@@ -342,15 +342,21 @@ data:
 ...
 ```
 
+Alternatively, you can modify this file on the web console. Ensure you are in the `openshift-logging` project namespace and go to `Workloads > Config Maps > fluentd > YAML`.  Change the value for the `merge_json_log` attribute of the `kubernetes.var.log.containers.**` filter to true.
+
+**OpenShift 4.3 to 4.5 only:** Instead of manually changing the config map you can run:
+[source]
+----
+[root@ocp ~]# oc set env ds/fluentd MERGE_JSON_LOG=true
+----
+
 Finally we need to force restart the Fluentd pods to pick up this new change:
 [source]
 ----
 oc delete pod --selector logging-infra=fluentd
 ----
 
-Alternatively, you can modify this file on the web console. Ensure you are in the `openshift-logging` project namespace and go to `Workloads > Config Maps > fluentd > YAML`
-
-*Note:* After you set this value to *"Unmanaged"*, any further changes to the _ClusterLogging_ or _ClusterLogForwarder_ instances are not automatically detected. To automatically detect changes, you must change the *managementState* field back to *"Managed"*. By switching back to *"Managed"* the Cluster Logging instance will revert the Fluentd's config map back to the original settings.
+*Note:* After you set the `managementState` to *"Unmanaged"* in the cluster logging instance, any further changes to the _ClusterLogging_ or _ClusterLogForwarder_ instances are not automatically detected. If you need to fix or modify the configuration for either you will need to change the *managementState* field back to *"Managed"*. However, once the `managementState` is changed to *"Managed"* the cluster logging instance will revert the Fluentd's config map back to the original settings.
 
 == Setting up the Splunk dashboard and viewing logs
 
