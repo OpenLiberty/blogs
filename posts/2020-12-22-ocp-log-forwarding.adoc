@@ -192,8 +192,8 @@ RUN fluent-gem install fluent-plugin-splunk-enterprise -v 0.10.0
 [start=4]
 . Create the `docker-compose.yaml` file under the `/path/to/fluentdSplunkDir` directory for Fluentd and Splunk deployment on your external machine.
 +
-
 * Sample `docker-compose.yaml`:
++
 ```
 version: '3'
 
@@ -228,6 +228,7 @@ Configure the ports for Splunk and Fluentd. You can also define a splunk passwor
 +
 
 The following `fluent.conf` file uses a *secure* connection between OpenShift Fluentd servers:
++
 ```
 <source>
   @type forward
@@ -282,9 +283,9 @@ The following `fluent.conf` file uses a *secure* connection between OpenShift Fl
 ** The *default_source* parameter sets the value as source metadata.
 ** Set the *use_ssl* parameter to true to use SSL when you connect to Splunk. By default, the Splunk deployment enables SSL for incoming HEC connections.
 ** The *ssl_verify* parameter is set to false to avoid SSL certificate verification. Since both the Fluentd and Splunk images are deployed on the same machine, this blog post uses an insecure connection. To secure your connection with Splunk, configure a certificate for your splunk deployment, load it into your Fluentd image, and point to it with the *ca_file* option. These steps are beyond the scope of this blog post.
-
++
 See the link:https://docs.fluentd.org/input/forward[Fluentd documentation for the _forward_ input plugin] for more configuration options.
-
++
 The Fluentd image that is used in this blog post has Fluent's Splunk HEC output plugin installed. See the link:https://github.com/fluent/fluent-plugin-splunk/blob/2247356927cab421af1ddb7d22bd8046726c8d62/README.hec.md[Splunk HTTP Event Collector Output Plugin documentation] for more configuration options.
 
 
@@ -323,7 +324,7 @@ Proceed to the `Review` section and submit. Copy the generated token value to us
 Since Open Liberty application pods output logs in JSON format, you must enable Fluentd to parse the JSON fields from the message body.
 
 . Change the cluster logging instance's `managementState` field from "Managed" to "Unmanaged":
-
++
 ```
 [root@ocp ~]# oc edit ClusterLogging instance
 
@@ -337,12 +338,14 @@ metadata:
 spec:
   managementState: "Unmanaged"
 ```
-
++
 Alternatively, you can modify this file on the web console. Ensure you are in the `openshift-logging` project namespace and go to `Administration > Custom Resource Definitions > ClusterLogging > Instances > Instance > YAML`. Change the `managementState` field from "Managed" to "Unmanaged".
 
 [start=2]
-. In the Fluentd config map, change the `merge_json_log` attribute of the `kubernetes.var.log.containers.` filter to `true`. If you are running on OpenShift 4.3 to 4.5, this step is slightly different. Skip to the line that says *OpenShift 4.3 to 4.5 only*.
-
+. In the Fluentd config map, change the `merge_json_log` attribute of the `kubernetes.var.log.containers.**` filter to `true`.
++
+If you are running on OpenShift 4.3 to 4.5, this step is slightly different. Skip to the line that says *OpenShift 4.3 to 4.5 only*.
++
 ```
 [root@ocp ~]# oc edit configmap fluentd
 
@@ -357,17 +360,19 @@ data:
   </filter>
 ...
 ```
-
++
 Alternatively, you can modify this file on the web console. Ensure you are in the `openshift-logging` project namespace and go to `Workloads > Config Maps > fluentd > YAML`.  Change the value for the `merge_json_log` attribute of the `kubernetes.var.log.containers.**` filter to true.
-
++
 **OpenShift 4.3 to 4.5 only:** Instead of manually changing the config map, run the following command:
++
 [source]
 ----
 [root@ocp ~]# oc set env ds/fluentd MERGE_JSON_LOG=true
 ----
 
 [start=3]
-.Force restart the Fluentd pods to pick up the change by running the following command:
+. Force restart the Fluentd pods to pick up the change by running the following command:
++
 [source]
 ----
 oc delete pod --selector logging-infra=fluentd
