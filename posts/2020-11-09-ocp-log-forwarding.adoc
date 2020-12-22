@@ -2,158 +2,112 @@
 layout: post
 title: "Forwarding Open Liberty logs in OpenShift Container Platform to Splunk using Log Forwarding API"
 categories: blog
-author_picture: https://avatars3.githubusercontent.com/melissa-lee 
-author_github: https://github.com/melissa-lee 
-seo-title: Forwarding Open Liberty logs in OpenShift Container Platform to Splunk using Log Forwarding API - OpenLiberty.io
-seo-description: Using Log Forwarding API, you can send logs from Open Liberty deployed in OpenShift Container Platform to remote destinations. You can deploy Splunk on your external machine or inside your OpenShift Container Platform. The logs can be forwarded to Splunk using the Fluentd forward protocol.
-blog_description: Using Log Forwarding API, you can send logs from Open Liberty deployed in OpenShift Container Platform to remote destinations. You can deploy Splunk on your external machine or inside your OpenShift Container Platform. The logs can be forwarded to Splunk using the Fluentd forward protocol.
-additional_authors: 
+author_picture: https://avatars3.githubusercontent.com/melissa-lee
+author_github: https://github.com/melissa-lee
+seo-title: Forwarding Open Liberty logs in OpenShift to Splunk by using the Log Forwarding API - OpenLiberty.io
+seo-description: Using the Log Forwarding API, you can send logs from Open Liberty that are deployed in OpenShift Container Platform to remote destinations. You can deploy Splunk on your external machine or inside your OpenShift Container Platform. The logs can be forwarded to Splunk using the Fluentd forward protocol.
+blog_description: Using the Log Forwarding API, you can send logs from Open Liberty deployed in OpenShift Container Platform to remote destinations. You can deploy Splunk on your external machine or inside your OpenShift Container Platform. The logs can be forwarded to Splunk using the Fluentd forward protocol.
+additional_authors:
 - name: David Chan
   github: https://github.com/Channyboy
   image: https://avatars0.githubusercontent.com/Channyboy
 ---
-= Forwarding Open Liberty logs in OpenShift Container Platform to Splunk using Log Forwarding API
+= Forwarding Open Liberty logs in OpenShift to Splunk by using the Log Forwarding API
 Halim Lee <https://github.com/leemelim>
 
-OpenShift Container Platform provides a log aggregation solution with cluster logging using Elasticsearch, Fluentd, and Kibana (EFK stack). In addition to EFK stack, you can integrate with other log analysis solutions. Starting in OpenShift 4.6 you can use Log Forwarding API to send logs from Open Liberty in OpenShift cluster to other available log analysis solutions.  The Log Forwarding API is also available for use in OpenShift 4.3 to 4.5 under Technology Preview.
+Collecting logs in a single location helps you monitor all of your applications efficiently, which is especially important in highly distributed and dynamic container orchestration systems. Red Hat OpenShift Container Platform (OpenShift) provides a built-in log aggregation solution that uses Elasticsearch, Fluentd, and Kibana, also known as the EFK stack. In addition to the EFK stack, you can use the https://docs.openshift.com/container-platform/4.6/logging/cluster-logging-external.html[Log Forwarding API] to send logs from an OpenShift cluster to other log analysis solutions. The Log Forwarding API is available starting with OpenShift 4.6, and in OpenShift 4.3 to 4.5 as a Technology Preview feature.
 
-Splunk is one of the most popular log analysis solutions. If you already have Splunk deployed on your external machine, or if you want to start using Splunk as your new logging solution, you will have to integrate OpenShift with Splunk. Collecting logs in one location helps you monitor all of your applications efficiently, especially because container orchestration system is highly distributed and dynamic. Log Forwarding API simplifies the integration ability of OpenShift cluster with Splunk. You can configure custom pipelines to send logs to desired endpoints within or outside of your OpenShift cluster. 
+https://www.splunk.com/[Splunk] is one of the most popular log analysis solutions. If you want to start using Splunk as your logging solution for Open Liberty on OpenShift, you must first integrate OpenShift with Splunk. The Log Forwarding API simplifies OpenShift cluster integration with Splunk. You can configure custom pipelines to send logs to endpoints that are either inside or outside of your OpenShift cluster.
 
-This blog will walk you through the configuration of the Log Forwarding API on your OCP cluster that will _forward_ your logs to a Fluentd and Splunk deployment that is external to your OCP cluster. The additional Fluentd server is needed to redirect the forwarded logs to Splunk using Splunk's HTTP Event Collector (HEC) API. This blog will also cover the configuration and deployment of the Fluentd and Splunk server on an external machine. The final steps are to integrate Open Liberty logs with the Log Forwarder and to setup Splunk dashboards provided by the Open Liberty team.
+To send logs from OpenShift to Splunk, the Log Forwarding API must first send them to a Fluentd server. This blog post walks you through configuring the Log Forwarding API on your OpenShift cluster to forward your logs to a Fluentd and Splunk deployment that is external to your cluster.  We also cover the configuration and deployment of the Fluentd and Splunk server on an external machine. The Fluentd server redirects the forwarded logs to Splunk by using Splunk's HTTP Event Collector (HEC) API. In the final sections, you integrate your Open Liberty logs with the Fluentd forwarder and setup Splunk dashboards that are provided by the Open Liberty team.
 
-Alternatively, you may follow the OpenShift blog link:https://www.openshift.com/blog/forwarding-logs-to-splunk-using-the-openshift-log-forwarding-api[Forwarding Logs to Splunk Using the OpenShift Log Forwarding API] that automates the configuration and deployment of the LogFowarding API, Fluentd forwarder and Splunk locally within your OCP cluster. Once complete proceed to <<integrating-open-liberty-json-logs,Integrating Open Liberty JSON Logs>> and <<setting-up-splunk-dashboard,Setting Up Splunk-Dashboard>> sections to complete your setup.
+If you would rather set up the Log Forwarding API, Fluentd forwarder, and Splunk locally within your OpenShift cluster, see link:https://www.openshift.com/blog/forwarding-logs-to-splunk-using-the-openshift-log-forwarding-api[Forwarding Logs to Splunk Using the OpenShift Log Forwarding API] on the OpenShift blog. After you complete those steps, proceed to the <<integrating-open-liberty-json-logs,Integrating Open Liberty JSON logs>> and <<setting-up-the-splunk-dashboard-and-viewing-logs,Setting up the Splunk dashboard>> sections of this blog post to complete your setup.
 
 
-== Configuring Log Forwarding API
+* <<before-you-begin,Before you begin>>
+* <<configuring-the-log-forwarding-api,Configuring the Log Forwarding API>>
+* <<configuring-splunk-and-fluentd,Configuring Splunk and Fluentd>>
+* <<integrating-open-liberty-json-logs,Integrating Open Liberty JSON logs>>
+* <<setting-up-the-splunk-dashboard-and-viewing-logs,Setting up the Splunk dashboard and viewing logs>>
+* <<troubleshooting,Troubleshooting>>
+* <<conclusion,Conclusion>>
 
-. Ensure your cluster logging instance is created and all pods are fully operational. See the installation and configuration guide for cluster logging: link:https://docs.openshift.com/container-platform/4.6/logging/cluster-logging-deploying.html[Deploying cluster logging]. It should be noted that the provided link leads to the OCP 4.6 documentation. You can chose the appropriate version once on the site. Additionally, the cluster logging instance sample provided on the Red Hat documentation leaves the _storage class_ value for the reader to configure. If you are simply _testing_ you can omit the storage section and the cluster logging instance will use in-memory storage. Note that this configuration would only be suitable for testing and NOT for production.
+== Before you begin
 
-. [[keycert-secret]]*(Optional: Security)* It is recommended that you secure your connection between the Fluentd servers on your OCP cluster and the external Fluentd server. This step will create a _secret_ used by the Log Forwarding API in step 3 for achieving a secured connection. It is expected that the necessary key and certificate (e.g `tls.crt` and `tls.key`) have already been created. The instructions for creating the keys and certificates is not included in this blog and is up to the reader to complete. The key and certificate will also be used <<keycert-fluentd, later when deploying the external Fluentd server>>.
+
+. Ensure that your cluster logging instance is created and all pods are fully operational. For more information, see the link:https://docs.openshift.com/container-platform/4.6/logging/cluster-logging-deploying.html[Deploying cluster logging] documentation for your OpenShift version.
 +
---
+*Note:* The cluster logging instance sample that is provided in the OpenShift documentation leaves the _storage class_ value for the reader to configure. In test environments, you can omit the storage section and the cluster logging instance uses in-memory storage. However, this configuration is not suitable for production.
+
+[start=2]
+. [[keycert-secret]]*Optional:* It is recommended that you secure the connection between the Fluentd servers on your OpenShift cluster and the external Fluentd server. This step creates a _secret_ that is used by the Log Forwarding API to achieve a secure connection. This procedure assumes that the necessary key and certificate files, for example `tls.crt` and `tls.key`, are already created. The instructions for creating the keys and certificates are not within the scope of this blog post. The key and certificate are also used when you <<keycert-fluentd, deploy the external Fluentd server>>.
++
 .. Switch to the `openshift-logging` project
 +
 [source]
 ----
 oc project openshift-logging
 ----
-.. Create the secret containing the key and certificate. You will also need to specify a _shared_key_ which is a string password that is used as an extra layer of authentication between the OCP cluster's Fluentd servers and the external Fluentd server. This blog will use _"secretpassword"_ as an example. (*Note*: Change the paths from the below example as necessary)
+.. Create a secret that contains your key and certificate. You also need to specify a _shared_key_, which is a string password that is used as an extra layer of authentication between the Fluentd servers on the OpenShift cluster and the external Fluentd server. The examples in this blog post use _secure-forward_ for the secret name and  _"secretpassword"_ for the shared key. Change the paths in the following example as necessary:
 +
 [source]
 ----
 oc create secret generic secure-forward --from-file=ca-bundle.crt=/path/to/tls.crt --from-file=tls.crt=/path/to/tls.crt --from-file=tls.key=/path/to/tls.key   --from-literal=shared_key=secretpassword
 ----
---
 
-. Create a Log Forwarding instance object YAML file, `log-forward-instance.yaml`. Configure outputs and pipelines.
+
+== Configuring the Log Forwarding API
+
+
+. Create the `log-forward-instance.yaml` file. Configure the outputs and pipelines.
 +
---
-* Outputs can be either `elasticsearch` or `forward`. `elasticsearch` routes logs to internal or external Elasticsearch cluster. `forward` forwards logs to an external log aggregation solution through Fluentd forward protocols.
-* Pipelines can be one of `logs.app`, `logs.infra` and `logs.audit`. Details on the pipelines can be found here: link:https://docs.openshift.com/container-platform/4.6/logging/cluster-logging-external.html#cluster-logging-collector-log-forward-about_cluster-logging-external[Understanding the Log Forwarding API].
-* If you are using a *secured* connection then the secret created in step 2 is used here:
+* The `outputs` section of the file specifies where to send the logs. To establish a secure connection to an output, you must specify a secret, such as the one that you created in <<keycert-secret,step 2b of the *Before you begin* section>>. If you want to use an insecure connection for test purposes, you can omit the secret from your output configuration.
+* The `pipelines` section of the file specifies which log types are sent to the configured outputs.
 +
-```
-   - name: fluentd-forward
-     type: "forward"
-     endpoint: splunk-fluentd-forward.offcluster.com:24224 # substitute with FQDN or IP address
-     secret:
-        name: secure-forward
-```
-+
-Sample `log-forward-instance.yaml` using a *secured* connection:
+The following sample `log-forward-instance.yaml` file defines two `outputs`: a secure connection to a Fluentd server named `fluentd-server-secure` and an insecure connection to another Fluentd server named `fluentd-server-insecure`. Note the different protocols that are defined for the _url_ in each output (tls vs tcp). Remove the output type that you do not want to use in your file. Each log type and its corresponding output reference is defined in the `pipelines` section. The `default` output reference points to the internal OpenShift Container Platform Elasticsearch instance:
 +
 ```
-apiVersion: "logging.openshift.io/v1alpha1"
-kind: "LogForwarding"
+apiVersion: logging.openshift.io/v1
+kind: ClusterLogForwarder
 metadata:
-  name: instance 
+  name: instance
   namespace: openshift-logging
 spec:
-  disableDefaultForwarding: true 
-  outputs: 
-   - name: elasticsearch 
-     type: "elasticsearch"  
-     endpoint: elasticsearch.openshift-logging.svc:9200 
-     secret: 
-        name: fluentd
-   - name: fluentd-forward
-     type: "forward"
-     endpoint: splunk-fluentd-forward.offcluster.com:24224 # substitute with FQDN or IP address
+  disableDefaultForwarding: true
+  outputs:
+   - name: fluentd-server-secure
+     type: fluentdForward
+     url: 'tls://fluntdserver.security.example.com:24224' # Substitute with FQDN or IP address
      secret:
         name: secure-forward
-  pipelines: 
-   - name: container-logs 
-     inputSource: logs.app 
-     outputRefs: 
-     - elasticsearch
-     - fluentd-forward
+   - name: fluentd-server-insecure
+     type: fluentdForward
+     url: 'tcp://fluntdserver.home.example.com:24224' # Substitute with FQDN or IP address
+  pipelines:
+   - name: container-logs
+     inputRefs:
+     - application
+     outputRefs:
+     - default
+     - fluentd-server-secure
    - name: infra-logs
-     inputSource: logs.infra
+     inputRefs:
+     - infrastructure
      outputRefs:
-     - elasticsearch
+     - default
    - name: audit-logs
-     inputSource: logs.audit
+     inputRefs:
+     - audit
      outputRefs:
-     - elasticsearch
-```
-+
-* If you are using an *insecured* connection then you need to specify the `insecure: true` configuration instead:
-+
-```
-   - name: fluentd-forward
-     type: "forward"
-     endpoint: splunk-fluentd-forward.offcluster.com:24224 # substitute with FQDN or IP address
-     insecure: true
-```
-+
-Sample `log-forward-instance.yaml` using an *insecured* connection:
-+
-```
-apiVersion: "logging.openshift.io/v1alpha1"
-kind: "LogForwarding"
-metadata:
-  name: instance 
-  namespace: openshift-logging
-spec:
-  disableDefaultForwarding: true 
-  outputs: 
-   - name: elasticsearch 
-     type: "elasticsearch"  
-     endpoint: elasticsearch.openshift-logging.svc:9200 
-     secret: 
-        name: fluentd
-   - name: fluentd-forward
-     type: "forward"
-     endpoint: splunk-fluentd-forward.offcluster.com:24224 # substitute with FQDN or IP address
-     insecure: true
-  pipelines: 
-   - name: container-logs 
-     inputSource: logs.app 
-     outputRefs: 
-     - elasticsearch
-     - fluentd-forward
-   - name: infra-logs
-     inputSource: logs.infra
-     outputRefs:
-     - elasticsearch
-   - name: audit-logs
-     inputSource: logs.audit
-     outputRefs:
-     - elasticsearch
-```
+     - default
 
-* The sample configuration files have two outputs defined: `elasticsearch` routing to internal Elasticsearch instance and `forward` routing to an instance of Fluentd. Each log type is defined under pipelines with its configured output references. For the `forward` output you will need to substitute the `splunk-fluentd-forward.offcluster.com` with the FQDN of your external machine or the IP address directly.
+```
 +
-For example:
-```
-   - name: fluentd-forward
-     type: "forward"
-     endpoint: 1.23.456.789:24224
-     secret:
-        name: secure-forward
-```
---
-. Create the instance inside your OpenShift cluster:
+For more information, see link:https://docs.openshift.com/container-platform/4.6/logging/cluster-logging-external.html#cluster-logging-collector-log-forward-fluentd_cluster-logging-external[Forwarding logs using the Fluentd forward protocol]. Make sure to consult the documentation for your version of OpenShift, as the pipeline configuration for version 4.6 is slightly different from the preceding versions.
+
+
+[start=2]
+. Create the Log Forwarding instance inside your OpenShift cluster:
 +
 [source]
 ----
@@ -161,7 +115,7 @@ For example:
 ----
 +
 
-. **(OpenShift 4.3 to 4.5)** Annotate the ClusterLogging instance to enable the Log Forwarding API.
+. **OpenShift 4.3 to 4.5 only:** Annotate the ClusterLogging instance to enable the Log Forwarding API.
 +
 [source]
 ----
@@ -169,17 +123,17 @@ For example:
 ----
 +
 
-
-. To check if the logs are being forwarded to the specified outputs, run the following command:
+[start=3]
+. To check whether the logs are forwarded to the specified outputs, run the following command:
 +
 [source]
 ----
 [root@ocp ~]# oc -n openshift-logging get cm fluentd -o json | jq -r '.data."fluent.conf"' > fluentd-with-logfowarding.conf
 ----
 +
-This command gets ConfigMap configuration for Fluentd inside OpenShift Container Platform. Check if the outputs are defined inside the configuration file.
+This command displays the ConfigMap configuration for Fluentd inside OpenShift. Check whether the outputs are defined inside the configuration file.
 
-* For example:
+* In the following configuration file example, you can see the `elasticsearch` and `fluent-forward` outputs that are referenced by `@label`:
 +
 ```
 ...
@@ -199,19 +153,19 @@ This command gets ConfigMap configuration for Fluentd inside OpenShift Container
 </label>
 ...
 ```
-+
 
 
-== Splunk and Fluentd configuration
 
-Using `forward` output, you can forward OpenShift Container Platform logs to Splunk using Fluentd forward protocol between two Fluentd servers. You can setup Splunk inside your OpenShift Cluster or on your external machine.
+== Configuring Splunk and Fluentd
+
+When you specify the `forward` output in your `log-forward-instance.yaml` file, you can forward OpenShift logs to Splunk by using the Fluentd forward protocol. You can set up Splunk inside your OpenShift Cluster or on your external machine.
 
 === Setting up Splunk and Fluentd on your external machine
 
-This following instructions will set up Splunk and Fluentd manually on your external machine. If you already have Splunk deployed on your external machine, this option will help you setup the connection between your OpenShift cluster and Splunk. Along with Splunk, you have to deploy an instance of Fluentd on your machine to receive packets from Fluentd inside your OpenShift cluster. For the setup demo purposes, docker compose will be used for installation and deployment of external Fluentd and Splunk.
+The following instructions explain how to manually set up Splunk and Fluentd on your external machine. If Splunk is already deployed on your external machine, this option helps you set up the connection between your OpenShift cluster and Splunk. To receive logs from Fluentd inside your OpenShift cluster, you must deploy both Splunk and an instance of Fluentd on your external machine. For the  purposes of this setup demo, Docker compose is used for installation and the external deployment of Fluentd and Splunk.
 
 
-. Create the following directories that we will use to contain our files. For example:
+. Create the following directories to hold the necessary files:
 +
 [source]
 ----
@@ -221,7 +175,8 @@ This following instructions will set up Splunk and Fluentd manually on your exte
 /path/to/fluentdSPlunkDir/fluentd/secret
 ----
 
-. Create `Dockerfile` under the `/path/to/fluentdSplunkDir/fluentd` to install essential packages while building Fluentd docker image. You need to install *build-essential* to install all dependencies and *fluent-plugin-splunk-enterprise* in order to forward the logs to Splunk.
+[start=2]
+. Create a `Dockerfile` file under the `/path/to/fluentdSplunkDir/fluentd` directory to install essential packages while you build the Fluentd Docker image. You need to install the *build-essential* package to install all dependencies and the *fluent-plugin-splunk-enterprise* package to forward the logs to Splunk.
 * Sample `Dockerfile`:
 +
 ```
@@ -232,14 +187,16 @@ RUN apt-get update -y
 RUN apt-get install build-essential -y
 RUN fluent-gem install fluent-plugin-splunk-enterprise -v 0.10.0
 ```
-+
 
-. [[keycert-fluentd]]*(Optional: Security)* If you are configuring a secure connection between your external Fluentd server and the Fluentd servers from your OCP cluster then move the  <<keycert-secret,`tls.key` and `tls.crt` that were created earlier>> to the `/path/to/fluentdSplunkDir/secret` directory .
 
-. Create `docker-compose.yaml` under the `/path/to/fluentdSplunkDir` file for Fluentd and Splunk deployment on your external machine.
+[start=3]
+. [[keycert-fluentd]]*Optional:* If you are configuring a secure connection between your external Fluentd server and the Fluentd servers from your OpenShift cluster, move the  <<keycert-secret,`tls.key` and `tls.crt` files that you created earlier>> to the `/path/to/fluentdSplunkDir/secret` directory.
+
+[start=4]
+. Create the `docker-compose.yaml` file under the `/path/to/fluentdSplunkDir` directory for Fluentd and Splunk deployment on your external machine.
 +
---
 * Sample `docker-compose.yaml`:
++
 ```
 version: '3'
 
@@ -252,32 +209,29 @@ services:
       SPLUNK_ENABLE_LISTEN: 8088
       SPLUNK_PASSWORD: changeme
     ports:
-      - "8000:8000" 
+      - "8000:8000"
       - "8088:8088"
 
   fluentd:
     build: ./fluentd
     volumes:
       - ./fluentd/conf:/fluentd/etc
-      - ./fluentd/secret:/fluentd/secret # remove if not using a secured connection
+      - ./fluentd/secret:/fluentd/secret # remove if not using a secure connection
     links:
       - "splunk"
     ports:
       - "24224:24224"
       - "24224:24224/udp"
 ```
-Configure the ports for Splunk and Fluentd. You can also define splunk password under *splunk: environment*.
+Configure the ports for Splunk and Fluentd. You can also define a splunk password under *splunk: environment*.
 
-If you are configuring an *insecure* connection between your OCP cluster's Fluentd servers you can remove the following line from the sample:
-```
-      - ./fluentd/secret:/fluentd/secret
-```
---
 
-. Create `fluent.conf` file to configure Fluentd at `/path/to/fluentdSplunkDir/fluentd/conf/fluent.conf`.
+[start=5]
+. Create `fluent.conf` file in the `/path/to/fluentdSplunkDir/fluentd/conf/` directory to configure Fluentd.
 +
---
-Sample `fluent.conf` with *secured* connection to between OCP Fluentd server:
+
+The following `fluent.conf` file uses a *secure* connection between OpenShift Fluentd servers:
++
 ```
 <source>
   @type forward
@@ -302,22 +256,22 @@ Sample `fluent.conf` with *secured* connection to between OCP Fluentd server:
 
   use_ssl true
   ssl_verify false  # skips SSL certificate verification
-  #ca_file /path/to/ca.pem 
+  #ca_file /path/to/ca.pem
 
   flush_interval 5s
 </match>
 
 ```
 
-* The *source* directive determines the input sources. It uses *forward* type to accept TCP packets from your OpenShift Container Platform.
-** The *port* indicates what port the Fluentd server is listening for data
-** The *transport* directive with the *tls*  parameter enables a secure tls connection between this Fluentd server and the OCP cluster's fluentd servers.
-*** The  *cert_path* and *private_key_path* are the keys and certificates that are mounted into the Fluentd docker image.
-** The *security* directive is used for additional authentication
-*** *self_hostname* is a required key to indicate the name of the host. The sample uses _fluentd_.
-*** *shared_key* is used to connect the Fluentd servers using password authentication. This blog uses uses _secretpassword_ as an exmaple.
-
-If you have chosen to use an *insecure* connection between the OCP cluster's Fluentd servers and this Fluentd server you can use the following source configuration instead:
+* The *source* directive determines the input sources. It uses the *forward* type to accept TCP packets from your OpenShift instance.
+** *port* indicates the port that the Fluentd server is listening to for data
+** The *transport* section with the *tls*  parameter enables a secure TLS connection between this Fluentd server and fluentd servers in the OpenShift cluster.
+*** The  *cert_path* and *private_key_path* parameters are the keys and certificates that are mounted into the Fluentd docker image.
+** The *security* section is used for additional authentication
+*** The *self_hostname* parameter is a required key that indicates the name of the host. This sample uses _fluentd_.
+*** The *shared_key* parameter connects the Fluentd servers by using password authentication. This example uses _secretpassword_ as the password.
+**** If you choose to use an *insecure* connection between the Fluentd servers in the OpenShift cluster and this Fluentd server, you can use the following simplified source configuration instead:
++
 ```
 <source>
   @type forward
@@ -325,20 +279,21 @@ If you have chosen to use an *insecure* connection between the OCP cluster's Flu
 </source>
 ```
 
-* The *match* directive determines the output destinations. It looks for events with matching tags and uses *splunk_hec* to sends the events to Splunk using HTTP Event Collector.
-** The Splunk's *host* is required. We will be using  _"splunk"_ for the host as defined in the `docker-compose.yml`.
-** The Splunk's *port* is required. We will be using port `8088` as defined in the `docker-compose.yml`.
-** [[fluent-conf]]*token* should be replaced by Splunk's generated token. This token is obtained later in <<splunk-token,step 7>>.
-** *default_source* sets the value as source metadata.
-** Set *use_ssl* to true to use SSL when connecting to Splunk. By default the Splunk deployment has SSL enabled for incoming HEC connections.
-** The *ssl_verify*  is set to false to avoid SSL certificate verification. Since both the Fluentd and Splunk images are deployed on the same machine this blog will be using an insecure connection. To secure your connection with Splunk you will need to configure a certificate for your splunk deployment and load it into your Fluentd image and point to it with the *ca_file* option. These steps are not detailed in this blog and is up to the reader to configure if needed.
+* The *match* directive determines the output destinations. It looks for events with matching tags and uses *splunk_hec* to send the events to Splunk by using HTTP Event Collector.
+** The Splunk *host* value is required. We are using  _"splunk"_ for the host, as defined in the `docker-compose.yml`.
+** The Splunk *port* value is required. We are using port `8088`, as defined in the `docker-compose.yml`.
+** Replace [[fluent-conf]]*token* with the Splunk generated token. This token is obtained later in <<splunk-token,step 7>>.
+** The *default_source* parameter sets the value as source metadata.
+** Set the *use_ssl* parameter to true to use SSL when you connect to Splunk. By default, the Splunk deployment enables SSL for incoming HEC connections.
+** The *ssl_verify* parameter is set to false to avoid SSL certificate verification. Since both the Fluentd and Splunk images are deployed on the same machine, this blog post uses an insecure connection. To secure your connection with Splunk, configure a certificate for your splunk deployment, load it into your Fluentd image, and point to it with the *ca_file* option. These steps are beyond the scope of this blog post.
++
+See the link:https://docs.fluentd.org/input/forward[Fluentd documentation for the _forward_ input plugin] for more configuration options.
++
+The Fluentd image that is used in this blog post has Fluent's Splunk HEC output plugin installed. See the link:https://github.com/fluent/fluent-plugin-splunk/blob/2247356927cab421af1ddb7d22bd8046726c8d62/README.hec.md[Splunk HTTP Event Collector Output Plugin documentation] for more configuration options.
 
-See the Fluentd's link:https://docs.fluentd.org/input/forward[documentation] for the _forward_ input plugin for more configuration options.
 
-The Fluentd image used in this blog has installed Fluent's Splunk HEC output plugin. See their link:https://github.com/fluent/fluent-plugin-splunk/blob/2247356927cab421af1ddb7d22bd8046726c8d62/README.hec.md[documentation] for more configuration options.
---
-
-. Deploy Splunk first.
+[start=6]
+. Deploy Splunk by running the following command:
 +
 [source]
 ----
@@ -346,18 +301,19 @@ The Fluentd image used in this blog has installed Fluent's Splunk HEC output plu
 ----
 +
 
-
-. [[splunk-token]]Create the Splunk HTTP Event Collector data input token. Visit Splunk at `http://localhost:8000` and log in with `admin` and using the password specified in `docker-compose.yaml`. Go to *Settings* > *Data Inputs* > *HTTP Event Collector* > *New Token*. Set `Name` as "openshift". In Input Settings, set `Source Type` as "Automatic" and `App Context` as "Search & Reporting (search)". Under `Index`, click `Create a new index` and set `Index Name` as "openshift". 
+[start=7]
+. [[splunk-token]]Create the Splunk HTTP Event Collector data input token. Visit Splunk at `http://localhost:8000` and log in with `admin` and the password that is specified in your `docker-compose.yaml` file. Go to *Settings* > *Data Inputs* > *HTTP Event Collector* > *New Token*. Set `Name` as "openshift" and click **Next**. In Input Settings, set `Source Type` as "Automatic" and `App Context` as "Search & Reporting (search)". Under `Index`, click `Create a new index` and set `Index Name` as "openshift".
 +
 image::/img/blog/splunk-index.png[Splunk Index,width=70%,align="center"]
 +
-Select "openshift" index under Avaliable item(s) box.
+Select the "openshift" index in the `Available item(s)` box to move the index into the `Selected item(s)` box.
 +
 image::/img/blog/splunk-openshift-index.png[Splunk Openshift Index,width=70%,align="center"]
 +
-Leave the other fields unchanged and submit. Copy the generated token value for use in the <<fluent-conf, fluent.conf>>
+Proceed to the `Review` section and submit. Copy the generated token value to use in the <<fluent-conf, fluent.conf file>>.
 
-. Deploy Fluentd.
+[start=8]
+. Deploy Fluentd by running the following command:
 +
 [source]
 ----
@@ -368,8 +324,11 @@ Leave the other fields unchanged and submit. Copy the generated token value for 
 
 == Integrating Open Liberty JSON Logs
 
-Liberty application pods output logs in JSON format, therefore it is recommended to set Fluentd to parse the JSON fields from the message body. To enable it, set the cluster logging instance's *managementState* field from *"Managed"* to *"Unmanaged"*. Note that once you set the value to *"Unmanaged"* any further changes to the _ClusterLogging_ or _LogForwarding_ instances will not be automatically detected. You will need to change it back to *"Managed"*.
+Since Open Liberty application pods output logs in JSON format, you must enable Fluentd to parse the JSON fields from the message body.
 
+
+. Change the cluster logging instance's `managementState` field from "Managed" to "Unmanaged":
++
 ```
 [root@ocp ~]# oc edit ClusterLogging instance
 
@@ -383,43 +342,82 @@ metadata:
 spec:
   managementState: "Unmanaged"
 ```
++
+Alternatively, you can modify this file on the web console. Ensure you are in the `openshift-logging` project namespace and go to `Administration > Custom Resource Definitions > ClusterLogging > Instances > Instance > YAML`. Change the `managementState` field from "Managed" to "Unmanaged".
 
+[start=2]
+. In the Fluentd ConfigMap, change the `merge_json_log` attribute of the `kubernetes.var.log.containers.**` filter to `true`.
++
+If you are running on OpenShift 4.3 to 4.5, this step is slightly different. Skip to the line that says *OpenShift 4.3 to 4.5 only*.
++
+```
+[root@ocp ~]# oc edit configmap fluentd
 
-Then, set the environment variable *MERGE_JSON_LOG* to *true*.
-
+apiVersion: v1
+data:
+...
+  <filter kubernetes.var.log.containers.**>
+    @type parse_json_field
+    merge_json_log 'true'
+    preserve_json_log 'true'
+    json_fields 'log,MESSAGE'
+  </filter>
+...
+```
++
+Alternatively, you can modify this file on the web console. Ensure you are in the `openshift-logging` project namespace and go to `Workloads > Config Maps > fluentd > YAML`.  Change the value for the `merge_json_log` attribute of the `kubernetes.var.log.containers.**` filter to true.
++
+**OpenShift 4.3 to 4.5 only:** Instead of manually changing the ConfigMap, run the following command:
++
 [source]
 ----
 [root@ocp ~]# oc set env ds/fluentd MERGE_JSON_LOG=true
 ----
 
-== Viewing Logs and Setting up Splunk Dashboard
+[start=3]
+. Force restart the Fluentd pods to pick up the change by running the following command:
++
+[source]
+----
+oc delete pod --selector logging-infra=fluentd
+----
+
+Note: After you set the `managementState` to "Unmanaged" in the _ClusterLogging_ instance, any further changes to the _ClusterLogging_ or _ClusterLogForwarder_ instances are not automatically detected. If you need to modify the configuration for either instance, you must change the managementState field back to "Managed". However, after the `managementState` is changed to "Managed", the _ClusterLogging_ instance reverts the Fluentd ConfigMap back to its original settings. You must complete the previous steps again to re-enable Fluentd to parse JSON.
+
+== Setting up the Splunk dashboard and viewing logs
+
 
 . Go to Search & Reporting. Search for `index="openshift"` to view logs from OpenShift Container Platform.
 
-. Download Splunk dashboards for Open Liberty: link:https://github.com/WASdev/sample.dashboards/tree/2ef92498e507657e1e718659184f46ff4826d2ce/Liberty/OCP/Splunk%208[Sample dashboard for Liberty inside OpenShift Container Platform using Splunk 8].
+[start=2]
+. Download the link:https://github.com/WASdev/sample.dashboards/tree/2ef92498e507657e1e718659184f46ff4826d2ce/Liberty/OCP/Splunk%208[Sample dashboard for Liberty inside OpenShift Container Platform using Splunk 8].
 
-. Under the Search & Reporting view go to the _Dashboards_ tab and click `Create New Dashboard` and give it a name (e.g. `Liberty Problems Dashboard`)
+[start=3]
+. Under the Search & Reporting view, go to the _Dashboards_ tab, click `Create New Dashboard`, and give it a name, for example, `Liberty Problems Dashboard`.
 
-. Import the downloaded sample dashboards using *Source* option. Using this dashboard, you can visualize message, trace, and first failure data capture (FFDC) logging data collected from JSON logging in Open Liberty.
+[start=4]
+. Import the downloaded sample dashboards by using the *Source* option. Using this dashboard, you can visualize message, trace, and first failure data capture (FFDC) logging data that is collected from JSON logging in Open Liberty.
 
 image::/img/blog/splunk-dashboard.png[Splunk-Dashboard,width=70%,align="center"]
 
 == Troubleshooting
 
-If you find that there are no logs present on Splunk when you are done configuring, there are a few approaches to diagnose the issue.
+If no logs are present on Splunk when you are done configuring, the following approaches can help diagnose the issue.
 
-*Connection between Fluentd and Splunk*
+=== Connection between Fluentd and Splunk
+
 
 * Ensure that the Splunk HEC token is correct
-* View the container logs from the Fluentd instance and Splunk instance for warnings or errors
+* Check the container logs from the Fluentd instance and the Splunk instance for warnings or errors
 
-*Connection between the OCP cluster and the Fluentd instance*
+=== Connection between the OpenShift cluster and the Fluentd instance
 
-* Ensure that the IP/FQDN of the machine hosting Fluentd and Splunk is accessible from the OCP cluster
-* (Security) Ensure thaat you are using the correct key and certificates for both the OCP _secret_ and Fluentd instance
-* (Security) Ensure that you are using the correct `shared_key` value for both the OCP _secret_ and Fluentd instance
-* View the logs for the Fluentd pods running under the `openshift-logging` namespace for warnings or errors
+
+* Ensure that the IP/FQDN of the machine that is hosting Fluentd and Splunk is accessible from the OpenShift cluster.
+* (Security) Ensure that you are using the correct key and certificates for both the OpenShift _secret_ and the Fluentd instance.
+* (Security) Ensure that you are using the correct `shared_key` value for both the OpenShift _secret_ and the Fluentd instance.
+* Check the logs for the Fluentd pods that are running under the `openshift-logging` namespace for warnings or errors.
 
 
 == Conclusion
-Application logging is one of the fundamental part of application managements. It helps you retrieve and analyze the problems on your servers easily. Using Log Forwarding API, you can use existing external enterprise log collection solutions for OpenShift Container Platform logs. We have now seen a popular log collection solution, Splunk connected with Fluentd. Splunk allows you to aggregate and analyze log events from Open Liberty servers running on OpenShift Container Platform.
+Application logging helps you easily retrieve and analyze problems on your servers. With the Log Forwarding API, you can use existing external enterprise log collection solutions for OpenShift logs. This post demonstrates how Splunk can help you to aggregate and analyze log events from Open Liberty servers that are running on OpenShift.
