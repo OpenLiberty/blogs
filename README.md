@@ -68,25 +68,27 @@ These steps are to be completed by the author of the blog post.
 
    If you find there are a load of merge conflicts at this stage, see [Troubleshooting GitHub workflow](#troubleshooting-github-workflow).
 
-5. Request a build of the [draft openliberty.io site](https://draft-openlibertyio.mybluemix.net/blog/):
-    1. Sign in to [Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io/branches) with your GitHub account.
-    2. Click **More Options > Trigger Build**. Type `draft` in the **Branch** field, then click **Trigger custom build**.
+
+5. Currently, Travis is no longer building our non-prod sites. However, all the non-prod sites and more have been moved to IBM Cloud and now build automatically when the code is    merged into the respective branch.  The benefit is that we not only have the previous [draft site](https://draft-openlibertyio.mybluemix.net/blog/), but we now also have        [blog-draft site](https://blog-draft-openlibertyio.mybluemix.net/blog/) which only contains the blog content, allowing it to build and deploy much quicker.  However, the        drawback is that the builds are private and, therefore, their detailed build/deploy progress can't be tracked.  However, if you have access to the [Slack channel](https://app.slack.com/client/T15GKHBT4/C01GXGW1DGQ), then you can at least see when the builds are kicked started and when they finish.
+   ~~Request a build of the [draft openliberty.io site](https://draft-openlibertyio.mybluemix.net/blog/):~~
+    1. ~~Sign in to [Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io/branches) with your GitHub account.~~
+    2. ~~Click **More Options > Trigger Build**. Type `draft` in the **Branch** field, then click **Trigger custom build**.~~
     
-          The draft site build starts running.
+          ~~The draft site build starts running.~~
 
-6. When the build is finished, check that the blog renders correctly on the [draft site](https://draft-openlibertyio.mybluemix.net/blog/).
+6. When the build is finished, check that the blog renders correctly on the [blog-draft site](https://blog-draft-openlibertyio.mybluemix.net/blog/) or [draft site](https://draft-openlibertyio.mybluemix.net/blog/).  In general, use the former (since it will be available much quicker), unless you need to verify links to other content on the site outside of /blogs/.
 
-   If you see any problems (e.g. formatting or typos), resolve them first in your branch, create another PR into `draft` branch (link the PR to the issue again), get the PR merged, then run the [draft site build from Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io/branches) again.
+   If you see any problems (e.g. formatting or typos), resolve them first in your branch, create another PR into `draft` branch (link the PR to the issue again), get the PR merged, and wait for IBM Cloud to rebuild [blog-draft site](https://blog-draft-openlibertyio.mybluemix.net/blog/) or [draft site](https://draft-openlibertyio.mybluemix.net/blog/), which you can use to verify the change.
 
 7. When you're happy with the post, create a PR from your branch (_not_ from the `draft` branch) to the `staging` branch.
 
    Link the PR to the issue.
-
-   In the PR, provide a link to your post on the [draft site](https://draft-openlibertyio.mybluemix.net/blog/). And, ideally, take a screenshot of the whole post so that reviewers can see what they reviewed after you've made changes.
+ 
+   In the PR, provide a link to your post on the [blog-draft site](https://blog-draft-openlibertyio.mybluemix.net/blog/) or [draft site](https://draft-openlibertyio.mybluemix.net/blog/). And, ideally, take a screenshot of the whole post so that reviewers can see what they reviewed after you've made changes.
    
    Add @GraceJansen, as well as your technical reviewer and any other reviewers to get their final approval for both content and format.
    
-   As before, make any changes in your feature branch, create a PR `draft` branch, get it merged, then run the [draft site build from Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io/branches) again to check that they are fine on the [draft site](https://draft-openlibertyio.mybluemix.net/blog/).
+   As before, make any changes in your feature branch, create a PR `draft` branch, get it merged, and, once they finished rebuilding, check that everything is correct on the [blog-draft site](https://blog-draft-openlibertyio.mybluemix.net/blog/) or [draft site](https://draft-openlibertyio.mybluemix.net/blog/).
 
    This automatically updates the PR to `staging`.
 
@@ -99,11 +101,11 @@ The editors will now review and edit the post. Please respond to any questions t
 
 These steps are completed by the editors of the blog. As editor, you might ask questions or make suggestions to the author of the post. You might also make edits directly in the post to prepare it for publishing.
 
-1. Review the post on the [draft site](https://draft-openlibertyio.mybluemix.net/blog/) as linked from the issue.
+1. Review the post on the [blog-draft site](https://blog-draft-openlibertyio.mybluemix.net/blog/) or [draft site](https://draft-openlibertyio.mybluemix.net/blog/) as linked from the issue.
 
    Ask the author to make changes by adding review comments to the PR.
 
-   For edits such as punctuation, formatting, highlighting, adding SEO details, or larger changes discussed with the author, the editor can make the edits directly in the author's branch and push the changes to `draft` branch, then rebuild the [draft site from Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io/branches) to check them.
+   For edits such as punctuation, formatting, highlighting, adding SEO details, or larger changes discussed with the author, the editor can make the edits directly in the author's branch and push the changes to `draft` branch, which will automatically rebuiild [blog-draft site](https://blog-draft-openlibertyio.mybluemix.net/blog/) and [draft site](https://draft-openlibertyio.mybluemix.net/blog/) where you can verify the changes.
    
    To check out the author's branch locally: `git fetch origin` then `git checkout -b branch_name origin/branch_name`, which creates a new local branch that's linked to their remote branch. When you've made changes, push them back to `origin/branch_name`.
 
@@ -127,13 +129,14 @@ These steps are completed by the editors of the blog. As editor, you might ask q
    
    b. Merge the PR into `staging`.
    
-4. Request a build  of the [staging openliberty.io site from Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io/branches) (type `staging` in the **Branch** field of the dialog).
+4. IBM Cloud will automatically rebuild [blogs-staging site](https://blogs-staging-openlibertyio.mybluemix.net/blog/) and [staging site](https://staging-openlibertyio.mybluemix.net/blog/). If you have access, you can track the progress in the [Slack channel](https://app.slack.com/client/T15GKHBT4/C01GXGW1DGQ).  
+~~Request a build of the [staging openliberty.io site from Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io/branches) (type `staging` in the **Branch** field of the dialog).~~
 
-5. When the build has finished, check to make sure the blog with its blog tags render correctly on the [staging site](https://staging-openlibertyio.mybluemix.net/blog/). 
+5. When the build has finished, check to make sure the blog with its blog tags render correctly on the [blogs-staging site](https://blogs-staging-openlibertyio.mybluemix.net/blog/) or [staging site](https://staging-openlibertyio.mybluemix.net/blog/). The latter includes the entire site, while the former just has the blog content.  If you need to verify links to other parts of the site (outside of the /blogs/ content) then you'll need to wait for the full [staging site](https://staging-openlibertyio.mybluemix.net/blog/) to build.  
 
    This is the final check before the post is published live on the [production site](https://openliberty.io/blog/).
 
-   If there are any problems found on the [staging site](https://staging-openlibertyio.mybluemix.net/blog/), you must resolve them quickly or revert the PR (the post must not stay in `staging` longer than a couple of hours or you risk someone accidentally publishing it for you).
+   If there are any problems found on with the content in the `staging` branch, you must resolve them quickly or revert the PR (the post must not stay in `staging` longer than a couple of hours or you risk someone accidentally publishing it for you).
    
    Make any changes in the author's branch, and push to both `draft` and `staging`.
    
@@ -141,7 +144,7 @@ These steps are completed by the editors of the blog. As editor, you might ask q
 
 7. When the PR is approved, merge it into `prod`.
 
-12. Rebuild the [production site from the IBM Cloud console](https://console.bluemix.net/devops/pipelines/fcc7c3e9-9c40-4a58-8a7f-09c08413ab7d?env_id=ibm:yp:us-south).
+12. Rebuild the [production site from the IBM Cloud console](https://cloud.ibm.com/devops/pipelines/063d397c-febc-4f73-8340-61da6bc775f5?env_id=ibm:yp:us-south).
 
     When the build has finished, check that the post looks as expected on [openliberty.io/blog](https://openliberty.io/blog/).
 
@@ -163,15 +166,15 @@ If a published post on openliberty.io/blog contains an error or needs updating i
 
 3. If the blog tags need correcting, update the [blogs_tags.json](./blog_tags.json) file. If you add new tags, make sure to add the blog post's slug to the beginning of the `posts` arrays (1-2 entries per line) for each tag.
 
-4. Create a PR from your branch to the `draft` branch, then (when the PR has been merged) run the [draft site build from Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io/branches) to check that the changes are fine on the [draft site](https://draft-openlibertyio.mybluemix.net/blog/).
+4. Create a PR from your branch to the `draft` branch, then (when the PR has been merged) wait for IBM Cloud to rebuild [blog-draft site](https://blog-draft-openlibertyio.mybluemix.net/blog/) or [draft site](https://draft-openlibertyio.mybluemix.net/blog/) (if you have access to [this Slack channel](https://app.slack.com/client/T15GKHBT4/C01GXGW1DGQ), then you can use it to track build/deploy preogress.  Check that the changes are fine on the [blog-draft site](https://blog-draft-openlibertyio.mybluemix.net/blog/) or [draft site](https://draft-openlibertyio.mybluemix.net/blog/).
 
-   Make any changes in your branch then push to `draft` branch again rebuild.
+   Make any changes in your branch then push to `draft` branch again verify the changes after rebuild.
 
 5. Create a PR from your branch to `staging branch` (not from `draft` branch) and add @GraceJansen as reviewer. You can create this PR at any point because any new changes you make in your branch are automatically added to the PR.
 
-6. When approved, the editor will merge to `staging`, then run the [build for the staging site from Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io/branches) and check that it looks fine on the [staging site](https://staging-openlibertyio.mybluemix.net/blog/).
+6. When approved, the editor will merge to the `staging` branch, causing IBM Cloud to automatically kick off a build of both the [blogs-staging site](https://blogs-staging-openlibertyio.mybluemix.net/blog/) and [staging site](https://staging-openlibertyio.mybluemix.net/blog/), which you can use to verify the changes look correct.
 
-7. The approver will then create a PR from `staging` to `prod`, then merge and [rebuild the production site from the IBM Cloud console](https://console.bluemix.net/devops/pipelines/fcc7c3e9-9c40-4a58-8a7f-09c08413ab7d?env_id=ibm:yp:us-south) to publish the updates on the [openliberty.io/blog](https://openliberty.io/blog/).
+7. The approver will then create a PR from `staging` to `prod`, then merge and [rebuild the production site from the IBM Cloud console](https://cloud.ibm.com/devops/pipelines/063d397c-febc-4f73-8340-61da6bc775f5?env_id=ibm:yp:us-south) to publish the updates on the [openliberty.io/blog](https://openliberty.io/blog/).
 
 
 
