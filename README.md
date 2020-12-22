@@ -69,14 +69,14 @@ These steps are to be completed by the author of the blog post.
    If you find there are a load of merge conflicts at this stage, see [Troubleshooting GitHub workflow](#troubleshooting-github-workflow).
 
 
-5. Currently, Travis is no longer building our non-prod sites. However, all the non-prod sites and more have been moved to IBM Cloud and now build automatically when the code is    merged into the respective branch.  The benefit is that we not only have the previous [draft site](https://draft-openlibertyio.mybluemix.net/blog/), but we now also have        [blog-draft site](https://blog-draft-openlibertyio.mybluemix.net/blog/) which only contains the blog content, allowing it to build and deploy much quicker.  However, the        drawback is that the builds are private and, therefore, their detailed build/deploy progress can't be tracked.  However, if you have access to the [Slack channel](https://app.slack.com/client/T15GKHBT4/C01GXGW1DGQ), then you can at least see when the builds are kicked started and when they finish.
+5. Currently, Travis is no longer building our non-prod sites. All the builds and deployments of non-prod sites have been moved to IBM Cloud and now build automatically whenever the a PR is merged into their respective branch. These builds are private and, therefore, their detailed build/deploy progress can't be tracked. However, if you have access to the [Slack channel](https://app.slack.com/client/T15GKHBT4/C01GXGW1DGQ), you can at least track when the builds start and finish.  
    ~~Request a build of the [draft openliberty.io site](https://draft-openlibertyio.mybluemix.net/blog/):~~
     1. ~~Sign in to [Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io/branches) with your GitHub account.~~
     2. ~~Click **More Options > Trigger Build**. Type `draft` in the **Branch** field, then click **Trigger custom build**.~~
     
           ~~The draft site build starts running.~~
 
-6. When the build is finished, check that the blog renders correctly on the [blog-draft site](https://blog-draft-openlibertyio.mybluemix.net/blog/) or [draft site](https://draft-openlibertyio.mybluemix.net/blog/).  In general, use the former (since it will be available much quicker), unless you need to verify links to other content on the site outside of /blogs/.
+6. When the build is finished, check that the blog renders correctly on the [blog-draft site](https://blog-draft-openlibertyio.mybluemix.net/blog/) or [draft site](https://draft-openlibertyio.mybluemix.net/blog/).  In general, use the former (since it will be available much quicker as it only contains the /blogs/ portion of the site), unless you need to verify links to other content on the site outside of /blogs/, in which case use the latter.
 
    If you see any problems (e.g. formatting or typos), resolve them first in your branch, create another PR into `draft` branch (link the PR to the issue again), get the PR merged, and wait for IBM Cloud to rebuild [blog-draft site](https://blog-draft-openlibertyio.mybluemix.net/blog/) or [draft site](https://draft-openlibertyio.mybluemix.net/blog/), which you can use to verify the change.
 
