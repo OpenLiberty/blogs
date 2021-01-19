@@ -1,0 +1,100 @@
+---
+layout: post
+title: "Develop cloud-native Java applications directly in OpenShift with Open Liberty and odo"
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/awisniew90
+author_github: https://github.com/awiniew90
+seo-title: Develop cloud-native Java applications directly in OpenShift with Open Liberty and odo - OpenLiberty.io
+seo-description: Get true-to-production development directly in a Kubernetes / OpenShift cluster
+blog_description: "Get true-to-production development directly in a Kubernetes / OpenShift cluster"
+open-graph-image: https://openliberty.io/img/blog/ol-stack-browser-2.png
+---
+= Develop cloud-native Java applications directly in OpenShift with Open Liberty and odo
+Adam Wisniewski <https://github.com/awisniew90>
+
+True-to-production development is critical when you create cloud-native applications, and what better way to develop those applications than directly in the cloud! The link:https://github.com/OpenLiberty/application-stack[Open Liberty devfile stack] allows you to do just that by providing a simple yet robust Open Liberty development experience directly in a Kubernetes or OpenShift cluster. The devfile stack does the heavy lifting by allowing you to focus on your code as if it were running right on your laptop.
+
+Check out a quick demo:
+++++
+<iframe width="560" height="315" align="center" src="https://www.youtube.com/embed/e_oIInKFtHw" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+++++
+
+== OpenShift Do
+
+link:https://odo.dev/[OpenShift Do (odo)] is the mechanism that's used to drive the Open Liberty stack. It's a straightforward CLI tool that you can use to create stack projects and interact directly with a Kubernetes or OpenShift cluster. Unlike `kubectl` and `oc`, odo abstracts away the complexity of the underlying infrastructure and helps developers focus on their applications.
+
+== Try it out
+
+After you link:https://odo.dev/docs/installing-odo/[install odo], you can use the Open Liberty stack to either link:https://github.com/OpenLiberty/application-stack/wiki/Using-the-Default-Starter#getting-started[create a new Open Liberty starter application] or initialize an existing application. In this blog post, we'll use the link:https://github.com/OpenLiberty/application-stack-intro[application-stack-intro project] as a starting point:
+
+[source,sh]
+----
+$ git clone git@github.com:OpenLiberty/application-stack-intro.git && \
+  cd application-stack-intro
+----
+
+This application is a basic JAX-RS sample that uses Maven, Open Liberty, and MicroProfile.
+You will also notice an additional `devfile` that's packaged with the application. This devfile is the brains behind the Open Liberty stack and outlines how the application is built, run, and deployed by using the stack's development image.
+
+For convenience and illustration, this devfile is included with the intro application. However, if a devfile wasn't included, you can easily use one from the devfile registry when you initialize your application with odo.
+
+Log in to your OpenShift cluster and create an odo component:
+
+[source,sh]
+----
+$ odo create my-ol-component
+----
+
+The `application-stack-intro` application is now initialized with odo and ready to deploy:
+
+[source,sh]
+----
+$ odo push
+----
+
+Just like that, the application is pushed to your cluster. There's no need to build an image, create a deployment, or run any custom commands. The stack and odo do everything behind the scenes.
+You can check the output to make sure that your application is up and ready for use:
+
+[source,sh]
+----
+$ odo log
+----
+
+To access the application, the Open Liberty stack creates a default URL for your deployment named `ep1`. You can find that URL in the URL list:
+
+[source,sh]
+----
+$ odo url list
+
+Found the following URLs for component my-ol-component
+NAME     STATE      URL                                                                     PORT     SECURE     KIND
+ep1      Pushed     http://ep1-my-ol-component-my-project.apps.awisniew.cp.fyre.ibm.com     9080     false      route
+----
+
+Open a browser to this URL and append `/api/resource` to the end of the URL for the REST endpoint, for example, `http://ep1-my-ol-component-my-project.apps.awisniew.cp.fyre.ibm.com/api/resource`. You should see the following screen:
+
+[.img_border_light]
+image::/img/blog/ol-stack-browser-1.png[String response,width=70%,align="center"]
+
+If you're deploying to generic Kubernetes, you might need to create a URL by using a configured Ingress domain, for example, `odo url create --host <my-ingress-domain>`, and then push your changes again.
+
+== Start coding!
+
+Not only is the application running in OpenShift, it is also running in link:https://openliberty.io/blog/2019/10/22/liberty-dev-mode.html[dev mode] so it's ready to pick up any changes that you make. Each time you make a change, you can either re-issue the `odo push` command to sync your local changes with your remote cluster, or odo can watch for changes automatically:
+
+[source,sh]
+----
+$ odo watch
+----
+
+Now, let's make a change to the REST API. Open `src/main/java/dev/odo/sample/StarterResource` and change the `getRequest()` String response to "Open Liberty is awesome!"
+
+Refresh your browser. The application that's running in OpenShift is automatically updated!
+
+[.img_border_light]
+image::/img/blog/ol-stack-browser-2.png[Updated String response,width=70%,align="center"]
+
+== Learn more
+
+To learn more about odo, go to https://odo.dev[the odo website].
+For more details about the Open Liberty stack, go to https://github.com/OpenLiberty/application-stack/wiki[the documentation in the GitHub repo].
