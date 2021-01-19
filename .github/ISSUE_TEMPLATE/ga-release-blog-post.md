@@ -42,21 +42,6 @@ The release notes are automatically built from the asciidoc release blog post. T
   - [ ] `//end::features[]` (after the last GA feature section)
 - [ ] In [the release notes file](https://raw.githubusercontent.com/PurpleLiberty/docs/master/releasenotes/master-remote.adoc) (in a separate repo on GitHub), find the include statement in the **Features** section of the release notes. Edit the file name part of the include statement so that it targets the new Open Liberty release blog post .adoc file. Don't change anything else. Work with the ID team if they contact you to resolve any problems when the Red Hat build is run.
 
-## 3. Red Hat Developer blog post
-
-Red Hat Developer blog is authored in Wordpress so you must convert the asciidoc blog post to Wordpress HTML markup. We have a tool that does most of the conversion for you and removes the sections that are not needed (eg the beta content).
-
-- [ ] Use [Tom's conversion tool](https://github.ibm.com/was-WASdev/asciidoc-to-wordpresshtml) to convert the asciidoc (.adoc) file to a text file of HTML source (it also removes irrelevant content such as the beta sections, and adds a final paragraph).
-- [ ] Log in to [Red Hat Developer blog's Wordpress Admin dashboard](https://developers.redhat.com/blog/wp-login.php). And make sure you have a profile on the site. See the [instructions in the Dashboard](https://developers.redhat.com/blog/wp-admin/index.php) if this is your first post.
-- [ ] [Create a new post](https://developers.redhat.com/blog/wp-admin/post-new.php).
-- [ ] Paste the content from the text file into the editor.
-- [ ] Provide a title and edit the slug so that it's succinct.
-- [ ] Select the relevant categories. Always select `Java` and `Open source`, plus any other categories _relevant_  to this post.
-- [ ] Upload and insert any images using the Wordpress editor.
-- [ ] Preview the post and check that it displays correctly and makes sense (e.g. doesn't contain any beta content).
-- [ ] Save the post, then email a link to `contributors@redhat.com` to let them know that it's ready for review.
-- [ ] Work with the Red Hat Developer blog editors to finalise the post. They might ask for additional clarfications or minor changes. They will also make edits directly in the post. When they are happy, they'll check with you then schedule the post to publish on the Tuesday morning after the Open Liberty release.
-
 ## All done?
 
 Check that you've completed every task above. Select each check box to confirm that you have before closing this issue.
