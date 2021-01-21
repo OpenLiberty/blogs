@@ -1,0 +1,182 @@
+---
+layout: post
+title: "Timed JWT payloads and HTTP redirect improvements with Open Liberty 21.0.0.1"
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/austin0
+author_github: https://github.com/austin0
+seo-title: Timed JWT payloads and HTTP redirect improvements with Open Liberty 21.0.0.1 - makes sure it ends with - OpenLiberty.io
+seo-description: DESCRIPTION
+blog_description: DESCRIPTION
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+---
+= Timed JWT payloads and HTTP redirect improvements with Open Liberty 21.0.0.1
+AUTHOR_NAME <https://github.com/austin0>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+// // // // // // // //
+// Above:
+// Do not insert any blank lines between any of the lines above.
+// Do not remove or edit the variables on the lines beneath the author name.
+//
+// "open-graph-image" is set to OL logo. Whenever possible update this to a more appriopriate/specific image (For example if present a image that is being used in the post). However, it
+// can be left empty which will set it to the default
+//
+// Replace TITLE with the blog post title eg: MicroProfile 3.3 is now available on Open Liberty 20.0.0.4
+// Replace austin0 with your GitHub username eg: lauracowen
+// Replace DESCRIPTION with a short summary (~60 words) of the release (a more succinct version of the first paragraph of the post).
+// Replace AUTHOR_NAME with your name as you'd like it to be displayed, eg: Laura Cowen
+//
+// Example post: 2020-04-09-microprofile-3-3-open-liberty-20004.adoc
+//
+// If adding image into the post add :
+// -------------------------
+// [.img_border_light]
+// image::img/blog/FILE_NAME[IMAGE CAPTION ,width=70%,align="center"]
+// -------------------------
+// "[.img_border_light]" = This adds a faint grey border around the image to make its edges sharper. Use it around screenshots but not           
+// around diagrams. Then double check how it looks.
+// There is also a "[.img_border_dark]" class which tends to work best with screenshots that are taken on dark
+// backgrounds.
+// Change "FILE_NAME" to the name of the image file. Also make sure to put the image into the right folder which is: img/blog
+// change the "IMAGE CAPTION" to a couple words of what the image is
+// // // // // // // //
+
+// tag::intro[]
+
+With Open Liberty 21.0.0.1 you can now make use of the new `nbfOffset` attribute, allowing for "not-before" timed payloads via JWT Builder. Also included is new behaviour for HTTP redirects that permits the use of fully relative linking.
+
+In link:{url-about}[Open Liberty] 21.0.0.1:
+
+* <<jwtbuilder, Scheduled payloads with JWT Builder>>
+* <<redirects, Relative linking for HTTP Redirects>>
+* <<bugs, Significant bugs fixed in this release>>
+
+// end::intro[]
+
+// tag::run[]
+[#run]
+
+// // // // // // // //
+// LINKS
+//
+// OpenLiberty.io site links:
+// link:{url-prefix}/guides/maven-intro.html[Maven]
+// 
+// Off-site links:
+//link:https://openapi-generator.tech/docs/installation#jar[Download Instructions]
+//
+// IMAGES
+//
+// Place images in ./img/blog/
+// Use the syntax:
+// image::/img/blog/log4j-rhocp-diagrams/current-problem.png[Logging problem diagram,width=70%,align="center"]
+// // // // // // // //
+
+== Run your apps using 21.0.0.1
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], here are the coordinates:
+
+[source,xml]
+----
+<dependency>
+    <groupId>io.openliberty</groupId>
+    <artifactId>openliberty-runtime</artifactId>
+    <version>21.0.0.1</version>
+    <type>zip</type>
+</dependency>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+dependencies {
+    libertyRuntime group: 'io.openliberty', name: 'openliberty-runtime', version: '[21.0.0.1,)'
+}
+----
+
+Or if you're using Docker:
+
+[source]
+----
+FROM open-liberty
+----
+//end::run[]
+
+Or take a look at our link:{url-prefix}/downloads/[Downloads page].
+
+[link=https://stackoverflow.com/tags/open-liberty]
+image::img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="center"]
+
+//tag::features[]
+
+[#jwtbuilder]
+=== Scheduled payloads with JWT Builder
+
+New in Open Liberty 21.0.0.1, the `jwtBuilder` element has been enhanced with a new attribute called `nbfOffset` which can be used to configure an NBF claim for a JWT payload. The time set for the `nbfOffset` will be added to the current time and the result will determine when Json Web Tokens will start to be accepted for processing.
+
+To configure the "not-before" claim using `jwtBuilder`, add the following to your `sever.xml` configuration file.
+
+`<jwtBuilder nbfOffset="1800s" />`
+
+If the JWT was issued at the current time, then the token can only be used after 1800 seconds have passed from the current time.
+
+`jwtBuilder` is a part of the `jwt-1.0` feature, to add the feature to your project add the following to the `server.xml`:
+
+[source, xml]
+----
+<server>
+  <featureManager>
+    <feature>jwt-1.0</feature>
+  </featureManager>
+</server>
+----
+
+For more information:
+
+* link:https://openliberty.io/docs/21.0.0.1/reference/config/jwtBuilder.html[Open Liberty JWT Builder Documentation]
+
+* link:https://www.ibm.com/support/knowledgecenter/SSAW57_liberty/com.ibm.websphere.wlp.nd.multiplatform.doc/ae/twlp_sec_build_jwt.html[Building JSON Web Tokens in Liberty]
+
+[#redirects]
+== Relative linking for HTTP Redirects
+
+Included in Open Liberty 21.0.0.1 is an enhancement for the `servlet-4.0` feature, within Open Liberty the `sendRedirect()` is used to direct a client to a new page or location away from the original page. Previously, Open Liberty would always convert the provided relative URL in the `sendRedirect()` function to an absolute URL. This could lead to problems for applications that took advantage of reverse proxy servers.
+
+To solve the problems presented, Open Liberty 21.0.0.1 ahs introduced a new `redirecttorelativeurl` web container property that will tell the application whether or not to construct absoulte URLs from relative redirect links. This property can be set in the `server.xml` file:
+
+[source, xml]
+----
+<server>
+  ...
+    <webContainer redirecttorelativeurl="true"/>
+  ...
+</server>
+----
+
+For more information:
+
+* link:https://openliberty.io/docs/21.0.0.1/reference/feature/servlet-4.0.html[Open Liberty Servlet Documentation]
+
+[#bugs]
+== Notable bugs fixed in this release
+
+We’ve spent some time fixing link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A200011+label%3A%22release+bug%22[bugs in 21.0.0.1], including the following issues:
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/14936[Improved recovery when core components are reinstalled at runtime]
++
+Previously, Open Liberty contained a flaw in the detection of changes to the JARs that compose the server implementation. When such changes were detected Liberty would force the JAR to be uninstalled and installed again. In most cases this allowed the runtime to recover and function properly. In specific cases, where some core component was re-installed, Liberty would not properly recover and it would result in some Java packages to be unavailable for class loading.  For example, on Java 11 the package `javax.xml.soap` would become unavailable to the application class loaders. 
++
+The most common environment where this occurred was running Open Liberty in OpenShift. This behavior has now been corrected for Open Liberty 21.0.0.1.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/14936[Enable MyFaces 2.3.7 for Open Liberty]
++
+The `jsf-2.3` feature in Open Liberty makes use of link:https://myfaces.apache.org/core23/index.html[Apache MyFaces] JavaServer Faces implementation. With the release of Apache MyFaces 2.3.7 a number of improvements and bug fixes have been made, for more information visit the link:https://issues.apache.org/jira/secure/ReleaseNote.jspa?projectId=10600&version=12346524[Apache MyFaces 2.3.7 changelog].
+
+
+== Get Open Liberty 21.0.0.1 now
+
+Available through <<run,Maven, Gradle, Docker, and as a downloadable archive>>.
