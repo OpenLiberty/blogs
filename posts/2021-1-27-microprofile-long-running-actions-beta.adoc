@@ -17,7 +17,7 @@ The 20.0.0.12-beta release of Open Liberty introduced support for MicroProfile L
 
 == What is MicroProfile LRA?
 
-link:https://download.eclipse.org/microprofile/microprofile-lra-1.0-M1/microprofile-lra-spec.html[MicroProfile LRA] provides a simple, loosely-coupled transaction model for microservices that is based on the Saga pattern for distributed transactions. It relaxes some of the constraints of ACID transactions to enable independent microservices to more easily participate in a potentially long-running orchestrated activity, with each microservice contributing the encapsulated business logic that is required to align with the overall outcome of the activity or transaction. 
+link:https://download.eclipse.org/microprofile/microprofile-lra-1.0-M1/microprofile-lra-spec.html[MicroProfile LRA] provides a simple, loosely-coupled transaction model for microservices that is based on the Saga pattern for distributed transactions. MicroProfile LRA enables a transaction manager, known as a coordinator, to handle one or more participant services so that the execution of their business logic is organized in a predictable way.It relaxes some of the constraints of ACID transactions to enable independent microservices to more easily participate in a potentially long-running orchestrated activity, with each microservice contributing the encapsulated business logic that is required to align with the overall outcome of the activity or transaction. 
 
 
 == Why do we need MicroProfile LRA? 
@@ -245,11 +245,11 @@ After a few moments, look for the following in the LRAParicipant server `message
 ----
 CWWKT0016I: Web application available (default_host): http://localhost:9081/flight/
 ----
-We now have an LRA participant that is orchestrated by the LRA coordinator.
+We now have an LRA participant that is orchestrated by the LRA coordinator, ashown in the following diagram:
 
 image::/img/blog/lra_single_participant.png[Single particiapant example,width=35%,align="center"]
 
-To see a successful LRA, make the following call
+To see a successful LRA, run the following command:
 [source,bash]
 ----
 curl -X POST -d London --header "Content-Type:text/plain" http://localhost:9081/flight/flight/book
@@ -282,7 +282,7 @@ Flight Booking compensated with LRA with id: http://localhost:9080/lrac/lra-coor
 These messages show the successful start of the LRA but since the business logic failed and the method returned an error response, the compensate method is automatically called and run.
 
 === Configuring an LRA with multiple participants
-While an LRA is useful for a single service, it is more common to have multiple services in an LRA. In the following example, the `BookHoliday` service, calls the `BookFlight` service and another new service called `BookHotel.`
+While an LRA is useful for a single service, it is more common to have multiple services in an LRA. In the following example, the `BookHoliday` service calls the `BookFlight` service and another new service called `BookHotel`.
 
 
 The following example shows the `BookHoliday` LRA method:
@@ -306,7 +306,7 @@ The following example shows the `BookHoliday` LRA method:
         return Response.ok().build();
     }
 ----
-In this this service, we set the `LRA.Type` value to `REQUIRES_NEW` because this service initiates the LRA and always starts a new LRA when called. 
+In this this service, we set the `LRA.Type` value to `REQUIRES_NEW` because this service initiates the LRA and always starts a new LRA when the method is called. 
 
 The  following example shows the `BookHotel` method:
 
@@ -329,7 +329,7 @@ The  following example shows the `BookHotel` method:
         }
     }
 ----
-The `LRA.Type` value for the `BookHotel` service is set to MANDATORY, which means that it has to be called as part of an existing LRA and fails automatically if it is called outside of one. So while the `BookFlight` service can start its own LRA if called outside of one, the `BookHotel` service cannot.
+The `LRA.Type` value for the `BookHotel` service is set to `MANDATORY`, which means that it must be called as part of an existing LRA or it fails automatically. So while the `BookFlight` service can start its own LRA if called outside of one, the `BookHotel` service cannot.
 
 The best practice is usually for each service to be deployed on a separate Open Liberty server. However, for convenience in this example case, deploy the `BookHoliday.war` and `BookHotel.war` to the `LRAParticipant` server and add the following lines to the `server.xml` file:
 [source,xml]
