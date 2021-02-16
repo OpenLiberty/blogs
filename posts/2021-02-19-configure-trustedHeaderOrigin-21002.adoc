@@ -18,7 +18,7 @@ Jakub Pomykala <https://github.com/jakub-pomykala>
 
 // tag::intro[]
 
-With Open Liberty 21.0.0.2 you can now configure `trustedHeaderOrigin` and `trustedSensitiveHeaderOrigin` using IP address wildcards and hostnames. Also included a number of significant bug fixes.
+With Open Liberty 21.0.0.2 you can now configure `trustedHeaderOrigin` and `trustedSensitiveHeaderOrigin` using IP address wildcards and hostnames.
 
 In link:{url-about}[Open Liberty] 21.0.0.2:
 
@@ -95,17 +95,75 @@ We’ve spent some time fixing bugs. The following sections describe just some o
 
 * link:https://github.com/OpenLiberty/open-liberty/issues/15433[System WABs may come online with the web container after server reports started]
 +
-When a WAB is included in a Liberty feature (also called a system WAB) it is possible that the server started message and the TCP ports will be opened and listening before the WAB has been fully provisioned with the web container. This is different behavior to web applications WARs where the server started and TCP ports are delayed until all the applications have started or a timeout has occurred on server start.
+When a WAB is included in a Liberty feature (also called a system WAB) it is possible that the server started message and the TCP ports will be opened and listening before the WAB has been fully provisioned with the web container. This is different behaviour to web applications WARs where the server started and TCP ports are delayed until all the applications have started or a timeout has occurred on server start.
 
 This could lead to 404 errors early after the server started status has returned until the WABs come online with the web container. The server should delay the TCP ports listening and the server started event for system WABs similar to the way it waits for applications to start.
 
-// // // // // // // //
-// Above:
-// Replace RELEASE_VERSION with the the version number of Open Liberty. e.g. 20.0.0.10
-// For this section ask either Tom Evens, Michal Broz or the #openliberty-release-blog channel for significant bug fixes in this release.
-// If the issue on Github is missing any information do not hesitate to message the person that fixed the bug.
-// For inspiration about how to write this section look at previous blogs e.g- 20.0.0.10
-// // // // // // // //
+This has been fixed by introducing a new service type `ServerReadyStatus`, the feature manager will call this service before registering `ServerStarted`. Implementations of `ServerReadyStatus` have the check method called to allow them to block while waiting for the server to be ready before proceeding to register `ServerStarted`.
+
+This allows the `WABInstaller` to check on the status of the system WABs to make sure the have completed their provisioning to the web container. 
+
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/15698[FeatureUtility not parsing liberty custom environment variables]
++
+When the entry is `/${shared.config.dir}/server.xml”` and the environment variable is `WLP_USER_DIR=/test/` in the `test/config/server.xml` file the user recieves an error stating that "it couldn't find file at /user/test/wlp/usr/shared/config/server.xml" where it should have been looking for `test/config/server.xml`.
+
+This bug causes include tags to not be prased and replaces the environment variables found link:https://www.ibm.com/support/knowledgecenter/en/SSEQTP_liberty/com.ibm.websphere.wlp.doc/ae/twlp_admin_customvars.html[here] 
+
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/15550[NullPointerException in HttpServletRequest or HttpServletResponse context proxies]
++
+Using the `HttpServletRequest` or `HttpServletResponse` JAX-RS context proxies with a null runtime context previously may have resulted in a `NullPointerException` similar to the following:
+
+[source, java]
+----
+java.lang.NullPointerException
+at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:90)
+at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:55)
+at java.lang.reflect.Method.invoke(Method.java:508)
+at com.ibm.ws.jaxrs20.injection.HttpServletRequestInjectionProxy$1.invoke(HttpServletRequestInjectionProxy.java:58)
+----
+
+This issue was resolved by adding a null checks to these two proxy classes similar to those in other proxy classes.
+
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/14109[Update gRPC dependencies to 1.35]
++
+Currently Open Liberty uses `grpc-java` version 1.31.1 to provide its `grpc-1.0` and `grpcClient-1.0` features. This issue will update the `grpc-java` dependencies we build on to their latest version which is 1.35.0. The 1.35.0 release we're pulling in provides numerous improvements and bug fixes; for a full list see link:https://github.com/grpc/grpc-java/releases[GRPC Java Release Notes]
+
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/14175[Expression Language 3.0 value lookup performance improvement]
++
+Lookup performance can be improved for certain Expression Language 3.0 values. By optimizing EL 3.0 `context handling` and `classloader` calls, the evaluations of EL unscoped and static expressions perform better with this fix. This is a port of link:https://bz.apache.org/bugzilla/show_bug.cgi?id=62453[Apache bug fix 62453]. Also includes link:https://bz.apache.org/bugzilla/show_bug.cgi?id=63781[Apache bug 63781] to support multiple java levels correctly.
+
+
+* link: https://github.com/OpenLiberty/open-liberty/issues/15040[ClassCastException when serving a static resource]
++
+When the following conditions occur:
+
+1. servlet 4.0
+2. The request is for a static resource
+3. The application wraps the request object in its filter.
+4. The ClassCastException might occur near the end of the request cycle when the server trying to cache the information for the served static resource.
+
+`A java.lang.ClassCastException` might occur near the end of request cycle for a static resource (i.e xml, html, jpg, css...). The response is still sending back to a client normally without any issue.
+
+An example of the exception:
+
+[source, java]
+----
+java.lang.ClassCastException: com.example.MyWrappedRequest incompatible with com.ibm.ws.webcontainer40.srt.SRTServletRequest40
+at com.ibm.ws.webcontainer40.servlet.CacheServletWrapper40.(CacheServletWrapper40.java:57)
+at com.ibm.ws.webcontainer40.servlet.factory.CacheServletWrapperFactory40Impl.createCacheServletWrapper(CacheServletWrapperFactory40Impl.java:30)
+at com.ibm.ws.webcontainer.WebContainer.addToCache(WebContainer.java:1231)
+at com.ibm.ws.webcontainer.extension.DefaultExtensionProcessor.handleRequest(DefaultExtensionProcessor.java:538)
+at com.ibm.ws.webcontainer.filter.WebAppFilterChain.invokeTarget(WebAppFilterChain.java:182)
+----
+
+This bug has been removed by fixing a `ClassCastException` when caching a static servlet wrapper under `servlet-4.0` feature.
+
+
 
 
 == Get Open Liberty 21.0.0.2 now
