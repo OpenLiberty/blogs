@@ -74,14 +74,16 @@ image::img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="cent
 [#trustedHeader]
 === HTTP Channel Configuration Improvements
 
-"WebSphere private headers" in the form `$WSXX` are used by WebSphere-aware proxies to provide information about original requests. The values provided by these headers are made available to the application via `ServletRequest` APIs like `getRemoteHost()`. Two HTTP Dispatcher custom properties are provided by Liberty to control over which remote hosts are allowed to send WebSphere private headers: `trustedHeaderOrigin` and `trustedSensitiveHeaderOrigin`. Ideally, these properties should be configured to only trust known proxy servers which will be forwarding requests to the Liberty server.
+"WebSphere private headers" in the form `$WSXX` are used by WebSphere-aware proxies to provide information about original requests. The values provided by these headers are made available to the application via `ServletRequest` APIs such as `getRemoteHost()`. Two HTTP Dispatcher custom properties are provided by Open Liberty to control which remote hosts are allowed to send the `trustedHeaderOrigin` and `trustedSensitiveHeaderOrigin` private headers. Ideally, these dispatcher properties should be configured to only trust known proxy servers which will be forwarding requests to the Open Liberty server.
 
-Previously, `trustedHeaderOrigin` and `trustedSensitiveHeaderOrigin` only accepted `*`, `none`, or a list of full IP addresses (eg. `"127.0.0.1, 192.168.6.6"`). As requested by customers, both properties can now additionally be configured with IP address wildcards and hostnames. As an example, the following list which will be valid for either property:`"localhost, 127.0.0.1, 192.168.*.*, 0:0:0:0:0:ffff:*:*, *.ibm.com"`
+Previously, `trustedHeaderOrigin` and `trustedSensitiveHeaderOrigin` only accepted `" * "`, `none`, or a list of full IP addresses (eg. " `127.0.0.1`, `192.168.6.6` "). As requested by customers, both properties can now additionally be configured with IP address wildcards and hostnames. As an example, the following list which will be valid for either property: "localhost, `127.0.0.1`, `192.168.*.*`, `0:0:0:0:0:ffff:*:*``, `*.ibm.com` "
 
 The same list as a server.xml example:
-```    
+
+[source, xml]
+----
 <httpDispatcher trustedHeaderOrigin="*" trustedSensitiveHeaderOrigin="localhost, 127.0.0.1, 192.168.*.*, 0:0:0:0:0:ffff:*:*, *.ibm.com"/>
-```
+----
 
 For more information about these properties, see link:{url-prefix}docs/21.0.0.2/reference/config/httpDispatcher.html#[Open Liberty docs on httpDispatcher]
 
@@ -93,9 +95,19 @@ For more information about these properties, see link:{url-prefix}docs/21.0.0.2/
 We’ve spent some time fixing bugs. The following sections describe just some of the issues resolved in this release. If you’re interested, here’s the  link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A21002+label%3A%22release+bug%22[full list of bugs fixed in 21.0.0.2].
 
 
-* link:https://github.com/OpenLiberty/open-liberty/issues/15433[System WABs may come online with the web container after server reports started]
+* link:https://github.com/OpenLiberty/open-liberty/issues/14109[Update gRPC dependencies to 1.35]
 +
-When a WAB is included in a Liberty feature (also called a system WAB) it is possible that the server started message and the TCP ports will be opened and listening before the WAB has been fully provisioned with the web container. This is different behaviour to web applications WARs where the server started and TCP ports are delayed until all the applications have started or a timeout has occurred on server start.
+Currently Open Liberty uses `grpc-java` version 1.31.1 to provide its `grpc-1.0` and `grpcClient-1.0` features. This issue will update the `grpc-java` dependencies we build on to their latest version which is 1.35.0. The 1.35.0 release we're pulling in provides numerous improvements and bug fixes; for a full list see link:https://github.com/grpc/grpc-java/releases[GRPC Java Release Notes]
+
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/14175[Expression Language 3.0 value lookup performance improvement]
++
+Lookup performance has been improved for certain Expression Language 3.0 values. By optimizing EL 3.0 `context handling` and `classloader` calls, the evaluations of EL unscoped and static expressions perform better with this fix. This fix includes link:https://bz.apache.org/bugzilla/show_bug.cgi?id=62453[Apache bug fix 62453] and also link:https://bz.apache.org/bugzilla/show_bug.cgi?id=63781[Apache bug 63781] to support multiple java levels correctly.
+
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/15433[System Web Application Bundles may not be fully provisioned until after the server reports as started]
++
+When a Web Application Bundle (WAB) is included in a Liberty feature (also called a system WAB) it is possible that the server started message and the TCP ports will be opened and listening before the WAB has been fully provisioned with the web container. This is different behaviour to web applications WARs where the server started and TCP ports are delayed until all the applications have started or a timeout has occurred on server start.
 
 This could lead to 404 errors early after the server started status has returned until the WABs come online with the web container. The server should delay the TCP ports listening and the server started event for system WABs similar to the way it waits for applications to start.
 
@@ -106,9 +118,9 @@ This allows the `WABInstaller` to check on the status of the system WABs to make
 
 * link:https://github.com/OpenLiberty/open-liberty/issues/15698[FeatureUtility not parsing liberty custom environment variables]
 +
-This issue originated from "link:https://github.com/OpenLiberty/open-liberty/issues/14417[<include location> tag does not consider variables when installing server.xml]". When the include tag entry was `/${shared.config.dir}/server.xml"` and the environment variable was `WLP_USER_DIR=/test/`, the expected path was `test/config/server.xml' but the user received an error stating that "it couldn't find file at /user/test/wlp/usr/shared/config/server.xml".
-This bug causes include tags to not be parsed correctly because the environment variables are not taken into account found link:https://www.ibm.com/support/knowledgecenter/en/SSEQTP_liberty/com.ibm.websphere.wlp.doc/ae/twlp_admin_customvars.html[here] 
-This was fixed by tapping into existing server configuration parsing libraries to find the user directory instead of a custom made method.
+When the entry is `/${shared.config.dir}/server.xml”` and the environment variable is `WLP_USER_DIR=/test/` in the `test/config/server.xml` file the user recieves an error stating that "it couldn't find file at /user/test/wlp/usr/shared/config/server.xml" where it should have been looking for `test/config/server.xml`.
+
+This bug caused include tags to not be parsed correctly by not replacing the environment variables found link:https://openliberty.io/docs/21.0.0.1/reference/config/server-configuration-overview.html#server-env[here]
 
 
 * link:https://github.com/OpenLiberty/open-liberty/issues/15550[NullPointerException in HttpServletRequest or HttpServletResponse context proxies]
@@ -126,16 +138,6 @@ at com.ibm.ws.jaxrs20.injection.HttpServletRequestInjectionProxy$1.invoke(HttpSe
 ----
 
 This issue was resolved by adding a null checks to these two proxy classes similar to those in other proxy classes.
-
-
-* link:https://github.com/OpenLiberty/open-liberty/issues/14109[Update gRPC dependencies to 1.35]
-+
-Currently Open Liberty uses `grpc-java` version 1.31.1 to provide its `grpc-1.0` and `grpcClient-1.0` features. This issue will update the `grpc-java` dependencies we build on to their latest version which is 1.35.0. The 1.35.0 release we're pulling in provides numerous improvements and bug fixes; for a full list see link:https://github.com/grpc/grpc-java/releases[GRPC Java Release Notes]
-
-
-* link:https://github.com/OpenLiberty/open-liberty/issues/14175[Expression Language 3.0 value lookup performance improvement]
-+
-Lookup performance has been improved for certain Expression Language 3.0 values. By optimizing EL 3.0 `context handling` and `classloader` calls, the evaluations of EL unscoped and static expressions perform better with this fix. This fix includes link:https://bz.apache.org/bugzilla/show_bug.cgi?id=62453[Apache bug fix 62453] and also link:https://bz.apache.org/bugzilla/show_bug.cgi?id=63781[Apache bug 63781] to support multiple java levels correctly.
 
 
 * link: https://github.com/OpenLiberty/open-liberty/issues/15040[ClassCastException when serving a static resource]
