@@ -1,0 +1,334 @@
+---
+layout: post
+title: "MicroProfile Context Propagation 1.2, RequestTiming 1.0 and JakartaMail 2.0 in Open Liberty 21.0.0.3-beta"
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/jakub-pomykala
+author_github: https://github.com/jakub-pomykala
+seo-title: MicroProfile Context Propagation 1.2, RequestTiming 1.0 and JakartaMail 2.0 in Open Liberty 21.0.0.3-beta - OpenLiberty.io
+seo-description: Open Liberty 21.0.0.3-beta contains four All Beta features (new `expandLocation` property for App Manager configuration, Ability to control whether thread dumps are collected when a hung request is detected in the Request Timing feature (RequestTiming 1.0), MicroProfile Context Propagation 1.2 and Automatic Cleanup of Leaked Connections) and one feature in Jakarta EE 9 (JakartaMail).
+blog_description: In addition to all Jakarta EE 9 and MicroProfile 4.0 beta features, Open Liberty 21.0.0.3-beta also contains five brand new features.
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+---
+= MicroProfile Context Propagation 1.2, RequestTiming 1.0 and JakartaMail 2.0 in Open Liberty 21.0.0.3-beta
+Jakub Pomykala <https://github.com/jakub-pomykala>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+
+'''
+
+We have two beta packages for link:{url-about}[Open Liberty]:
+
+* <<allbeta, All Beta Features>>: a larger package that contains all Open Liberty beta features (including Jakarta EE 9 beta features) and GA features and functions.
+* <<jakarta, Jakarta EE 9 Beta Features>>: a lightweight package that contains only the Jakarta EE 9 features.
+
+<<try, Try it now>>
+
+This means that you can now try out our in-development Open Liberty features by just adding the relevant coordinates to your build tools.
+
+If you try either package, <<feedback, let us know what you think>>.
+
+In addition to all Jakarta EE 9 and MicroProfile 4.0 beta features, Open Liberty 21.0.0.3-beta also contains five brand new features.
+
+'''
+
+[#allbeta]
+== All Beta Features package
+
+The All Beta Features package includes the following beta features:
+
+* <<MPContext, MicroProfile Context Propagation 1.2>>
+* <<requestTiming, Ability to control whether thread dumps are collected when a hung request is detected in the Request Timing feature>>
+* <<leakedConnections, Automatic Cleanup of Leaked Connections>>
+* <<expandLocation, expandLocation property for App Manager configuration>>
+
+
+
+These features also join all the MicroProfile 4.0 features:
+
+* link:{url-prefix}/blog/2020/10/27/microprofile40-jakartaee9-beta-200012.html#conf[MicroProfile Config 2.0]
+* link:{url-prefix}/blog/2020/09/02/jakarta-microprofile-beta-200010.html#metrics[MicroProfile Metrics 3.0]
+* link:{url-prefix}/blog/2020/09/02/jakarta-microprofile-beta-200010.html#opentracing[MicroProfile OpenTracing 2.0]
+* link:{url-prefix}/blog/2020/09/02/jakarta-microprofile-beta-200010.html#health[MicroProfile Health 3.0]
+* link:{url-prefix}/blog/2020/09/29/microprofile-openapi-beta-200011.html#openAPI[MicroProfile OpenAPI 2.0]
+* link:{url-prefix}/blog/2020/11/24/microprofile-rest-client-kubernetes-secrets-21001beta.html#MP[MicroProfile Rest Client 2.0]
+* link:{url-prefix}/blog/2020/10/27/microprofile40-jakartaee9-beta-200012.html#jwt[MicroProfile JWT 1.2]
+* link:{url-prefix}/blog/2020/09/02/jakarta-microprofile-beta-200010.html#fault[MicroProfile Fault Tolerance 3.0]
+
+'''
+
+[#MPContext]
+=== MicroProfile Context Propagation 1.2
+
+MicroProfile Context Propagation is a standalone MicroProfile specification. This new Open Liberty feature enables you to create completion stages that behave deterministically with respect to thread context and leverages the autonomic tuning of the Liberty global thread pool for asynchronous dependent stages.
+
+The 1.2 release of MicroProfile Context Propagation aligns with the MicroProfile 4.0 platform, specifically addressing a difference in how MicroProfile Config 2.0 treats empty value configuration properties. When using MicroProfile Config to specify an empty list of thread context types for MicroProfile Context Propagation to use as defaults, use a value of `None` rather than an empty value. An empty value in MicroProfile Config 2.0 indicates to override any lower ordinal config sources and instead use the built-in default value for the property.  For example, the combination of `mp.context.ManagedExecutor.cleared=None` and `mp.context.ManagedExecutor.propagated=Remaining` causes every context type to be propagated.
+
+To enable the MicroProfile Context Propagation 1.2 feature, add the following to your server configuration,
+
+[source, xml]
+----
+<featureManager>
+  <feature>mpContextPropagation-1.2</feature>
+  <!-- other features used by example code... -->
+  <feature>servlet-4.0</feature>
+  <feature>jdbc-4.2</feature>
+  <feature>jndi-1.0</feature>
+</featureManager>
+----
+
+Example usage within a Servlet:
+
+[source, java]
+----
+private ManagedExecutor executor;
+
+public void init(ServletConfig config) throws ServletException {
+    executor = ManagedExecutor.builder()
+                .propagated(ThreadContext.APPLICATION)
+                .cleared(ThreadContext.ALL_REMAINING)
+                .build();
+}
+
+public void destroy() {
+    executor.shutdownNow();
+}
+
+public void doGet(HttpServletRequest req, HttpServletResponse resp)
+    throws ServletException, IOException {
+    ...
+    executor.copy(unmanagedCompletionStage).thenAcceptAsync(value -> {
+        // requires java:comp namespace of the application,
+        DataSource ds = InitialContext.doLookup("java:comp/env/jdbc/ds");
+        ...
+    });
+}
+----
+
+Find out more: 
+
+* link:https://download.eclipse.org/microprofile/microprofile-context-propagation-1.2-RC1/microprofile-context-propagation-spec-1.2-RC1.html[The MicroProfile Context Propagation 1.2 Release Candidate 1 specification]
+* link:https://download.eclipse.org/microprofile/microprofile-context-propagation-1.2-RC1/apidocs/[The MicroProfile Context Propagation 1.2 Release Candidate 1 JavaDoc]
+
+'''
+
+[#requestTiming]
+=== Ability to control whether thread dumps are collected when a hung request is detected in the Request Timing feature
+
+The Request Timing feature (`requestTiming-1.0`) provides diagnostic information when the duration of any request exceeds the configured threshold. It provides a way to monitor requests with respect to time. The feature can automatically detect slow and hung requests and provide detailed diagnostic information; warning messages, thread stacks, and the creation of thread dumps.
+
+When a hung request is detected in the Request Timing feature, a warning message is written in the messages log file along with a dump of the events that happened during the request. Following that, a set of three thread dumps will be initiated, 1 minute apart. After the completion of the three thread dumps, further set of three thread dumps are created only if new requests are detected to be hanging.
+
+Some operations teams do not want so many thread dumps to be generated due to performance overhead on requests that are known to be long. In previous Open Liberty releases, there was no option to disable the thread dumps from being generated.
+
+You can now control whether the Request Timing feature collects thread dumps. By setting the **NEW** `enableThreadDumps` Request Timing server configuration attribute to false, thread dumps will not be created during hung requests. If the new server configuration attribute is set to true or not specified at all, thread dumps will still be created.
+   
+The new Request Timing server configuration attribute can be configured in your server.xml as follows:
+
+[source, xml]
+----
+<requestTiming includeContextInfo="true" slowRequestThreshold="120s" hungRequestThreshold="10s" sampleRate="1" enableThreadDumps="false"></requestTiming>`
+----
+
+
+The `enableThreadDumps` server configuration attribute can also be used in embedded Request Timing sub-elements: 
+`<servletTiming/>` or `<jdbcTiming/>`, as follows:
+
+[source, xml]
+----
+<requestTiming includeContextInfo="true" slowRequestThreshold="120s" hungRequestThreshold="10s" sampleRate="1">
+    <servletTiming appName="MyApp" servletName="MyServletApp" slowRequestThreshold="100s" hungRequestThreshold="5s" enableThreadDumps="false"/>
+</requestTiming>`
+----
+
+Note: An embedded `<servletTiming/>` or `<jdbcTiming/>` configuration element in the server.xml file overrides the configured slow and hung request threshold that are defined in `<requestTiming/>`. 
+
+For more information on the Request Timing feature, please refer to the following documentations:
+- link:{url-prefix}/docs/latest/reference/feature/requestTiming-1.0.html[Open Liberty Documentation on requestTiming-1.0 feature]
+- link:{url-prefix}/docs/latest/reference/config/requestTiming.html[Open Liberty Documentation on requestTiming Configuration]
+
+'''
+
+[#leakedConnections]
+=== Automatic Cleanup of Leaked Connections
+
+Open Liberty connection management is enhanced with the ability to automatically detect and close unsharable connections that are left open by the application across the end of a request.
+
+Occasionally, application code might forget to close an unsharable connection that it obtains. This prevents the connection from being returned to the connection pool for use by other requests. Over time, these leaked connections can degrade performance and eventually exhaust the connection pool. Open Liberty connection management now has the ability to detect and automatically close these leaked connections to prevent this from happening.
+
+To take advantage of this new capability, configure one of the Open Liberty features that leverages the `connectionManager` element. For example, JDBC:
+
+[source, xml]
+----
+<featureManager>
+  <feature>jdbc-4.2</feature>
+  <feature>jndi-1.0</feature>
+  <!-- more features -->
+</featureManager>
+----
+
+Configure connection managers for your data sources to enable the new `autoCloseConnections` attribute,
+
+[source, xml]
+----
+<dataSource id="DefaultDataSource">
+  <connectionManager maxPoolSize="10" autoCloseConnections="true"/>
+    <jdbcDriver libraryRef="PostgreSQL"/>
+    <properties.postgresql databaseName="TESTDB" serverName="localhost" portNumber="5432"/>
+</dataSource>
+
+<library id="PostgreSQL">
+    <file name="/usr/local/postgresql/postgresql-42.2.18.jar"/>
+</library>
+----
+
+Find out more:
+
+* link:{url-prefix}/docs/latest/reference/config/connectionManager.html[connectionManager config documentation]
+
+'''
+
+[#expandLocation]
+=== expandLocation property for App Manager configuration
+
+This enhancement allows the user to specify a expansion location (`expandLocation`) on the `applicationManager` configuration to be utilized when the `autoExpand` attribute is set to "true". As currently implemented, when an application is autoExpanded the default location for the expanded files are hard coded to `${server.config.dir}/apps/expanded/`.
+
+The user is now able to configure that location to a new value on the file system. 
+
+For example:
+
+[source, xml]
+----
+<applicationManager autoExpand="true" expandLocation="${server.config.dir}/myApps/" />
+----
+
+would result in the application being expanded at `${server.config.dir}/myApps/{appname}/`
+
+This enhancement gives users more flexibility regarding the location of their expanded applications.
+
+You can find out more at link:{url-prefix}/docs/latest/reference/config/applicationManager.html[Open Liberty applicationManager documentation]
+
+'''
+
+
+[#jakarta]
+== Jakarta EE 9 Beta Features package
+
+This Open Liberty beta introduces the following Jakarta EE 9 feature which now possesses its all-new Jakarta EE 9 package name:
+
+* <<mail, JakartaMail (`mail-2.0`)>>
+
+This feature joins the Jakarta EE 9 features in link:{url-prefix}/blog/2021/01/26/ee9-messaging-security-21002-beta.html#jakarta[Open Liberty 21.0.0.2-beta Jakarta functions].
+
+'''
+
+[#mail]
+=== JakartaMail
+
+The Java EE framework has been migrated to the open source Eclipse Jakarta EE Project. As part of this migration JavaMail version 1.6 has been migrated to JakartaMail 2.0. The API package names for the classes previously found under the javax.mail have been migrated to jakarta.mail. 
+
+The Jakarta mail API as described by the Jakarta Mail FAQ “The Jakarta Mail API is a set of abstract APIs that model a mail system. (Jakarta Mail was previously known as JavaMail.) The API provides a platform independent and protocol independent framework to build Java technology based email client applications. The Jakarta Mail API provides facilities for reading and sending email. Service providers implement particular protocols. Several service providers are included with the Jakarta Mail API package; others are available separately. The Jakarta Mail API is implemented as a Java optional package that can be used on JDK 1.4 and later on any operating system. The Jakarta Mail API is also a required part of the Jakarta EE Platform and the Java Platform, Enterprise Edition (Java EE).”
+
+Configuring mail sessions works basically the same as with the Liberty Feature JavaMail-1.5 and JavaMail-1.6. They can be configured using the API, or through the server.xml 
+
+Below is an example of a SMTP Mail session configured through the server.xml:
+
+[source, xml]
+----
+<featureManager>
+  <feature>mail-2.0</feature>
+  <feature>jndi-1.0</feature>
+</featureManager>
+
+<mailSession>
+      <mailSessionID>testSMTPMailSession</mailSessionID>
+      <jndiName>TestingApp/SMTPMailSessionServlet/testSMTPMailSession</jndiName>
+      <description>mailSession for testing SMTP protocol</description>
+      <transportProtocol>smtp</transportProtocol>
+      <host>localhost</host>
+      <user>somuser@someemailserver.com</user>
+      <password>usersPassword</password>
+      <from>someuser@someemailserver.com</from>
+      <property name="mail.smtp.host" value="localhost" \>
+      <property name="mail.smtp.port" value="3025" \>
+  </mailSession> 
+----
+
+Find out more:
+
+* link:https://eclipse-ee4j.github.io/mail/[Jakarta mail]
+* link:{url-prefix}/docs/latest/reference/config/mailSession.html[Mail Session Object (mailSession)]
+
+Enable the Jakarta EE 9 beta features in your server's `server.xml` configuration file. You can enable the individual features you want or you can just add the Jakarta EE 9 convenience feature to enable all of the Jakarta EE 9 beta features at once:
+
+[source, xml]
+----
+  <featureManager>
+    <feature>jakartaee-9.0</feature>
+  </featureManager>
+----
+
+Or you can add the Web Profile convenience feature to enable all of the Jakarta EE 9 Web Profile beta features at once:
+
+[source, xml]
+----
+  <featureManager>
+    <feature>webProfile-9.0</feature>
+  </featureManager>
+----
+
+'''
+[#try]
+=== Try it now 
+
+To try out these features, just update your build tools to pull the Open Liberty All Beta or Jakarta EE 9 Features package instead of the main release. The beta works with Java SE 15, Java SE 11, or Java SE 8.
+
+
+*If you're using link:{url-prefix}/guides/maven-intro.html[Maven], here are the coordinates for All Beta:*
+[source,xml]
+----
+<dependency>
+  <groupId>io.openliberty.beta</groupId>
+  <artifactId>openliberty-runtime</artifactId>
+  <version>21.0.0.3-beta</version>
+  <type>pom</type>
+</dependency>
+----
+
+*Or for Jakarta EE 9:*
+[source,xml]
+----
+<dependency>
+    <groupId>io.openliberty.beta</groupId>
+    <artifactId>openliberty-jakartaee9</artifactId>
+    <version>21.0.0.3-beta</version>
+    <type>zip</type>
+</dependency>
+----
+
+*link:{url-prefix}/guides/gradle-intro.html[Gradle] for All Beta:*
+[source,gradle]
+----
+dependencies {
+    libertyRuntime group: 'io.openliberty.beta', name: 'openliberty-runtime', version: '[21.0.0.3-beta,)'
+}
+----
+
+*Or for Jakarta EE 9:*
+
+[source,gradle]
+----
+dependencies {
+    libertyRuntime group: 'io.openliberty.beta', name: 'openliberty-jakartaee9', version: '[21.0.0.3-beta,)'
+}
+----
+
+Or take a look at our link:{url-prefix}/downloads/#runtime_betas[Downloads page].
+
+
+[#feedback]
+== Your feedback is welcomed
+
+Let us know what you think on link:https://groups.io/g/openliberty[our mailing list]. If you hit a problem, link:https://stackoverflow.com/questions/tagged/open-liberty[post a question on StackOverflow]. If you hit a bug, link:https://github.com/OpenLiberty/open-liberty/issues[please raise an issue].
+
+
