@@ -1,0 +1,173 @@
+---
+layout: post
+title: "Configure trustedHeaderOrigin and trustedSensitiveHeaderOrigin to be configured with a IP segment with Open Liberty 21.0.0.2"
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/jakub-pomykala
+author_github: https://github.com/jkaub-pomykala
+seo-title: Configure trustedHeaderOrigin and trustedSensitiveHeaderOrigin to be configured with a IP segment with Open Liberty 21.0.0.2 - OpenLiberty.io
+seo-description: With Open Liberty 21.0.0.2 you can now configure `trustedHeaderOrigin` and `trustedSensitiveHeaderOrigin` using IP address wildcards and hostnames. Also included a number of significant bug fixes.
+blog_description: With Open Liberty 21.0.0.2 you can now configure `trustedHeaderOrigin` and `trustedSensitiveHeaderOrigin` using IP address wildcards and hostnames. Also included a number of significant bug fixes.
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+---
+= Configure trustedHeaderOrigin and trustedSensitiveHeaderOrigin to be configured with a IP segment with Open Liberty 21.0.0.2
+Jakub Pomykala <https://github.com/jakub-pomykala>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+
+'''
+
+// tag::intro[]
+
+With Open Liberty 21.0.0.2 you can now configure `trustedHeaderOrigin` and `trustedSensitiveHeaderOrigin` using IP address wildcards and hostnames.
+
+In link:{url-about}[Open Liberty] 21.0.0.2:
+
+* <<trustedHeader, trustedHeaderOrigin Configuration Improvements>>
+* <<bugs, Significant bugs fixed in this release>>
+
+<<run, Run Open Liberty 21.0.0.2 now>>
+
+
+View the list of fixed bugs in link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3ARELEASE_VERSION+label%3A%22release+bug%22[21.0.0.2].
+// end::intro[]
+
+//tag::features[]
+'''
+[#trustedHeader]
+=== HTTP Channel Configuration Improvements
+
+"WebSphere private headers" in the form `$WSXX` are used by WebSphere-aware proxies to provide information about original requests. The values provided by these headers are made available to the application via `ServletRequest` APIs such as `getRemoteHost()`. Two HTTP Dispatcher custom properties are provided by Open Liberty to control which remote hosts are allowed to send the `trustedHeaderOrigin` and `trustedSensitiveHeaderOrigin` private headers. Ideally, these dispatcher properties should be configured to only trust known proxy servers which will be forwarding requests to the Open Liberty server.
+
+Previously, `trustedHeaderOrigin` and `trustedSensitiveHeaderOrigin` only accepted " * " , "none", or a list of full IP addresses (eg. " 127.0.0.1, 192.168.6.6 "). As requested by customers, both properties can now additionally be configured with IP address wildcards and hostnames. As an example, the following list which will be valid for either property: "localhost, 127.0.0.1, 192.168. * . * , 0:0:0:0:0:ffff*:*, *.ibm.com "
+
+The same list as a server.xml example:
+
+[source, xml]
+----
+<httpDispatcher trustedHeaderOrigin="*" trustedSensitiveHeaderOrigin="localhost, 127.0.0.1, 192.168.*.*, 0:0:0:0:0:ffff:*:*, *.ibm.com"/>
+----
+
+For more information about these properties, see link:{url-prefix}docs/latest/reference/config/httpDispatcher.html#[Open Liberty docs on httpDispatcher]
+
+'''
+
+[#bugs]
+== Significant bugs fixed in this release
+
+
+We’ve spent some time fixing bugs. The following sections describe just some of the issues resolved in this release. If you’re interested, here’s the  link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A21002+label%3A%22release+bug%22[full list of bugs fixed in 21.0.0.2].
+
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/14109[Update gRPC dependencies to 1.35]
++
+Currently Open Liberty uses `grpc-java` version 1.31.1 to provide its `grpc-1.0` and `grpcClient-1.0` features. This issue will update the `grpc-java` dependencies we build on to their latest version which is 1.35.0. The 1.35.0 release we're pulling in provides numerous improvements and bug fixes; for a full list see link:https://github.com/grpc/grpc-java/releases[GRPC Java Release Notes]
+
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/14175[Expression Language 3.0 value lookup performance improvement]
++
+Lookup performance has been improved for certain Expression Language 3.0 values. By optimizing EL 3.0 `context handling` and `classloader` calls, the evaluations of EL unscoped and static expressions perform better with this fix. This fix includes link:https://bz.apache.org/bugzilla/show_bug.cgi?id=62453[Apache bug fix 62453] and also link:https://bz.apache.org/bugzilla/show_bug.cgi?id=63781[Apache bug 63781] to support multiple java levels correctly.
+
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/15433[System Web Application Bundles may not be fully provisioned until after the server reports as started]
++
+When a Web Application Bundle (WAB) is included in a Liberty feature (also called a system WAB) it is possible that the server started message and the TCP ports will be opened and listening before the WAB has been fully provisioned with the web container. This is different behaviour to web applications WARs where the server started and TCP ports are delayed until all the applications have started or a timeout has occurred on server start.
++
+This could lead to 404 errors early after the server started status has returned until the WABs come online with the web container. The server should delay the TCP ports listening and the server started event for system WABs similar to the way it waits for applications to start.
++
+This has been fixed by delaying the server started message and TCP port listening until the system WABs are ready to serve, or a timeout has occurred. This has been done by introducing a new service type `ServerReadyStatus`, the feature manager will call this service before registering `ServerStarted`. Implementations of `ServerReadyStatus` have the check method called to allow them to block while waiting for the server to be ready before proceeding to register `ServerStarted`.
++
+This allows the `WABInstaller` to check on the status of the system WABs to make sure the have completed their provisioning to the web container. 
+
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/15698[FeatureUtility not parsing liberty custom environment variables]
++
+When the entry is `/${shared.config.dir}/server.xml”` and the environment variable is `WLP_USER_DIR=/test/` in the `test/config/server.xml` file the user recieves an error stating that "it couldn't find file at /user/test/wlp/usr/shared/config/server.xml" where it should have been looking for `test/config/server.xml`.
++
+This bug caused include tags to not be parsed correctly by not replacing the environment variables found link:https://openliberty.io/docs/latest/reference/config/server-configuration-overview.html#server-env[here]
+
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/15550[NullPointerException in HttpServletRequest or HttpServletResponse context proxies]
++
+Using the `HttpServletRequest` or `HttpServletResponse` JAX-RS context proxies with a null runtime context previously may have resulted in a `NullPointerException` similar to the following:
++
+[source, java]
+----
+java.lang.NullPointerException
+at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:90)
+at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:55)
+at java.lang.reflect.Method.invoke(Method.java:508)
+at com.ibm.ws.jaxrs20.injection.HttpServletRequestInjectionProxy$1.invoke(HttpServletRequestInjectionProxy.java:58)
+----
++
+This issue was resolved by adding a null checks to these two proxy classes similar to those in other proxy classes.
+
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/15040[ClassCastException when serving a static resource]
++
+When the following conditions occur: 
+* The `servlet-4.0` feature is installed
+* The request is for a static resource
+* The application wraps the request object in its filter. 
++
+A `java.lang.ClassCastException` might occur near the end of the request cycle when the server is trying to cache information for a served static resource. (e.g. xml, html, jpg, css…​). The response is still sent back to a client normally without any issue. 
++
+An example of the exception: 
++
+[source, java]
+----
+java.lang.ClassCastException: com.example.MyWrappedRequest incompatible with com.ibm.ws.webcontainer40.srt.SRTServletRequest40
+at com.ibm.ws.webcontainer40.servlet.CacheServletWrapper40.(CacheServletWrapper40.java:57)
+at com.ibm.ws.webcontainer40.servlet.factory.CacheServletWrapperFactory40Impl.createCacheServletWrapper(CacheServletWrapperFactory40Impl.java:30)
+at com.ibm.ws.webcontainer.WebContainer.addToCache(WebContainer.java:1231)
+at com.ibm.ws.webcontainer.extension.DefaultExtensionProcessor.handleRequest(DefaultExtensionProcessor.java:538)
+at com.ibm.ws.webcontainer.filter.WebAppFilterChain.invokeTarget(WebAppFilterChain.java:182)
+----
++
+This bug has been removed by fixing a `ClassCastException` when caching a static servlet wrapper under `servlet-4.0` feature.
+
+// end::features[]
+'''
+// tag::run[]
+[#run]
+== Run your apps using 21.0.0.2
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], here are the coordinates:
+
+[source,xml]
+----
+<dependency>
+    <groupId>io.openliberty</groupId>
+    <artifactId>openliberty-runtime</artifactId>
+    <version>21.0.0.2</version>
+    <type>zip</type>
+</dependency>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+dependencies {
+    libertyRuntime group: 'io.openliberty', name: 'openliberty-runtime', version: '[21.0.0.2,)'
+}
+----
+
+Or if you're using Docker:
+
+[source]
+----
+FROM open-liberty
+----
+//end::run[]
+
+Or take a look at our link:{url-prefix}/downloads/[Downloads page].
+
+[link=https://stackoverflow.com/tags/open-liberty]
+image::img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="center"]
+
+
+== Get Open Liberty 21.0.0.2 now
+
+Available through <<run,Maven, Gradle, Docker, and as a downloadable archive>>.
