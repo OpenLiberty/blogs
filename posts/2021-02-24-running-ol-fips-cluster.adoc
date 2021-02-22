@@ -1,60 +1,82 @@
 ---
 layout: post
-title: "Running Open Liberty in a FIPS-enabled cluster"
+title: "Deploying an application with FIPS enabled to OpenShift "
 categories: blog
 author_picture: https://avatars3.githubusercontent.com/u/28316667
 author_github: https://github.com/mtamboli
-seo-title: Running Open Liberty in a FIPS-enabled cluster - OpenLiberty.io
-seo-description: This post demonstrates how to run an Open Liberty application with Federal Information Processing Standards (FIPS) enabled.
-blog_description: "This post demonstrates how to run an Open Liberty application with Federal Information Processing Standards (FIPS) enabled."
+seo-title: Deploying an application with FIPS enabled to OpenShift - OpenLiberty.io
+seo-description: This post demonstrates how to run an Open Liberty application with Federal Information Processing Standards (FIPS) enabled and deploy it to an OpenShift cluster.
+blog_description: "This post demonstrates how to run an Open Liberty application with Federal Information Processing Standards (FIPS) enabled and deploy it to an OpenShift cluster."
 ---
-= Running Open Liberty in a FIPS-enabled cluster
+= Deploying an application with FIPS enabled to OpenShift
 Monica Tamboli <https://github.com/mtamboli>
 
-In this blog post, you'll learn how to run an Open Liberty application with Federal Information Processing Standards (FIPS) enabled by doing the following things:
+In this post, I'll show you how to run an Open Liberty application with Federal Information Processing Standards (FIPS) enabled and deploy it to a OpenShift cluster.
+First, let's cover some key concepts about FIPS and running Open Liberty with FIPS enabled.
 
-. <<create-image-fips,Creating an Open Liberty Docker image that has FIPS enabled>>
-. <<deploy-image-cluster,Deploying the Open Liberty image to your OpenShift Cluster>>
+== What is FIPS and why is it important?
+
+Federal Information Processing Standards (FIPS) are standards and guidelines that are issued by the National Institute of Standards and Technology (NIST) for federal government computer systems. 
+FIPS specifies required levels of encryption for Transport Layer Security (TLS).
+This standard ensures high protection of data as it's sent over the wire.
+
+United States government agencies and many other healthcare and financial firms use only products that support FIPS.
+These standards ensure that the products conform to specified security requirements.
+So, when you deploy an Open Liberty application to a Kubernetes cluster like OpenShift, it can be important to make sure that FIPS is enabled. 
+
+== Considerations for enabling FIPS
+
+=== Kubernetes cluster considerations
+
+First, you need to decide whether to install your Kubernetes cluster in FIPS mode.
+In this blog, we'll use OpenShift 4.6. Starting in version 4.3, you can https://docs.openshift.com/container-platform/4.6/installing/installing-fips.html[install an OpenShift cluster that uses FIPS Validated / Modules in Process cryptographic libraries].
+
+=== Open Liberty considerations
+
+Open Liberty supports FIPS by using the IBMJSSE2 FIPS provider in the IBM JDK 8.
+Open Liberty can support FIPS 140-2, https://www.ibm.com/support/knowledgecenter/SSEQTP_liberty/com.ibm.websphere.wlp.doc/ae/twlp_sec_nist.html[SP800-131, and Suite B security standards].
+At this time, the IBM JDK 8 has to be used for FIPS compliance with Open Liberty, although more JDKs will support FIPS in the future.
+Your application could stop working after enabling FIPS if the other software that your application interacts with isn't FIPS-compliant.
+However, a FIPS-enabled Open Liberty image can be installed on a cluster that isn't FIPS-enabled.
+
+== Enabling FIPS for Open Liberty
+
+Let's explore the steps to enable FIPS for an Open Liberty application that's running on a FIPS-enabled OpenShift cluster:
+
+. <<create-image-fips,Creating an Open Liberty container image that has FIPS enabled>>
+. <<deploy-image-cluster,Deploying the Open Liberty image to your OpenShift cluster>>
 . <<verify-fips,Verifying that FIPS is enabled on the Open Liberty server>>
 
-== Before you begin
-
-* Deploy an OpenShift Container Platform (OCP) cluster.
-If you want to run Open Liberty on a FIPS-enabled OCP cluster, see the https://docs.openshift.com/container-platform/4.6/installing/installing-fips.html[OpenShift documentation].
-* Install the xref:open-liberty-operator.adoc[Open Liberty Operator].
-
 [#create-image-fips]
-== Creating an Open Liberty Docker image that has FIPS enabled
+== Creating an Open Liberty container image that has FIPS enabled
 
-. https://github.com/OpenLiberty/ci.docker#container-images[Create an Open Liberty Docker image]. To enable FIPS for Open Liberty, use the Open Liberty image that uses the IBM JDK.
+. https://github.com/OpenLiberty/ci.docker#container-images[Create an Open Liberty container image]. To enable FIPS for Open Liberty, use the Open Liberty image that uses the IBM JDK.
 
-. Ensure that SSL is enabled for your Open Liberty server by adding the feature:transportSecurity[display=Transport Security feature] (`transportSecurity-1.0`) to your `server.xml` file.
+. Ensure that SSL is enabled for your Open Liberty server by adding the xref:/docs/latest/reference/feature/transportSecurity-1.0.html[Transport Security feature] (`transportSecurity-1.0`) to your `server.xml` file.
 
-. Set the `com.ibm.jsse2.usefipsprovider` system property to  https://www.ibm.com/support/knowledgecenter/SSYKE2_8.0.0/com.ibm.java.security.component.80.doc/security-component/jsse2Docs/enablefips.html[enable FIPS mode in the `IBMJSSE2` provider].
-  * To set this property, create or update the `jvm.options` file in the server configuration directory, as shown in the following example:
+. Set the correct system property to https://www.ibm.com/support/knowledgecenter/SSYKE2_8.0.0/com.ibm.java.security.component.80.doc/security-component/jsse2Docs/enablefips.html[enable FIPS mode in the IBMJSSE2 provider].
+This property differs depending on the FIPS mode.
+For FIPS140-2, set the `-Dcom.ibm.jsse2.usefipsprovider=true` property.
+SP800-131a can be enabled by using the `-Dcom.ibm.jsse2.sp800-131=transition` property or the `-Dcom.ibm.jsse2.sp800-131=strict` property.
+To set this system property, create or update the `jvm.options` file, as shown in the following example:
 +
 ----
 $ cat jvm.options
 -Dcom.ibm.jsse2.usefipsprovider=true
 ----
-*  You may also want to enable JSSE trace by adding the `-Djavax.net.debug=all` property for verification:
 +
-----
-$ cat jvm.options
--Dcom.ibm.jsse2.usefipsprovider=true
--Djavax.net.debug=all
-----
+If you're working in a development environment, you might also want to enable JSSE trace for debugging or verification purposes by adding the `-Djavax.net.debug=all` property to the `jvm.options` file.
 
-. Ensure that the `com.ibm.crypto.fips.provider.IBMJCEFIPS` Java Cryptography Extension (JCE) FIPS provider is included in the provider list on top in the `java.security` file, which is located in the `JAVA_HOME/jre/lib/security` directory. 
-  * `java.security` file can be extracted from from the liberty image or from a running pod as follows
+. Add the `com.ibm.crypto.fips.provider.IBMJCEFIPS` Java Cryptography Extension (JCE) FIPS provider in the `java.security` file, which is located in the `JAVA_HOME/jre/lib/security` directory.
+By default, the `java.security` file doesn't include a FIPS provider.
+.. You can extract the `java.security` file from the Open Liberty image or from a running pod:
 +
 ----
 $ docker run -v $PWD:/opt/mount --rm -ti openliberty/open-liberty:21.0.0.1-full-java8-ibmjava-ubi bash -c "cp /opt/ibm/java/jre/lib/security/java.security /opt/mount/"
 or
 $ oc rsync <pod-name>:/opt/ibm/java/jre/lib/security/java.security .
 ----
-+
-  * Update 'java.security` file to add the correct FIPS provider and adjust the provider number.
+.. Add the FIPS provider and adjust the provider number in the `java.security` file:
 +
 ----
 $ vi java.security
@@ -66,7 +88,7 @@ security.provider.3=com.ibm.crypto.provider.IBMJCE
 .....
 ----
 
-. Update Dockerfile with updated `server.xml`, `jvm.options`, and `java.security` files, as shown in the following example `Dockerfile.ibmjdk` file. https://github.com/OpenLiberty/ci.docker[Follow this link for details on creating Open Liberty images] :
+. Update the Dockerfile with updated `server.xml`, `jvm.options`, and `java.security` files, as shown in the following example Dockerfile:
 +
 ----
 FROM openliberty/open-liberty:21.0.0.1-full-java8-ibmjava-ubi
@@ -84,26 +106,33 @@ $ docker build -t <image_name> -f Dockerfile.ibmjdk .
 ----
 
 . Log in to your image registry and push the image.
-In this example, we use the OCP internal registry:
+In this example, we use the OpenShift internal registry:
 +
 ----
-$ dcoker login <registry>
+$ docker login <registry>
 $ docker tag <image_name> default-route-openshift-image-registry.apps.example.ibm.com/ol-app/<image_name>
 $ docker push default-route-openshift-image-registry.apps.example.ibm.com/ol-app/<image_name>
 ----
 
 [#deploy-image-cluster]
 == Deploying the Open Liberty image to your OpenShift Cluster
-. Login to your OCP cluster by using the `oc login` command.
+
+. Deploy an OpenShift cluster.
+
+. Install the https://github.com/OpenLiberty/open-liberty-operator#operator-installation[Open Liberty Operator].
+
+. Log in to your OpenShift cluster by using the `oc login` command.
 
 . Create a project for your Open Liberty application by running the following command:
 +
 ----
 $ oc new-project ol-app
 ----
-. Create Open Liberty Application CR to deploy your application. https://github.com/OpenLiberty/open-liberty-operator/blob/master/doc/user-guide.adoc[See Open Liberty Operator user guide for details.] 
-It's important that route for the application is enabled so that SSL can use FIPS. The following example file shows how you might configure the Open Liberty Operator for deployment to an OCP cluster.  :
-
+. Create an https://github.com/OpenLiberty/open-liberty-operator/blob/master/doc/user-guide.adoc[OpenLibertyApplication custom resource (CR)] to deploy your application.
+It's important that route for the application is enabled so that TLS can use FIPS.
+The following example file shows how you might configure the Open Liberty Operator for deployment to an OpenShift cluster.
+Make sure to replace `<image_name>` with the name of your image:
++
 ----
 $ cat app-deploy_ssl.yaml
 apiVersion: openliberty.io/v1beta1
@@ -124,7 +153,7 @@ spec:
 ----
 
 
-. Replace the <image_name> in above example app-deploy_ssl.yaml file. Deploy the application to OCP by running the following command:
+. Deploy the application to OpenShift by running the following command:
 +
 ----
 $ oc apply -f app-deploy_ssl.yaml
@@ -144,13 +173,17 @@ inventory-ibmjdk   inventory-ibmjdk-ol-app.apps.example.ibm.com          invento
 [#verify-fips]
 == Verifying that FIPS is enabled on the Open Liberty server
 
-. Enable JSSE trace (if not enabled in earlier step) by updating the `jvm.options` file to add the following property and rebuild the Open Liberty image and redeploy the new image to OCP:
+If you're working in a development environment, you might want to complete the following steps to verify that FIPS is enabled on the Open Liberty server.
+
+. Enable JSSE trace if you haven't already done so by adding the following property to the `jvm.options` file:
 +
 ----
 -Djavax.net.debug=all
 ----
 
-. Access the Open Liberty application at the same route that you accessed in the previous section, for example, https://inventory-ibmjdk-ol-app.apps.example.ibm.com.
+. Rebuild and redeploy your Open Liberty image.
+
+. Access your Open Liberty application at the same route that you accessed in the previous section, for example, https://inventory-ibmjdk-ol-app.apps.example.ibm.com.
 
 . Check the logs on the Open Liberty container, as shown in the following example:
 +
@@ -171,3 +204,10 @@ IPS provider IBMJCEFIPS
 $  grep ClientHello /logs/messages.log
 [2/16/21 17:05:00:861 UTC] 0000003d SystemOut                                                    O *** ClientHello, TLSv1.2
 ----
+
+== Summary
+
+Security is obviously a top priority for any organization.
+Different levels of FIPS can be enabled for Open Liberty applications when you use the IBM JDK 8.
+It's important to take into consideration all of the dependencies of an application before you enable FIPS to make sure that the application will continue to work when it's FIPS-compliant.
+If you're already using Open Liberty applications with FIPS enabled on-premises, you can move to Kubernetes by making sure that you pick the Open Liberty image with IBM JDK 8 and update the container image with FIPS-enabled files.
