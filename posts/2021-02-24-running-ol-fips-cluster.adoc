@@ -39,13 +39,10 @@ At this time, the IBM JDK 8 has to be used for FIPS compliance with Open Liberty
 Your application could stop working after enabling FIPS if the other software that your application interacts with isn't FIPS-compliant.
 However, a FIPS-enabled Open Liberty image can be installed on a cluster that isn't FIPS-enabled.
 
-== Enabling FIPS for Open Liberty
-
 Let's explore the steps to enable FIPS for an Open Liberty application that's running on a FIPS-enabled OpenShift cluster:
 
 * <<create-image-fips,Creating an Open Liberty application container image that has FIPS enabled>>
 * <<deploy-image-cluster,Deploying the Open Liberty image to your OpenShift cluster>>
-* <<verify-fips,Verifying that FIPS is enabled on the Open Liberty server>>
 
 [#create-image-fips]
 == Creating an Open Liberty application container image that has FIPS enabled
@@ -65,7 +62,6 @@ $ cat jvm.options
 -Dcom.ibm.jsse2.usefipsprovider=true
 ----
 +
-If you're working in a development environment, you might also want to enable JSSE trace for debugging or verification purposes by adding the `-Djavax.net.debug=all` property to the `jvm.options` file.
 
 . Add the `com.ibm.crypto.fips.provider.IBMJCEFIPS` Java Cryptography Extension (JCE) FIPS provider in the `java.security` file, which is located in the `JAVA_HOME/jre/lib/security` directory.
 By default, the `java.security` file doesn't include a FIPS provider.
@@ -102,7 +98,23 @@ RUN configure.sh
 ----
 $ docker build -t <image_name> -f Dockerfile .
 ----
+. You can optionally verify application container image created above to make sure that the correct JSSE provider is being used by enabling JSSE trace using `-Djavax.net.debug=all` property. 
++
+----
+ $ docker run -e JVM_ARGS=-Djavax.net.debug=all -p 9443:443 <image_name>
 
+...
+********************************************************************************
+product = Open Liberty 21.0.0.1 (wlp-1.0.48.cl210120210113-1459)
+...
+[2/16/21 17:02:19:243 UTC] 0000002a SystemOut                                                    O IBMJSSE2 will use default F
+IPS provider IBMJCEFIPS
+[2/16/21 17:02:19:244 UTC] 0000002a SystemOut                                                    O Installed Providers =
+[2/16/21 17:02:19:244 UTC] 0000002a SystemOut                                                    O      IBMJCEFIPS
+[2/16/21 17:02:19:245 UTC] 0000002a SystemOut                                                    O      IBMJSSE2
+[2/16/21 17:02:19:245 UTC] 0000002a SystemOut                                                    O      IBMJCE
+...
+----
 . Log in to your image registry and push the image.
 In this example, we use the OpenShift internal registry:
 +
@@ -167,41 +179,6 @@ inventory-ibmjdk   inventory-ibmjdk-ol-app.apps.example.ibm.com          invento
 ----
 
 . Open a browser and access the route that was returned in the previous step, for example, https://inventory-ibmjdk-ol-app.apps.example.ibm.com.
-
-[#verify-fips]
-== Verifying that FIPS is enabled on the Open Liberty server
-
-If you're working in a development environment, you might want to complete the following steps to verify that FIPS is enabled on the Open Liberty server.
-
-. Enable JSSE trace if you haven't already done so by adding the following property to the `jvm.options` file:
-+
-----
--Djavax.net.debug=all
-----
-
-. Rebuild and redeploy your Open Liberty image.
-
-. Access your Open Liberty application at the same route that you accessed in the previous section, for example, https://inventory-ibmjdk-ol-app.apps.example.ibm.com.
-
-. Check the logs on the Open Liberty container, as shown in the following example:
-+
-----
-$oc rsh inventory-ibmjdk-687487479-4rxk7 bash
-bash-4.4$ more /logs/messages.log
-...
-********************************************************************************
-product = Open Liberty 21.0.0.1 (wlp-1.0.48.cl210120210113-1459)
-...
-[2/16/21 17:02:19:243 UTC] 0000002a SystemOut                                                    O IBMJSSE2 will use default F
-IPS provider IBMJCEFIPS
-[2/16/21 17:02:19:244 UTC] 0000002a SystemOut                                                    O Installed Providers =
-[2/16/21 17:02:19:244 UTC] 0000002a SystemOut                                                    O      IBMJCEFIPS
-[2/16/21 17:02:19:245 UTC] 0000002a SystemOut                                                    O      IBMJSSE2
-[2/16/21 17:02:19:245 UTC] 0000002a SystemOut                                                    O      IBMJCE
-...
-$  grep ClientHello /logs/messages.log
-[2/16/21 17:05:00:861 UTC] 0000003d SystemOut                                                    O *** ClientHello, TLSv1.2
-----
 
 == Summary
 
