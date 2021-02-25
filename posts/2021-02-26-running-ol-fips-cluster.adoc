@@ -56,12 +56,13 @@ To enable FIPS for Open Liberty, we're using the Open Liberty image that uses th
 You also need to ensure that Transport Layer Security (TLS) is enabled for your Open Liberty server by adding the xref:/docs/latest/reference/feature/transportSecurity-1.0.html[Transport Security feature] (`transportSecurity-1.0`) to your `server.xml` file.
 
 Set the correct system property to https://www.ibm.com/support/knowledgecenter/SSYKE2_8.0.0/com.ibm.java.security.component.80.doc/security-component/jsse2Docs/enablefips.html[enable FIPS mode in the IBMJSSE2 provider].
-For FIPS140-2, set the `-Dcom.ibm.jsse2.usefipsprovider=true` property.
-SP800-131a can also be enabled by using the `-Dcom.ibm.jsse2.sp800-131=transition` property or the `-Dcom.ibm.jsse2.sp800-131=strict` property.
+For FIPS140-2, set the `-Dcom.ibm.jsse2.usefipsprovider=true` property. We also need to set system property to specify correct FIPS provider name `com.ibm.jsse2.usefipsProviderName=IBMJCEPlusFIPS`
+
 To set this system property, create or update the `jvm.options` file:
 ----
 $ cat jvm.options
 -Dcom.ibm.jsse2.usefipsprovider=true
+-Dcom.ibm.jsse2.usefipsProviderName=IBMJCEPlusFIPS
 ----
 
 Next, add the Java Cryptography Extension (JCE) FIPS provider in the `java.security` file, which is located in the `JAVA_HOME/jre/lib/security` directory.
@@ -71,17 +72,17 @@ $ docker cp <container>:/opt/ibm/java/jre/lib/security/java.security .
 ----
 
 By default, the `java.security` file doesn't include a FIPS provider.
-This example uses the `com.ibm.crypto.fips.provider.IBMJCEFIPS` FIPS provider, although there is a newer version of the https://www.ibm.com/support/knowledgecenter/SSYKE2_8.0.0/com.ibm.java.security.component.80.doc/security-component/jsse2Docs/enablefips.html[com.ibm.crypto.plus.provider.IBMJCEPlusFIPS` FIPS provider]. You also need to set `com.ibm.jsse2.usefipsProviderName=IBMJCEPlusFIPS` in jvm.options file if the IBMJCEPlusFIPS provider is used.
+This example uses the `com.ibm.crypto.plus.provider.IBMJCEPlusFIPS` FIPS provider. We already set `com.ibm.jsse2.usefipsProviderName=IBMJCEPlusFIPS` in jvm.options file for the IBMJCEPlusFIPS provider.
 
 After you extract the `java.security` file, add the FIPS provider and adjust the provider number in the file:
 ----
 $ vi java.security
 # List of providers and their preference orders (see above):
-#Added the security.provider.1=com.ibm.crypto.fips.provider.IBMJCEFIPS on top
-security.provider.1=com.ibm.crypto.fips.provider.IBMJCEFIPS
+#Added the security.provider.1=com.ibm.crypto.plus.provider.IBMJCEPlusFIPS
+security.provider.1=com.ibm.crypto.plus.provider.IBMJCEPlusFIPS
 security.provider.2=com.ibm.jsse2.IBMJSSEProvider2
 security.provider.3=com.ibm.crypto.provider.IBMJCE
-.....
+...
 ----
 
 Next, update the Dockerfile with updated `server.xml`, `jvm.options`, and `java.security` files, as shown in the following example Dockerfile:
@@ -95,7 +96,7 @@ COPY --chown=1001:0 java.security /opt/ibm/java/jre/lib/security
 RUN configure.sh
 ----
 
-Now you can run the following command to build the updated Open Liberty image:
+Now you build the application image:
 ----
 $ docker build -t <image_name> -f Dockerfile .
 ----
@@ -109,12 +110,11 @@ $ docker run -e JVM_ARGS=-Djavax.net.debug=all -p 9443:443 <image_name>
 ********************************************************************************
 product = Open Liberty 21.0.0.1 (wlp-1.0.48.cl210120210113-1459)
 ...
-[2/16/21 17:02:19:243 UTC] 0000002a SystemOut                                                    O IBMJSSE2 will use default F
-IPS provider IBMJCEFIPS
-[2/16/21 17:02:19:244 UTC] 0000002a SystemOut                                                    O Installed Providers =
-[2/16/21 17:02:19:244 UTC] 0000002a SystemOut                                                    O      IBMJCEFIPS
-[2/16/21 17:02:19:245 UTC] 0000002a SystemOut                                                    O      IBMJSSE2
-[2/16/21 17:02:19:245 UTC] 0000002a SystemOut                                                    O      IBMJCE
+IBMJSSE2 will use FIPS provider IBMJCEPlusFIPS
+Installed Providers =
+        IBMJCEPlusFIPS
+        IBMJSSE2
+        IBMJCE
 ...
 ----
 
