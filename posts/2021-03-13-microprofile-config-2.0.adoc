@@ -1,0 +1,331 @@
+---
+layout: post
+title: "MicroProfile Config 2.0"
+categories: blog, MicroProfile
+author_picture: https://avatars3.githubusercontent.com/Joseph-Cass
+author_github: https://github.com/Joseph-Cass
+seo-title: MicroProfile Config 2.0 - OpenLiberty.io
+seo-description: MicroProfile Config 2.0 is a major version release with lots of new features designed to simplify configuring microservices. Config Profiles, Property Expressions, and new API methods are just some of the new features which allow configuration values to be retrieved with ease from source code. These configuration values can be defined in any valid ConfigSource in an Open Liberty application
+blog_description: "MicroProfile Config 2.0 is a major version release with lots of new features designed to simplify configuring microservices. Config Profiles, Property Expressions, and new API methods are just some of the new features which allow configuration values to be retrieved with ease from source code. These configuration values can be defined in any valid ConfigSource in an Open Liberty application."
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+---
+= MicroProfile Config 2.0
+Joseph Cass <https://github.com/Joseph-Cass>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+
+link:https://download.eclipse.org/microprofile/microprofile-config-2.0/microprofile-config-spec-2.0.html[MicroProfile Config 2.0] is a major version release jam-packed with new features to help make configuring your microservices a breeze. Released as part of link:https://download.eclipse.org/microprofile/microprofile-4.0.1/microprofile-spec-4.0.1.html#microprofile4.0[MicroProfile 4.0], Config 2.0 introduces:
+
+- <<Config-Profile, Config Profile>>- a property, called mp.config.profile, which can be used to determine which set of config property values are used
+- <<ConfigValue, ConfigValue>>- an API class which holds a bunch of useful information about a specified config property
+- <<ConfigProperties, @ConfigProperties>>- an annotation which provides a way to retrieve a number of related config property values, with a shared specified prefix, into a CDI bean.
+- <<Property-Expression, Property Expression>>- a way of defining and expanding config property values inside of other config property values using the `${}` syntax.
+
+
+[#Prepare-For-Liftoff]
+== Prepare For Liftoff
+MicroProfile Config 2.0 is new to link:https://openliberty.io/downloads/#runtime_releases[Open Liberty 21.0.0.3] - so make sure you are using the latest version of Liberty. 
+
+Then, it's just 2 steps to launch:
+
+1. You’ll need to tell your build where all the awesome new features are defined. 
++
+The easiest way to do this it to point to the link:https://search.maven.org/artifact/org.eclipse.microprofile/microprofile/4.0.1/pom[MicroProfile 4.0 Repository] which includes the link:https://search.maven.org/artifact/org.eclipse.microprofile.config/microprofile-config-api/2.0/jar[MicroProfile Config 2.0 API].
++
+- If you’re using link:https://maven.apache.org/[Maven] add the following dependency to your pom.xml:
++
+.pom.xml
+[source,xml]
+----
+<dependency>
+	<groupId>org.eclipse.microprofile</groupId>
+	<artifactId>microprofile</artifactId>
+	<version>4.0.1</version>
+	<type>pom</type>
+	<scope>provided</scope> <!-- This package is built and released with Open Liberty -->
+</dependency>
+----
++
+- Or, if you're using link:https://gradle.org/[Gradle]:
++
+.build.gradle
+[source,gradle]
+----
+dependencies {
+    compileOnly group: 'org.eclipse.microprofile', name: 'microprofile', version: '4.0.1'
+}
+----
++
+
+1. You'll also need to enable the link:https://openliberty.io/docs/21.0.0.2/reference/feature/feature-overview.html[feature] in Open Liberty. 
++
+The easiest way to enable mpConfig-2.0 (MicroProfile Config 2.0’s feature name in Open Liberty) is to enable the microProfile-4.0 link:https://openliberty.io/docs/21.0.0.3/reference/feature/microProfile-4.0.html[convenience feature] (which enables mpConfig-2.0) in your server.xml:
++
+.server.xml
+[source,xml]
+----
+<featureManager>
+    <feature>microProfile-4.0</feature>
+</featureManager>
+----
++
+If you’d rather enable the individual feature instead, you’ll need to add `<feature>mpConfig-2.0</feature>` in addition to `<feature>cdi-2.0</feature>` which enables all the cool injection functionally.
+
+And just like that you’re ready for take-off!
+
+[#Getting-Up-To-Speed]
+== Getting Up To Speed
+If you’re a little unfamiliar with MicroProfile Config (no worries if you are), link:https://download.eclipse.org/microprofile/microprofile-config-2.0/microprofile-config-spec-2.0.html[the spec] is a great place to start, or the link:https://openliberty.io/docs/21.0.0.3/external-configuration.html#[Open Liberty Docs]. 
+
+In essence, MicroProfile Config allows you to define configuration values (referred to as "config property" values) in a huge range of locations known as link:https://download.eclipse.org/microprofile/microprofile-config-2.0/microprofile-config-spec-2.0.html#configsource[ConfigSources]. These values can be easily retrieved anywhere in your code with link:https://jakarta.ee/specifications/cdi/2.0/cdi-spec-2.0.html[CDI]. For example, you could define the following in your Liberty server.xml
+
+.server.xml
+[source,xml]
+----
+<variable name="port" value="9080"/>
+----
+
+And inject it into your application code with:
+[source,java]
+----
+@Inject
+@ConfigProperty(name="port")
+int port;
+----
+
+[#New-Horizons]
+== New Horizons
+Now let’s blast off into the new features in MicroProfile Config 2.0.
+
+The examples below use the config property values defined in this example META-INF/microprofile-config.properties file (A link:https://download.eclipse.org/microprofile/microprofile-config-2.0/microprofile-config-spec-2.0.html#default_configsources[default ConfigSource]) which would be found on the classpath:
+
+[[example-ConfigSource]]
+.META-INF/microprofile-config.properties
+[source]
+----
+%testing.server.host= example.test.org
+server.host=example.org
+server.port=9080
+server.url=http://${server.host}
+----
+
+[#Config-Profile]
+=== Config Profile
+link:https://download.eclipse.org/microprofile/microprofile-config-2.0/microprofile-config-spec-2.0.html#configprofile[Config Profiles] allow configuration for different environments and development stages while only one of them is active (e.g. dev, test, prod). The Config Profile is specified using the `mp.config.profile` property, which can be set in any ConfigSource. Once it is set, the corresponding properties associated with the active profile are used. The value can also be set at application start-up, for example if you’re using Maven and the link:https://github.com/OpenLiberty/ci.maven[liberty-maven-plugin] you can start your app in link:https://openliberty.io/docs/21.0.0.2/development-mode.html[Dev mode] with:
+
+ mvn liberty:dev -Dliberty.var.mp.config.profile="testing"
+
+Where the `-Dliberty.var.mp.config.profile` argument sets a link:https://maven.apache.org/pom.html#Properties[Maven property] which the liberty-maven-plugin link:https://github.com/scottkurz/ci.maven/blob/f3920800351b6d2c26e62a19008b68093afa48ea/docs/common-server-parameters.md#setting-liberty-configuration-with-maven-project-properties[uses to configure the Liberty app]. In this case, `mp.config.profile` property is set to `testing`.
+
+`mp.config.profile` can be used:
+
+- link:https://download.eclipse.org/microprofile/microprofile-config-2.0/microprofile-config-spec-2.0.html#_on_property_level[On property level]: config property names can be set in the following format so that they are used for specific selected profiles: 
++
+ %<mp.config.profile>.<original property name> 
++
+For example, with `mp.config.profile` set to `testing`, retrieving the config value for "server.host" would use the config property `%testing.server.host` from the <<example-ConfigSource, example ConfigSource>> rather than `server.host`. The value of the property would resolve to `example.test.org`.
++
+If `mp.config.profile` was not set, retrieving "server.host" would resolve to `example.org`.
+
+- link:https://download.eclipse.org/microprofile/microprofile-config-2.0/microprofile-config-spec-2.0.html#_on_config_source_level[On ConfigSource level]: multiple microprofile-config.properties files can be provided in the following format so they can be used for specific selected profiles:
++
+ microprofile-config-<mp.config.profile>.properties 
++
+For example, if a file called microprofile-config-testing.properties was provided on the classpath, with `mp.config.profile` set to `testing` the file would be loaded "on top of" the default microprofile-config.properties file. The config property values from microprofile-config-testing.properties would take precedence.
+
+
+[#ConfigProperties]
+=== @ConfigProperties
+If you’re Injecting plenty of related config property values into the same class, things could start getting a little out of hand:
+
+[source,java]
+----
+@Inject
+@ConfigProperty(name="server.port")
+int port;
+
+@Inject
+@ConfigProperty(name="server.host")
+String host;
+
+@Inject
+@ConfigProperty(name="server.url")
+String url;
+----
+
+Wouldn’t it be great if you could Inject these related values all at once? Well now you can! This is achieved by defining a link:https://download.eclipse.org/microprofile/microprofile-config-2.0/apidocs/org/eclipse/microprofile/config/inject/ConfigProperties.html[@ConfigProperties] bean for config property values which share a common prefix. For example, you can define a bean annotated with @ConfigProperties called ServerDetailsBean:
+
+[source,java]
+----
+@ConfigProperties(prefix="server")
+@Dependent
+public class ServerDetailsBean {
+   String host;
+   int port; 
+   int url;
+}
+----
+
+And inject the bean into another class:
+
+[source,java]
+----
+@Inject
+@ConfigProperties
+ServerDetailsBean serverDetails;
+----
+
+Where the config property values can be easily retrieved within the class the bean was injected into with:
+
+[source,java]
+----
+serverDetails.host;  // retrieves the value, as a String, for the config property named server.host, which is “example.org”.
+serverDetails.port;  // retrieves the value, as an int, for the config property named server.port, which is "9080".
+----
+
+[#ConfigValue]
+=== ConfigValue
+The new link:https://download.eclipse.org/microprofile/microprofile-config-2.0/apidocs/org/eclipse/microprofile/config/ConfigValue.html[ConfigValue API class] allows you to retrieve details about a given config property into one convenient ConfigValue object. And it’s super easy to get hold of. All you have to do is inject the config property you’d like, as usual, only this time define the type as ConfigValue:
+
+[source,java]
+----
+@Inject
+@ConfigProperty(name="server.host")
+ConfigValue serverNameConfigValue;
+----
+
+With this, you can retrieve all the useful values with the get methods defined in the link:https://download.eclipse.org/microprofile/microprofile-config-2.0/apidocs/[Javadoc]. For example, you can determine which ConfigSource was the “winning” one (the ConfigSource with the highest ordinal) for a config property defined in multiple locations by calling:
+
+[source,java]
+----
+serverNameConfigValue.getSourceName(); // returns “PropertiesConfigSource[source=file:/<path-to-file>/META-INF/microprofile-config.properties]”
+serverNameConfigValue.getSourceOrnial(); // returns “100”, the default ordinal value for META-INF/microprofile-config.properties
+----
+
+[#Property-Expression]
+=== Property Expression
+Property Expressions provide a way to set and expand variables in property values using the `${}` syntax. For example, the config property `server.url` defined in the <<example-ConfigSource, example ConfigSource>>  as `\http://${server.host}` will be resolved to `\http://example.org` since `server.host` is defined as `example.org`
+
+[source,java]
+----
+@Inject
+@ConfigProperty(name="server.url")
+String url; // retrieves the resolved value of “http://example.org”, or “http://example.test.org” if mp.config.profile is set to “testing”
+----
+
+You can also do some funky expressions, defining default values, composed expressions, and multiple expressions, which link:https://download.eclipse.org/microprofile/microprofile-config-2.0/microprofile-config-spec-2.0.html#property-expressions[the spec] covers really well.
+
+Previous working configurations might behave differently if the configuration in use contains values with Property Expressions syntax.
+
+[#Extra-Info]
+== Some extra info for the return journey
+
+For the following examples, we'll use a slightly more rogue example ConfigSource (let's call it "example ConfigSource v2"):
+[[example-ConfigSource2]]
+.META-INF/microprofile-config.properties
+[source]
+----
+empty.property=
+empty.array.prop=,
+ports=9080,9081,9082
+server.port=9080
+----
+
+[#Config-Value-Behaviour-Updates]
+=== Empty And Special Values Behaviour Updates
+The behaviour for "empty" and "special" config property values has been updated:
+
+* The easiest way to get your head around this is to look at the link:https://download.eclipse.org/microprofile/microprofile-config-2.0/microprofile-config-spec-2.0.html#_config_value_conversion_rules[conversion rule examples].
+* A value is considered to be "empty" if the link:https://download.eclipse.org/microprofile/microprofile-config-2.0/apidocs/org/eclipse/microprofile/config/spi/Converter.html[Converter] being used considers it to be "empty". For example: 
+** All Converters consider `""`, the empty String, to be empty.
+** The built-in Converter for String[] considers `","` to be empty (because it is "special"). 
+* Retrieving these "empty" values "natively" will now throw a `NoSuchElementException`, e.g. for the values defined in the <<example-ConfigSource2, example ConfigSource v2>>:
++
+[source,java]
+----
+@Inject
+@ConfigProperty(name = "empty.property")
+String emptyProperty; // Will throw a `DeploymentException` caused by a `NoSuchElementException`
+
+@Inject
+@ConfigProperty(name = "empty.array.property")
+String[] emptyArrayProperty; // Will throw a `DeploymentException` caused by a `NoSuchElementException`
+----
++
+and
++
+[source,java]
+----
+Config config = ConfigProvider.getConfig();
+config.getValue("empty.property", String.class); // Will thorw a `NoSuchElementException`
+config.getValue("empty.array.property", String[].class); // Will thorw a `NoSuchElementException`
+----
++
+However these values can be retrieved "optionally":
++
+[source,java]
+----
+@Inject
+@ConfigProperty(name = "empty.property")
+Optional<String> emptyProperty; // returns "Optional.empty"
+
+@Inject
+@ConfigProperty(name = "empty.array.property")
+Optional<String[]> emptyArrayProperty; // returns "Optional.empty"
+----
++
+and
++
+[source,java]
+----
+Config config = ConfigProvider.getConfig();
+config.getOptionalValue("empty.property", String.class); // returns “Optional.empty"
+config.getOptionalValue("empty.array.property", String[].class); // returns “Optional.empty"
+----
+
+
+* This means that link:https://download.eclipse.org/microprofile/microprofile-config-2.0/apidocs/org/eclipse/microprofile/config/Config.html#getValue-java.lang.String-java.lang.Class-[Config.getValue()] will never return null; a `NoSuchElementException` will be thrown if the property:
+
+** Is not defined
+** Is defined as an empty String (`""`)
+** Is converted to `null` (considered to be "empty") by its Converter
+
+[#Expanding-Config-API]
+=== Expanding the Config API
+Two new methods have been added to the link:https://download.eclipse.org/microprofile/microprofile-config-2.0/apidocs/org/eclipse/microprofile/config/Config.html[Config API class]:
+
+1. link:https://download.eclipse.org/microprofile/microprofile-config-2.0/apidocs/org/eclipse/microprofile/config/Config.html#getValues-java.lang.String-java.lang.Class-[Config.getValues()]: `List<T> Config.getValues(String propertyName, Class<T> propertyType)`
+
+2. link:https://download.eclipse.org/microprofile/microprofile-config-2.0/apidocs/org/eclipse/microprofile/config/Config.html#getOptionalValues-java.lang.String-java.lang.Class-[Config.getOptionalValues()]: `Optional <List<T>>Config.getOptionalValues(String propertyName, Class<T> propertyType)`
+
+The methods have been added to enable you to retrieve multi-valued config property values as lists instead of arrays. The methods return the resolved property values with the specified `propertyType` for the specified `propertyName`. For example:
+
+[source,java]
+----
+Config config = ConfigProvider.getConfig();
+config.getOptionalValues("ports", Integer.class) // returns "Optional[[9080, 9081, 9082]]"
+----
+
+[#More-Optional-Converter]
+=== More Optional Converters
+`OptinalInt`, `OptionalLong` and `OptionalDouble` are now provided as link:https://download.eclipse.org/microprofile/microprofile-config-2.0/apidocs/org/eclipse/microprofile/config/spi/Converter.html#built_in_converters[built-in Converters]. The new Converters can be used like any of the other built-in Converters; converting injected config property values to a defined type:
+
+[source,java]
+----
+@Inject
+@ConfigProperty(name = "server.port")
+OptionalInt optionalServerPort; // returns “9080"
+----
+
+[#Incompatibility-changes]
+== Heads up! Incompatibility Changes
+If you move up from MicroProfile Config 1.x to 2.0, please take care of the following incompatible changes:
+
+* link:https://javadoc.io/static/org.eclipse.microprofile/microprofile/4.0.1/org/eclipse/microprofile/config/Config.html#getPropertyNames--[ConfigSource.getPropertyNames()] is no longer a `default` method. Any implementations of a ConfigSource must implement this method.
+* Previous versions of MP Config would not evaluate Property Expressions. As such, previous working configuration may behave differently (if the configuration contains values with Property Expressions syntax, e.g. `${var.name}`). Property Expressions can be disabled by setting the property `mp.config.property.expressions.enabled` with the value of `false`.
+* As <<Config-Value-Behaviour-Updates, mentioned here>>, the behaviour of retrieving "empty" and "special" config property values has changed. In previous releases, an "empty" value was considered valid. Now, unless retrieved "optionally", a `NoSuchElementException` will be thrown.
+
+[#feedback]
+== Thankyou For Joining The Ride
+Thankyou for reading! As allows we'd love to hear any feedback you'd like to share. You can message link:https://groups.io/g/openliberty[our mailing list], ask questions on link:https://stackoverflow.com/questions/tagged/open-liberty[StackOverflow], and raise any issues on link:https://github.com/OpenLiberty/open-liberty/issues[our GitHub page].
