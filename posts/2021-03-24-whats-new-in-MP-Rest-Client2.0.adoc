@@ -15,7 +15,7 @@ Andy McCright <https://github.com/andymc12>
 The latest release of MicroProfile's type-safe REST client has a lot of new and exciting features. In this post, we'll
 take a look at some of the new features and how you can use them in Open Liberty, including:
 
-. <<query-param-style,Use QueryParamStyle for specifying how collections of query parameters should be formatted>>
+. <<query-param-style,Using QueryParamStyle to specify how collections of query parameters should be formatted>>
 . <<proxy-server,Proxy server support>>
 . <<auto-redirects,Automatically following redirects>>
 . <<sse-support,Support for Server Sent Events (SSEs)>>
@@ -60,7 +60,7 @@ That's it! Now that we've got our development and deployment environments set up
 
 
 [#query-param-style]
-== Use QueryParamStyle for specifying how collections of query parameters should be formatted
+== Using QueryParamStyle to specify how collections of query parameters should be formatted
 
 Rest Client interfaces can specify query parameters using the `@QueryParam("paramName")` annotation, but often a server
 will require that multi-valued query parameters must be formatted in a certain way. For example, suppose we have a
@@ -68,7 +68,7 @@ client interface like:
 [source,java]
 ----
 @RegisterRestClient
-public interface MyMultiValuedQueryParamClient {
+public interface MyClient {
     @GET
     String multiValues(@QueryParam("myParam") List<String> values);
 }
@@ -86,15 +86,23 @@ instance - for example:
 
 [source,java]
 ----
-MyMultiValuedQueryParamClient client = RestClientBuilder.newBuilder()
-                                                        .queryParamStyle(QueryParamStyle.COMMA_SEPARATED)
-                                                        //...
-                                                        .build(MyMultiValuedQueryParamClient.class);
+MyClient client = RestClientBuilder.newBuilder()
+                                   .queryParamStyle(QueryParamStyle.COMMA_SEPARATED)
+                                   //...
+                                   .build(MyClient.class);
 ----
 
 Alternatively the query parameter style can be declared through MP Config using a property like:
 
-`com.mypkg.MyMultiValuedQueryParamClient/mp-rest/queryParamStyle=ARRAY_PAIRS`
+`com.mypkg.MyClient/mp-rest/queryParamStyle=ARRAY_PAIRS`
+
+.QueryParamStyle Options
+|=======================
+|Enum Value            | Output Example
+|MULTI_PAIRS (default) | `?myParam=a&myParam=b&myParam=c`
+|COMMA_SEPARATED       | `?myParam=a,b,c`
+|ARRAY_PAIRS           | `?myParam[]=a&myParam[]=b&myParam[]=c`
+|=======================
 
 [#proxy-server]
 == Proxy server support
@@ -117,9 +125,9 @@ Alternatively, you can specify the proxy address via MP Config with a property l
 `com.mypkg.MyClient/mp-rest/proxyAddress=myproxy.xyz.com:1080`
 
 Note that this approach to setting the proxy server host and port should be preferred to using vendor-specific
-properties like `com.ibm.ws.jaxrs.client.proxy.host` and `com.ibm.ws.jaxrs.client.proxy.port`, though these properties
-will still work. For proxy authentication, you can still use the `com.ibm.ws.jaxrs.client.proxy.username` and
-`com.ibm.ws.jaxrs.client.proxy.password` properties like:
+properties such as `com.ibm.ws.jaxrs.client.proxy.host` and `com.ibm.ws.jaxrs.client.proxy.port`, though these
+properties will still work. For proxy authentication, you can still use the `com.ibm.ws.jaxrs.client.proxy.username` and
+`com.ibm.ws.jaxrs.client.proxy.password` properties. For example:
 [source,java]
 ----
 MyClient client = RestClientBuilder.newBuilder()
@@ -133,8 +141,8 @@ MyClient client = RestClientBuilder.newBuilder()
 [#auto-redirects]
 == Automatically following redirects
 
-If a RESTful resource has relocated, often the HTTP response code will be in the 300 range and will indicate the new
-location. Rather than handling the 3XX response and manually issuing a new request, MP Rest Client 2.0 allows rest
+If a RESTful resource has been relocated, often the HTTP response code will be in the 300 range and will indicate the
+new location. Rather than handling the 3XX response and manually issuing a new request, MP Rest Client 2.0 allows rest
 client instances to automatically follow redirects. This can be configured programmatically while building the client
 instance or via MP Config. Here is an example of configuring auto-redirect via the `RestClientBuilder` API:
 
@@ -177,11 +185,13 @@ public interface SseClient {
 
 First, the method (or interface) must be annotated with `@Produces(MediaType.SERVER_SENT_EVENTS)` to indicate that it
 expects the server to produce SSEs. Next, the method's return type must be `org.reactivestreams.Publisher`. The generic
-type can be `javax.ws.rs.sse.InboundSseEvent` from JAX-RS or it can be a primitive or complex object - the latter only
-works if (1) the server only sends one type of events (e.g. only sends `WeatherEvents` - then `Publisher<WeatherEvent>`
-would be applicable) and (2) if you have an entity provider that is capable of converting the events into the generic
-type (e.g. `MessageBodyReader<WeatherEvent>`). For most cases, if the remote server sends events using JSON, you can
-enable the `jsonb-1.0` feature in your Liberty server which will automatically register a JSON-B-based entity provider.
+type can be `javax.ws.rs.sse.InboundSseEvent` (from JAX-RS), a primitive, a String or a complex type. Complex types may only be used if;
+1. the server only sends one type of event (e.g. only sends `WeatherEvents` - then `Publisher<WeatherEvent>` would be applicable)
+_and_
+2. there is a registered entity provider capable of converting the events (e.g. `MessageBodyReader<WeatherEvent>`).
+In most cases, if the remote server sends events using JSON, you can enable the `jsonb-1.0` feature in your Liberty
+server which will automatically register a JSON-B-based entity provider.
+
 
 Once you've invoked one of these methods, you should be able to register one or more `Subscriber` instances to the
 `Publisher`. Each subscriber will be notified on receipt of a new event or if the connection to the server has been
@@ -189,9 +199,7 @@ closed.
 
 == Summary
 
-MicroProfile Rest Client 2.0 has some powerful new features useful for building cloud native applications. There are
-still more features not covered here, but have been in Open Liberty's previous Rest Client support, including using CDI-
-enabled providers and supporting `ContextResolver` to customize the built-in JSON-B provider. These features and more
-are available on the link:https://github.com/eclipse/microprofile-rest-client/releases/tag/2.0[MicroProfile Rest Client 2.0 release page].
+MicroProfile Rest Client 2.0 has some powerful new features useful for building cloud native applications. You can read
+more about these updates on the link:https://github.com/eclipse/microprofile-rest-client/releases/tag/2.0[MP Rest Client 2.0 release page].
 
 As always, let us know if you have any questions with this new feature. Thanks for checking it out!
