@@ -1,0 +1,85 @@
+---
+layout: post
+title: "What's New in MicroProfile JSON Web Token 1.2?"
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/ayoho
+author_github: https://github.com/ayoho
+seo-title: What's New in MicroProfile JSON Web Token 1.2 - OpenLiberty.io
+seo-description: This post demonstrates how to configure an Open Liberty application with the latest enhancements to the MicroProfile JSON Web Token feature. New capabilities include support for new MicroProfile Config properties, JSON Web Encryption (JWE) tokens, and enhanced algorithm support.
+blog_description: "This post demonstrates how to configure an Open Liberty application with the latest enhancements to the MicroProfile JSON Web Token feature. New capabilities include support for new MicroProfile Config properties, JSON Web Encryption (JWE) tokens, and enhanced algorithm support."
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+---
+= What's New in MicroProfile JSON Web Token 1.2?
+Adam Yoho <https://github.com/ayoho>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+
+The MicroProfile JSON Web Token specification allows using a JWT for authenticating and authorizing requests to a service. The latest version of the specification simplifies the configuration for managing the validation of the JWT by introducing new MicroProfile Config properties. Support for JSON Web Encryption (JWE) tokens and new signature algorithms are also added in this feature.
+
+== New MP Config properties
+
+Version 1.2 of the MicroProfile JSON Web Token specification adds the following MicroProfile Config properties to control different aspects of the JWT validation.
+
+*Note:* Whenever there is an equivalent server.xml attribute for an MP Config property, the server.xml attribute takes precedence if configured.
+
+=== mp.jwt.token.header
+
+The `mp.jwt.token.header` property allows you to control the HTTP request header that is expected to contain a JWT. You can specify either `"Authorization"` (default) or `"Cookie"`.
+
+The token header can also be configured in the `tokenHeader` attribute of the `<mpJwt>` server.xml element as shown here:
+[source,xml]
+----
+<mpJwt id="myMpJwt" tokenHeader="Authorization" ... />
+----
+
+=== mp.jwt.token.cookie
+
+The `mp.jwt.token.cookie` property allows you to specify the name of the cookie that is expected to contain a JWT. The default value is `"Bearer"` if not specified.
+
+The token cookie name can also be configured in the `cookieName` attribute of the `<mpJwt>` server.xml element as shown here:
+[source,xml]
+----
+<mpJwt id="myMpJwt" tokenHeader="Cookie" cookieName="Bearer" ... />
+----
+
+*Note:* The `mp.jwt.token.header` MP Config property or `tokenHeader` server.xml attribute must be set to `"Cookie"` for the `mp.jwt.token.cookie` property or `cookieName` attribute to be recognized.
+
+=== mp.jwt.verify.audiences
+
+The `mp.jwt.verify.audiences` property allows you to create list of allowable "aud" values. At least one of these must be found in the `"aud"` claim of the JWT. Previously, this had to be configured in the server.xml file. Now you can configure the audiences in the MicroProfile Config property as follows:
+[source]
+----
+mp.jwt.verify.audiences=conferenceService
+----
+
+=== mp.jwt.decrypt.key.location
+
+To support JSON Web Encryption tokens, the `mp.jwt.decrypt.key.location` property allows you to specify the location of the Key Management Key. This is the private key that is used to decrypt the Content Encryption Key, which is then used to decrypt the JWE ciphertext. The private key must correspond to the public key that is used to encrypt the Content Encryption Key.
+[source]
+----
+mp.jwt.decrypt.key.location=/path/to/privatekey.pem
+----
+
+The decryption key location can also be specified in the `<mpJwt>` server.xml element using the `keyManagementKeyAlias` attribute. The value must be set to the alias for the private key in the configured keystore that should be used to decrypt the Content Encryption Key.
+[source,xml]
+----
+<mpJwt id="myMpJwt" sslRef="sslConfig" keyManagementKeyAlias="kmkAlias" ... />
+
+<ssl id="sslConfig" keyStoreRef="myKeyStore" ... />
+
+<!-- Keystore that contains a key with the alias "kmkAlias" to be used to decrypt the Content Encryption Key -->
+<keyStore id="myKeyStore" ... />
+----
+
+*Note:* When the `mp.jwt.decrypt.key.location` property or `keyManagementKeyAlias` attribute is specified, the application will only accept tokens in JWE format; tokens in JWS format will be rejected. Inversely, if this property is not specified, the application will only accept tokens in JWS format.
+
+=== mp.jwt.verify.publickey.algorithm
+
+The `mp.jwt.verify.publickey.algorithm` property allows you to control the Public Key Signature Algorithm that is supported by the MP JWT endpoint. The default value is `"RS256"` if not specified. Previously, this had to be configured in the server.xml file. Now you can configure the public key algorithm used for verification of the JWT in the MicroProfile Config property as follows:
+[source]
+----
+mp.jwt.verify.publickey.algorithm=ES256
+----
+
+The specification adds support for the ES256 signature algorithm, while Open Liberty also adds support for using the RS384, RS512, HS384, HS512, ES256, ES384, and the ES512 signature algorithms.
