@@ -31,7 +31,7 @@ Then, it's just 2 steps to launch:
 
 1. You’ll need to tell your build where all the awesome new features are defined. 
 +
-The easiest way to do this it to point to the link:https://search.maven.org/artifact/org.eclipse.microprofile/microprofile/4.0.1/pom[MicroProfile 4.0 Repository] which includes the link:https://search.maven.org/artifact/org.eclipse.microprofile.config/microprofile-config-api/2.0/jar[MicroProfile Config 2.0 API].
+The easiest way to do this it to point to the link:https://search.maven.org/artifact/org.eclipse.microprofile/microprofile/4.0.1/pom[MicroProfile 4.0 API] artifact which includes the link:https://search.maven.org/artifact/org.eclipse.microprofile.config/microprofile-config-api/2.0/jar[MicroProfile Config 2.0 API] artifact.
 +
 - If you’re using link:https://maven.apache.org/[Maven] add the following dependency to your pom.xml:
 +
@@ -76,9 +76,9 @@ And just like that you’re ready for take-off!
 
 [#Getting-Up-To-Speed]
 == Getting Up To Speed
-If you’re a little unfamiliar with MicroProfile Config (no worries if you are), link:https://download.eclipse.org/microprofile/microprofile-config-2.0/microprofile-config-spec-2.0.html[the spec] is a great place to start, or the link:https://openliberty.io/docs/21.0.0.3/external-configuration.html#[Open Liberty Docs]. 
+If you’re a little unfamiliar with MicroProfile Config (no worries if you are), the Open Liberty link:https://openliberty.io/guides/#configuration[Configuration guides] are a great place to start. The link:https://download.eclipse.org/microprofile/microprofile-config-2.0/microprofile-config-spec-2.0.html[MicroProfile spec] and the link:https://openliberty.io/docs/21.0.0.3/external-configuration.html#[Open Liberty Docs] are good to have at hand for reference too. 
 
-In essence, MicroProfile Config allows you to define configuration values (referred to as "config property" values) in a huge range of locations known as link:https://download.eclipse.org/microprofile/microprofile-config-2.0/microprofile-config-spec-2.0.html#configsource[ConfigSources]. These values can be easily retrieved anywhere in your code with link:https://jakarta.ee/specifications/cdi/2.0/cdi-spec-2.0.html[CDI]. For example, you could define the following in your Liberty server.xml
+In essence, MicroProfile Config allows you to define configuration values (referred to as "config property" values) in a huge range of locations known as link:https://download.eclipse.org/microprofile/microprofile-config-2.0/microprofile-config-spec-2.0.html#configsource[ConfigSources]. These values can be easily retrieved anywhere in your code with link:https://openliberty.io/guides/cdi-intro.html[CDI]. For example, you could define the following in your Liberty server.xml
 
 .server.xml
 [source,xml]
@@ -104,7 +104,8 @@ The examples below use the config property values defined in this example META-I
 .META-INF/microprofile-config.properties
 [source]
 ----
-%testing.server.host= example.test.org
+%testing.server.host=example.test.org
+%production.server.host=example.prod.org
 server.host=example.org
 server.port=9080
 server.url=http://${server.host}
@@ -112,13 +113,16 @@ server.url=http://${server.host}
 
 [#Config-Profile]
 === Config Profile
-link:https://download.eclipse.org/microprofile/microprofile-config-2.0/microprofile-config-spec-2.0.html#configprofile[Config Profiles] allow configuration for different environments and development stages while only one of them is active (e.g. dev, test, prod). The Config Profile is specified using the `mp.config.profile` property, which can be set in any ConfigSource. Once it is set, the corresponding properties associated with the active profile are used. The value can also be set at application start-up, for example if you’re using Maven and the link:https://github.com/OpenLiberty/ci.maven[liberty-maven-plugin] you can start your app in link:https://openliberty.io/docs/21.0.0.2/development-mode.html[Dev mode] with:
+link:https://download.eclipse.org/microprofile/microprofile-config-2.0/microprofile-config-spec-2.0.html#configprofile[Config Profiles] allow configuration for different environments and development stages while only one of them is active (e.g. dev, test, prod). The Config Profile is specified using the `mp.config.profile` property, which can be set in any ConfigSource. Once it is set, the corresponding config property values associated with the active profile are used. The `mp.config.profile` property can also be set at application start-up, for example if you’re using Maven and the link:https://github.com/OpenLiberty/ci.maven[liberty-maven-plugin] you can start your app in link:https://openliberty.io/docs/21.0.0.2/development-mode.html[Dev mode] with:
+[source]
+----
+mvn liberty:dev -Dliberty.var.mp.config.profile="testing"
+----
 
- mvn liberty:dev -Dliberty.var.mp.config.profile="testing"
+Where the `-Dliberty.var.mp.config.profile` argument sets a link:https://maven.apache.org/pom.html#Properties[Maven property] which the liberty-maven-plugin link:https://github.com/scottkurz/ci.maven/blob/f3920800351b6d2c26e62a19008b68093afa48ea/docs/common-server-parameters.md#setting-liberty-configuration-with-maven-project-properties[uses to configure the Liberty app]. In this case, the `mp.config.profile` property is set to `testing`.
 
-Where the `-Dliberty.var.mp.config.profile` argument sets a link:https://maven.apache.org/pom.html#Properties[Maven property] which the liberty-maven-plugin link:https://github.com/scottkurz/ci.maven/blob/f3920800351b6d2c26e62a19008b68093afa48ea/docs/common-server-parameters.md#setting-liberty-configuration-with-maven-project-properties[uses to configure the Liberty app]. In this case, `mp.config.profile` property is set to `testing`.
 
-`mp.config.profile` can be used:
+The `mp.config.profile` property can be used:
 
 - link:https://download.eclipse.org/microprofile/microprofile-config-2.0/microprofile-config-spec-2.0.html#_on_property_level[On property level]: config property names can be set in the following format so that they are used for specific selected profiles: 
 +
@@ -126,7 +130,7 @@ Where the `-Dliberty.var.mp.config.profile` argument sets a link:https://maven.a
 +
 For example, with `mp.config.profile` set to `testing`, retrieving the config value for "server.host" would use the config property `%testing.server.host` from the <<example-ConfigSource, example ConfigSource>> rather than `server.host`. The value of the property would resolve to `example.test.org`.
 +
-If `mp.config.profile` was not set, retrieving "server.host" would resolve to `example.org`.
+Similarly, if `mp.config.profile` was set to `production`, retrieving "server.host" would resolve to `example.prod.org`. If `mp.config.profile` was **not** set, retrieving "server.host" would resolve to `example.org`.
 
 - link:https://download.eclipse.org/microprofile/microprofile-config-2.0/microprofile-config-spec-2.0.html#_on_config_source_level[On ConfigSource level]: multiple microprofile-config.properties files can be provided in the following format so they can be used for specific selected profiles:
 +
@@ -180,8 +184,8 @@ Where the config property values can be easily retrieved within the class the be
 
 [source,java]
 ----
-serverDetails.host;  // retrieves the value, as a String, for the config property named server.host, which is “example.org”.
-serverDetails.port;  // retrieves the value, as an int, for the config property named server.port, which is "9080".
+serverDetails.host;  // Retrieves the value, as a String, for the config property named server.host. Returns: example.org
+serverDetails.port;  // Retrieves the value, as an int, for the config property named server.port. Returns: 9080
 ----
 
 [#ConfigValue]
@@ -199,8 +203,8 @@ With this, you can retrieve all the useful values with the get methods defined i
 
 [source,java]
 ----
-serverNameConfigValue.getSourceName(); // returns “PropertiesConfigSource[source=file:/<path-to-file>/META-INF/microprofile-config.properties]”
-serverNameConfigValue.getSourceOrnial(); // returns “100”, the default ordinal value for META-INF/microprofile-config.properties
+serverNameConfigValue.getSourceName(); // Returns: PropertiesConfigSource[source=file:/<path-to-file>/META-INF/microprofile-config.properties]
+serverNameConfigValue.getSourceOrnial(); // Returns: 100 (the default ordinal value for META-INF/microprofile-config.properties)
 ----
 
 [#Property-Expression]
@@ -211,10 +215,10 @@ Property Expressions provide a way to set and expand variables in property value
 ----
 @Inject
 @ConfigProperty(name="server.url")
-String url; // retrieves the resolved value of “http://example.org”, or “http://example.test.org” if mp.config.profile is set to “testing”
+String url; // Returns: http://example.org (or http://example.test.org if mp.config.profile is set to “testing”)
 ----
 
-You can also do some funky expressions, defining default values, composed expressions, and multiple expressions, which link:https://download.eclipse.org/microprofile/microprofile-config-2.0/microprofile-config-spec-2.0.html#property-expressions[the spec] covers really well.
+You can also do some funky expressions; defining default values, composed expressions, and multiple expressions, which link:https://download.eclipse.org/microprofile/microprofile-config-2.0/microprofile-config-spec-2.0.html#property-expressions[the spec] covers really well.
 
 Previous working configurations might behave differently if the configuration in use contains values with Property Expressions syntax.
 
@@ -258,8 +262,8 @@ and
 [source,java]
 ----
 Config config = ConfigProvider.getConfig();
-config.getValue("empty.property", String.class); // Will thorw a `NoSuchElementException`
-config.getValue("empty.array.property", String[].class); // Will thorw a `NoSuchElementException`
+config.getValue("empty.property", String.class); // Will throw a `NoSuchElementException`
+config.getValue("empty.array.property", String[].class); // Will throw a `NoSuchElementException`
 ----
 +
 However these values can be retrieved "optionally":
@@ -268,11 +272,11 @@ However these values can be retrieved "optionally":
 ----
 @Inject
 @ConfigProperty(name = "empty.property")
-Optional<String> emptyProperty; // returns "Optional.empty"
+Optional<String> emptyProperty; // Returns: Optional.empty
 
 @Inject
 @ConfigProperty(name = "empty.array.property")
-Optional<String[]> emptyArrayProperty; // returns "Optional.empty"
+Optional<String[]> emptyArrayProperty; // Returns: Optional.empty
 ----
 +
 and
@@ -280,8 +284,8 @@ and
 [source,java]
 ----
 Config config = ConfigProvider.getConfig();
-config.getOptionalValue("empty.property", String.class); // returns “Optional.empty"
-config.getOptionalValue("empty.array.property", String[].class); // returns “Optional.empty"
+config.getOptionalValue("empty.property", String.class); // Returns: Optional.empty
+config.getOptionalValue("empty.array.property", String[].class); // Returns: Optional.empty
 ----
 
 
@@ -297,14 +301,14 @@ Two new methods have been added to the link:https://download.eclipse.org/micropr
 
 1. link:https://download.eclipse.org/microprofile/microprofile-config-2.0/apidocs/org/eclipse/microprofile/config/Config.html#getValues-java.lang.String-java.lang.Class-[Config.getValues()]: `List<T> Config.getValues(String propertyName, Class<T> propertyType)`
 
-2. link:https://download.eclipse.org/microprofile/microprofile-config-2.0/apidocs/org/eclipse/microprofile/config/Config.html#getOptionalValues-java.lang.String-java.lang.Class-[Config.getOptionalValues()]: `Optional <List<T>>Config.getOptionalValues(String propertyName, Class<T> propertyType)`
+2. link:https://download.eclipse.org/microprofile/microprofile-config-2.0/apidocs/org/eclipse/microprofile/config/Config.html#getOptionalValues-java.lang.String-java.lang.Class-[Config.getOptionalValues()]: `Optional<List<T>> Config.getOptionalValues(String propertyName, Class<T> propertyType)`
 
 The methods have been added to enable you to retrieve multi-valued config property values as lists instead of arrays. The methods return the resolved property values with the specified `propertyType` for the specified `propertyName`. For example:
 
 [source,java]
 ----
 Config config = ConfigProvider.getConfig();
-config.getOptionalValues("ports", Integer.class) // returns "Optional[[9080, 9081, 9082]]"
+config.getOptionalValues("ports", Integer.class) // Returns: Optional[[9080, 9081, 9082]] (an Optional<List<Integer>>)
 ----
 
 [#More-Optional-Converter]
@@ -315,14 +319,14 @@ config.getOptionalValues("ports", Integer.class) // returns "Optional[[9080, 908
 ----
 @Inject
 @ConfigProperty(name = "server.port")
-OptionalInt optionalServerPort; // returns “9080"
+OptionalInt optionalServerPort; // Returns: OptionalInt[9080]
 ----
 
 [#Incompatibility-changes]
 == Heads up! Incompatibility Changes
 If you move up from MicroProfile Config 1.x to 2.0, please take care of the following incompatible changes:
 
-* link:https://javadoc.io/static/org.eclipse.microprofile/microprofile/4.0.1/org/eclipse/microprofile/config/Config.html#getPropertyNames--[ConfigSource.getPropertyNames()] is no longer a `default` method. Any implementations of a ConfigSource must implement this method.
+* link:https://javadoc.io/static/org.eclipse.microprofile/microprofile/4.0.1/org/eclipse/microprofile/config/Config.html#getPropertyNames[ConfigSource.getPropertyNames()] is no longer a `default` method. Any implementations of a ConfigSource must implement this method.
 * Previous versions of MP Config would not evaluate Property Expressions. As such, previous working configuration may behave differently (if the configuration contains values with Property Expressions syntax, e.g. `${var.name}`). Property Expressions can be disabled by setting the property `mp.config.property.expressions.enabled` with the value of `false`.
 * As <<Config-Value-Behaviour-Updates, mentioned here>>, the behaviour of retrieving "empty" and "special" config property values has changed. In previous releases, an "empty" value was considered valid. Now, unless retrieved "optionally", a `NoSuchElementException` will be thrown.
 
