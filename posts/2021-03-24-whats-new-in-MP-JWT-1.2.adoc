@@ -17,6 +17,14 @@ Adam Yoho <https://github.com/ayoho>
 
 The MicroProfile JSON Web Token specification allows using a JWT for authenticating and authorizing requests to a service. The latest version of the specification simplifies the configuration for managing the validation of the JWT by introducing new MicroProfile Config properties. Support for JSON Web Encryption (JWE) tokens and new signature algorithms are also added in this feature.
 
+This blog is broken into the following sections:
+
+- <<new-mp-config-properties, New MP Config properties>>
+- <<examples, Examples>>
+    * <<accepting-json-web-encryption-jwe-tokens, Accepting JSON Web Encryption (JWE) tokens>>
+    * <<accepting-jwts-in-cookies, Accepting JWTs in cookies>>
+
+[#new-mp-config-properties]
 == New MP Config properties
 
 Version 1.2 of the MicroProfile JSON Web Token specification adds the following MicroProfile Config properties to control different aspects of the JWT validation.
@@ -27,7 +35,7 @@ Version 1.2 of the MicroProfile JSON Web Token specification adds the following 
 - <<mp-jwt-decrypt-key-location, mp.jwt.decrypt.key.location>>
 - <<mp-jwt-verify-publickey-algorithm, mp.jwt.verify.publickey.algorithm>>
 
-*Note:* Whenever there is an equivalent server.xml attribute for an MP Config property, the server.xml attribute takes precedence if configured.
+*Note:* If you don't wish to use, or cannot use, MP Config properties, the `<mpJwt>` element in server.xml provides attributes that offer equivalent functionality for each of these properties. Whenever there is an equivalent server.xml attribute for an MP Config property, the server.xml attribute takes precedence if configured.
 
 [#mp-jwt-token-header]
 === mp.jwt.token.header
@@ -84,6 +92,8 @@ The decryption key location can also be specified in the `<mpJwt>` server.xml el
 
 *Note:* When the `mp.jwt.decrypt.key.location` property or `keyManagementKeyAlias` attribute is specified, the application will only accept tokens in JWE format; tokens in JWS format will be rejected. Inversely, if this property is not specified, the application will only accept tokens in JWS format.
 
+*Also note:* The payload of JWE tokens must be a nested JWT in JSON Web Signature (JWS) format. JWE tokens whose payload is not a nested JWS will be rejected.
+
 [#mp-jwt-verify-publickey-algorithm]
 === mp.jwt.verify.publickey.algorithm
 
@@ -94,3 +104,178 @@ mp.jwt.verify.publickey.algorithm=ES256
 ----
 
 The specification adds support for the ES256 signature algorithm, while Open Liberty also adds support for using the RS384, RS512, HS384, HS512, ES256, ES384, and the ES512 signature algorithms.
+
+[#examples]
+== Examples
+
+This section will demonstrate a few examples of how to use MP JWT 1.2 functionality in your web applications.
+
+The <<server-configuration, server configuration>> and <<application-code, application code>> shown here is common to all of the ensuing examples. Application code and MP Config values are taken, and in some cases modified, from the link:https://github.com/eclipse/microprofile-jwt-auth/tree/master/tck[Eclipse JWT RBAC for MicroProfile TCK].
+
+[#server-configuration]
+==== Server configuration
+
+Enabling the `microProfile-4.0` convenience feature will enable MP JWT 1.2 support, as shown here.
+
+[source,xml]
+----
+<featureManager>
+	<feature>microProfile-4.0</feature>
+</featureManager>
+----
+
+This is the only server configuration typically necessary to use MP JWT 1.2 functionality. The `mpJwt-1.2` feature can also be specified on its own if the other MicroProfile 4.0 features aren't needed.
+
+[#application-code]
+==== Application code
+
+The snippet shown here is a JAX-RS resource that is used in all of the web applications in later examples. The original source can be found link:https://github.com/eclipse/microprofile-jwt-auth/blob/1.2/tck/src/test/java/org/eclipse/microprofile/jwt/tck/container/jaxrs/RolesEndpoint.java[here].
+
+[source,java]
+----
+import javax.annotation.security.DenyAll;
+import javax.annotation.security.RolesAllowed;
+import javax.enterprise.context.RequestScoped;
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.SecurityContext;
+
+@Path("/endp")
+@DenyAll
+@RequestScoped
+public class RolesEndpoint {
+
+    @GET
+    @Path("/echo")
+    @RolesAllowed("Echoer")
+    public String echoInput(@Context SecurityContext sec, @QueryParam("input") String input) {
+        Principal user = sec.getUserPrincipal();
+        return input + ", user="+user.getName();
+    }
+}
+----
+
+The configuration of the resource is pretty simple. In a nutshell, this resource provides a `/endp/echo` endpoint that serves HTTP `GET` requests to users in the `"Echoer"` role. If authorized, the endpoint returns a string that contains the Principal name of the authenticated user alongside the value of the `"input"` query parameter that is sent in the request. If the user is not authorized, a 401 will be returned.
+
+With the `mpJwt-1.2` feature enabled, authorization will be determined based on the MP JWT configuration in the server configuration and application. Any authorized request to this endpoint must therefore include a valid JWT in accordance with the MP JWT and application configurations.
+
+[#accepting-json-web-encryption-jwe-tokens]
+=== Accepting JSON Web Encryption (JWE) tokens
+
+This example demonstrates how to configure a web application to accept JWTs in JSON Web Encryption (JWE) format.
+
+Usage of the following MP Config properties will be demonstrated:
+
+- <<mp-jwt-decrypt-key-location, mp.jwt.decrypt.key.location>>
+- <<mp-jwt-verify-audiences, mp.jwt.verify.audiences>>
+- mp.jwt.verify.publickey.location
+- mp.jwt.verify.issuer
+
+*Note:* The `mp.jwt.verify.publickey.location` and `mp.jwt.verify.issuer` properties were added by an earlier version of the MP JWT specification. As with other MP Config properties, specifying these properties allows us to avoid having to add more configuration to the server.xml.
+
+The following MP Config source snippet shows the values for those properties:
+
+[source]
+----
+mp.jwt.decrypt.key.location=/privateKey.pem
+mp.jwt.verify.audiences=s6BhdRkqt3
+mp.jwt.verify.publickey.location=/publicKey.pem
+mp.jwt.verify.issuer=https://server.example.com
+----
+
+The `mp.jwt.decrypt.key.location` and `mp.jwt.verify.publickey.location` properties point to PEM files that are packaged within the application itself. The decrypt key is used to decrypt the JWE content. The public key is used to verify the signature of the nested JSON Web Signature (JWS) token in the payload of the JWE token. The `mp.jwt.verify.audiences` value is checked against the `"aud"` claim of the nested JWS token to ensure that the claim contains the audience value. Likewise, the `mp.jwt.verify.issuer` value is checked against the `"iss"` claim.
+
+==== Submitting the request
+
+The following shows an HTTP `GET` request to the `/endp/echo` endpoint, where `<JWE>` would be substituted for the JWE token string:
+
+[source]
+----
+GET /endp/echo HTTP/1.1
+Host: server.example.com
+Authorization: Bearer <JWE>
+
+input=Hello
+----
+
+A successfully authorized request produces the response:
+
+[source]
+----
+HTTP/1.1 200 OK
+
+Hello, user=jdoe@example.com
+----
+
+A successful response means that:
+
+- The JWT in the Authorization header is in JWE format.
+- The JWE content was successfully decrypted using the `privateKey.pem` key packaged within the application, per the `mp.jwt.decrypt.key.location` MP Config property.
+- The payload of the JWE token is a nested JWS.
+- The signature of the nested JWS was successfully verified using the `publicKey.pem` key packaged within the application, per the `mp.jwt.verify.publickey.location` MP Config property.
+- The `"iss"` claim of the nested JWS within the JWE token is `"https://server.example.com"`.
+- The `"aud"` claim of the nested JWS within the JWE is set to, or includes, `"s6BhdRkqt3"`.
+- The `"groups"` claim of the nested JWS within the JWE is set to, or includes, `"Echoer"`.
+- The `"upn"` claim of the nested JWS within the JWE token is `"jdoe@example.com"`.
+
+[#accepting-jwts-in-cookies]
+=== Accepting JWTs in cookies
+
+This example demonstrates how to configure a web application to accept JWTs in a cookie instead of an HTTP request header.
+
+Usage of the following MP Config properties will be demonstrated:
+
+- <<mp-jwt-token-header, mp.jwt.token.header>>
+- <<mp-jwt-token-cookie, mp.jwt.token.cookie>>
+- <<mp.jwt.verify.publickey.algorithm, mp.jwt.verify.publickey.algorithm>>
+- mp.jwt.verify.publickey.location
+- mp.jwt.verify.issuer
+
+*Note:* The `mp.jwt.verify.publickey.location` and `mp.jwt.verify.issuer` properties were added by an earlier version of the MP JWT specification.
+
+The following MP Config source snippet shows the values for those properties:
+
+[source]
+----
+mp.jwt.token.header=Cookie
+mp.jwt.token.cookie=jwt
+mp.jwt.verify.publickey.algorithm=ES256
+mp.jwt.verify.publickey.location=/publicKey.pem
+mp.jwt.verify.issuer=https://server.example.com
+----
+
+The `mp.jwt.token.header` property indicates that the application expects a JWT to be passed in a cookie in inbound requests. The `mp.jwt.token.cookie` property specifies that the JWT will be in a cookie named `"jwt"`. The `mp.jwt.verify.publickey.algorithm` property indicates that the JWS is expected to be signed using the ES256 (ECDSA using P-256 and SHA-256) signature algorithm.
+
+The `mp.jwt.verify.publickey.location` and `mp.jwt.verify.issuer` enforce the same behavior described in the <<accepting-json-web-encryption-jwe-tokens, Accepting JSON Web Encryption (JWE) tokens>> example.
+
+==== Submitting the request
+
+The following shows an HTTP `GET` request to the `/endp/echo` endpoint, where `<JWS>` would be substituted for the JWS token string:
+
+[source]
+----
+GET /endp/echo HTTP/1.1
+Host: server.example.com
+Cookie: jwt=<JWS>
+
+input=Hello
+----
+
+A successfully authorized request produces the response:
+
+[source]
+----
+HTTP/1.1 200 OK
+
+Hello, user=jdoe@example.com
+----
+
+A successful response means that:
+
+- The JWS was signed using the ES256 signature algorithm, per the `mp.jwt.verify.publickey.algorithm` MP Config property.
+- The signature of the JWS was successfully verified using the `publicKey.pem` key packaged within the application, per the `mp.jwt.verify.publickey.location` MP Config property.
+- The `"iss"` claim of the nested JWS within the JWE token is `"https://server.example.com"`.
+- The `"groups"` claim of the nested JWS within the JWE is set to, or includes, `"Echoer"`.
+- The `"upn"` claim of the nested JWS within the JWE token is `"jdoe@example.com"`.
