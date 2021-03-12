@@ -17,10 +17,10 @@ Joseph Cass <https://github.com/Joseph-Cass>
 
 link:https://download.eclipse.org/microprofile/microprofile-config-2.0/microprofile-config-spec-2.0.html[MicroProfile Config 2.0] is a major version release jam-packed with new features to help make configuring your microservices a breeze. Released as part of link:https://download.eclipse.org/microprofile/microprofile-4.0.1/microprofile-spec-4.0.1.html#microprofile4.0[MicroProfile 4.0], Config 2.0 introduces:
 
-- <<Config-Profile, Config Profile>>- a property, called `mp.config.profile`, which can be used to determine which set of config property values are used
-- <<ConfigValue, ConfigValue>>- an API class which holds a bunch of useful information about a specified config property
-- <<ConfigProperties, @ConfigProperties>>- an annotation which provides a way to retrieve a number of related config property values, with a shared specified prefix, into a CDI bean.
-- <<Property-Expression, Property Expression>>- a way of defining and expanding config property values inside of other config property values using the `${}` syntax.
+- <<Config-Profile, Config Profile>>- A special property, called `mp.config.profile`, can be used to determine which set of config property values are used.
+- <<ConfigValue, ConfigValue>>- An API class which holds a variety of useful information about a specified config property.
+- <<ConfigProperties, @ConfigProperties>>- An annotation which provides a way to retrieve a number of related config property values, with a shared specified prefix, into a CDI bean.
+- <<Property-Expression, Property Expression>>- A way of embedding config property values inside of other config property values using the `${}` syntax.
 
 
 [#Prepare-For-Liftoff]
@@ -58,9 +58,9 @@ dependencies {
 ----
 +
 
-1. You'll also need to enable the link:https://openliberty.io/docs/latest/reference/feature/feature-overview.html[feature] in Open Liberty. 
+2. You'll also need to enable the link:https://openliberty.io/docs/latest/reference/feature/feature-overview.html[feature] in Open Liberty. 
 +
-You’ll need to enable `mpConfig-2.0` (MicroProfile Config 2.0’s feature name in Open Liberty) in your server.xml in addition to `cdi-2.0` which enables all the cool injection functionally:
+This is done by adding `mpConfig-2.0` (MicroProfile Config 2.0’s feature name in Open Liberty) to the feature list in your server.xml. Additionally `cdi-2.0` is recommended to enable all the cool injection functionally:
 +
 .server.xml
 [source,xml]
@@ -71,7 +71,7 @@ You’ll need to enable `mpConfig-2.0` (MicroProfile Config 2.0’s feature name
 </featureManager>
 ----
 +
-Alternativelly, you could enable the `microProfile-4.0` link:https://openliberty.io/docs/latest/reference/feature/microProfile-4.0.html[convenience feature], which enables `mpConfig-2.0` and `cdi-2.0` and all the other awesome MicroProfile features.
+Alternatively, using the `microProfile-4.0` link:https://openliberty.io/docs/latest/reference/feature/microProfile-4.0.html[convenience feature] will enable all of the awesome MicroProfile 4.0 features at once, including `mpConfig-2.0` and `cdi-2.0`.
 
 And just like that you’re ready for take-off!
 
@@ -114,13 +114,13 @@ server.url=http://${server.host}
 
 [#Config-Profile]
 === Config Profile
-link:https://download.eclipse.org/microprofile/microprofile-config-2.0/microprofile-config-spec-2.0.html#configprofile[Config Profiles] allow configuration for different environments and development stages while only one of them is active (e.g. dev, test, prod). The Config Profile is specified using the `mp.config.profile` property, which can be set in any ConfigSource. Once it is set, the corresponding config property values associated with the active profile are used. The `mp.config.profile` property can also be set at application start-up, for example if you’re using Maven and the link:https://github.com/OpenLiberty/ci.maven[liberty-maven-plugin] you can start your app in link:https://openliberty.io/docs/latest/development-mode.html[Dev mode] with:
+link:https://download.eclipse.org/microprofile/microprofile-config-2.0/microprofile-config-spec-2.0.html#configprofile[Config Profiles] allow configuration for different environments and development stages while only one of them is active (e.g. dev, test, prod). The active Config Profile is specified using the `mp.config.profile` property, which can be set in any ConfigSource. Once it is set, the corresponding config property values associated with the active profile are used. The `mp.config.profile` property can also be set at application start-up, for example if you’re using Maven and the link:https://github.com/OpenLiberty/ci.maven[liberty-maven-plugin] you can start your app in link:https://openliberty.io/docs/latest/development-mode.html[Dev mode] with:
 [source]
 ----
 mvn liberty:dev -Dliberty.var.mp.config.profile="testing"
 ----
 
-Where the `-Dliberty.var.mp.config.profile` argument sets a link:https://maven.apache.org/pom.html#Properties[Maven property] which the liberty-maven-plugin link:https://github.com/scottkurz/ci.maven/blob/f3920800351b6d2c26e62a19008b68093afa48ea/docs/common-server-parameters.md#setting-liberty-configuration-with-maven-project-properties[uses to configure the Liberty app]. In this case, the `mp.config.profile` property is set to `testing`.
+The `-Dliberty.var.mp.config.profile` argument sets a link:https://maven.apache.org/pom.html#Properties[Maven property] which the liberty-maven-plugin link:https://github.com/scottkurz/ci.maven/blob/f3920800351b6d2c26e62a19008b68093afa48ea/docs/common-server-parameters.md#setting-liberty-configuration-with-maven-project-properties[uses to configure the Liberty server]. In this case, the `mp.config.profile` property is set to `testing`.
 
 If you deploy your microservices to Kubernetes, you can set the property either:
 
@@ -145,7 +145,7 @@ Similarly, if `mp.config.profile` was set to `production`, retrieving "server.ho
 +
 For example, if a file called microprofile-config-testing.properties was provided on the classpath, with `mp.config.profile` set to `testing` the file would be loaded "on top of" the default microprofile-config.properties file. The config property values from microprofile-config-testing.properties would take precedence.
 
-With Config Profiles, your microservice reacts appropriately based on the project stage without changing **any** code and without updating a bunch of config values manually.
+With Config Profiles, your microservices are configured appropriately based on the project stage without changing **any** code or needing to update a bunch of config values manually.
 
 [#ConfigProperties]
 === @ConfigProperties
@@ -214,7 +214,7 @@ With this, you can retrieve all the useful values with the get methods defined i
 [source,java]
 ----
 serverNameConfigValue.getSourceName(); // Returns: PropertiesConfigSource[source=file:/<path-to-file>/META-INF/microprofile-config.properties]
-serverNameConfigValue.getSourceOrnial(); // Returns: 100 (the default ordinal value for META-INF/microprofile-config.properties)
+serverNameConfigValue.getSourceOrdinal(); // Returns: 100 (the default ordinal value for META-INF/microprofile-config.properties)
 ----
 
 [#Property-Expression]
@@ -228,9 +228,9 @@ Property Expressions provide a way to set and expand variables in property value
 String url; // Returns: http://example.org (or http://example.test.org if mp.config.profile is set to “testing”)
 ----
 
-You can also do some funky expressions such as defining default values, composed expressions, and multiple expressions. link:https://download.eclipse.org/microprofile/microprofile-config-2.0/microprofile-config-spec-2.0.html#property-expressions[The spec] covers these really well.
+You can also implement some funky expressions such as defining default values, composed expressions, and multiple expressions. link:https://download.eclipse.org/microprofile/microprofile-config-2.0/microprofile-config-spec-2.0.html#property-expressions[The spec] covers these really well.
 
-Previous working configurations might behave differently if the configuration in use contains values with Property Expressions syntax.
+Note: Previously working configurations might now behave differently if the configuration happens to contain values with the Property Expressions syntax (`${}`) in them.
 
 [#Extra-Info]
 == Some Extra Info For The Return Journey
@@ -254,7 +254,7 @@ The behaviour for "empty" and "special" config property values has been updated:
 * A value is considered to be "empty" if the link:https://download.eclipse.org/microprofile/microprofile-config-2.0/apidocs/org/eclipse/microprofile/config/spi/Converter.html[Converter] being used considers it to be "empty". For example: 
 ** All Converters consider `""`, the empty String, to be empty.
 ** The built-in Converter for String[] considers `","` to be empty (because it is "special"). 
-* From MicroProfile Config 2.0, these "empty" values are no longer valid. Retrieving the values "natively" will now throw a `NoSuchElementException`. E.g. for the values defined in the <<example-ConfigSource2, example ConfigSource v2>>:
+* From MicroProfile Config 2.0, these "empty" values are no longer valid. Retrieving the values "natively" (without defaultValues or Optionals) will now throw a `NoSuchElementException`. E.g. for the values defined in the <<example-ConfigSource2, example ConfigSource v2>>:
 +
 [source,java]
 ----
