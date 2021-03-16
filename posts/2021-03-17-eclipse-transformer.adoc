@@ -1,0 +1,322 @@
+---
+layout: post
+title: "Jakarta EE 9 Enablement for Development and Test Using the Eclipse Transformer"
+categories: blog
+author_picture: TBD
+author_github: https://github.com/tbitonti
+seo-title: Jakarta EE 9 Enablement for Development and Test Using the Eclipse Transformer
+seo-description: This article describes how application developers can use the Eclipse Transformer to update their application and test artifacts to run against Jakarta EE 9. Typical artifacts which can be transformed include applications in source and binary form, test code, and Open Liberty server configurations.
+blog_description: "This article describes how application developers can use the Eclipse Transformer to update their application and test artifacts to run against Jakarta EE 9. Typical artifacts which can be transformed include applications in source and binary form, test code, and Open Liberty server configurations."
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+---
+= Jakarta EE 9 Enablement for Development and Test Using the Eclipse Transformer
+Thomas Bitonti <https://github.com/tbitonti>
+
+== Overview
+
+This article describes how application developers can use the Eclipse Transformer to update their application and test artifacts to run using Jakarta EE 9.
+
+The core problem introduced by Jakarta EE 9 is the renaming of package prefixes from "javax" to "jakarta" for APIs and properties. As a consequence, existing applications that run against Java EE 7 or Jakarta EE 8 do not run against Jakarta EE 9. To run existing applications as Jakarta EE 9 applications, specific package references must be updated.
+
+To solve this problem, the Open Liberty development team created the Eclipse Transformer. This open source project provides a utility that updates package references in various artifacts.
+
+The development team uses the Eclipse Transformer to update bundle implementation archives. The team also uses the transformer to update test artifacts, which include:
+
+* Test applications
+* The actual tests
+* Server configuration files used by the tests
+
+In a similar fashion, application developers can use the Eclipse Transformer to update their applications and test artifacts.
+
+The transformer is quick and efficient. When integrated as a build step, as is done in Open Liberty builds, using the transformer avoids the creation of new Jakarta EE 9 source files.
+
+Since Jakarta EE 9 is the same as Jakarta EE 8, but with different packages, this article will refer to Jakarta EE 8 applications and Open Liberty features. The article is also applicable to Java EE 7 applications and Open Liberty features.
+
+== Test Transformation Strategy
+
+The stratgy used for Jakarta EE 9 test enablement in Open Liberty is to annotate test classes and methods to indicate which of these are to be run as Jakarta EE 9 tests. The Open Liberty test framework transforms and re-runs the annotated tests as Jakarta EE 9 tests.
+
+Two types of updates are required to transform test artifacts. First, package references must be updated, changing old "javax" package references into new "jakarta" package references. Package references can be in several locations, including test applications, test code, and server configurations. Second, if Open Liberty is being used, server configurations must be updated to replace old Jakarta EE 8 features with corresponding new Jakarta EE 9 features.
+
+Open Liberty updates package references using the Eclipse Transformer.
+
+The Open Liberty test framework updates the feature names in the server configurations using existing function in the framework. Alternatively, the transformer could be used to update features in the server configuration if rules data were created with the substitution values needed for this update. Application and test developers will need to create code similar to the test framework code, or will need to update server configurations manually.
+
+== Running the Transformer
+
+The Eclipse Transformer can be used directly from the command line, as a build task, or from Java code. This article describes using the transformer from the command line. For more information, see the link:https://projects.eclipse.org/projects/technology.transformer[transformer project pages].
+
+=== Preparing to Run the Transformer
+
+A transformer image may be obtained by downloading the image or by building an image using the open source repository.
+
+Top level link:https://projects.eclipse.org/projects/technology.transformer/downloads[downloads links] are available within the project pages.
+
+Several current link:https://oss.sonatype.org/content/repositories/snapshots/org/eclipse/transformer/org.eclipse.transformer.cli/[snapshots] are usually available.
+
+Alternatively, the transformer can be built by cloning the link:https://github.com/eclipse/transformer[Eclipse Transformer repository] and invoking maven to build the transformer jar:
+
+[source]
+--
+    maven clean package
+--
+
+The maven build creates the distribution jar at:
+
+[source]
+--
+    org.eclipse.transformer.cli/target/org.eclipse.transformer.cli-0.3.0-SNAPSHOT-distribution.jar
+--
+
+Unzipping the downloaded or built distribution obtains the transformer and prerequisite jars:
+
+[source]
+--
+    unzip org.eclipse.transformer.cli-0.3.0-SNAPSHOT-distribution.jar
+--
+
+[source]
+--
+    org.eclipse.transformer.cli-0.3.0-SNAPSHOT.jar
+    libs/org.eclipse.transformer-0.3.0-SNAPSHOT.jar
+    libs/biz.aQute.bnd.transform-5.2.0.jar
+    libs/slf4j-api-1.7.25.jar
+    libs/commons-cli-1.4.jar
+    libs/slf4j-simple-1.7.30.jar
+--
+
+=== Running the transformer
+
+To run the transformer by using the default rules, run the following command:
+
+[source]
+--
+  java -jar org.eclipse.transformer.cli-0.3.0-SNAPSHOT.jar \
+    <target_location> \
+    <output_location>
+--
+
+The target location can be a packed application archive file (EAR, WAR, RAR, or JAR) or a directory containing the fully or partially expanded contents of one of these archives. The target can also be a directory containing Java source, or a directory containing several application archives. The transformer processes all of the artifacts in the target location. Transformed artifacts are written to the output location.
+
+The file 'org.eclipse.transformer.cli-0.3.0-SNAPSHOT.jar' is a runnable jar file that specifies 'org.eclipse.transformer.jakarta.JakartaTransformer' as the main class and uses the necessary jars from the 'libs' folder in its class path.
+
+The transformer can be run using custom rules by specifying additional options on the command line. The additional options specify local rules files that the transformer uses instead of the default rules files.
+
+For example, to use Open Liberty rules data, which can be more up-to-date than the default rules data, download link:https://github.com/OpenLiberty/open-liberty/tree/integration/dev/wlp-jakartaee-transform/rules[Open Liberty Rules]. Then pull in the downloaded rules data by adding options "-tr", "-td", and "-tf", to the command line invocation:
+
+[source]
+--
+  java -jar org.eclipse.transformer.cli-0.3.0-SNAPSHOT.jar \
+    <target_location> \
+    <output_location> \
+    -tr ${rules}/jakarta-renames.properties \
+    -td ${rules}/jakarta-direct.properties \
+    -tf ${rules}/jakarta-xml-master.properties
+--
+
+The "-tr" option specifies a properties file that contains package rename data. The "-td" option specifies a properties file that contains java direct string replacement data. The "-tf" option specifies a master properties file that links to other properties files. Each of the linked properties files contains replacement data for text-like files matching specific patterns, as specified in the master properties file.
+
+These three command line options are most important for application and test developers. Other command line options are available, but are less important. For example, the option "-tb" is used to specify data for transforming bundle archives, while the option "-ts" is used to specify which target files are to be transformed. For more information about command line options, run the transformer with either the "-usage" option or with the "-help" option.
+
+[source]
+--
+  java -jar org.eclipse.transformer.cli-0.3.0-SNAPSHOT.jar \
+    -usage
+--
+
+=== Transforming Server Configurations
+
+When using Open Liberty to run Jakarta EE 9 enabled applications, transformation of server configurations is necessary because server configuration elements may contain "javax" package references. For example, attribute "destinationType" of element "jmsActivationSpec" contains a package reference:
+
+[source]
+--
+  <jmsActivationSpec id="SharedSubscriptionWithMsgSel/TestTopic1">
+    <properties.wasJms
+        destinationRef="jms/FAT_TOPIC"
+        destinationType="javax.jms.Topic"
+        subscriptionDurability="DurableShared"
+        clientId="cid1"
+        subscriptionName="DURSUB"/>
+  </jmsActivationSpec>
+--
+
+This configuration must be updated to:
+
+[source]
+--
+  <jmsActivationSpec id="SharedSubscriptionWithMsgSel/TestTopic1">
+    <properties.wasJms
+        destinationRef="jms/FAT_TOPIC"
+        destinationType="jakarta.jms.Topic"
+        subscriptionDurability="DurableShared"
+        clientId="cid1"
+        subscriptionName="DURSUB"/>
+  </jmsActivationSpec>
+--
+
+== Updating features in server configurations
+
+For Jakarta EE 9 applications to run in Open Liberty, new Jakarta EE 9 features must be specified in the server configuration. In many cases, the new Jakarta EE 9 features use the same short names as the corresponding Jakarta EE 8 features. In those cases, the Jakarta EE 9 features simply have an updated feature version. For example, "cdi-2.0" was updated to "cdi-3.0'. However, in some cases, the feature short name is also different, as with "ejb-3.2", which was updated to "enterpriseBeans-4.0".
+
+When both the feature short name and the feature name were updated, if an old short name is incorrectly used with a new Jakarta EE 9 version, the server will not start, and the server logs will provide information to say which new feature short name must be used. For example, if "ejb-3.2" were incorrectly changed to "ejb-4.0", the server logs would indicate that "enterpriseBeans-4.0" must be used.
+
+Currently, feature names must be updated manually. The transformer cannot be used because it is missing rules data which specify feature name updates.
+
+Here is a table of features for which only the feature version was updated:
+
+.Jakarta EE 8 to Jakarta EE 9 Feature Updates: Version Only
+|===
+| Jakarta EE 8 feature name | Jakarta EE 9 feature name
+
+| appClientSupport-1.0
+| appClientSupport-2.0
+
+| appSecurity-3.0
+| appSecurity-4.0
+
+| batch-1.0
+| batch-2.0
+
+| beanValidation-2.0
+| beanValidation-3.0
+
+| cdi-2.0
+| cdi-3.0
+
+| concurrent-1.0
+| concurrent-2.0
+
+| jsonb-1.0
+| jsonb-2.0
+
+| jsonbContainer-1.0
+| jsonbContainer-2.0
+
+| jsonp-1.1
+| jsonp-2.0
+
+| jsonpContainer-1.1
+| jsonpContainer-2.0
+
+| managedBeans-1.0
+| managedBeans-2.0
+
+| mdb-3.2
+| mdb-4.0
+
+| servlet-4.0
+| servlet-5.0
+
+| webProfile-8.0
+| webProfile-9.0
+
+| websocket-1.1
+| websocket-2.0
+|===
+
+Here is a table of features which update both the feature short name and the feature version.
+
+.Jakarta EE 8 to Jakarta EE 9 Feature Updates: Short Name and Version
+|===
+| Jakarta EE 8 feature name | Jakarta EE 9 feature name
+
+| ejb-3.2
+| enterpriseBeans-4.0
+
+| ejbHome-3.2
+| enterpriseBeansHome-4.0
+
+| ejbLite-3.2
+| enterpriseBeansLite-4.0
+
+| ejbPersistentTimer-3.2
+| enterpriseBeansPersistentTimer-4.0
+
+| ejbRemote-3.2
+| enterpriseBeansRemote-4.0
+
+| el-3.0
+| expressionLanguage-4.0
+
+| jacc-1.5
+| appAuthorization-2.0
+
+| jaspic-1.1
+| appAuthentication-2.0
+
+| javaee-8.0
+| jakartaee-9.0
+
+| javaeeClient-8.0
+| jakartaeeClient-9.0
+
+| javaMail-1.6
+| mail-2.0
+
+| jaxb-2.2
+| xmlBinding-3.0
+
+| jaxrs-2.1
+| restfulWS-3.0
+
+| jaxrsClient-2.1
+| restfulWSClient-3.0
+
+| jaxws-2.2
+| xmlWS-3.0
+
+| jca-1.7
+| connectors-2.0
+
+| jcaInboundSecurity-1.0
+| connectorsInboundSecurity-2.0
+
+| jms-2.0
+| messaging-3.0
+
+| jpa-2.2
+| persistence-3.0
+
+| jpaContainer-2.2
+| persistenceContainer-3.0
+
+| jsf-2.3
+| faces-3.0
+
+| jsfContainer-2.3
+| facesContainer-3.0
+
+| jsp-2.3
+| pages-3.0
+
+| wasJmsClient-2.0
+| messagingClient-3.0
+
+| wasJmsSecurity-1.0
+| messagingSecurity-3.0
+
+| wasJmsServer-1.0
+| messagingServer-3.0
+|===
+
+== Reference resources
+
+=== Eclipse Transformer project links
+
+* The link:https://projects.eclipse.org/projects/technology.transformer[Main Eclipse Transformer page].
+
+* The link:https://github.com/eclipse/transformer[Eclipse Transformer GIT repository].
+
+* Top level link:https://projects.eclipse.org/projects/technology.transformer/downloads[downloads] page.
+
+* Several current transformer link:https://oss.sonatype.org/content/repositories/snapshots/org/eclipse/transformer/org.eclipse.transformer.cli/[snapshots].
+
+=== Open Liberty project links
+
+* Open Liberty transformer data: link:https://github.com/OpenLiberty/open-liberty/tree/integration/dev/wlp-jakartaee-transform/rules[dev/wlp-jakartaee-transform/rules].
+
+* Open Liberty gradle tasks used to transform bundle implementation jars: link:https://github.com/OpenLiberty/open-liberty/blob/integration/dev/wlp-gradle/subprojects/tasks.gradle[dev/wlp-gradle/subprojects/tasks.gradle].
+
+* Open Liberty Java transformer invocation used on FAT (Feature Acceptance Test) artifacts: link:https://github.com/OpenLiberty/open-liberty/blob/integration/dev/fattest.simplicity/src/componenttest/rules/repeater/JakartaEE9Action.java#L204[JakartaEE9Action.transformApp].
+
+* Java source for the the custom Open Liberty "repeat test action": link:https://github.com/OpenLiberty/open-liberty/blob/integration/dev/fattest.simplicity/src/componenttest/rules/repeater/JakartaEE9Action.java[dev/fattest.simplicity/src/componenttest/rules/repeater/JakartaEE9Action.java].
