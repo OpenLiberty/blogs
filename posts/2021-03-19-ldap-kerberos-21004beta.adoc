@@ -1,0 +1,226 @@
+---
+layout: post
+title: "LDAP connection support for Kerberos authentication in Open Liberty 21.0.0.4-beta"
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/austin0
+author_github: https://github.com/austin0
+seo-title: LDAP connection support for Kerberos authentication in Open Liberty 21.0.0.4-beta - OpenLiberty.io
+seo-description: Open Liberty 21.0.0.4-beta contains new authentication methods for LDAP connections and the complete suite of Jakarta EE 9 API candidates.
+blog_description: Open Liberty 21.0.0.4-beta contains new authentication methods for LDAP connections and the complete suite of Jakarta EE 9 API candidates.
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+---
+= LDAP connection support for Kerberos authentication in Open Liberty 21.0.0.4-beta
+Austin Bailey <https://github.com/austin0>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+
+Open Liberty 21.0.0.4-beta contains new authentication methods for LDAP connections and the complete suite of Jakarta EE 9 API candidates.
+
+With the release of Open Liberty 21.0.0.3 MicroProfile 4.0 and associated componenets have been promoted to the general availability release, more information can be found in the link:[Open Liberty 21.0.0.3 release blog post].
+
+We have two beta packages for link:{url-about}[Open Liberty]:
+
+* <<allbeta, All Beta Features>>: a larger package that contains all Open Liberty beta features (including Jakarta EE 9 beta features) and GA features and functions.
+* <<jakarta, Jakarta EE 9 Beta Features>>: a lightweight package that contains only the Jakarta EE 9 features.
+
+This means that you can now try out our in-development Open Liberty features by just adding the relevant coordinates to your build tools.
+
+If you try either package, <<feedback, let us know what you think>>.
+[#allbeta]
+== All Beta Features package
+
+The All Beta Features package includes the following beta features:
+
+* <<LDAP, LDAP connection support for Kerberos authentication>>
+
+[#LDAP]
+=== LDAP connection support for Kerberos authentication
+
+LDAP Bind operations are used to authenticate clients (and the users or applications behind them) to the directory server. This establishes an authorization identity that will be used for subsequent operations processed on that connection, and to specifies the LDAP protocol version that the client will use. Prior to this update, LDAP would allow binding either anonymously or with a `bindDN` user and a `bindPassword` (simple authentication), this update adds a new option to bind to LDAP: GSSAPI/Kerberos. Kerberos is an authentication mechanism that allows a client and service to mutually authenticate via a Key Distribution Center (KDC). In Open Liberty 21.0.0.4-beta using both a Kerberos credential cache (ccache) or a Kerberos keytab file is supported.
+
+To update an `LdapRegistry`, from using no bind credentials or using a `bindDN` and `bindPassword`, to use the GSSAPI/Kerberos option, you will need to set the bind authentication mechanism type using the new `LdapRegistry` attribute, `bindAuthMechanism`:
+
+[source, xml]
+----
+bindAuthMechanism="GSSAPI"
+----
+
+You will also need the Kerberos principal or Service Principal Name: 
+
+[source, xml]
+----
+krb5Principal="user1@EXAMPLE.COM"
+----
+
+If you are using a Kerberos credential cache (ticket cache or ccache) to store the Kerberos credentials, add the ticket cache file name to the `LdapRegistry` with the new attribute, `krb5TicketCache`:
+ 
+[source, xml]
+----
+krb5TicketCache="${server.config.dir}/security/krb5-user1.cc"
+----
+
+If you are using a custom Kerberos configuration file (krb.conf or krb.ini), set the file name using the global Kerberos configuration element:
+
+[source, xml]
+----
+<kerberos configFile="${server.config.dir}/security/krb5.conf"/>
+----
+
+If you are using a Kerberos keytab file to store encrypted keys for principals, set the file using the global Kerberos configuration element:
+
+[source, xml]
+----
+<kerberos keytab="${server.config.dir}/security/krb5.keytab" configFile="${server.config.dir}/security/krb5.conf"/>
+----
+
+If the Kerberos configuration file is not defined, Open Liberty will attempt to resolve using the JDK default locations and the operating system default locations.
+
+For the Kerberos credentials, the locations are checked in the following order: the ticket cache (if provided), the configured keytab file, and finally the JDK default location.
+
+Below is an example of congiuring an `LdapRegistry` using a ticket cache and custom Kerberos config file:
+
+[source, xml]
+----
+<kerberos keytab= configFile="${server.config.dir}/security/krb5.conf"/>
+
+<ldapRegistry id="LDAP" realm="SampleLdapADRealm" host="ldap_hostname" port="389" ignoreCase="true"  baseDN="DC=example,DC=com" bindAuthMechanism="GSSAPI" krb5Principal="user1@EXAMPLE.COM" krb5TicketCache="${server.config.dir}/security/krb5-user1.cc" ldapType="Custom"  />
+----
+
+Below is an example of congiuring an LDAP Registry using a keytab and custom Kerberos config file:
+
+[source, xml]
+----
+<kerberos keytab= configFile="${server.config.dir}/security/krb5.conf"/>
+
+<ldapRegistry id="LDAP" realm="SampleLdapADRealm" host="ldap_hostname" port="389" ignoreCase="true"  baseDN="DC=example,DC=com" bindAuthMechanism="GSSAPI" krb5Principal="user1@EXAMPLE.COM" ldapType="Custom"  />
+----
+
+For more information on LdapRegistry, visit the link:https://openliberty.io/docs/latest/reference/feature/ldapRegistry-3.0.html[LDAP User Registry documentation].
+
+To enable the new beta features in your app, add them to your `server.xml`:
+
+[source, xml]
+----
+<featureManager>
+  <feature>ldapRegistry-3.0</feature>
+</featureManager>
+----
+
+=== Try it now 
+
+To try out these features, just update your build tools to pull the Open Liberty All Beta Features package instead of the main release. The beta works with Java SE 15, Java SE 11, or Java SE 8.
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], here are the coordinates:
+
+[source,xml]
+----
+<dependency>
+  <groupId>io.openliberty.beta</groupId>
+  <artifactId>openliberty-runtime</artifactId>
+  <version>20.0.0.4-beta</version>
+  <type>pom</type>
+</dependency>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+dependencies {
+    libertyRuntime group: 'io.openliberty.beta', name: 'openliberty-runtime', version: '[20.0.0.4-beta,)'
+}
+----
+
+Or take a look at our link:{url-prefix}/downloads/#runtime_betas[Downloads page].
+
+[#jakarta]
+== Jakarta EE 9 Beta Features package
+
+As of the 21.0.0.2-beta release, Open Liberty is the first vendor product to be Jakarta EE Web Profile 9.0 compatible. With the recent 21.0.0.3-beta release, Open Liberty is the first vendor product to be added to the Jakarta EE Platform 9.0 compatibility list.
+
+This Open Liberty beta release comes complete with all of the previously released Jakarta EE9 API candidates:
+
+* Jakarta Messaging 3.0 (`messaging-3.0, messagingClient-3.0, messagingServer-3.0, messagingSecurity-3.0`)
+* Jakarta Security 2.0 (`appSecurity-4.0, appSecurityClient-1.0`)
+* Jakarta XML Web Services 3.0 (`xmlWS-3.0`)
+* Jakarta Batch 2.0 (`batch-2.0`)
+* Jakarta Mail (`mail-2.0`)
+* Jakarta WebSocket 2.0 (`websocket-2.0`; now with full CDI integration)
+* RESTful Web Services 3.0 (`restfulWS-3.0` and `restfulWSClient-3.0`)
+* Jakarta Server Faces 3.0 (`faces-3.0`)
+* Jakarta Connectors 2.0 (`connectors-2.0`)
+* Jakarta Enterprise Beans 4.0 (`enterpriseBeans-4.0`)
+* Jakarta Enterprise Beans Remote 4.0 (`enterpriseBeansRemote-4.0`)
+* Jakarta Enterprise Beans Home 4.0 (`enterpriseBeansHome-4.0`)
+* Jakarta Enterprise Beans Lite 4.0 (`enterpriseBeansLite-4.0`)
+* Jakarta Enterprise Beans Persistent Timers 4.0 (`enterpriseBeansPersistentTimer-4.0`)
+* Jakarta EE Application Client 9.0 (`jakartaeeClient-9.0`)
+* Jakarta Authentication 2.0 (`appAuthentication-2.0`)
+* Jakarta Authorization 2.0 (`appAuthorization-2.0`)
+* Jakarta Persistence 3.0 (includes Eclipselink 3.0-GA.) (`persistence-3.0`)
+* Jakarta XML Binding 3.0 (`xmlBinding-3.0`)
+* Jakarta Managed Beans 2.0 (`managedBeans-2.0`)
+* Jakarta Concurrency 2.0 (`concurrent-2.0`)
+* Jakarta Bean Validation 3.0 (`beanValidation-3.0`)
+* Jakarta Contexts and Dependency Injection 3.0 (`cdi-3.0`)
+* Message-Driven Beans 4.0 (`mdb-4.0`)
+* JDBC 4.2 & 4.3 (`jdbc-4.2` & `jdbc-4.3`)
+* Jakarta JSON Binding 2.0 (`jsonb-2.0`)
+* Jakarta JSON Processing 2.0 (`jsonp-2.0`)
+* Jakarta Servlet 5.0 (`servlet-5.0`)
+* Jakarta Server Pages 3.0 (`pages-3.0`)
+* Jakarta Expression Language 4.0 (`expressionLanguage-4.0`)
+
+For more information about Open Liberty's Jakarta EE 9 compatability, view our link:https://openliberty.io/blog/2021/03/05/jakarta-ee-9-compatibility.html[Open Liberty beta is Jakarta EE 9 compatible] blog release.
+
+Enable the Jakarta EE 9 beta features in your app's `server.xml`. You can enable the individual features you want or you can just add the Jakarta EE 9 convenience feature to enable all of the Jakarta EE 9 beta features at once:
+
+[source, xml]
+----
+  <featureManager>
+    <feature>jakartaee-9.0</feature>
+  </featureManager>
+----
+
+Or you can add the Web Profile convenience feature to enable all of the Jakarta EE 9 Web Profile beta features at once:
+
+[source, xml]
+----
+  <featureManager>
+    <feature>webProfile-9.0</feature>
+  </featureManager>
+----
+
+=== Try it now
+
+To try out these Jakarta EE 9 features on Open Liberty in a lightweight package, just update your build tools to pull the Open Liberty Jakarta EE 9 Beta Features package instead of the main release. The beta works with Java SE 15, Java SE 11, or Java SE 8.
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], here are the coordinates:
+
+[source,xml]
+----
+<dependency>
+    <groupId>io.openliberty.beta</groupId>
+    <artifactId>openliberty-jakartaee9</artifactId>
+    <version>20.0.0.4-beta</version>
+    <type>zip</type>
+</dependency>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+dependencies {
+    libertyRuntime group: 'io.openliberty.beta', name: 'openliberty-jakartaee9', version: '[20.0.0.4-beta,)'
+}
+----
+
+Or take a look at our link:{url-prefix}/downloads/#runtime_betas[Downloads page].
+
+
+[#feedback]
+== Your feedback is welcomed
+
+Let us know what you think on link:https://groups.io/g/openliberty[our mailing list]. If you hit a problem, link:https://stackoverflow.com/questions/tagged/open-liberty[post a question on StackOverflow]. If you hit a bug, link:https://github.com/OpenLiberty/open-liberty/issues[please raise an issue].
