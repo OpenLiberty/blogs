@@ -5,10 +5,9 @@ categories: blog
 author_picture: https://avatars3.githubusercontent.com/andymc12
 author_github: https://github.com/andymc12
 seo-title: MicroProfile Rest Client 2.0 - First Look - OpenLiberty.io
-seo-description: This post describes the new features available in MicroProfile Rest Client 2.0 and how to use
-them.
-blog_description: "This post describes the new features available in MicroProfile Rest Client 2.0 and how to use
-them."
+seo-description: This post describes the new features available in MicroProfile Rest Client 2.0 and how to use them.
+blog_description: "This post describes the new features available in MicroProfile Rest Client 2.0 and how to use them."
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
 ---
 = MicroProfile Rest Client 2.0 - First Look
 Andy McCright <https://github.com/andymc12>
@@ -16,14 +15,14 @@ Andy McCright <https://github.com/andymc12>
 The latest release of MicroProfile's type-safe REST client has a lot of new and exciting features. In this post, we'll
 take a look at some of the new features and how you can use them in Open Liberty, including:
 
-. <<query-param-style,Using QueryParamStyle to specify how collections of query parameters should be formatted>>
-. <<proxy-server,Proxy server support>>
-. <<auto-redirects,Automatically following redirects>>
-. <<sse-support,Support for Server Sent Events (SSEs)>>
+- <<query-param-style,Using QueryParamStyle to specify how collections of query parameters should be formatted>>
+- <<proxy-server,Proxy server support>>
+- <<auto-redirects,Automatically following redirects>>
+- <<sse-support,Support for Server Sent Events (SSEs)>>
 
 == Getting started
 
-The MP Rest Client 2.0 implementation is new in Open Liberty 21.0.0.3 - so make sure you are using the latest
+The MicroProfile Rest Client 2.0 implementation is new in Open Liberty 21.0.0.3 - so make sure you are using the latest
 version of Liberty. Next, you will need to add the following link:{url-prefix}/guides/maven-intro.html[Maven] dependency
 to your pom.xml:
 
@@ -41,7 +40,7 @@ or, if you use link:{url-prefix}/guides/gradle-intro.html[Gradle]:
 [source,gradle]
 ----
 dependencies {
-    mpRestClient group: 'org.eclipse.microprofile.rest.client', name: 'microprofile-rest-client-api', version: '2.0'
+    compileOnly group: 'org.eclipse.microprofile.rest.client', name: 'microprofile-rest-client-api', version: '2.0'
 }
 ----
 
@@ -74,13 +73,13 @@ public interface MyClient {
     String multiValues(@QueryParam("myParam") List<String> values);
 }
 ----
-By default, if a caller invokes the the client with `multiValues(Arrays.asList("a", "b", "c"))` the MP Rest Client will
-produce an HTTP request with multiple key/value pairs - something like: `?myParam=a&myParam=b&myParam=c`
+By default, if a caller invokes the client with `multiValues(Arrays.asList("a", "b", "c"))` the MP Rest Client will
+produce an HTTP request with multiple key/value pairs - something like: `?myParam=a&myParam=b&myParam=c`.
 
-Most servers will handle that just fine, but other servers will require that the HTTP request be a single key with a 
+Although most servers will handle that just fine, some servers might require the HTTP request to be a single key with a 
 comma-separated list of values, like: `?myParam=a,b,c`
 
-Other servers will require array-like syntax, such as: `?myParam[]=a&myParam[]=b&myParam[]=c`
+Still other servers will require array-like syntax, such as: `?myParam[]=a&myParam[]=b&myParam[]=c`
 
 In order to support those other server types, you can now use the `QueryParamStyle` enum when building the client
 instance - for example:
@@ -93,9 +92,13 @@ MyClient client = RestClientBuilder.newBuilder()
                                    .build(MyClient.class);
 ----
 
-Alternatively the query parameter style can be declared through MP Config using a property like:
+Alternatively, you can declare the query parameter style through 
+https://www.openliberty.io/guides/microprofile-config-intro.html[MP Config] by using a property like:
 
 `com.mypkg.MyClient/mp-rest/queryParamStyle=ARRAY_PAIRS`
+
+The following table lists the `QueryParamStyle` enum values and provides an example of the corresponding output for
+each value.
 
 .QueryParamStyle Options
 |=======================
@@ -108,15 +111,15 @@ Alternatively the query parameter style can be declared through MP Config using 
 [#proxy-server]
 == Proxy server support
 
-Many RESTful endpoints might require the use of a proxy server to access. MP Rest Client 2.0 makes it easier
+You might need to use a proxy server to access some RESTful endpoints. MicroProfile Rest Client 2.0 makes it easier
 and more portable to specify a proxy server with the new `proxyAddress(host, port)` method on the `RestClientBuilder`
-class. For example, suppose you need to access an endpoint via a proxy server at myproxy.xyz.com on port 1080. You could
-build your rest client instance with code like:
+class. For example, suppose you need to access an endpoint via a proxy server at `myproxy.xyz.com` on port `1080`. You
+could build your rest client instance with code like:
 
 [source,java]
 ----
 MyClient client = RestClientBuilder.newBuilder()
-                                   .proxyAddress(myproxy.xyz.com, 1080)
+                                   .proxyAddress("myproxy.xyz.com", 1080)
                                    //...
                                    .build(MyClient.class);
 ----
@@ -125,7 +128,7 @@ Alternatively, you can specify the proxy address via MP Config with a property l
 
 `com.mypkg.MyClient/mp-rest/proxyAddress=myproxy.xyz.com:1080`
 
-Note that this approach to setting the proxy server host and port should be preferred to using vendor-specific
+Note that for portability, this approach to setting the proxy server host and port is preferred to using vendor-specific
 properties such as `com.ibm.ws.jaxrs.client.proxy.host` and `com.ibm.ws.jaxrs.client.proxy.port`, though these
 properties will still work. For proxy authentication, you can still use the `com.ibm.ws.jaxrs.client.proxy.username` and
 `com.ibm.ws.jaxrs.client.proxy.password` properties. For example:
@@ -144,8 +147,9 @@ MyClient client = RestClientBuilder.newBuilder()
 
 If a RESTful resource has been relocated, often the HTTP response code will be in the 300 range and will indicate the
 new location. Rather than handling the 3XX response and manually issuing a new request, MP Rest Client 2.0 allows rest
-client instances to automatically follow redirects. This can be configured programmatically while building the client
-instance or via MP Config. Here is an example of configuring auto-redirect via the `RestClientBuilder` API:
+client instances to automatically follow redirects. You can configure a client to automatically follow redirects either
+programmatically, when you build the client instance, or via MP Config. Here is an example of configuring auto-redirect
+via the `RestClientBuilder` API:
 
 [source,java]
 ----
@@ -162,18 +166,17 @@ And here is how you would configure it via MP Config:
 [#sse-support]
 == Support for Server Sent Events (SSEs)
 
-link:https://openliberty.io/guides/reactive-messaging-sse.html[Server Sent Events] are part of the HTML 5 spec and
-enables a server to push data to a client asynchronously via events - all over HTTP. The JAX-RS 2.1 spec enabled SSE
+link:https://openliberty.io/guides/reactive-messaging-sse.html[Server Sent Events], part of the HTML 5 spec, enable a
+server to push data to a client asynchronously via events, over HTTP. The JAX-RS 2.1 spec enabled SSE
 support for both the client and server. Now you can consume SSE events from the type-safe MP Rest Client.
 
 The MP Rest Client specification uses the link:http://www.reactive-streams.org/[Reactive Streams] APIs to consume
-events. A client interface capable of consuming SSEs would look something like this:
+events. A client interface capable of consuming SSEs looks something like this:
 
 [source,java]
 ----
 @RegisterRestClient
 public interface SseClient {
-
     @GET
     @Path("/path/sse")
     @Produces(MediaType.SERVER_SENT_EVENTS)
@@ -188,25 +191,28 @@ public interface SseClient {
 
 First, the method (or interface) must be annotated with `@Produces(MediaType.SERVER_SENT_EVENTS)` to indicate that it
 expects the server to produce SSEs. Next, the method's return type must be `org.reactivestreams.Publisher`. The generic
-type can be `javax.ws.rs.sse.InboundSseEvent` (from JAX-RS), a primitive, a String or a complex type. Complex types may only be used if;
+type can be `javax.ws.rs.sse.InboundSseEvent` (from JAX-RS), a primitive, a String, or a complex type. Complex types can
+only be used if;
 
-1) the server only sends one type of event (e.g. only sends `WeatherEvents` - then `Publisher<WeatherEvent>` would be applicable)
+1) the server only sends one type of event (e.g. only sends `WeatherEvents` - then `Publisher<WeatherEvent>` would be
+applicable)
 
 _and_
 
 2) there is a registered entity provider capable of converting the events (e.g. `MessageBodyReader<WeatherEvent>`).
 
 In most cases, if the remote server sends events using JSON, you can enable the `jsonb-1.0` feature in your Liberty
-server which will automatically register a JSON-B-based entity provider.
+server, which will automatically register a JSON-B-based entity provider.
 
 
-Once you've invoked one of these methods, you should be able to register one or more `Subscriber` instances to the
+Once you invoke one of these methods, you can register one or more `Subscriber` instances to the
 `Publisher`. Each subscriber will be notified on receipt of a new event or if the connection to the server has been
 closed.
 
 == Summary
 
-MicroProfile Rest Client 2.0 has some powerful new features useful for building cloud native applications. You can read
-more about these updates on the link:https://github.com/eclipse/microprofile-rest-client/releases/tag/2.0[MP Rest Client 2.0 release page].
+MicroProfile Rest Client 2.0 has some powerful new features that are useful for building cloud native applications. You
+can read more about these updates on the
+link:https://github.com/eclipse/microprofile-rest-client/releases/tag/2.0[MP Rest Client 2.0 release page].
 
 As always, let us know if you have any questions with this new feature. Thanks for checking it out!
