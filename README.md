@@ -121,7 +121,7 @@ These steps are completed by the editors of the blog. As editor, you might ask q
 
 2. Add blog tags to the blog post:
 
-   a. In the `staging` branch, update the [blogs_tags.json](./blog_tags.json) file by adding the slug of the blog post (the file name without the date part or the `.adoc`) to the start of the `posts` array (1-2 entries per line) for each appropriate tag. You can do this in the web UI editor as long as you're careful with the syntax. This is done in staging to reduce the number of merge conflicts in the `draft` branch later.
+   a. In the `staging` branch, update the [blogs_tags.json](./blog_tags.json) file by adding the slug of the blog post (the file name without the date part or the `.adoc`) to the start of the `posts` array (1-2 entries per line) for each appropriate tag. You can do this in the web UI editor as long as you're careful with the syntax. This is done in staging to reduce the number of merge conflicts in the `draft` branch later. However, you should backport this change to draft once it is verified on staging.
 
    b. Merge the changes to `staging` branch. You can do this in advance of the post being ready (as long as the post's file name doesn't change). It's fine if this file gets merged to `prod` earlier than the post itself.
 
