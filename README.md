@@ -98,6 +98,7 @@ You've written a post!
 
 The editors will now review and edit the post. Please respond to any questions they ask or suggestions they make. Their aim is to make the post readable and useful to its target audience.
 
+Please note that if you have a specific date in mind that you want this blog to be published by, we need a final draft of the blog to be ready for editing in the draft repo a minimum of two weeks prior to the desired publish date.
 
 ## Editors: editing and publishing a post
 
