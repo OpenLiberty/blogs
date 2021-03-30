@@ -1,10 +1,11 @@
 # Writing and publishing blog posts on the OpenLiberty.io blog
 
-* [Authors: creating a new blog post](#Authors-creating-a-new-blog-post)
-* [Editors: editing and publishing a post](#Editors-editing-and-publishing-a-post)
-* [Authors and Editors: updating a published post](#Authors-and-Editors-updating-a-published-post)
-* [Troubleshooting Asciidoc](#Troubleshooting-Asciidoc)
-* [Troubleshooting GitHub workflow](#troubleshooting-github-workflow)
+- [Writing and publishing blog posts on the OpenLiberty.io blog](#writing-and-publishing-blog-posts-on-the-openlibertyio-blog)
+  - [Authors: creating a new blog post](#authors-creating-a-new-blog-post)
+  - [Editors: editing and publishing a post](#editors-editing-and-publishing-a-post)
+  - [Authors and Editors: updating a published post](#authors-and-editors-updating-a-published-post)
+  - [Troubleshooting Asciidoc](#troubleshooting-asciidoc)
+  - [Troubleshooting GitHub workflow](#troubleshooting-github-workflow)
 
 
 ## Authors: creating a new blog post
@@ -99,7 +100,6 @@ You've written a post!
 The editors will now review and edit the post. Please respond to any questions they ask or suggestions they make. Their aim is to make the post readable and useful to its target audience.
 
 Please note that if you have a specific date in mind that you want this blog to be published by, we need a final draft of the blog to be ready for editing in the draft repo a minimum of two weeks prior to the desired publish date.
-
 
 ## Editors: editing and publishing a post
 
