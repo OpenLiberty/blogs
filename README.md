@@ -7,7 +7,6 @@
 * [Troubleshooting GitHub workflow](#troubleshooting-github-workflow)
 
 
-
 ## Authors: creating a new blog post
 
 These steps are to be completed by the author of the blog post.
