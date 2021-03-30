@@ -1,10 +1,11 @@
 # Writing and publishing blog posts on the OpenLiberty.io blog
 
-* [Authors: creating a new blog post](#Authors-creating-a-new-blog-post)
-* [Editors: editing and publishing a post](#Editors-editing-and-publishing-a-post)
-* [Authors and Editors: updating a published post](#Authors-and-Editors-updating-a-published-post)
-* [Troubleshooting Asciidoc](#Troubleshooting-Asciidoc)
-* [Troubleshooting GitHub workflow](#troubleshooting-github-workflow)
+- [Writing and publishing blog posts on the OpenLiberty.io blog](#writing-and-publishing-blog-posts-on-the-openlibertyio-blog)
+  - [Authors: creating a new blog post](#authors-creating-a-new-blog-post)
+  - [Editors: editing and publishing a post](#editors-editing-and-publishing-a-post)
+  - [Authors and Editors: updating a published post](#authors-and-editors-updating-a-published-post)
+  - [Troubleshooting Asciidoc](#troubleshooting-asciidoc)
+  - [Troubleshooting GitHub workflow](#troubleshooting-github-workflow)
 
 
 ## Authors: creating a new blog post
