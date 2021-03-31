@@ -100,7 +100,6 @@ The editors will now review and edit the post. Please respond to any questions t
 
 Please note that if you have a specific date in mind that you want this blog to be published by, we need a final draft of the blog to be ready for editing in the draft repo a minimum of two weeks prior to the desired publish date.
 
-
 ## Editors: editing and publishing a post
 
 These steps are completed by the editors of the blog. As editor, you might ask questions or make suggestions to the author of the post. You might also make edits directly in the post to prepare it for publishing.
