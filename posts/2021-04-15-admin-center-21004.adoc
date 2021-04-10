@@ -1,0 +1,243 @@
+---
+layout: post
+title: "Admin Center feature now available in Open Liberty 21.0.0.4"
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/aknguyen7
+author_github: https://github.com/aknguyen7
+seo-title: Admin Center feature now available in Open Liberty 21.0.0.4 - OpenLiberty.io
+seo-description: This post describes the Admin Center feature now available in Open Liberty and how to use them.
+blog_description: "This post describes the Admin Center feature now available in Open Liberty and how to use them."
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+---
+= Admin Center feature now available in Open Liberty 21.0.0.4
+Annie Nguyen <https://github.com/aknguyen7>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+
+The `adminCenter-1.0` feature enables the Liberty Administrative Center (“Admin Center”), a web-based graphical interface for deploying, monitoring and managing Liberty servers. In this post, we’ll take a look how you can use the feature in Open Liberty.
+
+// tag::intro[]
+
+* <<TAG_1, Set up Admin Center>>
+* <<TAG_2, Log in to Admin Center>>
+* <<TAG_3, The Toolbox>>
+* <<TAG_4, The Server Config tool>>
+* <<TAG_5, The Explore tool>>
+* <<TAG_6, The Java Batch tool>>
+* <<TAG_7, The OpenID Connect (OIDC) tools>>
+
+// tag::run[]
+[#run]
+
+//tag::features[]
+
+[#TAG_1]
+== Set up Admin Center
+
+[start=1]
+. Open Liberty version >=*21.0.0.4* *All GA Features* zip link:https://openliberty.io/downloads/[download] comes with the `adminCenter-1.0` feature installed. If using a different Open Liberty zip, run the command from the wlp/bin directory to 
+install the `adminCenter-1.0` feature using the link:https://openliberty.io/docs/latest/reference/command/featureUtility-installFeature.html[featureUtility].
++
+[source]
+----
+featureUtility installFeature adminCenter-1.0
+----
++
+[start=2]
+. If your Liberty installation does not have a server, create a Liberty server. Run the command from the wlp/bin directory to create a server named myServer.
++
+[source]
+----
+server create myServer
+----
++
+[start=3]
+. Configure the `server.xml` file to enable Admin Center and secure login.
++
+[loweralpha, start=a]
+.. Enable the Admin Center feature.
++
+[source, xml]
+----
+  <featureManager>
+    <feature>adminCenter-1.0</feature>
+  </featureManager>
+----
++
+[start=b]
+.. Add one or more users to configure a secure login.
++
+[source, xml]
+----
+<basicRegistry realm="basicRealm">
+   <user name="admin" password="adminpwd" />
+   <user name="reader" password="readerpwd" />
+</basicRegistry>
+----
++
+If user names or passwords include non-English characters, create the jvm.options file for the server and define the default client encoding as UTF-8:
++
+[source]
+----
+-Ddefault.client.encoding=UTF-8
+----
++
+[start=c]
+.. Configure administrative roles required to access the Admin Center.
++
+  * A user with the administrator-role has full access to the Admin Center.
++
+[source, xml]
+----
+<administrator-role>
+   <user>admin</user>
+</administrator-role>
+----
++
+  * A user with the reader-role has read-only access to the Admin Center.
++
+[source, xml]
+----
+<reader-role>
+   <user>reader</user>
+</reader-role>
+----
++
+[start=d]
+.. To protect keystore files that have server authentication credentials, define a keystore and assign it a password.
++
+[source, xml]
+----
+<keyStore id="defaultKeyStore" password="Liberty" />
+----
++
+[start=e]
+.. To access Admin Center from a smartphone, tablet, or remote computer, ensure that the `server.xml` file sets the host attribute of the httpEndpoint element to * (asterisk) or to a defined host name. By default, the host attribute is set to localhost.
++
+[source, xml]
+----
+<httpEndpoint id="defaultHttpEndpoint"
+              host="*"
+              httpPort="9080"
+              httpsPort="9443" />
+----
++
+[start=f]
+.. Save your changes to the `server.xml` file.
++
+The `server.xml` file needs to be saved in UTF-8 format, if client encoding is set to UTF-8 in the jvm.options file and the user registry is basicRegistry.
++
+[start=4]
+. If the server is not running, start the server. Run the command window from the wlp/bin directory, enter a run or start command.
++
+[source]
+----
+server run myServer
+----
++
+Look for server messages that show the adminCenter web application is running. After Admin Center is running, you can point a web browser at the application and log in.
+
+[#TAG_2]
+== Log in to Admin Center
+
+. Point a web browser at Admin Center  https://host_name:port_number/adminCenter/
+
+.. For host_name, specify the IP address or domain name server (DNS) hostname of the computer on which the Liberty server is running. Specify localhost only if the browser is running on the same computer as the server.
+
+.. For port_number, specify the httpsPort value in the `server.xml` file, as shown in the following example:
++
+https://localhost:9443/adminCenter/
++
+https://myhost.xyz.com:9443/adminCenter/
++  
+https://9.65.234.567:9443/adminCenter/
++ 
+For security reasons Admin Center is only accessible over https.
+
+. If your browser prompts you to confirm that the connection is trusted, specify an exception or otherwise enable the connection to continue to Admin Center.
+
+. To log in to Admin Center, specify the username _admin_ and the password _adminpwd_.
++
+image::img/blog/ui_login.png[align="center"]
+
+
+[#TAG_3]
+== The Toolbox
+
+When log in to Admin Center, you view the **Toolbox**, which contains tools such as the **Server Config** and **Explore** and a bookmark to link:https://openliberty.io[openliberty.io].
+
+image::img/blog/ui_toolbox.png[align="center"]
+
+To add or remove tools and bookmarks, select *Edit* image:img/blog/ui_edit.png[] and use the **Tool Catalog** to customize your user-specific **Toolbox**.
+
+To view a tool, select its **Toolbox** icon or directly start the tool by using the URL that is shown in the browser when you view the tool. For example, to directly start the **Explore** tool, use a URL such as https://localhost:9443/adminCenter/#explore.
+
+Later, to log out of Admin Center, select *User* image:img/blog/ui_user.png[User] *> Log out* user_name.
+
+[#TAG_4]
+== The Server Config tool
+
+You can use the **Server Config** tool to view and edit server configuration files in the Liberty topology. The **Server Config** tool displays configuration files such as a `server.xml` file in two modes. The Design mode displays the content of configuration files using graphical controls with inline documentation. The Source mode provides direct access to the file text and has content assist capabilities. You can customize the modes, for example, to add or remove parameter descriptions on the Design mode or to add or remove line numbers on the Source mode. Before you can edit files, you must add a link:https://openliberty.io/docs/latest/reference/config/remoteFileAccess.html[remoteFileAccess] element to the server configuration file; otherwise, files are shown in read-only mode.
+
+To enable write access, add the following to your `server.xml` file:
+[source, xml]
+----
+<remoteFileAccess>
+   <writeDir>${server.config.dir}</writeDir>
+</remoteFileAccess>
+----
+
+image::img/blog/ui_serverConfigTool1.png[align="center"]
+
+Click on `server.xml` displays the content of the configuration file:
+
+image::img/blog/ui_serverConfigTool2.png[align="center"]
+
+[#TAG_5]
+== The Explore tool
+You can use the **Explore** tool to explore and manage resources in the Liberty topology. This tool offers options to view information about the server and its applications, to stop, start or restart resources.
+
+image::img/blog/ui_exploreTool1.png[align="center"]
+
+The Monitor view on the vertical navigation bar shows the metrics graphically in charts. You can use the Monitor view to track used heap memory, loaded classes, active Java™ virtual machine (JVM) threads, central processing unit (CPU) usage.
+
+image::img/blog/ui_exploreTool3.png[align="center"]
+
+[#TAG_6]
+== The Java Batch tool
+
+If you configured link:https://openliberty.io/docs/latest/reference/feature/batchManagement-1.0.html[batchManagement-1.0] feature, you can access the Admin Center **Java Batch** tool. With the **Java Batch** tool you can view the progress and status of your Java™ batch jobs, manage their instances, and view their log files.
+
+image::img/blog/ui_javaBatchTool.png[align="center"]
+
+If the batch jobs or job logs do not reside on the server that runs Admin Center, configure link:https://openliberty.io/docs/21.0.0.3/reference/config/cors.html[CORS] on each remote server that has batch jobs or job logs to enable Admin Center to request job information from each remote server.
+
+[#TAG_7]
+== The OpenID Connect (OIDC) tools
+
+If you enabled link:https://openliberty.io/docs/latest/reference/feature/openidConnectServer-1.0.html[openidConnectServer-1.0] feature and configured OIDC, you can access the Liberty Admin Center **OIDC** tools.
+
+* *OpenID Connect Client Management Tool*
++
+This tool is used to allow an administrator to manage clients on an OpenID Connect provider.
++
+image::img/blog/ui_oidc_client.png[align="center"]
++
+* *OpenID Connect Personal Token Management Tool*
++
+This tool is used to allow a user to manage application passwords and application tokens on an OpenID Connect provider.
++
+image::img/blog/ui_oidc_personalToken.png[align="center"]
++
+* *OpenID Connect Users Token Management Tool*
++
+This tool is used to allow an adminstrator to revoke app-passwords and app-tokens of other users on an OpenID Connect provider.
++
+image::img/blog/ui_oidc_usersToken.png[align="center"]
+
+
+This concludes our brief tour of Admin Center in Open Liberty. Thank you for checking it out!
+
+//end::features[]
+
