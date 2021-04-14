@@ -123,7 +123,7 @@ Stay tuned for a blog specifically regarding Admin Center which will showcase th
 [#ldapconnection]
 == LDAP connection supports Kerberos authentication
 
-LDAP bind operations are used to authenticate clients (and the users or applications behind them) to the directory server. This establishes an authorization identity that is used for subsequent operations that are processed on that connection, and specifies the LDAP protocol version that the client uses. Before this update, the `LdapRegistry` element supported binding either anonymously or by using simple authentication with a user (`bindDN`) and password (`bindPassword`). This update adds an option to bind to LDAP: GSSAPI/Kerberos. Kerberos is an authentication mechanism that allows a client and service to mutually authenticate by a Key Distribution Center (KDC). In Open Liberty 21.0.0.4-beta,  you can use either a Kerberos credential cache (ccache) or a Kerberos keytab file.
+LDAP bind operations are used to authenticate clients (and the users or applications behind them) to the directory server. This establishes an authorization identity that is used for subsequent operations that are processed on that connection, and specifies the LDAP protocol version that the client uses. Before this update, the `LdapRegistry` element supported binding either anonymously or by using simple authentication with a user (`bindDN`) and password (`bindPassword`). This update adds an option to bind to LDAP: GSSAPI/Kerberos. Kerberos is an authentication mechanism that allows a client to authenticate by a Key Distribution Center (KDC). In Open Liberty 21.0.0.4-beta,  you can use either a Kerberos credential cache (ccache) or a Kerberos keytab file.
 
 To update an `LdapRegistry` to use the GSSAPI/Kerberos option, you can set the bind authentication mechanism type using the new `LdapRegistry` attribute, `bindAuthMechanism`:
 
@@ -139,41 +139,41 @@ You also need the Kerberos principal or Service Principal Name:
 krb5Principal="user1@EXAMPLE.COM"
 ----
 
-If you are using a Kerberos credential cache (ticket cache or ccache) to store the Kerberos credentials, add the ticket cache file name to the `LdapRegistry` with the new attribute, `krb5TicketCache`:
+If you are using a Kerberos ticket cache also known as a credential cache or ccache, add the Kerberos ticket cache file name to the `LdapRegistry` with the new attribute, `krb5TicketCache`:
 
 [source, xml]
 ----
 krb5TicketCache="${server.config.dir}/security/krb5-user1.cc"
 ----
 
-If you are using a custom Kerberos configuration file (krb.conf or krb.ini), set the file name using the global Kerberos configuration element:
+Set the Kerberos configuration file name (for example, krb5.conf or krb5.ini) using the Kerberos element:
 
 [source, xml]
 ----
 <kerberos configFile="${server.config.dir}/security/krb5.conf"/>
 ----
 
-If you are using a Kerberos keytab file to store encrypted keys for principals, set the file using the global Kerberos configuration element:
+If you are using a Kerberos keytab file, set the Kerberos keytab file name using the Kerberos element:
 
 [source, xml]
 ----
 <kerberos keytab="${server.config.dir}/security/krb5.keytab" configFile="${server.config.dir}/security/krb5.conf"/>
 ----
 
-If the Kerberos configuration file is not defined, Open Liberty will attempt to resolve by using the JDK default locations and the operating system default locations.
+If the Kerberos configuration file is not defined in the Kerberos element, Open Liberty will attempt to resolve the configuration file location by using the JDK default locations.
 
 For the Kerberos credentials, the locations are checked in the following order: the ticket cache (if provided), the configured keytab file, and finally the JDK default location.
 
-The following example shows how to configure the `LdapRegistry` element using a ticket cache and custom Kerberos config file:
+The following example shows how to configure the `LdapRegistry` element using a Kerberos ticket cache and Kerberos config file:
 
 [source, xml]
 ----
-<kerberos keytab= configFile="${server.config.dir}/security/krb5.conf"/>
+<kerberos configFile="${server.config.dir}/security/krb5.conf"/>
 
 <ldapRegistry id="LDAP" realm="SampleLdapADRealm" host="ldap_hostname" port="389" ignoreCase="true" baseDN="DC=example,DC=com" bindAuthMechanism="GSSAPI" krb5Principal="user1@EXAMPLE.COM" krb5TicketCache="${server.config.dir}/security/krb5-user1.cc" ldapType="Custom" />
 ----
 
-The following example shows how to configure an LDAP Registry using a keytab and custom Kerberos config file:
+The following example shows how to configure an LDAP Registry using a Kerberos keytab and Kerberos config file:
 
 [source, xml]
 ----
@@ -327,7 +327,7 @@ Find out more at link:{url-prefix}/docs/latest/reference/config/connectionManage
 [#SSO]
 == Single Sign-On (SSO) LTPA and JWT support authentication filter>>
 
-With this new enhancement users can now use the authentication filter to select which HTTP servlet request should use LTPA and JWT for the SSO authentications. To find out more about this take a look at link:{url-prefix}/blog/2020/07/02/disable-default-cookies-20007.html[Disabling default LTPA cookies for TAI/SPNEGO or default JWT cookies for JWT SSO on Open Liberty 20.0.0.7]
+With this new enhancement users can now use the authentication filter to select which HTTP servlet request should use link:{url-prefix}/docs/latest/reference/feature/appSecurity-3.0.html[LTPA] and link:{url-prefix}/docs/latest/reference/feature/jwtSso-1.0.html[JWT] for the SSO authentications.
 
 
 //end::features[]
@@ -344,10 +344,6 @@ The IBM/OpenJ9 JDK Shared Class Cache may not have been generated on Windows if 
 * link:https://github.com/OpenLiberty/open-liberty/issues/16054[HSTS Header not added on responses with 404 status]
 +
 In certain cases where the response is fully handled by the HTTP transport without invoking the WebContainer engine (e.g. a 404 response), the HTTP Strict-Transport-Security (`HSTS`) header was improperly omitted from the response even though the link:{url-prefix}/docs/latest/reference/config/webContainer.html[`addStrictTransportSecurityHeader`] was properly configured.  The HTTP transport's parsing of these properties now has new tracing, the HTTP transport will inspect the response and, when configured to do so, add the `HSTS` header if it is missing and if the scheme is 'https'. The `HTTPDispatcher=all` trace level can be used to see what the resulting header value will look like.
-
-* link:https://github.com/OpenLiberty/open-liberty/issues/15336[Replace DNS lookup with regular expression to get the domain name in SSO Cookie Domain function]
-+
-A bug in the SSO Cookie domain function caused an unnecessary DNS lookup when sending a regular HTTP Request to generate an LTPA token. To improve performance, a regex will now be used instead to obtain the domain name.
 
 * link:https://github.com/OpenLiberty/open-liberty/issues/15989[Bump netty dependencies to 4.1.62.Final]
 +
