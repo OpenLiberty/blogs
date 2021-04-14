@@ -119,6 +119,55 @@ image::img/blog/ui_login.png[ui login ,width=70%,align="center"]
 
 Stay tuned for a blog specifically regarding Admin Center which will showcase the various tools and functionality it provides.
 
+[#mpContextPropagation]
+== MicroProfile Context Propagation 1.2
+
+MicroProfile Context Propagation is a standalone MicroProfile specification. MicroProfile Context Propagation enables you to create completion stages that behave deterministically with respect to thread context and leverages the autonomic tuning of the Open Liberty global thread pool for asynchronous dependent stages.
+
+The 1.2 release of MicroProfile Context Propagation aligns with the link:{url-prefix}/blog/2021/03/19/microprofile40-open-liberty-21003.html[MicroProfile 4.0 platform], specifically addressing a difference in how link:{url-prefix}/blog/2021/03/31/microprofile-config-2.0.html[MicroProfile Config 2.0] treats empty value configuration properties. When using MicroProfile Config to specify an empty list of thread context types for MicroProfile Context Propagation to use as defaults, use a value of `None` rather than an empty value. An empty value in MicroProfile Config 2.0 indicates to override any lower ordinal config sources and instead use the built-in default value for the property.  For example, the combination of `mp.context.ManagedExecutor.cleared=None` and `mp.context.ManagedExecutor.propagated=Remaining` causes every context type to be propagated.
+
+To enable the MicroProfile Context Propagation 1.2 feature, add the following to your server configuration:
+[source, xml]
+----
+<featureManager>
+  <feature>mpContextPropagation-1.2</feature>
+  <!-- other features used by example code... -->
+  <feature>servlet-4.0</feature>
+  <feature>jdbc-4.2</feature>
+  <feature>jndi-1.0</feature>
+</featureManager>
+----
+
+Example usage within a Servlet:
+[source, java]
+----
+private ManagedExecutor executor;
+
+public void init(ServletConfig config) throws ServletException {
+    executor = ManagedExecutor.builder()
+                .propagated(ThreadContext.APPLICATION)
+                .cleared(ThreadContext.ALL_REMAINING)
+                .build();
+}
+
+public void destroy() {
+    executor.shutdownNow();
+}
+
+public void doGet(HttpServletRequest req, HttpServletResponse resp)
+    throws ServletException, IOException {
+    ...
+    executor.copy(unmanagedCompletionStage).thenAcceptAsync(value -> {
+        // requires java:comp namespace of the application,
+        DataSource ds = InitialContext.doLookup("java:comp/env/jdbc/ds");
+        ...
+    });
+}
+----
+
+For more information please see: 
+* link:https://download.eclipse.org/microprofile/microprofile-context-propagation-1.2/microprofile-context-propagation-spec-1.2.html[MicroProfile Context Propagation 1.2 specification]
+* link:https://download.eclipse.org/microprofile/microprofile-context-propagation-1.2/apidocs/[JavaDoc]
 
 [#ldapconnection]
 == LDAP connection supports Kerberos authentication
@@ -192,56 +241,6 @@ To enable this new beta function in your app, pull the All Beta Features package
   <feature>ldapRegistry-3.0</feature>
 </featureManager>
 ----
-
-[#mpContextPropagation]
-== MicroProfile Context Propagation 1.2
-
-MicroProfile Context Propagation is a standalone MicroProfile specification. MicroProfile Context Propagation enables you to create completion stages that behave deterministically with respect to thread context and leverages the autonomic tuning of the Open Liberty global thread pool for asynchronous dependent stages.
-
-The 1.2 release of MicroProfile Context Propagation aligns with the link:{url-prefix}/blog/2021/03/19/microprofile40-open-liberty-21003.html[MicroProfile 4.0 platform], specifically addressing a difference in how link:{url-prefix}/blog/2021/03/31/microprofile-config-2.0.html[MicroProfile Config 2.0] treats empty value configuration properties. When using MicroProfile Config to specify an empty list of thread context types for MicroProfile Context Propagation to use as defaults, use a value of `None` rather than an empty value. An empty value in MicroProfile Config 2.0 indicates to override any lower ordinal config sources and instead use the built-in default value for the property.  For example, the combination of `mp.context.ManagedExecutor.cleared=None` and `mp.context.ManagedExecutor.propagated=Remaining` causes every context type to be propagated.
-
-To enable the MicroProfile Context Propagation 1.2 feature, add the following to your server configuration:
-[source, xml]
-----
-<featureManager>
-  <feature>mpContextPropagation-1.2</feature>
-  <!-- other features used by example code... -->
-  <feature>servlet-4.0</feature>
-  <feature>jdbc-4.2</feature>
-  <feature>jndi-1.0</feature>
-</featureManager>
-----
-
-Example usage within a Servlet:
-[source, java]
-----
-private ManagedExecutor executor;
-
-public void init(ServletConfig config) throws ServletException {
-    executor = ManagedExecutor.builder()
-                .propagated(ThreadContext.APPLICATION)
-                .cleared(ThreadContext.ALL_REMAINING)
-                .build();
-}
-
-public void destroy() {
-    executor.shutdownNow();
-}
-
-public void doGet(HttpServletRequest req, HttpServletResponse resp)
-    throws ServletException, IOException {
-    ...
-    executor.copy(unmanagedCompletionStage).thenAcceptAsync(value -> {
-        // requires java:comp namespace of the application,
-        DataSource ds = InitialContext.doLookup("java:comp/env/jdbc/ds");
-        ...
-    });
-}
-----
-
-For more information please see: 
-* link:https://download.eclipse.org/microprofile/microprofile-context-propagation-1.2/microprofile-context-propagation-spec-1.2.html[MicroProfile Context Propagation 1.2 specification]
-* link:https://download.eclipse.org/microprofile/microprofile-context-propagation-1.2/apidocs/[JavaDoc]
 
 [#expandLocation]
 === expandLocation property for AutoExpand
