@@ -1,0 +1,194 @@
+---
+layout: post
+title: "Building Multipart payloads for JAX-RS client and services in Open Liberty 21.0.0.5-beta"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/jakub-pomykala
+author_github: https://github.com/jakub-pomykala
+seo-title: Building Multipart payloads for JAX-RS client and services in Open Liberty 21.0.0.5-beta - OpenLiberty.io
+seo-description: With Open Liberty 21.0.0.5-beta you can now build multipart payloads for your JAX-RS client and services. Also present in this release is Jakarta EE 9 support for `oauth-2.0` and `samlWeb-2.0`.  
+blog_description: With Open Liberty 21.0.0.5-beta you can now build multipart payloads for your JAX-RS client and services. Also present in this release is Jakarta EE 9 support for `oauth-2.0` and `samlWeb-2.0`.  
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+---
+= Building Multipart payloads for JAX-RS client and services in Open Liberty 21.0.0.5-beta
+Jakub Pomykala <https://github.com/jakub-pomykala>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+
+With Open Liberty 21.0.0.5-beta you can now build multipart payloads for your JAX-RS client and services. Also present in this release is Jakarta EE 9 support for `oauth-2.0` and `samlWeb-2.0`.
+
+We have two beta packages for link:{url-about}[Open Liberty]:
+
+* <<allbeta, All Beta Features>>: a larger package that contains all Open Liberty beta features (including Jakarta EE 9 beta features) and GA features and functions.
+* <<jakarta, Jakarta EE 9 Beta Features>>: a lightweight package that contains only the Jakarta EE 9 features.
+
+This means that you can now try out our in-development Open Liberty features by just adding the relevant coordinates to your build tools.
+
+If you try either package, <<feedback, let us know what you think>>.
+[#allbeta]
+== All Beta Features package
+
+The All Beta Features package includes 
+
+* <<webservices, Build multipart payloads for your JAX-RS client and services>>.
+* <<jee9support, Jakarta EE 9 support for oauth-2.0 and samlWeb-2.0>>s
+
+[#webservices]
+=== Build multipart payloads for your JAX-RS client and services
+
+Often, a RESTful service or client will need to send multiple disparate pieces of data in the same request, for example, uploading a resume/CV with a picture and text for name and address. This is usually done using `multipart/form-data`.
+
+While Liberty currently has APIs to enable users to _receive_ multipart/form-data payloads, it does not have any APIs to enable users to _send_ multipart payloads - until now. With the new `AttachmentBuilder` API, users can now send multipart requests from their JAX-RS clients or send multipart payloads as responses from their JAX-RS resources.
+
+To send a multipart request, you will need to enable the `jaxrs-2.0` or `jaxrs-2.1` feature. Presumably, if you are already using JAX-RS, one of these features will already be enabled. To send a multipart payload, you must send an instance of `List<IAttachment>`.  Each object in that list represents a single attachment part.  Here is an example of creating and sending a multipart request from a JAX-RS client:
+[source, java]
+----
+List<IAttachment> attachments = new ArrayList<>();
+
+attachments.add(AttachmentBuilder.newBuilder("blogPost")
+                                 .inputStream(new FileInputStream("/path/to/yesterdaysBlogPost.xml"))
+                                 .fileName("myRenamedBlogPost.asciidoc")
+                                 .contentType("text/asciidoc")
+                                 .contentId("myBlogPostID")
+                                 .header("X-PriorityLevel", "Medium")
+                                 .build());
+
+attachments.add(AttachmentBuilder.newBuilder("file1")
+                                 .inputStream("some.xml", new FileInputStream("/path/to/myPicture.png"))
+                                 .contentType("image/png")
+                                 .build());
+
+attachments.add(AttachmentBuilder.newBuilder("authorName")
+                                 .inputStream(new ByteArrayInputStream("John Doe".getBytes()))
+                                 .build());
+
+Response response = client.target(BLOG_SITE_URI)
+                          .request()
+                          .post(Entity.entity(attachments, MediaType.MULTIPART_FORM_DATA));
+----
+
+For more information vist:
++
+* link:https://tools.ietf.org/html/rfc7578[multipart/form-data RFC 7578]
+
+[#jee9support]
+=== Jakarta EE 9 support for oauth-2.0 and samlWeb-2.0
+
+The `oauth-2.0` and `samlWeb-2.0` features have been updated to support Jakarta EE 9. Now these features will automatically adapt to the level of Java EE or Jakarta EE that is already in use. This means that there is no change needed when using them with Jakarta EE 9.
+
+=== Try it now
+
+To try out these features, just update your build tools to pull the Open Liberty All Beta Features package instead of the main release. The beta works with Java SE 15, Java SE 11, or Java SE 8.
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven]:
+
+1. Add the following dependency to your `pom.xml` file:
++
+[source,xml]
+----
+<dependency>
+  <groupId>io.openliberty.beta</groupId>
+  <artifactId>openliberty-runtime</artifactId>
+  <version>21.0.0.5-beta</version>
+  <type>pom</type>
+</dependency>
+----
++
+2. Add a dependency for the beta version of each of the APIs that you'd like to try. For example, to try MicroProfile Config 2.0:
++
+[source,xml]
+----
+<dependency>
+  <groupId>org.eclipse.microprofile.config</groupId>
+  <artifactId>microprofile-config-api</artifactId>
+  <version>2.0</version>
+  <scope>provided</scope>
+</dependency>
+----
++
+3. Add add the following `runtimeArtifact` section to the `configuration` section of your `pom.xml` file:
++
+[source,xml]
+----
+<runtimeArtifact>
+  <groupId>io.openliberty.beta</groupId>
+  <artifactId>openliberty-runtime</artifactId>
+  <version>21.0.0.5-beta</version>
+  <type>zip</type>
+</runtimeArtifact>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+dependencies {
+    libertyRuntime group: 'io.openliberty.beta', name: 'openliberty-runtime', version: '[21.0.0.5-beta,)'
+}
+----
+
+Or take a look at our link:{url-prefix}/downloads/#runtime_betas[Downloads page].
+
+[#jakarta]
+== Jakarta EE 9 Beta Features package
+
+As of the 21.0.0.2-beta release, Open Liberty is the first vendor product to be Jakarta EE Web Profile 9.0 compatible. With the recent 21.0.0.3-beta release, Open Liberty is the first vendor product to be added to the link:https://jakarta.ee/compatibility/#tab-9[Jakarta EE Platform 9.0 compatibility list].
+
+This Open Liberty beta release comes complete with all of the previously released Jakarta EE9 API candidates.
+For more information about Open Liberty's Jakarta EE 9 compatability, view our link:{url-prefix}/blog/2021/03/05/jakarta-ee-9-compatibility.html[Open Liberty beta is Jakarta EE 9 compatible] blog release.
+
+Enable the Jakarta EE 9 beta features in your app's `server.xml`. You can enable the individual features you want or you can just add the Jakarta EE 9 convenience feature to enable all of the Jakarta EE 9 beta features at once:
+
+[source, xml]
+----
+  <featureManager>
+    <feature>jakartaee-9.0</feature>
+  </featureManager>
+----
+
+Or you can add the Web Profile convenience feature to enable all of the Jakarta EE 9 Web Profile beta features at once:
+
+[source, xml]
+----
+  <featureManager>
+    <feature>webProfile-9.0</feature>
+  </featureManager>
+----
+
+=== Try it now
+
+To try out these Jakarta EE 9 features on Open Liberty in a lightweight package, just update your build tools to pull the Open Liberty Jakarta EE 9 Beta Features package instead of the main release. The beta works with Java SE 15, Java SE 11, or Java SE 8.
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], here are the coordinates:
+
+[source,xml]
+----
+<dependency>
+    <groupId>io.openliberty.beta</groupId>
+    <artifactId>openliberty-jakartaee9</artifactId>
+    <version>21.0.0.5-beta</version>
+    <type>zip</type>
+</dependency>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+dependencies {
+    libertyRuntime group: 'io.openliberty.beta', name: 'openliberty-jakartaee9', version: '[21.0.0.5-beta,)'
+}
+----
+
+Or take a look at our link:{url-prefix}/downloads/#runtime_betas[Downloads page].
+
+
+[#feedback]
+== Your feedback is welcomed
+
+Let us know what you think on link:https://groups.io/g/openliberty[our mailing list]. If you hit a problem, link:https://stackoverflow.com/questions/tagged/open-liberty[post a question on StackOverflow]. If you hit a bug, link:https://github.com/OpenLiberty/open-liberty/issues[please raise an issue].
+
+
