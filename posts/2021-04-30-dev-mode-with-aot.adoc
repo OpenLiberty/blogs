@@ -1,0 +1,27 @@
+---
+layout: post
+title: "Faster startup in Open Liberty dev mode with Eclipse OpenJ9 0.26.0"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/dsouzai
+author_github: https://github.com/dsouzai
+seo-title: Faster startup in Open Liberty dev mode with Eclipse OpenJ9 0.26.0 - OpenLiberty.io
+seo-description: Improved Open liberty deveopment mode startup with AOT compilation using Eclipse OpenJ9.
+blog_description: "Improved Open liberty deveopment mode startup with AOT compilation using Eclipse OpenJ9."
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+---
+= Faster startup in Open Liberty dev mode with Eclipse OpenJ9 0.26.0
+Irwin D'Souza <https://github.com/dsouzai>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+
+Open Liberty development mode, or dev mode, is a feature in Open Liberty that enhances the developer’s experience by providing hot reload and deployment, on-demand testing, and debugger supportfootnote:[https://openliberty.io/blog/2019/10/22/liberty-dev-mode.html]. Eclipse OpenJ9 is a high performance, scalable, Java virtual machine (JVM) implementationfootnote:[https://www.eclipse.org/openj9/about]. One of the biggest benefits of OpenJ9 is its fast startup; a big part of this is due to the Shared Classes Cache (SCC) featurefootnote:[https://www.eclipse.org/openj9/docs/shrc/], which contains both classes and previously (dynamically) compiled Ahead-of-time (AOT) Codefootnote:[https://www.eclipse.org/openj9/docs/aot/]. AOT Compilation in Eclipse OpenJ9 is the process of compiling code in one JVM instance for the purpose of reuse in another JVM instancefootnote:[https://blog.openj9.org/2018/10/10/intro-to-ahead-of-time-compilation/]. When using a JDK with the Eclipse OpenJ9 VM to run Open Liberty, the VM feature that is used to enable dev mode is called Full Speed Debug (FSD). Before Eclipse OpenJ9 Version 0.26.0, the VM did not have AOT support for FSD; this meant that Open Liberty dev mode could not benefit from the fast startup that normally comes with Eclipse OpenJ9. However, from version 0.26.0 onward, FSD support has been added for AOT compilations, and therefore Open Liberty dev mode does see the boost in startup from the SCC.
+
+How did this improvement occur? First, there was a significant improvement in FSD performance when FSD was implemented with another feature known as OSRfootnote:[https://blog.openj9.org/2019/04/30/introduction-to-full-speed-debug-base-on-osr/]. This new implementation naturally facilitated generalization to relocatable compilations. The main idea behind FSD is, if a debug event occurs, an application thread will transition from the middle of a compiled body to the interpreter; this ensures that compiled code can be highly optimized as the compiler does not need to worry about the consequences of debug events. When there are no more debug events, the application thread is allowed to run compiled code again.
+
+Adding AOT support essentially boiled down to ensuring that all the OSR data in the compiled body’s metadata, as well as Breakpoint Guards, are relocatedfootnote:[https://github.com/eclipse/openj9/pull/11552]footnote:[https://github.com/eclipse/openj9/pull/11553]footnote:[https://github.com/eclipse/openj9/pull/11554]. The OSR data is needed to ensure the transition from the compiled code into the interpreter; the Breakpoint Guards are needed to ensure that debug events on a method that gets inlined are respected. There were a few more subtleties involved regarding relocations, but you can read about those in the various pull requests. However, the practical impact of these changes is a noticeable difference in the user experience of dev mode. 
+
+To give a more objective description of the improvement, I ran dev mode on a benchmark application DayTrader7 and I observed that the time taken to startup roughly halved; this was measured by starting and stopping the Open Liberty running on 4CPUs without measuring the first run’s startup time. It is important to note that the first time dev mode is used with OpenJ9 0.26.0 it will seem slower; however this normal because it is the run that generates all the AOT code that is placed in the SCC - all subsequent invocations of dev mode will be noticeably faster.
+
+To conclude, I would recommend upgrading your JDK to use OpenJ9 0.26.0footnote:[https://github.com/eclipse/openj9/releases/tag/openj9-0.26.0] as you too can benefit from a drastic improvement in Open Liberty dev mode performance.
