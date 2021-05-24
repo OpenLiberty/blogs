@@ -1,0 +1,104 @@
+---
+layout: post
+title: "Finding the Liberty fixpack from a GitHub issue"
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/barbj
+author_github: https://github.com/barbj
+seo-title: Finding the Liberty fixpack from a GitHub issue
+seo-description: It can be challenge to find the shipped fix pack for a Liberty GitHub issue.  This post has steps to help you out.
+blog_description: "It can be challenge to find the shipped fix pack for a Liberty GitHub issue.  This post has steps to help you out."
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+---
+= Finding the Liberty fixpack from a GitHub issue
+Barbara Jensen <https://github.com/barbj>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+
+Liberty users often run into problems for which they've found a matching issue in GitHub.  One of the challenges that you can have once you've found the right GitHub issue is finding the Liberty fix packs in which the issue is available.
+
+There are at least three methods for finding this information:
+
+1. If the issue has the **release bug** label, you may find the issue in the https://www.ibm.com/support/pages/fix-list-ibm-websphere-application-server-liberty-continuous-delivery[Fix list for IBM WebSphere Application Server Liberty - Continuous Delivery]
+** If the **release bug** label was added to an issue before its first fix pack was delivered, the issue will be in the fix list.
+** There may be issues that have the **release bug** label, but they are not in the fix list.  This means that the label was added after its fix pack was delivered and the issue was not manually added to the fix list.
+2. Find the fix pack information in the release:yynnn issue label.
+** If the **release bug** label was added to an issue before its first fix pack was delivered, the release:yynnn label may not appear on the issue.
+** Developers may add the **release:yynnn** label to an issue after fix pack delivery.
+3. Find the fix pack information in the last commit in the last pull request for the issue.
+** If you cannot find the issue in the fix list and there is no **release:yynnn** label, you can use this method.
+
+== Finding the fix pack for a 'release bug' issue
+
+Suppose that you have found issue https://github.com/OpenLiberty/open-liberty/issues/14975[14975 OIDC RP: creating a subject with allowCustomCachKey=false results in a subject that includes a cache key].
+
+* When you display the issue, you'll see the following in the Label list:
++
+image::img/blog/finding_14975_a.png[align="center"]
++
+* There are two things to note here:
+[start=1]
+. The **release bug** label is in the issue, therefore the issue should appear in the fix list.
+. The **release:21001** label is on the issue.  This means that the fix for this issue should be first available in 21.0.0.1.
+
+=== Let's verify the **release:21001** label:
+
+. Navigate to https://www.ibm.com/support/pages/fix-list-ibm-websphere-application-server-liberty-continuous-delivery[Fix list for IBM WebSphere Application Server Liberty - Continuous Delivery]
+. Search for **14975**:
++
+image::img/blog/finding_14975_b.png[align="center"]
++
+. Search back to find the fix pack:
++
+image::img/blog/finding_21001.png[align="center"] 
+
+
+== Finding the fix pack for a non-'release bug' issue
+
+Suppose that you have found issue https://github.com/OpenLiberty/open-liberty/issues/15987[15987 OIDC state cookie cannot be read by another JVM in collective w/socal login TS004966274]
+
+* When you display the issue, you'll see the following in the Label list:
++
+image::img/blog/finding_15987_a.png[align="center"]
++
+* There are two things to note here:
+. The **release bug** label is not in the issue, therefore the issue will not appear in the fix list.
+. The **release:21004** label is on the issue. This means that the fix for this issue should be first available in 21.0.0.4.
+
+
+=== Let's verify the **release:21004** label:
+
+. Navigate to https://github.com/OpenLiberty/open-liberty/issues/15987[15987] 
+. Find the pull request (PR) that fixes the issue, for this issue, it is https://github.com/OpenLiberty/open-liberty/pull/16150[16150]
+ 
+image::img/blog/finding_15987_b.png[align="center"]
+
+[start=3]
+. Click on the link for PR https://github.com/OpenLiberty/open-liberty/pull/16150[16150]
+. Search the text of the PR for `revert "`
+** That is: revert, space, double quote
+** If you find that the PR has been reverted, you cannot follow the rest of these simple steps for your issue.
+** Example (not in this PR):
++
+image::img/blog/finding_revert_1.png[align="center"]
++
+[start=5]
+. Click on the **Commits** tab
++
+image::img/blog/finding_16150_a.png[align="center"]
++
+. Click on the last commit for the PR (in this PR, there is only one):
++
+image::img/blog/finding_16150_b.png[align="center"]
++
+. At the top of the Commits tab, there will be a list of release tags that indicates in which releases this PR was included, starting from the newest to oldest.  The last tag in the list is the first release in which the PR was included; in this case it is **gm-21.0.0.4**:
++
+image::img/blog/finding_16150_c.png[align="center"]
+
+== Finding the fix pack for a PR that has been reverted
+
+When attempting to find the fix pack for an issue, you may run into a PR that has been reverted.  When a PR has been reverted, you will see a pair of updates in the PR that look like this:
+
+image::img/blog/finding_revert_2.png[align="left"]
+
+If everything proceeds as you would expect, you should be able to follow a Revert, Re-introduce chain until you end up with a commit in a PR that was successfully merged.  However, this is dependent on developers properly associating the PRs that re-introduce the updates to the Re-introduce issue.  This does not always happen and you can end up at a dead-end with the appearance that the issue was never re-merged, when in fact it was.  Therefore, if you follow the Revert, Re-introduce chain and it results in success, you can count on the results.  However, if you encounter a dead-end, the issue may, or may not have been resolved.
