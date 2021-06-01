@@ -1,42 +1,58 @@
 ---
 layout: post
-title: "Database Connections Using SSL/TLS a Primer"
+title: "Database connections with TLS"
 categories: blog
 author_picture: https://avatars3.githubusercontent.com/Kyle_Aure
 author_github: https://github.com/Kyle_Aure
-seo-title: Database Connections Using SSL/TLS a Primer - OpenLiberty.io
+seo-title: Database connections with TLS - OpenLiberty.io
 seo-description: How to setup common database jdbc drivers (DB2, Oracle, Postgres, SQLServer) to use SSL / TLS for secure connections.
 blog_description: "How to setup common database jdbc drivers (DB2, Oracle, Postgres, SQLServer) to use SSL / TLS for secure connections."
 open-graph-image: https://openliberty.io/img/twitter_card.jpg
 ---
-= Database Connections Using SSL/TLS a Primer
+= Database connections with TLS
 Kyle Aure <https://github.com/Kyle_Aure>
 :imagesdir: /
 :url-prefix:
 :url-about: /
 
+This post is primer to help get you jumpstarted when enabling TLS database connections on Open Liberty.  
+Provided within is a background of how TLS connections are established, example configurations for our most commonly used database drivers (DB2, Oracle, Postgre, and SQLServer), and how to debug the most common issues.  
+Most of the configuration in this post is done on the Database JDBC driver which is easily configured on Open Liberty using the `JDBC-4.x` features and the `dataSource` element.
+
+This is an advance configuration.  
+For new Open Liberty users please review our existing documentation on configuring database connections here: link:https://openliberty.io/docs/21.0.0.3/relational-database-connections-JDBC.html[Relational database connections with JDBC]
+
+
 == What are TLS database connections and why are they important?
 Most enterprise ready database providers allow users to create connections using the Transport Layer Security (TLS) protocol.  
 
-TLS is a cryptographic security protocol that authenticates data transfer between systems, in this case between an Open Liberty server and a backend enterprise database. The Secure Socket Layer (SSL) protocol is also a cryptographic protocol that was replaced by TLS around 1999.  However, due to the similarities between the protocols, SSL and TLS are terms that are sometimes used interchangeably.
+TLS is a cryptographic security protocol that authenticates data transfer between systems, in this case between an Open Liberty server and a backend enterprise database. 
+The Secure Socket Layer (SSL) protocol is also a cryptographic protocol that was replaced by TLS around 1999.  
+However, due to the similarities between the protocols, SSL and TLS are terms that are sometimes used interchangeably.
 
-At the time of writing this blog the only two TLS protocol versions that are considered safe are TLSv1.2 and TLSv1.3.
-
-This is an advance configuration.  For new Open Liberty users please review our existing documentation on configuring database connections here: link:https://openliberty.io/docs/21.0.0.3/relational-database-connections-JDBC.html[Relational database connections with JDBC]
+At the time of writing this post the only two TLS protocol versions that are considered safe are TLSv1.2 and TLSv1.3.
 
 == How are TLS connections established?
 
-The TLS handshake is a process by which a client and server set the terms for secure communications during a connection. The handshake occurs before any data is exchanged. 
+The TLS handshake is a process by which a client and server set the terms for secure communications during a connection. 
+The handshake occurs before any data is exchanged. 
 
-Through this process, the client and server agree on a version of the TLS protocol, select cryptographic algorithms that are called cipher suites, and authenticate one another by exchanging and verifying digital certificates. These digital certificates are data files that contain cryptographic keys and other identifying information about a client or server. TLS certificates are digitally signed by a certificate authority, which acts as a trusted third party that can verify the identity of the parties that are exchanging information.
+Through this process, the client and server agree on a version of the TLS protocol, select cryptographic algorithms that are called cipher suites, and authenticate one another by exchanging and verifying digital certificates. 
+These digital certificates are data files that contain cryptographic keys and other identifying information about a client or server. 
+TLS certificates are digitally signed by a certificate authority, which acts as a trusted third party that can verify the identity of the parties that are exchanging information.
 
-The JDBC drivers are using the underlying JDK to create and participate in the TLS handshake.  Therefore, changes to protocol, cipher suites, and root certificates need to be done via the Transport Security feature. By default, Java 8 uses TLSv1.2. 
+The JDBC drivers are using the underlying JDK to create and participate in the TLS handshake.  
+Therefore, changes to protocol, cipher suites, and root certificates need to be done via the Transport Security feature. 
+By default, Java 8 uses TLSv1.2. 
 
 Additional documentation on Open Liberty support for TLS here: link:https://openliberty.io/docs/21.0.0.3/secure-communication-tls.html[Secure communication with Transport Layer Security (TLS)]
 
 == Common database primers
 
-The JDBC API does not specifiy an interface for creating TLS connections.  As a result, every JDBC driver provider that supports TLS connections has created their own implementations.  Therefore, each JDBC driver has to be configured differently. Below is a primer on the config needed for the most popular JDBC drivers supported by Open Liberty.
+The JDBC API does not specifiy an interface for creating TLS connections.  
+As a result, every JDBC driver provider that supports TLS connections has created their own implementations.  
+Therefore, each JDBC driver has to be configured differently. 
+The following sections provide example configurations for the most popular JDBC drivers that Open Liberty supports.
 
 Each driver will need to be configured with the following: 
 
@@ -85,11 +101,12 @@ To enable TLS connections on the DB2 driver add `sslConnection="true"` attribute
 
 **Establish Trust**
 
-To establish trust the driver needs to be able to compare the certificate sent by the database with a trusted certificate.  To establish trust, do one of the following: 
+To establish trust the driver needs to be able to compare the certificate sent by the database with a trusted certificate.
+To establish trust, do one of the following: 
 
-1. Configure a `keyStore` element that has the trusted certificate.
-2. Configure `sslTrustStoreLocation`, `sslTrustStorePassword`, and `sslTrustStoreType` attributes on the dataSource properties element that has the trusted certificate. 
-3. Configure `sslCertLocation` to point directly to the trusted certificate.
+- Configure a `keyStore` element that has the trusted certificate.
+- Configure `sslTrustStoreLocation`, `sslTrustStorePassword`, and `sslTrustStoreType` attributes on the dataSource properties element that has the trusted certificate. 
+- Configure `sslCertLocation` to point directly to the trusted certificate.
 
 Property Documentation: https://www.ibm.com/docs/en/db2-for-zos/11?topic=dsdjsss-configuring-connections-under-data-server-driver-jdbc-sqlj-use-ssl
 
@@ -127,15 +144,18 @@ Property Documentation: https://www.ibm.com/docs/en/db2-for-zos/11?topic=dsdjsss
 
 To enable TLS connections on the Postgre SQL driver add `ssl="true"` attribute to the dataSource properties element.
 
-The attribute `sslMode` is optional, but can be used to fine tune the amount of verification done by the driver. By default the `sslMode` is set to `prefer` which means the driver prefers to use encryption, but will create a connection even if it cannot.  Recommended setting is at least `veryify-ca` which will require encryption, and will verify the server certificate.  
+The attribute `sslMode` is optional, but can be used to fine tune the amount of verification done by the driver. 
+By default the `sslMode` is set to `prefer` which means the driver prefers to use encryption, but will create a connection even if it cannot.  
+Recommended setting is at least `veryify-ca` which will require encryption, and will verify the server certificate.  
 
 **Establish Trust**
 
-To establish trust the driver needs to be able to compare the certificate sent by the database with a trusted certificate.  To establish trust, do one of the following: 
+To establish trust the driver needs to be able to compare the certificate sent by the database with a trusted certificate.
+To establish trust, do one of the following: 
 
-1. Configure a `keyStore` element that has the trusted certificate.  
+- Configure a `keyStore` element that has the trusted certificate.  
   - To tell the Postgre SQL Driver to use the java SSLFactory set `sslfactory="org.postgresql.ssl.DefaultJavaSSLFactory"`
-2. Configure `sslKey` and `sslPassword` attributes on the dataSource properties element that has the trusted certificate.
+- Configure `sslKey` and `sslPassword` attributes on the dataSource properties element that has the trusted certificate.
 
 Property Documentation: https://jdbc.postgresql.org/documentation/head/connect.html
 
@@ -175,7 +195,8 @@ Property Documentation: https://jdbc.postgresql.org/documentation/head/connect.h
 
 To enable TLS connections on the Oracle JDBC driver add `connectionProperties="oracle.net.ssl_version=1.2;"` attribute to the dataSource properties element.
 
-The `connectionProperties` attribute takes a semicolon delimited list of properties to be applied to the driver. Additional properties that can be set for TLS configuration are: 
+The `connectionProperties` attribute takes a semicolon delimited list of properties to be applied to the driver. 
+Additional properties that can be set for TLS configuration are: 
 
 - `oracle.net.ssl_server_dn_match` - If true driver will confirm that the distinguished name (dn) of the certificate matches the hostname that sent the certificate.
 - `oracle.net.ssl_cipher_suites` - Specified subset of supported cipher suites for the driver to use. 
@@ -183,10 +204,11 @@ The `connectionProperties` attribute takes a semicolon delimited list of propert
 
 **Establish Trust**
 
-The Oracle database has a feature called Oracle Wallets. When setup correctly on the database side, the Database Administrator can provide two Wallet files (`cwallet.sso` and `ewallet.p12`) to the client. 
+The Oracle database has a feature called Oracle Wallets. 
+When setup correctly on the database side, the Database Administrator can provide two Wallet files (`cwallet.sso` and `ewallet.p12`) to the client. 
 
-1. To establish trust using Oracle Wallets point the driver to the directory containing your wallet files; `connectionProperties="oracle.net.wallet_location=security/;"`
-2. To establish trust using traditional keystore / truststore files use the `javax.net.ssl.*` connection properties.
+- To establish trust using Oracle Wallets point the driver to the directory containing your wallet files; `connectionProperties="oracle.net.wallet_location=security/;"`
+- To establish trust using traditional keystore / truststore files use the `javax.net.ssl.*` connection properties.
 
 Property Documentation: https://www.oracle.com/technetwork/topics/wp-oracle-jdbc-thin-ssl-130128.pdf
 
@@ -236,11 +258,12 @@ To enable TLS connections on the SQLServer driver add `encrypt="true"` attribute
 
 **Establish Trust**
 
-To establish trust the driver needs to be able to compare the certificate sent by the database with a trusted certificate.  To establish trust, do one of the following: 
+To establish trust the driver needs to be able to compare the certificate sent by the database with a trusted certificate.
+To establish trust, do one of the following: 
 
-1. Set `trustServerCertificate` to true.  This will tell the driver to always trust any certificate sent by the database. This is helpful when debugging your configuration, but should not be used in a production environment. 
-2. Configure a `keyStore` element that has the trusted certificate and set the `hostNameInCertificate` attribute on the datasource properties to tell the driver what hostname to expect in the certificate. 
-3. Configure `trustStore` and `trustStorePassword` attributes on the dataSource properties element that has the trusted certificate.
+- Set `trustServerCertificate` to true.  This will tell the driver to always trust any certificate sent by the database. This is helpful when debugging your configuration, but should not be used in a production environment. 
+- Configure a `keyStore` element that has the trusted certificate and set the `hostNameInCertificate` attribute on the datasource properties to tell the driver what hostname to expect in the certificate. 
+- Configure `trustStore` and `trustStorePassword` attributes on the dataSource properties element that has the trusted certificate.
 
 Property Documentation: https://docs.microsoft.com/en-us/sql/connect/jdbc/setting-the-connection-properties?view=sql-server-ver15
 
@@ -257,8 +280,13 @@ To enable TLS debug trace add a `jvm.options` file to your server configuration 
 -Djavax.net.debug=ssl:handshake:keymanager:trustmanager
 ----
 
+The following sections have snippets of debug provided by the Java Virutal Machine (JVM), in this case OpenJDK + OpenJ9.
+Each section will help point out the debug that can show a potential issues with your configuration and suggestions on how to fix it.
+Since this debug is provided by the JVM you will see the same output no matter what JDBC Driver you are using.
+The JDBC Driver may also give a meaningful message. 
+
 === Protocol and Cipher Suites
-Ensure protocol's match, and both client and server have common cipher suites (typically server chooses the cipher suite)
+Ensure protocol's match, and both client and server have common cipher suites (typically the database (server) chooses the cipher suite)
 
 [source,txt]
 ----
@@ -274,8 +302,14 @@ javax.net.ssl|DEBUG|48|Default Executor-thread-16|ServerHello.java:870|Consuming
 ----
 
 === Verify Certificate (client side)
-If you get the exception
-`PKIX path building failed: sun.security.provider.certpath.SunCertPathBuilderException: unable to find valid certification path to requested target` this means that the server sent a certificate in it's ServerHello message and the driver was not able to find a trusted certificate to verify against. 
+If you get the exception similar to the following.
+
+[source,txt]
+----
+PKIX path building failed: sun.security.provider.certpath.SunCertPathBuilderException: unable to find valid certification path to requested target
+----
+
+This likely means that the database (server) sent a certificate in it's ServerHello message and the driver was not able to find a trusted certificate to verify against. 
 
 Try to find what trusted certifcates were add by searching for the following trace:
 
@@ -289,7 +323,7 @@ javax.net.ssl|DEBUG|35|Default Executor-thread-3|X509TrustManagerImpl.java:79|ad
 ----
 
 === Verify Certificate (server side)
-If you have configured your driver to send a certificate back to your database to verify (like in the oracle example above), then that verification could also fail.
+If you have configured your driver to send a certificate back to your database to verify (like in the Oracle section), then that verification could also fail.
 
 Driver could not find a certificate to send: 
 
@@ -303,7 +337,9 @@ javax.net.ssl|DEBUG|41|Default Executor-thread-9|CertificateMessage.java:321|Pro
 
 Driver sent certificate, but database could not verify:
 
-This is a difficult issue to debug because the issue is on the database side and the driver may throw one of many different exception to indicate that it could not finish the handshake.  Below is a sample exception of when this occures when trying to connect to a SQLServer database. 
+This is a difficult issue to debug because the issue is on the database side and the driver may throw one of many different exception to indicate that it could not finish the handshake.  
+The following is a sample exception of when this occures when trying to connect to a SQLServer database. 
+
 [source,txt]
 ----
 java.sql.SQLException: The driver could not establish a secure connection to SQL Server by using Secure Sockets Layer (SSL) encryption. Error: "SQL Server did not return a response. The connection has been closed. DSRA0010E: SQL State = 08S01, Error Code = 0
