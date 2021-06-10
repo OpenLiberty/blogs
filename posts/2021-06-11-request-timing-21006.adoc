@@ -151,27 +151,27 @@ The problem was fixed by adding steps to transfer the `useJandex` setting to the
 +
 We found that Java’s `AtomicReference.getAndUpdate()` did not prevent the initialisation code from running twice.
 (This is the design of AtomicReference but a false assumption about this led to a bug in Liberty.)
-To avoid this in the future we wrote our own concurrent utility, AcidReference, that guaranteed a single thread would win the race to perform the initialisation.
+To avoid this we wrote our own concurrent utility, AcidReference, that guaranteed a single thread would win the race to perform the initialisation.
 Consequently, when two components are starting up in parallel in Liberty and both call for the `ORB`, only one of the threads performs the initialisation and the other one waits for the result.
 
 * link:https://github.com/OpenLiberty/open-liberty/issues/17177[Failed to locate DataSource, null Resourcefactory]
 +
-A defect was found in the situation where a customer has deployed a user feature that references a relational database and is also running applications that use global transactions in a configuration where the transaction recovery logs are stored in a database. 
-+
-Note that this is not applicable in the default case where transaction recovery logs are stored in a filesystem.
-+
-The issue occurred intermittently at server startup and arose when transaction recovery was attempted before data source initialization has been completed. In this situation the server would report `InternalLogExceptions` and failed to start.
-The fix introduces additional coordination between transaction recovery and data source initialization to allow the server to start successfully.
+A problem was found where a user feature is deployed which references a relational database and the server is running applications which use global transactions.  If transaction recovery is attempted before data source initialization completed, the server will report `InternalLogExceptions` and will fail to start.  The problem occurs intermittently at server startup.
+The problem occurs only if transaction recovery logs are configured to be stored in a database.
+
+The problem does not occur if the default case where transaction recovery logs are stored in a filesystem.
+
+The problem was fixed by a code update which better coordinates transaction recovery and data source initialization.
 
 * link:https://github.com/OpenLiberty/open-liberty/issues/17040[Revision to httpOption maxKeepAliveRequest default value]
 +
 By default, the Liberty HTTP channel configuration closes an incoming `HTTP keep alive connection` after 100 requests (`maxKeepAliveRequests`). The WAS Liberty performance documentation recommends disabling this without qualification and recommends using unlimited requests per persistent connection. Note that there is still the persistent timeout of 30 seconds (`persistTimeout`) which closes an idle `keepalive` socket after 30 seconds.
 +
-To fix this issue it was decided to change the default of the `maxKeepAliveRequests` option to `-1`. 
+In order to improve performance, it was decided to change the default of the `maxKeepAliveRequests` option to `-1`. 
 
 * link:https://github.com/OpenLiberty/open-liberty/issues/16743[Pull in MyFaces 2.3.9]
 +
-The `jsf-2.3` feature in Open Liberty makes use of link:https://myfaces.apache.org/#/core23[Apache MyFaces] JavaServer Faces implementation. With the release of Apache MyFaces 2.3.9 a number of improvements and bug fixes have been made, for more information visit the link:https://issues.apache.org/jira/secure/ReleaseNote.jspa?projectId=10600&version=12349634[Apache MyFaces 2.3.9 changelog].
+The `jsf-2.3` feature in Open Liberty makes use of link:https://myfaces.apache.org/#/core23[Apache MyFaces] JavaServer Faces implementation. With the release of Apache MyFaces 2.3.9 a number of improvements and bug fixes have been made. For more information visit the link:https://issues.apache.org/jira/secure/ReleaseNote.jspa?projectId=10600&version=12349634[Apache MyFaces 2.3.9 changelog].
 
 * link:https://github.com/OpenLiberty/open-liberty/issues/15023[WASReqURLOidc cookie encodes the request url but doesn't decoded it upon successful redirection]
 +
@@ -180,12 +180,22 @@ When calling an OIDC-protected URL that includes query parameters, the URL in th
 * link:https://github.com/OpenLiberty/open-liberty/issues/12778[mpJWT-1.1 configured by using jwksUri results in CWWKS5523E at the first jwt token presented to the server]
 +
 The `JwkRetriever` class contained a bug that caused it to potentially return an incorrect JWK from an internal cache. The wrong key could be returned if a JWK document containing a single JWK was previously fetched and cached, followed by the Liberty server receiving a JWT with a `kid` value that didn’t match the cached JWK. Instead of attempting to re-fetch the JWK document to find a matching JWK, the Liberty runtime would return the cached JWK as the key to use to verify the JWT’s signature. That would cause a JWT signature verification error, which would fail the request.
-The `JwkRetriever` class is now updated to return the sole cached JWK only if the JWT does not contain a key identifier (e.g. `kid`, `x5t`, or `use` values). If the JWT does contain one of those values, but a key cannot be found in the cache that matches one of those values, the runtime will now re-fetch the JWK document and see if it can find a matching key from there.
+The `JwkRetriever` class was updated to return the sole cached JWK only if the JWT does not contain a key identifier (e.g. `kid`, `x5t`, or `use` values). If the JWT does contain one of those values, but a key cannot be found in the cache that matches one of those values, the runtime will re-fetch the JWK document and see if it can find a matching key from within the document.
+
 
 == Known issues
 
+In this release there is a couple of issues that have already been detected. If you would like to find out more you can check out the corresponding Github Issues linked bellow.
 
 
+* link:https://github.com/OpenLiberty/open-liberty/issues/17465[Remove system out]
++
+An extra message is output to the console during server startup. It will only show when creating a certificate and on the first server start. Subsequent ones will not see it.
+
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/17478[Invalid featureUtility help parameters shown]
++
+Invalid command line optional parameters (`--featuresBom`) and (`--to`) are shown with "featureUtility help installFeature". Invalid command line optional parameter (`--featuresBom`) is shown with "featureUtility help installServerFeatures"
 
 
 == Get Open Liberty 21.0.0.6 now
