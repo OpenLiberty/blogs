@@ -1,0 +1,201 @@
+---
+layout: post
+title: "Request Timing Metrics plus a number of significant bug fixes in Open Liberty 21.0.0.6"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/jakub-pomykala
+author_github: https://github.com/jakub-pomykala
+seo-title: Request Timing Metrics plus a number of significant bug fixes in Open Liberty 21.0.0.6 - OpenLiberty.io
+seo-description: Open Liberty 21.0.0.6 now supports integrating Request Timing information with MicroProfile Metrics plus a number of significant bug fixes.
+blog_description: Open Liberty 21.0.0.6 now supports integrating Request Timing information with MicroProfile Metrics plus a number of significant bug fixes.
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+---
+= Request Timing Metrics plus a number of significant bug fixes in Open Liberty 21.0.0.6
+Jakub Pomykala <https://github.com/jakub-pomykala>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+
+// tag::intro[]
+
+Open Liberty 21.0.0.6 brings improvements to the MicroProfile Metrics feature, allowing for information gathered via the Request Timing feature to be displayed on the metrics endpoint, plus a number of significant bug fixes.
+
+In link:{url-about}[Open Liberty] 21.0.0.6:
+
+* <<metrics, Request Timing now supported by MicroProfile Metrics>>
+
+// end::intro[]
+View the list of fixed bugs in <<bugs, 21.0.0.6>>.
+
+// tag::run[]
+[#run]
+
+== Run your apps using 21.0.0.6
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], here are the coordinates:
+
+[source,xml]
+----
+<dependency>
+    <groupId>io.openliberty</groupId>
+    <artifactId>openliberty-runtime</artifactId>
+    <version>21.0.0.6</version>
+    <type>zip</type>
+</dependency>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+dependencies {
+    libertyRuntime group: 'io.openliberty', name: 'openliberty-runtime', version: '[21.0.0.6,)'
+}
+----
+
+Or if you're using Docker:
+
+[source]
+----
+FROM open-liberty
+----
+//end::run[]
+
+// // // // // // // //
+// Above:
+// Replace the RELEASE_VERSION with the Open Liberty release number e.g. 20.0.0.4
+// // // // // // // //
+
+Or take a look at our link:{url-prefix}/downloads/[Downloads page].
+
+[link=https://stackoverflow.com/tags/open-liberty]
+image::img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="center"]
+
+//tag::features[]
+
+[#metrics]
+=== Request Timing now supported by MicroProfile Metrics
+
+The request timing feature (`requestTiming-1.0`) is used to keep track of the slow and hung requests for servlet requests with a RequestTimingStats MXBean. The Microprofile Metrics features (`mpMetrics-X.X`) on the other hand provides vendor metrics that are distinct to the Open Liberty runtime.
+
+Starting with the Open Liberty 21.0.0.6 the RequestTimingStats MXBean will now have its data retrieved by the MicroProfile Metrics feature for reporting on the `/metrics` (or `/metrics/vendor`) endpoint. This functionality is compatible with both the 2.X and 3.X MicroProfile Metrics features.
+
+The following example shows a sample output of the new request timing metrics:
+
+[source, xml]
+----
+# TYPE vendor_requestTiming_activeRequestCount gauge
+# HELP vendor_requestTiming_activeRequestCount The number of servlet requests currently running.
+vendor_requestTiming_activeRequestCount 1
+
+# TYPE vendor_requestTiming_requestCount_total counter
+# HELP vendor_requestTiming_requestCount_total The number of servlet requests since the server started.
+vendor_requestTiming_requestCount_total 3
+
+# TYPE vendor_requestTiming_hungRequestCount gauge
+# HELP vendor_requestTiming_hungRequestCount The number of servlet requests that are currently running but are hung.
+vendor_requestTiming_hungRequestCount 0
+
+# TYPE vendor_requestTiming_slowRequestCount gauge
+# HELP vendor_requestTiming_slowRequestCount The number of servlet requests that are currently running but are slow.
+vendor_requestTiming_slowRequestCount 0
+----
+
+To be able to retrieve request timing metrics from `/metrics` you must enable both the `requestTiming-1.0` feature in combination with one of the following MicroProfile Metric features: `mpMetrics-2.0`, `mpMetrics-2.2` or `mpMetrics-2.3` or `mpMetric-3.0`.
+
+The metrics you receive depend on the configuration of the request timing thresholds for slow or hung requests. The following example demonstrates enabling request timing metrics for `mpMetrics-3.0`, with a sample threshold configuration for both slow and hung servlet requests.
+
+[source,xml]
+----
+    <featureManager>
+      <feature>mpMetrics-3.0</feature>
+      <feature>requestTiming-1.0</feature>
+      <!-- other features omitted for brevity -->
+    </featureManager>
+
+    <requestTiming sampleRate="1" slowRequestThreshold="10s">
+      <servletTiming
+        slowRequestThreshold="2s"
+        hungRequestThreshold="10s"/>
+    </requestTiming>
+----
+
+The following screenshot illustrates the four new metrics in Grafana.
+
+
+image::/img/blog/new_Metrics_Grafana-21006.png[requestCountThings,width=100%,align="center"]
+
+For more information about Request Timing with MicroProfile Metrics, see the following links:
+
+
+* link:{url-prefix}/docs/latest/reference/feature/requestTiming-1.0.html[Request Timing Documentation]
+* link:{url-prefix}/docs/latest/introduction-monitoring-metrics.html[Monitoring with Metrics]
+* link:{url-prefix}/docs/latest/jmx-metrics-list.html#request-timing-stats[Request Timing MXBean Documentation]
+
+//end::features[]
+
+[#bugs]
+== Notable bugs fixed in this release
+
+
+We’ve spent some time fixing bugs. The following sections describe just some of the issues resolved in this release. If you’re interested, here’s the  link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A21.0.0.6+label%3A%22release+bug%22[full list of bugs fixed in 21.0.0.6].
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/17268[useJandex is ignored when autoExpand is set]
++
+Normally, Open Liberty reads Jandex indexes when `useJandex` is set to `true`. For this APAR, when both `autoExpand` and `useJandex` were set to `true`, the `useJandex` setting was not used, meaning that Jandex indexes were not being read. This impacted first startups, causing them to be slower than if Jandex indexes were read. (A first startup is a startup just after an application archive is placed into the applications folder; or a startup just after the application archive is updated; or when `--clean` is specified on the startup.)
+The problem was that the `useJandex` setting was attached to a data structure that Open Liberty uses to access unexpanded application files. Open Liberty uses a different data structure to access the expanded application files.  The `useJandex` setting was not attached to the second data structure.
+The problem was fixed by adding steps to transfer the `useJandex` setting to the data structure used by Open Liberty to access the expanded application files.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/17203[ORB.init() called simultaneously on two threads during server start]
++
+We found a problem in Liberty's ORB initialization code, based on a false assumuption that Java's `AtomicReference.getAndUpdate()` would only call the provided 'updateFunction' once for any update to the reference's value. (In fact, though it guarantees the update to the reference's value to be atomic, the `updateFunction` might be called by several threads contending to perform the update). To provide the behaviour we required, we devised our own concurrent utility, AcidReference, (built using AtomicReference), which guarantees the `updateFunction` is only called once, by one of the threads contending for update. Making use of this new `AcidReference` allows any contention in ORB initialization in Liberty to be resolved correctly, tasking one thread to perform the ORB initialization whilst any others wait for its result.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/17177[Failed to locate DataSource, null Resourcefactory]
++
+A problem was found where a user feature is deployed which references a relational database and the server is running applications which use global transactions.  If transaction recovery is attempted before data source initialization completed, the server reports `InternalLogExceptions` and fails to start.  The problem occurs intermittently at server startup.
+The problem occurs only if transaction recovery logs are configured to be stored in a database.
+
+The problem does not occur if the default case where transaction recovery logs are stored in a filesystem.
+
+The problem was fixed by a code update which better coordinates transaction recovery and data source initialization.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/17040[Revision to httpOption maxKeepAliveRequest default value]
++
+By default, the Liberty HTTP channel configuration closes an incoming `HTTP keep alive connection` after 100 requests (`maxKeepAliveRequests`). The WAS Liberty performance documentation recommends disabling this without qualification and recommends using unlimited requests per persistent connection. Note that there is still the persistent timeout of 30 seconds (`persistTimeout`) which closes an idle `keepalive` socket after 30 seconds.
++
+In order to improve performance, it was decided to change the default of the `maxKeepAliveRequests` option to `-1`.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/16743[Pull in MyFaces 2.3.9]
++
+The `jsf-2.3` feature in Open Liberty makes use of link:https://myfaces.apache.org/#/core23[Apache MyFaces] JavaServer Faces implementation. With the release of Apache MyFaces 2.3.9 a number of improvements and bug fixes have been made. For more information visit the link:https://issues.apache.org/jira/secure/ReleaseNote.jspa?projectId=10600&version=12349634[Apache MyFaces 2.3.9 changelog].
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/15023[WASReqURLOidc cookie encodes the request url but doesn't decoded it upon successful redirection]
++
+When calling an OIDC-protected URL that includes query parameters, the URL in the `WASReqURLOidc` cookie was incorrectly encoded. This would cause the URL query parameters to not be decoded correctly upon successful redirection to the original request URL. To fix this issue, instead of encoding the query string in the original request URL, we are leaving it as-is. That should ensure we ultimately use the correct original value of the query string. During the creation of the `WASReqURLOidc` cookie, the cookie value is encoded to mitigate against malformed and potentially malicious cookie values anyway. The `OidcRedirectServlet` class is also updated to use slightly different code to read the cookie so that the appropriate respective decoding is done.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/12778[mpJWT-1.1 configured by using jwksUri results in CWWKS5523E at the first jwt token presented to the server]
++
+The `JwkRetriever` class contained a bug that caused it to potentially return an incorrect JWK from an internal cache. The wrong key could be returned if a JWK document containing a single JWK was previously fetched and cached, followed by the Liberty server receiving a JWT with a `kid` value that didn’t match the cached JWK. Instead of attempting to re-fetch the JWK document to find a matching JWK, the Liberty runtime would return the cached JWK as the key to use to verify the JWT’s signature. That would cause a JWT signature verification error, which would fail the request.
+The `JwkRetriever` class was updated to return the sole cached JWK only if the JWT does not contain a key identifier (e.g. `kid`, `x5t`, or `use` values). If the JWT does contain one of those values, but a key cannot be found in the cache that matches one of those values, the runtime will re-fetch the JWK document and see if it can find a matching key from within the document.
+
+
+== Known issues
+
+In this release, a couple of issues were discovered. If you would like to find out more, you can check out the corresponding Github Issues linked bellow.
+
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/17465[Remove system out]
++
+An extra message is output to the console during server startup. It will only show when creating a certificate and on the first server start. Subsequent server starts will not see it.
+
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/17478[Invalid featureUtility help parameters shown]
++
+Invalid command line optional parameters (`--featuresBom`) and (`--to`) are shown with "featureUtility help installFeature". Invalid command line optional parameter (`--featuresBom`) is shown with "featureUtility help installServerFeatures"
+
+
+== Get Open Liberty 21.0.0.6 now
+
+Available through <<run,Maven, Gradle, Docker, and as a downloadable archive>>.

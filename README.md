@@ -82,21 +82,23 @@ These steps are to be completed by the author of the blog post.
 
    If you see any problems , such as formatting issues or typos, resolve them first in your branch. Then, create another PR into `draft` branch, link the PR to the issue again,  and get the PR merged. Wait for IBM Cloud to rebuild [blog-draft site](https://blog-draft-openlibertyio.mybluemix.net/blog/) or [draft site](https://draft-openlibertyio.mybluemix.net/blog/) and verify the change.
 
-7. When you're happy with the post, create a PR from your branch (_not_ from the `draft` branch) to the `staging` branch.
+7. When you're happy with the post:
+   - Create a PR from your branch (_not_ from the `draft` branch) to the `staging` branch.
+   - Link the PR to the issue.
+   - In the PR, provide a link to your post on the [blog-draft site](https://blog-draft-openlibertyio.mybluemix.net/blog/) or [draft site](https://draft-openlibertyio.mybluemix.net/blog/). 
+   - Ideally, also paste a screenshot of the entire blog post page as this will allow reviewers to see the rendered post content even while the sites are innaccessible (e.g. redeploys). 
+   - Add @GraceJansen, as well as your technical reviewer and any other reviewers to get their final approval for both content and format.
+8. The editors will now review and edit the post. Please respond to any questions they ask or suggestions they make. Their aim is to make the post readable and useful to its target audience.
+9. If you need to make changes based on review comments, as before: 
+   - Make any changes in your feature branch
+     - The updates that you make to your branch for the `draft` PR will be automatically picked up by your `staging` PR; there is no need to update it. 
+   - Create a PR to the `draft` branch 
+   - Link the PR to the issue
+   - Merge the PR
+   - Once the site rebuilds, check that everything is correct on the [blog-draft site](https://blog-draft-openlibertyio.mybluemix.net/blog/) or [draft site](https://draft-openlibertyio.mybluemix.net/blog/).
+10. Get reviewers to review the updates in your new PR.
 
-   Link the PR to the issue.
- 
-   In the PR, provide a link to your post on the [blog-draft site](https://blog-draft-openlibertyio.mybluemix.net/blog/) or [draft site](https://draft-openlibertyio.mybluemix.net/blog/). Ideally, also paste a screenshot of the entire blog post page as this will allow reviewers to see the rendered post content even while the sites are innaccessible (e.g. redeploys).
-   
-   Add @GraceJansen, as well as your technical reviewer and any other reviewers to get their final approval for both content and format.
-   
-   As before, make any changes in your feature branch, create a PR `draft` branch, get it merged, and once the site rebuilds, check that everything is correct on the [blog-draft site](https://blog-draft-openlibertyio.mybluemix.net/blog/) or [draft site](https://draft-openlibertyio.mybluemix.net/blog/).
-
-   This automatically updates the PR to `staging`.
-
-You've written a post!
-
-The editors will now review and edit the post. Please respond to any questions they ask or suggestions they make. Their aim is to make the post readable and useful to its target audience.
+You're done! The editors will handle the rest.
 
 Please note that if you have a specific date in mind that you want this blog to be published by, we need a final draft of the blog to be ready for editing in the draft repo a minimum of two weeks prior to the desired publish date.
 
