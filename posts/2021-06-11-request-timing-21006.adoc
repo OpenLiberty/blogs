@@ -80,7 +80,7 @@ image::img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="cent
 
 The request timing feature (`requestTiming-1.0`) is used to keep track of the slow and hung requests for servlet requests with a RequestTimingStats MXBean. The Microprofile Metrics features (`mpMetrics-X.X`) on the other hand provides vendor metrics that are distinct to the Open Liberty runtime.
 
-Starting with the Open Liberty 21.0.0.6 the RequestTimingStats MXBean will now have it’s data retrieved by the MicroProfile Metrics feature for reporting on the `/metrics` (or `/metrics/vendor`) endpoint. This functionality is compatible with both the 2.X and 3.X MicroProfile Metrics features.
+Starting with the Open Liberty 21.0.0.6 the RequestTimingStats MXBean will now have its data retrieved by the MicroProfile Metrics feature for reporting on the `/metrics` (or `/metrics/vendor`) endpoint. This functionality is compatible with both the 2.X and 3.X MicroProfile Metrics features.
 
 The following example shows a sample output of the new request timing metrics:
 
@@ -150,10 +150,7 @@ The problem was fixed by adding steps to transfer the `useJandex` setting to the
 
 * link:https://github.com/OpenLiberty/open-liberty/issues/17203[ORB.init() called simultaneously on two threads during server start]
 +
-We found that Java’s `AtomicReference.getAndUpdate()` did not prevent the initialization code from running twice.
-(This is the design of AtomicReference but a false assumption about this led to a bug in Liberty.)
-To avoid this we wrote our own concurrent utility, AcidReference, that guaranteed a single thread would win the race to perform the initialization.
-Consequently, when two components are starting up in parallel in Liberty and both call for the `ORB`, only one of the threads performs the initialization and the other one waits for the result.
+We found a problem in the Liberty ORB initialization code, based on a false assumption that the Java `AtomicReference.getAndUpdate()` would only call the provided `updateFunction` once for any update to the reference value. In fact, though it guarantees the update to the reference's value to be atomic, the `updateFunction` might be called by several threads contending to perform the update. To provide the behavior we required, we devised our own concurrent utility, `AcidReference`, which was built by using AtomicReference and guarantees the `updateFunction` is only called once, by one of the threads contending for update. Making use of this new `AcidReference` allows any contention in ORB initialization in Liberty to be resolved correctly, tasking one thread to perform the ORB initialization while any others wait for its result.
 
 * link:https://github.com/OpenLiberty/open-liberty/issues/17177[Failed to locate DataSource, null Resourcefactory]
 +
@@ -191,7 +188,7 @@ In this release, a couple of issues were discovered. If you would like to find o
 
 * link:https://github.com/OpenLiberty/open-liberty/issues/17465[Remove system out]
 +
-An extra message is output to the console during server startup. It will only show when creating a certificate and on the first server start. Subsequent ones will not see it.
+An extra message is output to the console during server startup. It will only show when creating a certificate and on the first server start. Subsequent server starts will not see it.
 
 
 * link:https://github.com/OpenLiberty/open-liberty/issues/17478[Invalid featureUtility help parameters shown]
