@@ -19,9 +19,8 @@ Jakub Pomykala <https://github.com/jakub-pomykala>
 
 // tag::intro[]
 
-Open Liberty 21.0.0.7 comes with out any new features but a number of signifcant bug fixes. 
+Open Liberty 21.0.0.7 comes with out any new features but a number of signifcant bug fixes. The majority of the work in this release went into our Beta version. You can find a link to our 21.0.0.8-beta here shortly, so keep an eye out!
 
-View the list of fixed bugs in link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A21.0.0.7+label%3A%22release+bug%22[21.0.0.7].
 // end::intro[]
 
 
@@ -77,23 +76,24 @@ We’ve spent some time fixing bugs. The following sections describe just some o
 * link:https://github.com/OpenLiberty/open-liberty/issues/17344[Occasional login failure of OIDC RP if clientSecret is not configured]
 +
 In the `OIDC RP`, when no `clientSecret` is configured, validation of the signature of the `JWT` occasionally would fail with a message similar to:
-
++
 [source, text]
 ----
 CWWKS1739E: A signing key required by signature algorithm [none] was not available. null
 ----
-
-This bug was fixed by updating the `JWT `validation code in the `OpenID` Connect client to return a `null` `java.security.Key` object as the signature verification key if `signatureAlgorithm` is set to `none` in the `OpenID` Connect client configuration. Before, an `HmacKey` object was instantiated using the `clientSecret` value from the `OIDC` client configuration, even though the Key object will never be used if `signatureAlgorithm` is set to `none`. The new behavior avoids a `NullPointerException` when a `clientSecret` is not configured in the `OIDC` client.
++
+This bug was fixed by updating the `JWT` validation code in the `OpenID` Connect client to return a `null` `java.security.Key` object as the signature verification key if `signatureAlgorithm` is set to `none` in the `OpenID` Connect client configuration. Before, an `HmacKey` object was instantiated using the `clientSecret` value from the `OIDC` client configuration, even though the Key object will never be used if `signatureAlgorithm` is set to `none`. The new behavior avoids a `NullPointerException` when a `clientSecret` is not configured in the `OIDC` client.
 
 * link:https://github.com/OpenLiberty/open-liberty/issues/17593[EJB Singleton Lifecycle Deadlock]
 +
-When the Singleton called another managed object (like another session bean or asynchronous bean) OR the Singleton had a lifecycle interceptor.
-The other managed object calls the Singleton. (Either through an asynchronous method that is invoked at the right time (so a timing problem) or through the method the Singleton called on it).
-This would cause a deadlock because the Singleton would be locked from the lifecycle event.
+A Singleton can be locked from the lifecycle event causing a deadlock when:
+
+** When the Singleton called another managed object (like another session bean or asynchronous bean) OR the Singleton had a lifecycle interceptor.
+** The other managed object calls the Singleton. (Either through an asynchronous method that is invoked at the right time (so a timing problem) or through the method the Singleton called on it).
 
 For `@PreDestroy` we are no longer locking the singleton, depending on when the destroy resolves, the other managed object might get an error stating the bean has been stopped/destroyed.
 
-For `@PostConstruct` the `EJBContainer` must lock the creation of `SingletonBeans` to ensure only one gets created. Instead of deadlocking forever we now have a timeout value of attempting to obtain a lock. This value is 2 minutes by default but configurable by `@AccessTimeout` value either on the class or the `@PostConstruct` method. A thread that times out trying to access the Singleton will get a `javax.ejb.ConcurrentAccessTimeoutException`
+For `@PostConstruct` the `EJBContainer` must lock the creation of `SingletonBeans` to ensure only one gets created. Instead of deadlocking forever we now have a timeout value of attempting to obtain a lock. This value is 2 minutes by default but configurable by `@AccessTimeout` value either on the class or the `@PostConstruct` method. A thread that times out trying to access the Singleton will get a `javax.ejb.ConcurrentAccessTimeoutException`.
 
 * link:https://github.com/OpenLiberty/open-liberty/issues/17235[Improve featureUtility return code when invalid action name is specified]
 +
@@ -105,18 +105,18 @@ FeatureUtility installFeature command did not support the installation of multip
 
 * link:https://github.com/OpenLiberty/open-liberty/issues/17666[JavaMail tries to use a resource file that only exists in the implementation]
 +
-Instead of the `javax.mail.Session` constructor (from `wlp/dev/api/spec/com.ibm.websphere.javaee.mail.1.6_1.0.53.jar`) tried to load the resource `/META-INF/javamail.default.address.map`, that is required. However, this file only existed in the implementation (`wlp/lib/com.ibm.ws.com.sun.mail.javax.mail.1.6_1.6.53.jar`) and it is not able to find it, so it caused a warning to show up:
-
+The `javax.mail.Session` constructor (from w`lp/dev/api/spec/com.ibm.websphere.javaee.mail.1.6_1.0.53.jar`) tried to load the resource `/META-INF/javamail.default.address.map`. However, this file only existed in the implementation (`wlp/lib/com.ibm.ws.com.sun.mail.javax.mail.1.6_1.6.53.jar`). It is not able to find it, so it caused a warning to show up:
++
 [source, text]
 ----
 [WARNING ] expected resource not found: /META-INF/javamail.default.address.map
 ----
-
++
 This issue was resolved by adding `javamail.default.address.map` to the `app-resource` header.
 
 * link:https://github.com/OpenLiberty/open-liberty/issues/17658[concurrencyPolicy loses queue slots when managed executor deactivates and erroneously cancels tasks of other executors]
 +
-It has been noticed that the identifier that is supplied by the managed executor to `PolicyExecutor.cancel` is ignored by the policy executor and it appears to indiscriminately cancel everything. This would cause a bug where 2 or more managed executors sharing the same `concurrencyPolicy` and used by different applications where only one managed executor deactivates, would erroneously see cancellation of tasks belonging to the other managed executor as well. We have now switched the code from removing directly from the queue and then issuing the cancel to just issuing the cancel.  This is the correct solution because the cancel operation contains the correct logic for decrementing the count against the `maxQueueSize`.
+It has been noticed that the identifier that is supplied by the managed executor to `PolicyExecutor.cancel` is ignored by the policy executor and it appears to indiscriminately cancel everything. This would cause a bug where two or more managed executors sharing the same `concurrencyPolicy` and used by different applications where only one managed executor deactivates, would erroneously see cancellation of tasks belonging to the other managed executor. We have now switched the code from removing directly from the queue and then issuing the cancel to just issuing the cancel.  This is the correct solution because the cancel operation contains the correct logic for decrementing the count against the `maxQueueSize`.
 
 * link:https://github.com/OpenLiberty/open-liberty/issues/17482[JSP with trackDependencies should check for updates of included JSP in the extended document root]
 +
