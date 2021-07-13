@@ -6,8 +6,8 @@ categories: blog
 author_picture: https://avatars3.githubusercontent.com/joe-chacko
 author_github: https://github.com/joe-chacko
 seo-title: Building on AtomicReference - OpenLiberty.io
-seo-description: AtomicReference does not guarantee that an update function gets called exactly once. We describe a helpful, thread-safe mechanism that builds on AtomicReference to provide such a guarantee. This can be used for lazy initialization, clean-up, or any state change processing that is to happen exactly once.
-blog_description: "AtomicReference does not guarantee that an update function gets called exactly once. We describe a helpful, thread-safe mechanism that builds on AtomicReference to provide such a guarantee. This can be used for lazy initialization, clean-up, or any state change processing that is to happen exactly once."
+seo-description: Java's AtomicReference does not guarantee that an update function gets called exactly once. We describe a helpful, thread-safe mechanism that builds on AtomicReference to provide such a guarantee. This can be used for lazy initialization, clean-up, or any state change processing that is to happen exactly once.
+blog_description: "Java's AtomicReference does not guarantee that an update function gets called exactly once. We describe a helpful, thread-safe mechanism that builds on AtomicReference to provide such a guarantee. This can be used for lazy initialization, clean-up, or any state change processing that is to happen exactly once."
 open-graph-image: https://openliberty.io/img/twitter_card.jpg
 additional_authors:
 - name: Neil Richards
@@ -41,7 +41,7 @@ For example, one might write something like this:
 When `getWidget()` is first invoked, it will create a new `Widget`, but later calls will find the existing one.
 
 There is a trap here for the unwary developer.
-The contract of the `updateAndGet()` method warns us about the update function: --
+The contract of the `updateAndGet()` method describes some restrictions on the update function: --
 [quote]
 ----
 "The function should be side-effect-free, since it may be re-applied when attempted updates fail due to contention among threads."
@@ -49,25 +49,32 @@ The contract of the `updateAndGet()` method warns us about the update function: 
 Although the update only happens once, many threads may call the update function at the same time.
 If the update function is fast and side-effect free, there is no cause for concern.
 But if creating a new widget is slow, or has side-effects, this approach is flawed.
+Let's build an alternative that works well with any kind of update function,
+even if it is slow, non-thread-safe, or throws exceptions.
 
 == To do or not to do
 
-The update processing -- e.g. a lazy initialization step -- should happen exactly once.
+The update processing  --  e.g. a lazy initialization step  --  should happen exactly once.
 Thread contention must be resolved _before the work is undertaken_: --
 
 * Exactly one thread must win the race *to do* the update.
-* All other threads need *not to do* anything but wait for the result.
+* All other threads need *not to do* anything except wait for the result.
 
-Let's consider a new class that behaves this way.
-`AtomicReference` is atomic, consistent, and durable (within the process).
-Our new utility adds the missing transactional property: isolation.
-We'll call it `AcidReference`.
+Let's consider a new utility we'll call `AcidReference`.
+[NOTE]
+.What's in a name?
+====
+`AcidReference` provides the transactional isolation missing from `AtomicReference`.
+We called it `AcidReference` after the https://en.wikipedia.org/wiki/ACID[ACID properties of transactions].
+The name is a bit of a stretch since the utility provides neither consistency nor durability.
+But why let mere facts stand in the way of a great name?
+====
 
 === Though this be madness, yet there is method in't
 
 We need a more expressive interface for this behaviour.
 Rather than an update function, we accept a _supplier of_ an update function.
-A `null` return value means no update is necessary.
+If the supplier returns `null` then no update is necessary.
 Our method signature looks like this:
 [source, java]
 ----
@@ -78,7 +85,7 @@ Our method signature looks like this:
 Also note that we dispensed with the update-and-get approach.
 In our use case, we were not using the return value of `updateAndGet()`.
 We return a `boolean` to show whether the update happened on this thread.
-It should be easy to implement `updateAndGet()` or `getAndUpdate()` instead.
+It should be easy to modify the code to implement an isolated atomic `updateAndGet()` or `getAndUpdate()` .
 
 === By indirections, find directions out
 [quote, David John Wheeler]
@@ -86,7 +93,7 @@ It should be easy to implement `updateAndGet()` or `getAndUpdate()` instead.
 "We can solve any problem by introducing an extra level of indirection."
 ----
 
-Let's create a `Ref` interface that tells us whether it is in transition.
+We define a `Ref` interface that tells us whether it is in transition.
 [source, java]
 ----
     @FunctionalInterface
@@ -94,8 +101,13 @@ Let's create a `Ref` interface that tells us whether it is in transition.
         default boolean isReady() { return true; }
     }
 ----
-`@FunctionalInterface` reserves the right to use a lambda expression.
-(The compiler checks the interface satisfies Java's lambda constraints.)
+
+[NOTE]
+.It was Greek to me
+====
+Marking the interface with `@FunctionalInterface` reserves the implementer's right to use a lambda expression.
+It is a hint to the compiler to check the interface satisfies Java's lambda constraints.
+====
 
 While the update is being applied, we want a special `Ref` that makes other threads wait for the result:
 [source, java]
@@ -135,16 +147,16 @@ Waiting for a transition is very simple:
     }
 ----
 Usually, this loop will run only once, because `ref.isReady()` returns true.
-For a `TransitionalRef`, the `isReady()` method will block until the transition completes.
-A waiting thread would usually repeat the loop only once more.
-An unlucky thread could loop around many times -- once for each observed transition.
+If `ref` is a `TransitionalRef`, the `isReady()` method will block until the transition completes.
+Even then, the loop would usually repeat once more and then retrieve the updated value.
+An unlucky thread could loop around many times -- once for each of many observed transitions.
 
 [NOTE]
-.Indefinite loops in Java
+.For ever and a day
 ====
-Some programmers prefer the `while (true)` or `do`...`while (true)` stype of indefinite loop.
+Some programmers prefer the `while (true)` or `do`...`while (true)` style of indefinite loop.
 The empty `for` has fewer compare operations,
-and the `(;;)` syntax looks more fun.
+and the `(;;)` syntax is more fun.
 We call it the spider operator. &#128375;
 ====
 
@@ -188,18 +200,18 @@ Other threads must wait for the transition to complete before they can access th
 <3> If the supplier returned `null`, it means that no update was necessary.
 <4> An update is required; create a transitional reference for the current thread.
 <5> Atomically compare and swap the original `ref` with this thread's transitional one. If it fails, retry steps 1, 2, 3, and 5 until no update is needed (on step 2) or the compare-and-swap succeeds (on step 5).
-<6> If a thread proceeds to here, it must update the value.
+<6> If a thread reaches here, it can update the value.
 <7> Use the provided updater to compute the new value. Remember this can be slow or costly, or have side-effects. Any computed value will be applied and observable. This is the _raison d'&ecirc;tre_ of `AcidReference`. `AtomicReference` can provide no such guarantee.
 <8> Create a new non-transitional reference. (At last, the lambda we hinted at earlier.)
 <9> Flag up to the caller that this update has succeeded.
 <10> `ref` will hold either the new value, or the original value if an exception occurred. `set()` either _commits_ the new value, or _rolls back_ to the old one.
-<11> This call to `markAsReady()` unblocks any threads waiting in step 1.
+<11> `markAsReady()` unblocks any threads waiting in step 1.
 
 == There are more things in heaven and earth than are dreamt of in our philosophy
-Writing this post made us think of some potential improvements to `AcidReference`.
+Writing this post flushed out some potential improvements to `AcidReference`.
 We made several of these as we went along, but we may yet find others.
 You can https://github.com/OpenLiberty/open-liberty/search?q=AcidReference[search for the latest implementation, tests, and usage of this utility in the OpenLiberty source repository].
 
 We also noticed (for the first time) a utility that has been in the Java class library since Java 5: `AtomicMarkableReference`.
 This adds a boolean flag and further atomic operations to make use of it.
-This is useful but does not provide thread update notification.
+This is useful but does not provide the thread-safe isolation of updates that `AcidReference` does.
