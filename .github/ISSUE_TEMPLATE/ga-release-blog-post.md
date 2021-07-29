@@ -3,7 +3,7 @@ name: Open Liberty GA release blog post
 about: Checklist that must be completed to create and publish Open Liberty release notes.
 title: Open Liberty GA release blog post for VERSION_NUMBER
 labels: release
-assignees: jakub-pomykala, austin0
+assignees: jakub-pomykala, ryan-storey
 
 ---
 
