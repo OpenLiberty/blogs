@@ -3,7 +3,7 @@ name: Open Liberty GA release blog post
 about: Checklist that must be completed to create and publish Open Liberty release notes.
 title: Open Liberty GA release blog post for VERSION_NUMBER
 labels: release
-assignees: jakub-pomykala, austin0
+assignees: jakub-pomykala, ryan-storey
 
 ---
 
@@ -28,19 +28,6 @@ Follow the instructions in the README and the template file to complete the foll
 - [ ] Agree with @mbroz2 which feature will lead this blog post, then write a title, slug, summary first paragraph, and SEO front matter appropriately.
 - [ ] Get the post approved by @mbroz2.
 - [ ] On release day (usually a Friday) @mbroz2 will publish the post.
-
-## 2. Red Hat Runtimes release notes for Open Liberty
-
-The release notes are automatically built from the asciidoc release blog post. This is done by using the appropriate tags in the asciidoc source and then the Red Hat documentation build includes the tagged sections in the release notes. The tags ensure that information in the blog post that is not relevant to the Red Hat Runtimes release are omitted from the Red Hat Runtimes release notes.
-
-- [ ] In the asciidoc source of the draft release blog post, check that the include tags are in the correct places in the asciidoc source file:
-  - [ ] `// tag::intro[]` (before the first paragraph)
-  - [ ] `// end::intro[]` (after the link to the list of fixed bugs)
-  - [ ] `// tag::run[]` (before the Maven coordinates)
-  - [ ] `//end::run[]` (after the Dockerfile entry)
-  - [ ] `//tag::features[]` (before the first GA feature section)
-  - [ ] `//end::features[]` (after the last GA feature section)
-- [ ] In [the release notes file](https://raw.githubusercontent.com/PurpleLiberty/docs/master/releasenotes/master-remote.adoc) (in a separate repo on GitHub), find the include statement in the **Features** section of the release notes. Edit the file name part of the include statement so that it targets the new Open Liberty release blog post .adoc file. Don't change anything else. Work with the ID team if they contact you to resolve any problems when the Red Hat build is run.
 
 ## All done?
 
