@@ -1,0 +1,140 @@
+---
+layout: post
+title: "New important bug fixes in Open Liberty 21.0.0.8"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/ryan-storey
+author_github: https://github.com/ryan-storey
+seo-title: New important bug fixes in Open Liberty 21.0.0.8 - OpenLiberty.io
+seo-description: Whilst there is no new content in Open Liberty 21.0.0.8, there are several important new bug fixes. 
+blog_description: Whilst there is no new content in Open Liberty 21.0.0.8, there are several important new bug fixes. 
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+---
+= TITLE
+Ryan Storey <https://github.com/ryan-storey>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+//tag::intro[]
+
+Whilst there is no new content in Open Liberty 21.0.0.8, there are several important new bug fixes. 
+
+//end::intro[]
+
+//tag::run[]
+[#run]
+
+// // // // // // // //
+// LINKS
+//
+// OpenLiberty.io site links:
+// link:{url-prefix}/guides/maven-intro.html[Maven]
+// 
+// Off-site links:
+//link:https://openapi-generator.tech/docs/installation#jar[Download Instructions]
+//
+// IMAGES
+//
+// Place images in ./img/blog/
+// Use the syntax:
+// image::/img/blog/log4j-rhocp-diagrams/current-problem.png[Logging problem diagram,width=70%,align="center"]
+// // // // // // // //
+
+== Run your apps using 21.0.0.8
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], here are the coordinates:
+
+[source,xml]
+----
+<dependency>
+    <groupId>io.openliberty</groupId>
+    <artifactId>openliberty-runtime</artifactId>
+    <version>21.0.0.8</version>
+    <type>zip</type>
+</dependency>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+dependencies {
+    libertyRuntime group: 'io.openliberty', name: 'openliberty-runtime', version: '[21.0.0.8,)'
+}
+----
+
+Or if you're using Docker:
+
+[source]
+----
+FROM open-liberty
+----
+//end::run[]
+
+// // // // // // // //
+// Above:
+// Replace the 21.0.0.8 with the Open Liberty release number e.g. 20.0.0.4
+// // // // // // // //
+
+Or take a look at our link:{url-prefix}/downloads/[Downloads page].
+
+[link=https://stackoverflow.com/tags/open-liberty]
+image::img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="center"]
+
+//tag::features[]
+
+//end::features[]
+
+[#bugs]
+== Notable bugs fixed in this release
+
+
+We’ve spent some time fixing bugs. The following sections describe just some of the issues resolved in this release. If you’re interested, here’s the  link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A21.0.0.8+label%3A%22release+bug%22[full list of bugs fixed in 21.0.0.8].
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/17904[grpcClient-1.0 dynamic enablement unexpected behavior]
++
+Previously, the `grpcClient-1.0` feature could not be enabled dynamically after server startup. This was caused by an implementation bug - a mismatch between the `ServiceLoader` and `OSGi` lifecycles. The feature has been updated to remove its `ServiceLoader` reliance, allowing it to function correctly when it's enabled after server start.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/17828[Update JSP Logic to Avoid Race Condition Regarding trackDependencies]
++
+A bug was discovered with the `trackDependencies` property in `JSP` when handling concurrent requests. This meant that dependents were not tracked, and the `JSP` would fail to update when any changes were made to these dependents. This issue was resolved by fixing a race condition regarding one of `JSP`'s variables.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/17799[gRPC monitoring requires the enablement of both grpc-1.0 and grpcClient-1.0]
++
+Previously, when `monitoring-1.0` was enabled along with either of `grpc-1.0` or `grpcClient-1.0`, a bundle resolution error was encountered. There was no issue if both `grpc-1.0` and `grpcClient-1.0` were enabled. This happened because the gRPC monitoring private feature had simultaneous dependencies on both `grpc-1.0` and `grpcClient-1.0`. This issue was resolved by splitting up the internal gRPC monitoring implementation so that it can be used with the gRPC features independently.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/17757[Passivating remote EJB Stub fails when rmicCompatible=true]
++
+When the `com.ibm.websphere.ejbcontainer.rmicCompatible` JVM property is set, a `ClassCastException` occurs when passivating then activating a stateful session bean that contains a reference (stub) to an `EJB 3.x` style remote interface that does not extend `java.rmi.Remote`. The issue has been fixed by using the `ORB` during passivation to convert the `stub` to a serialized string that my be restored during activation.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/17678[Port MYFACES-4065/MYFACES-4187 to JSF 2.2]
++
+Occasionally, in `jsf-2.2` - `StringIndexOutOfBoundsException` would be thrown if JSF tried to handle an empty string as a resource.  This would result in a error like below:
+java.lang.StringIndexOutOfBoundsException: String index out of range: 0
+at java.lang.String.charAt(Unknown Source)
+at org.apache.myfaces.application.ResourceHandlerImpl.createResource(ResourceHandlerImpl.java:118)
+at javax.faces.application.ResourceHandlerWrapper.createResource(ResourceHandlerWrapper.java:47)
+Now a `NullPointerExcepton` will be thrown if a resourceName is `null`.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/17313[ubuntu upgrade re-enabled openliberty@defaultServer]
++
+When upgrading `ubuntu` from `21.0.0.1-1ubuntu1` to `21.0.0.5-1ubuntu1`, `openliberty@defaultServer` was unexpectedly re-enabled, however the expected behaviour is that it should remain disabled. This issue was resolved by making sure the `defaultServer` service was only enabled if no `openliberty@` services exist, and to not enable the service if it already exists.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/16994[Dynamic reconfig of discovery endpoint not updating endpoints in all cases]
++
+Previously, if a Social client was reconfigured, replacing the valid `discoveryEndpointUrl` with an empty string, and then reconfiguring it again with a good discovery endpoint, the endpoint would not be updated and users would receive a `403 error` in the response when they attempt to access a social login protected app. This issue was resolved by ensuring that the discoveryEndpointUrl and discoverey endpoints are properly dynamically updated.
+
+// // // // // // // //
+// Above:
+// Replace RELEASE_VERSION with the the version number of Open Liberty. e.g. 20.0.0.10
+// For this section ask either Tom Evans, Michal Broz or the #openliberty-release-blog channel for Notable bug fixes in this release.
+// If the issue on Github is missing any information do not hesitate to message the person that fixed the bug.
+// For inspiration about how to write this section look at previous blogs e.g- 20.0.0.10
+// // // // // // // //
+
+
+== Get Open Liberty 21.0.0.8 now
+
+Available through <<run,Maven, Gradle, Docker, and as a downloadable archive>>.
