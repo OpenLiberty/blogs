@@ -1,0 +1,130 @@
+---
+layout: post
+title: "Dev mode support for multi-module Maven projects"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/ericglau
+author_github: https://github.com/ericglau
+seo-title: Dev mode support for multi-module Maven projects - OpenLiberty.io
+seo-description: Dev mode support for Maven projects with multiple modules, featuring hot deployment of changes in all modules in a Maven reactor build.  Iterate quickly when developing multi-module applications with Open Liberty.
+blog_description: "Dev mode support for Maven projects with multiple modules, featuring hot deployment of changes in all modules in a Maven reactor build.  Iterate quickly when developing multi-module applications with Open Liberty."
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+additional_authors: 
+- name: Kathryn Kodama
+  github: https://github.com/kathrynkodama
+  image: https://avatars0.githubusercontent.com/kathrynkodama
+---
+= Dev mode support for multi-module Maven projects
+Eric Lau <https://github.com/ericglau>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+When developing a cloud-native Java application that is built using Maven, a common way to organize your project is to separate it into multiple sub-projects, or modules.  Each module is a Maven project that can have dependencies on other modules.  An aggregator project lists all of the modules that should be built together, and this aggregator along with its modules is the multi-module project.  The Maven reactor is used with this project to collect, sort, and build the modules in the correct order.
+
+In this blog post, we introduce Open Liberty dev mode support for working with multi-module Maven projects.  This provides hot deployment of changes in all modules of a Maven reactor build, on-demand and hot testing for multiple modules, and the ability to attach a debugger to debug code in any module.  
+
+Dev mode support for multi-module Maven projects is available starting in version `3.4` of the Liberty Maven plug-in, which is available now.
+
+== Multi-module projects
+
+With multi-module Maven projects, there is a top-level aggregator `pom.xml` file that manages a group of modules. This is convenient as you can use one single command to build the entire project, and the link:https://maven.apache.org/guides/mini/guide-multiple-modules.html[Maven reactor] will determine the correct build order for you.  
+
+The following example is the link:https://github.com/OpenLiberty/guide-maven-multimodules[Open Liberty multi-module sample application]. This project contains three modules: a Java library in the `jar` folder, a web module in the `war` folder, and template files and the Liberty server configuration in the `ear` folder. 
+
+----
+guide-maven-multimodules
+|_ pom.xml
+|_ jar
+    |_pom.xml
+    |_src/main/java
+|_ war
+    |_pom.xml
+    |_src/main
+        |_java
+        |_webapp
+|_ ear
+    |_pom.xml
+    |_src
+        |_main/liberty/config
+        |_test/java
+----
+
+Each module is defined in the top-level aggregator `pom.xml` file:
+
+[source,xml]
+----
+    <modules>
+        <module>jar</module>
+        <module>war</module>
+        <module>ear</module>
+    </modules>
+----
+
+The modules within the project can also have dependencies on each other. In this example, the `war` module depends on the `jar` module, and the `ear` module depends on both the `war` and `jar` modules. By leveraging dev mode for multiple modules, not only will the code changes you make be automatically picked up and hot deployed, but any dependent modules will also be recompiled and hot deployed.
+
+== Running Liberty on a multi-module project
+
+Liberty can be run on a multi-module project with a single command by using dev mode, dev mode with container support, or by starting the server in the foreground.  To do any of these, the Liberty Maven plug-in must first be defined.
+
+=== Defining the Liberty Maven plug-in
+
+To use the Liberty Maven plug-in in your multi-module project, you can define the plug-in in either the parent `pom.xml` file of every module or in the `pom.xml` of every module.
+
+For example, if your modules have a `<parent>` element that points to a parent project, add the Liberty Maven plug-in to the `<pluginManagement>` section of the parent project's `pom.xml` as follows:
+[source,xml]
+----
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>io.openliberty.tools</groupId>
+                    <artifactId>liberty-maven-plugin</artifactId>
+                    <version>3.4</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+----
+
+=== Starting dev mode
+
+To start dev mode, from the directory containing the top-level multi-module `pom.xml`, run:
+
+----
+mvn liberty:dev
+----
+
+Once dev mode starts successfully, changes in all modules are detected and hot deployed. By default, any dependent modules will also be recompiled and deployed. For example, if a change is made in the `jar` module of the sample application described above, the `war` module will also be recompiled since it depends on the `jar` module. 
+
+**gif of change made to jar module, show compilation of jar and war module**
+
+=== Starting dev mode with container support
+
+There is container support for multiple module projects and dev mode. Use the `devc` goal to start dev mode with container support:
+
+----
+mvn liberty:devc  
+----
+
+If your Dockerfile is not in the same directory as where you started the dev mode command from, you can point to it with the `-Ddockerfile=<path-to-dockerfile>` paremeter. For more information on Dockerfiles for your Open Liberty application, see the link:https://github.com/OpenLiberty/ci.docker#building-an-application-image[Open Liberty Docker image documentation]. 
+
+=== Running tests
+You can run tests on all modules by pressing Enter. 
+
+**gif of enter to run tests**
+
+You can also enable hot tests so that tests will run on every code change. To enable hot tests, add the `-DhotTests` parameter: `mvn liberty:dev -DhotTests`. With hot tests enabled, tests will run on the module that was changed and any dependent modules.
+
+=== Stopping dev mode
+
+You can exit dev mode by pressing Control-C, or type `q` and press Enter in the terminal.
+
+=== Running Liberty in the foreground without dev mode
+
+To run Liberty in the foreground but without dev mode features such as hot deployment, on-demand testing, or debugging, run the `mvn liberty:run` command from the directory containing the top-level multi-module `pom.xml`.  You can stop Liberty by pressing Control-C.
+
+=== Additional resources
+
+For more details on how to use dev mode with multi-module projects, see the documentation for link:https://github.com/OpenLiberty/ci.maven/blob/main/docs/dev.md#multiple-modules[multiple modules in the Liberty Maven plug-in's dev goal].
