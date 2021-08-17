@@ -1,0 +1,208 @@
+---
+layout: post
+title: "Building on Atomic Reference"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/joe-chacko
+author_github: https://github.com/joe-chacko
+seo-title: Building on AtomicReference - OpenLiberty.io
+seo-description: Java's AtomicReference does not guarantee that an update function gets called exactly once. We describe a helpful, thread-safe mechanism that builds on AtomicReference to provide such a guarantee. This can be used for lazy initialization, clean-up, or any state change processing that is to happen exactly once.
+blog_description: "Java's AtomicReference does not guarantee that an update function gets called exactly once. We describe a helpful, thread-safe mechanism that builds on AtomicReference to provide such a guarantee. This can be used for lazy initialization, clean-up, or any state change processing that is to happen exactly once."
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+additional_authors:
+- name: Neil Richards
+  github: https://github.com/ngmr
+  image: https://avatars0.githubusercontent.com/ngmr
+---
+= Building on AtomicReference
+Joe Chacko <https://github.com/joe-chacko>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+The https://devdocs.io/openjdk/java.base/java/util/concurrent/atomic/atomicreference[`AtomicReference`] and other `Atomic...` classes in the `java.util.concurrent` package allow multiple threads to read and update values safely.
+Yet `AtomicReference` alone is of limited use in writing thread-safe code.
+This article describes a helpful mechanism to provide a more useful thread-safe reference.
+
+== Something is rotten in the state transition
+Consider the https://devdocs.io/openjdk~15/java.base/java/util/concurrent/atomic/atomicreference#updateAndGet(java.util.function.UnaryOperator)[`updateAndGet()`] method.
+This allows many threads to contend to update the value.
+For example, one might write something like this:
+[source, java]
+----
+    private AtomicReference<Widget> ref;
+
+    public Widget getWidget() {
+        return ref.updateAndGet(value -> value == null ? new Widget() : value);
+    }
+----
+When `getWidget()` is first invoked, it will create a new `Widget`, but later calls will find the existing one.
+
+But there is a trap here for the unwary developer.
+The contract of the `updateAndGet()` method describes some restrictions on the update function: --
+[quote]
+----
+"The function should be side-effect-free, since it may be re-applied when attempted updates fail due to contention among threads."
+----
+Although the update only happens once, many threads may call the update function at the same time.
+If the update function is fast and side-effect free, there is no cause for concern.
+But if creating a new widget is slow, or has side-effects, this approach is flawed.
+Let's build an alternative that works well with any kind of update function,
+even if it is slow, non-thread-safe, or throws exceptions.
+
+== To do or not to do
+The update processing  --  e.g. a lazy initialization step  --  should happen exactly once.
+Thread contention must be resolved _before the work is undertaken_: --
+
+* Exactly one thread must win the race *to do* the update.
+* All other threads need *not to do* anything but wait for the result.
+
+Let's build a new utility.
+We'll call it `AcidReference`.
+
+.What's in a name?
+****
+`AcidReference` provides the transactional isolation missing from `AtomicReference`.
+We called it `AcidReference` after the https://en.wikipedia.org/wiki/ACID[ACID properties of transactions].
+The name is a bit of a stretch since the utility provides neither consistency nor durability.
+But why let mere facts stand in the way of a great name?
+****
+
+=== Though this be madness, yet there is method in't
+We need a more expressive interface for this behaviour.
+Rather than an update function, we accept a _supplier of_ an update function.
+If it  update function is `null` then no update is necessary.
+Our method signature looks like this:
+[source, java]
+----
+    public boolean update(Function<T, Supplier<T>> updaterSupplier) {
+        // ...
+    }
+----
+Also note that we dispensed with the update-and-get approach.
+In our use case, we were not using the return value of `updateAndGet()`.
+We wanted to know whether a particular call had performed an update,
+so we return a `boolean` to show whether the update happened.
+It should be easy to modify the code to implement `updateAndGet()` or `getAndUpdate()`.
+
+=== By indirections, find directions out
+[quote]
+----
+"We can solve any problem by introducing an extra level of indirection." -- David J. Wheeler
+----
+We define a `Ref` interface that tells us whether it is in transition.
+[source, java]
+----
+    @FunctionalInterface
+    private interface Ref<T> extends Supplier<T> {
+        default boolean isReady() { return true; }
+    }
+----
+.It was Greek to me
+****
+Marking the interface with `@FunctionalInterface` ensures it is lambda-capable.
+The compiler checks that the interface satisfies Java's lambda constraints.
+****
+While the update is being applied, we want a special `Ref` that makes other threads wait for the result:
+[source, java]
+----
+    /** A placeholder ref to allow contending threads to wait for an in-flight update. */
+    private static class TransitionalRef<T> implements Ref<T> {
+        private final CountDownLatch latch = new CountDownLatch(1);
+        private final Thread updaterThread = Thread.currentThread();
+        public boolean isReady() {
+            // It is not valid to try to retrieve the value
+            // from the updating thread while it is still updating
+            if (Thread.currentThread() == updaterThread)
+                throw new IllegalStateException("Attempt to retrieve value during update process");
+            try {
+                latch.await();
+            } catch (InterruptedException ignored) {}
+            return false;
+        }
+        void markAsReady() { latch.countDown(); }
+        public T get() { throw new UnsupportedOperationException();  }
+    }
+----
+We hold one of these `Ref` objects inside an `AtomicReference`.
+Instead of `AtomicReference<Widget>` we now use `AtomicReference<Ref<Widget>>`.
+
+=== And waits upon the judgement
+Waiting for a transition is very simple:
+[source, java]
+----
+    private Ref<T> getWithWait() {
+        for (;;) {
+            Ref<T> ref = atomicReference.get();
+            if (ref.isReady()) return ref;
+        }
+    }
+----
+Usually, this loop will run only once, because `ref.isReady()` returns true.
+If `ref` is a `TransitionalRef`, the `isReady()` method will block until the transition completes.
+Even then, the loop would usually repeat once more and then retrieve the updated value.
+An unlucky thread could loop around many times -- once for each of many observed transitions.
+
+.For ever and a day
+****
+Some programmers prefer the `while (true)` or `do`...`while (true)` style of indefinite loop.
+The empty `for` has fewer compare operations,
+and the `(;;)` syntax is more fun.
+We call it the spider operator. &#128375;
+****
+
+The `get()` method is trivial -- get the reference, and dereference it:
+[source, java]
+----
+    public T get() { return getWithWait().get(); }
+----
+
+=== What judgement would step from this to this?
+
+The `update()` implementation is more involved.
+Only one thread may enter the critical section where the update happens.
+Other threads must wait for the transition to complete before they can access the result.
+[source, java]
+----
+    public boolean update(Function<T, Supplier<T>> updaterSupplier) {
+        Ref<T> ref = getWithWait(); // <1>
+        Supplier<T> neededUpdate = updaterSupplier.apply(ref.get()); // <2>
+        if (null == neededUpdate) return false; // <3>
+        final TransitionalRef<T> tranRef = new TransitionalRef<>(); // <4>
+
+        while (false == atomicReference.compareAndSet(ref, tranRef)) { // <5>
+            ref = getWithWait(); <1>
+            neededUpdate = updaterSupplier.apply(ref.get()); // <2>
+            if (null == neededUpdate) return false; // <3>
+        }
+
+        try { // <6>
+            T newT = neededUpdate.get(); // <7>
+            ref = () -> newT; // <8>
+            return true; // <9>
+        } finally {
+            atomicReference.set(ref); // <10>
+            tranRef.markAsReady(); // <11>
+        }
+    }
+----
+<1> Get the existing value, waiting for any in-flight update (on another thread).
+<2> Use the supplier to check whether this value needs updating.
+<3> If the supplier returned `null`, no update was necessary.
+<4> An update is required; create a transitional reference for the current thread.
+<5> Atomically compare and swap the transitional ref for the original.
+    If it fails, retry steps 1&#8211;3 and 5 until
+        * either no update is needed
+        * or the compare-and-swap succeeds.
+<6> If a thread reaches here, it can update the value.
+<7> Compute the new value.
+<8> Create a new non-transitional reference. (At last, the lambda we hinted at earlier.)
+<9> Flag up to the caller that this update has succeeded.
+<10> Apply the new value, or the original value if an exception occurred.
+<11> Unblock any threads waiting in step 1.
+
+== There are more things in heaven and earth than are dreamt of in our philosophy
+This is our best and most generic solution yet to a common problem.
+We improved it further while writing this post, and we probably aren't finished.
+You can https://github.com/OpenLiberty/open-liberty/search?q=AcidReference[search for the latest code in the OpenLiberty source repository].
