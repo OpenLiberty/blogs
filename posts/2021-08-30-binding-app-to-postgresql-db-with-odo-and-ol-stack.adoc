@@ -12,7 +12,7 @@ open-graph-image: https://openliberty.io/img/blog/ol-stack-jpa-app-db-bind-brows
 = Bind an Operator Managed PostgreSQL Database to a JPA Application in a Kubernetes Cluster
 Edward Mezarina <https://github.com/mezarin>
 
-Binding your Microservice application to operator based services (i.e databases, etc) has now been made easier through automatic collection of service data, deployment of needed resources, and data sharing with the application.
+Binding your Microservice application to operator based services (e.g. databases, etc.) has now been made easier through automatic collection of service data, deployment of needed resources, and data sharing with the application.
 
 == Open Liberty devfile stack
 
@@ -32,14 +32,14 @@ The link:https://github.com/redhat-developer/service-binding-operator/blob/maste
 
 To begin, you need three things:
 
-- Kubernetes cluster. For this blog, we will be using an Openshift cluster. Be sure to log in. Odo will interact with your kubernetes cluster.
-- Openshift Do. If you have not already installed odo, do so now by following the instructions outlined in the link:https://odo.dev[odo] documentation. Be sure to install version 2.2.4 and above.
-- An application that uses a PostgreSQL database. For this blog, we will be using the Open Liberty stack link:https://github.com/OpenLiberty/application-stack-samples/tree/main/jpa[sample JPA application]
+- Kubernetes cluster. For this blog, an OpenShift cluster is used. Be sure to log in. Odo will interact with your kubernetes cluster.
+- OpenShift Do. If you have not already installed odo, do so now by following the instructions outlined in the link:https://odo.dev[odo] documentation. Be sure to install version 2.2.4 and above.
+- An application that uses a PostgreSQL database. For this blog, the Open Liberty stack link:https://github.com/OpenLiberty/application-stack-samples/tree/main/jpa[sample JPA application] is used.
 
 
-Install the needed operators.
+=== Install the needed operators
 
-If you have the right priviledges, you can use the OpenShift console to install these operators. You do this by navigating to `Operators->OperatorHub` and searching/selecting/installing a couple of operators from the catalog.
+If you have the right privileges, you can use the OpenShift console to install these operators. You do this by navigating to `Operators->OperatorHub` and searching/selecting/installing a couple of operators from the catalog.
 
 - Service Binding Operator (provided by Red Hat)
 
@@ -51,63 +51,54 @@ Before installing this operator, create the project/namespace under which the ap
 
 [source,sh]
 ----
-$ odo project create service-binding-demo
+odo project create service-binding-demo
 ----
 
 Use the OpenShift console (`Operators->OperatorHub`) to install this operator. Be sure to pick `service-binding-demo` as the namespace in which to install it.
+
+=== Create a Java Open Liberty based component and the Database resource service
 
 Clone the application repository.
 
 [source,sh]
 ----
-$ git clone https://github.com/OpenLiberty/application-stack-samples.git && \
-  cd application-stack-samples/jpa
+git clone https://github.com/OpenLiberty/application-stack-samples.git && \
+cd application-stack-samples/jpa
 ----
 
 Create a Java Open Liberty component.
 
-If you want the application to be built and deployed using Maven:
-
 [source,sh]
 ----
-$ odo create java-openliberty mysboproj
+odo create java-openliberty mysboproj
 ----
-
-If you want the application to be built and deployed using Gradle:
-
-[source,sh]
-----
-$ odo create java-openliberty-gradle mysboproj
-----
-
-Push the application to the cluster.
-
-[source,sh]
-----
-$ odo push
-----
-
-So far, the application has been deployed on your cluster. However, the application is not ready to be used yet because the application does not have the data needed to access the database, and the PostgreSQL database instance has not been created. Let's create the database instance next.
 
 Display the service providers and services available in the cluster.
 
 [source,sh]
 ----
 odo catalog list services
-Services available through Operators
-NAME                                CRDs
-postgresql-operator.v0.1.1          Backup, Database
-service-binding-operator.v0.9.1     ServiceBinding, ServiceBinding
 ----
 
-Generate the yaml config of the Database resource/service provided by the postgresql-operator.v0.1.1 operator and store it in a file. We do this because we need to edit that file to modify some access information and to tell the Service Binding Operator, in annotation form, what data provided by this service needs to be bound to the application.
+Output:
+
+[source,sh]
+----
+Services available through Operators
+NAME                                CRDs
+...
+postgresql-operator.v0.1.1          Backup, Database
+...
+----
+
+Generate the `postgresql-operator.v0.1.1` provided Database resource/service yaml and store it in a file. The data is stored in a file because some entries such as the resource name, the access information, and annotations will be customized.
 
 [source,sh]
 ----
 odo service create postgresql-operator.v0.1.1/Database --dry-run > db.yaml
 ----
 
-Modify the database name, user, and password values under the spec section in db.yaml
+Customize the database name, user name, and password values under the spec section in `db.yaml`.
 
 [source,sh]
 ----
@@ -116,7 +107,7 @@ Modify the database name, user, and password values under the spec section in db
   databaseUser: "sampleuser"
 ----
 
-Add the needed annotations under the metadata section in db.yaml. 
+Customize the Database resource name and add the needed annotations in `db.yaml`. The annotations are used to inform the Service Binding Operator about the service data required by the application.
 
 [source,sh]
 ----
@@ -128,11 +119,44 @@ metadata:
     service.binding/db_user: 'path={.spec.databaseUser}'
 ----
 
-Generate the Database service devfile configuration.
+Generate the Database resource service devfile configuration.
 
 [source,sh]
 ----
 odo service create --from-file db.yaml
+----
+
+Configuration added to devfile.yaml:
+
+[source,sh]
+----
+...
+- kubernetes:
+    inlined: |
+      apiVersion: postgresql.dev4devs.com/v1alpha1
+      kind: Database
+      metadata:
+        annotations:
+          service.binding/db_name: path={.spec.databaseName}
+          service.binding/db_password: path={.spec.databasePassword}
+          service.binding/db_user: path={.spec.databaseUser}
+        name: sampledatabase
+      spec:
+        databaseCpu: 30m
+        databaseCpuLimit: 60m
+        databaseMemoryLimit: 512Mi
+        databaseMemoryRequest: 128Mi
+        databaseName: sampledb
+        databaseNameKeyEnvVar: POSTGRESQL_DATABASE
+        databasePassword: samplepwd
+        databasePasswordKeyEnvVar: POSTGRESQL_PASSWORD
+        databaseStorageRequest: 1Gi
+        databaseUser: sampleuser
+        databaseUserKeyEnvVar: POSTGRESQL_USER
+        image: centos/postgresql-96-centos7
+        size: 1
+  name: sampledatabase
+...
 ----
 
 Push the updates to the cluster.
@@ -142,16 +166,31 @@ Push the updates to the cluster.
 odo push
 ----
 
-We have now created a Dev4Ddevs Database resource instance, which in turn triggered the creation of a PostgreSQL database instance. However, the application is still not usable because it does not have the data needed to connect to the database. Let's solve that next.
+So far, two things have taken place:
+
+- The application was deployed on your cluster. The application was built and deployed using Maven. However, you could have also built and deployed the application using Gradle by using the `odo create java-openliberty-gradle mysboproj` command instead when creating the Java Open Liberty component.
+
+- A Dev4Ddevs Database resource instance was created. This, in turn, triggered the creation of a PostgreSQL database instance.
+
+However, the application is still not usable because it does not have the data needed to connect to the database. Let's solve that next.
+
+=== Bind the application to the PostgreSQL service
 
 List the available services to which the application can be bound. The PostgreSQL database service should be listed.
 
 [source,sh]
 ----
 odo service list
+----
 
+Output:
+
+[source,sh]
+----
 NAME                        MANAGED BY ODO      STATE      AGE
+...
 Database/sampledatabase     Yes (mysboproj)     Pushed     50s
+...
 ----
 
 Generate the service binding devfile configuration.
@@ -161,6 +200,37 @@ Generate the service binding devfile configuration.
 odo link Database/sampledatabase
 ----
 
+Configuration added to devfile.yaml:
+
+[source,sh]
+----
+...
+- kubernetes:
+    inlined: |
+      apiVersion: binding.operators.coreos.com/v1alpha1
+      kind: ServiceBinding
+      metadata:
+        creationTimestamp: null
+        name: mysboproj-database-sampledatabase
+      spec:
+        application:
+          group: apps
+          name: mysboproj-app
+          resource: deployments
+          version: v1
+        bindAsFiles: false
+        detectBindingResources: true
+        services:
+        - group: postgresql.dev4devs.com
+          kind: Database
+          name: sampledatabase
+          version: v1alpha1
+      status:
+        secret: ""
+  name: mysboproj-database-sampledatabase
+...
+----
+
 Push the updates to the cluster. 
 
 [source,sh]
@@ -168,22 +238,27 @@ Push the updates to the cluster.
 odo push
 ----
 
-With this last `odo push` command, we triggered the creation of a secret containing the database connection information, and the pod hosting the application is restarted with the database connection information, contained in the secret, as environment variables.
+That is all. The application is now bound to the PostgreSQL database service. During the binding process, a secret containing the database connection information was created, and the pod hosting the application is restarted with the database connection information contained in the secret. The connection information is set in the application pod as environment variables.
 
-That is all. The PostgreSQL database instance was created, and the application was deployed and bound to the database. Let's make sure we can use the application next.
+Let’s make sure we can use the application next.
+
+=== Use the application
 
 Find the URL to access the application through a browser.
 
 [source,sh]
 ----
 odo url list
+----
 
+Output:
+
+[source,sh]
+----
 Found the following URLs for component mysboproj
 NAME     STATE      URL                                                                      PORT     SECURE     KIND
 ep1      Pushed     http://ep1-mysboproj-service-binding-demo.apps.my.os.cluster.ibm.com     9080     false      route
 ----
-
-The default endpoint name assigned by the stack's devfile is ep1.
 
 Open a browser and go to the URL shown by the previous step. Click "Create New Person" button.
 
@@ -195,12 +270,10 @@ Enter a user's name and age via the form shown on the page, and click  `Save`. T
 [.img_border_light]
 image::/img/blog/ol-stack-jpa-app-db-bind-browser-data-entry.png[Data Input Page,width=70%,align="center"]
 
-After you save the data to the postgreSQL database, notice that you are re-directed to the PersonList.xhtml page. The data being displayed was retrieved from the PostgreSQL database.
+After you save the data to the PostgreSQL database, notice that you are re-directed to the PersonList.xhtml page. The data being displayed was retrieved from the PostgreSQL database.
 
 [.img_border_light]
 image::/img/blog/ol-stack-jpa-app-db-bind-browser-show-data.png[Data Display Page,width=70%,align="center"]
-
-For a more detail set of instructions visit the link:https://github.com/OpenLiberty/application-stack-samples/blob/main/jpa/README.md[Open Liberty stack sample JPA documentation].
 
 == Learn more
 
@@ -208,5 +281,4 @@ For a more detail set of instructions visit the link:https://github.com/OpenLibe
 - For more details about the Open Liberty devfile stack, open an issue, or create a pull request, go to the https://github.com/OpenLiberty/application-stack[Open Liberty Application Stack GitHub repo]. For questions or comments, contact us on link:https://gitter.im/OpenLiberty/developer-experience[Gitter].
 - For instructions on how to bind an operator managed PostgreSQL database to a JPA Application on Minikube, see the https://github.com/OpenLiberty/application-stack-samples/blob/main/jpa/README-minikube.md[Open Liberty Stack sample JPA Minikube documentation].
 - For instructions on how to deploy Maven built applications using the Open Liberty devfile stack, see https://openliberty.io/blog/2021/01/20/open-liberty-devfile-stack.html[Develop cloud-native Java applications directly in OpenShift with Open Liberty and odo]
-- For instructions on how to deploy Gradle built applications using the Open Liberty devfile stack, see https://openliberty.io/blog/2021/08/30/binding-app-to-postgresql-db-with-odo-and-ol-stack.html[Cloud-native Development of Gradle Built Applications with the Open Liberty Devfile Stack]
 - For more information on how to use JPA to access and persist data for your microsevice, see this link:https://openliberty.io/guides/jpa-intro.html[JPA intro Open Liberty guide].
