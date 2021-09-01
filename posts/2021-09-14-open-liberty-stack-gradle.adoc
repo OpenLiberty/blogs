@@ -1,0 +1,109 @@
+---
+layout: post
+title: "Cloud-native development of Gradle-built applications with the Open Liberty devfile stack"
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/mezarin
+author_github: https://github.com/mezarin
+seo-title: Cloud-native development of Gradle-built applications with the Open Liberty devfile stack - OpenLiberty.io
+seo-description: Get true-to-production development of Gradle-built applications directly in a Kubernetes cluster
+blog_description: "Get true-to-production development of Gradle-built applications directly in a Kubernetes cluster"
+---
+= Cloud-native development of Gradle-built applications with the Open Liberty devfile stack
+Edward Mezarina <https://github.com/mezarin>
+
+The Open Liberty devfile stack now allows you build and deploy new and existing cloud-native applications using Gradle. The stack leverages link:https://github.com/OpenLiberty/ci.gradle[Open Liberty Gradle Plugin] capabilities to manage the Liberty server and Gradle-built applications.
+
+In this post, we'll use the Open Liberty devfile stack and Openshift odo to deploy an application that uses Gradle to a Kubernetes cluster.
+
+== Open Liberty devfile stack
+
+The link:https://github.com/OpenLiberty/application-stack#open-liberty-application-stack[Open Liberty devfile stack] provides much of the infrastructure (Open Liberty, Maven/Gradle, Open J9, etc.) needed to start developing applications that use Maven or Gradle, and it is made available as Maven and Gradle development images. The devfiles that are provided by the stack use these images as a base to build and run your applications. 
+
+The Open Liberty devfile stack provides two fully configured link:https://docs.devfile.io/devfile/2.1.0/user-guide/index.html[devfiles]: A link:https://github.com/devfile/registry/blob/main/stacks/java-openliberty/devfile.yaml[Maven based devfile] and a link:https://github.com/devfile/registry/blob/main/stacks/java-openliberty-gradle/devfile.yaml[Gradle based devfile]. These devfiles define the environment and steps to build and deploy your application using the Open Liberty runtime.
+
+== OpenShift Do (odo)
+
+link:https://odo.dev[Odo] is a simple CLI tool to create devfile-based components that interact directly with your Kubernetes cluster. With odo you can set up the environment, and also build, deploy, access, and debug your application. Directives to manage the environment and application are provided by a component's devfile.
+
+== Try it out
+
+To begin, you need three things:
+
+- Kubernetes cluster (i.e. Openshift, Minikube). Be sure to log in. Odo will interact with your kubernetes cluster.
+- Openshift Do. If you have not already installed odo, do so now by following the instructions outlined in the link:https://odo.dev[odo documentation].
+- An application using Gradle. You can use your own application, or use one of the applications provided by the stack, such as the link:https://github.com/OpenLiberty/application-stack-intro[intro] or link:https://github.com/OpenLiberty/application-stack-starters[starter] application. For this blog, we will use the intro application. This is a basic application that uses JAX-RS and MicroProfile technologies. For instructions on how to use the starter application, see link:https://github.com/OpenLiberty/application-stack/wiki/Using-the-Default-Starter#getting-started[[Using the Default Starter: Getting started]].
+
+First, clone the application.
+
+[source,sh]
+----
+git clone git@github.com:OpenLiberty/application-stack-intro.git && \
+cd application-stack-intro
+----
+
+Create an odo component of type java-openliberty-gradle. When the component is created, the Gradle based devfile provided by the Open Liberty devfile stack is downloaded to the root of the application.
+
+[source,sh]
+----
+odo create java-openliberty-gradle my-ol-component
+----
+
+Deploy the application on your Kubernetes cluster.
+
+[source,sh]
+----
+odo push
+----
+
+That is all. The application is now deployed on your cluster and a URL is available to access it.
+
+Notice that you did not have to create any Kubernetes resources to deploy the application. The work to make that happen was done behind the scenes by odo and the stack.
+
+Now, let's see if the application was deployed successfully. We can get the URL to access the application by running `odo url list`:
+
+[source,sh]
+----
+odo url list
+----
+
+Output:
+
+[source,sh]
+----
+Found the following URLs for component my-ol-component
+NAME     STATE      URL                                                                     PORT     SECURE     KIND
+ep1      Pushed     http://ep1-my-ol-component-my-project.my.kube.cluster.ibm.com           9080     false      route
+...
+----
+
+The default endpoint name assigned by the stack's devfile is ep1.
+
+To access the REST endpoint for the application, append `/api/resource` to the URL listed in the previous step, for example, `http://ep1-my-ol-component-my-project.my.kube.cluster.ibm.com/api/resource`. You can access this endpoint through a browser or by running a curl command:
+
+[source,sh]
+----
+curl http://ep1-my-ol-component-my-project.my.kube.cluster.ibm.com/api/resource -w "\n"
+----
+
+Output:
+[source,sh]
+----
+Hello! Welcome to Open Liberty
+----
+
+If you get back `Hello! Welcome to Open Liberty` as a response, the application is up and running. 
+
+Now, all that is left to do is to have odo watch for changes in the application.
+
+[source,sh]
+----
+odo watch
+----
+
+Odo will now push any application changes to the cluster automatically without the need for you to manually push (`odo push`) your source code updates to the cluster. All you need to do to see your updates is to refresh the browser or access the endpoint again.
+
+== Learn more
+
+- To learn more about odo, see https://odo.dev[odo.dev].
+- For more details about the Open Liberty devfile stack, open an issue, or create a pull request, go to the https://github.com/OpenLiberty/application-stack[Open Liberty Application Stack GitHub repo]. For questions or comments, contact us on link:https://gitter.im/OpenLiberty/developer-experience[Gitter].
+- For instructions on how to deploy Maven-built applications using the Open Liberty devfile stack, see https://openliberty.io/blog/2021/01/20/open-liberty-devfile-stack.html[Develop cloud-native Java applications directly in OpenShift with Open Liberty and odo]
