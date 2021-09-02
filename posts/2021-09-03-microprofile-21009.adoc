@@ -1,0 +1,268 @@
+---
+layout: post
+title: MicroProfile 4.1, Transaction Peer Recovery, a new logging format and lots more in Open Liberty 21.0.0.9
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/ryan-storey
+author_github: https://github.com/ryan-storey
+seo-title: MicroProfile 4.1, Transaction Peer Recovery, a new logging format and lots more in Open Liberty 21.0.0.9 - OpenLiberty.io
+seo-description: Open Liberty 21.0.0.9 introduces many new benefits such as MicroProfile 4.1 with MicroProfile Health updates. Transaction Peer Recovery allows 2 phase commit to be used in cloud environments for the first time, and a new logging format (TBASIC) is made available, as well as a new method to determine active endpoints.
+blog_description: Open Liberty 21.0.0.9 introduces many new benefits such as MicroProfile 4.1 with MicroProfile Health updates. Transaction Peer Recovery allows 2 phase commit to be used in cloud environments for the first time, and a new logging format (`TBASIC`) is made available, as well as a new method to determine active endpoints.
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+---
+= MicroProfile 4.1, Transaction Peer Recovery, a new logging format and lots more in Open Liberty 21.0.0.9
+Ryan Storey <https://github.com/ryan-storey>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+Open Liberty 21.0.0.9 introduces many new benefits such as MicroProfile 4.1 with MicroProfile Health updates. Transaction Peer Recovery allows 2 phase commit to be used in cloud environments for the first time, and a new logging format (`TBASIC`) is made available, as well as a new method to determine active endpoints. This release also comes with many significant bug fixes.
+
+In link:{url-about}[Open Liberty] 21.0.0.9:
+
+* <<mp4_1, MicroProfile 4.1>>
+** <<mpHealth3_1, MicroProfile Health 3.1>>
+* <<transaction, Transaction Peer Recovery>>
+* <<tbasic, TBASIC Logging Format>>
+* <<activeEndpoints, New method to determine active endpoints>>
+
+
+View the list of fixed bugs in link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A21.0.0.9+label%3A%22release+bug%22[21.0.0.9].
+
+
+[#run]
+== Run your apps using 21.0.0.9
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], here are the coordinates:
+
+[source,xml]
+----
+<dependency>
+    <groupId>io.openliberty</groupId>
+    <artifactId>openliberty-runtime</artifactId>
+    <version>21.0.0.9</version>
+    <type>zip</type>
+</dependency>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+dependencies {
+    libertyRuntime group: 'io.openliberty', name: 'openliberty-runtime', version: '[21.0.0.9,)'
+}
+----
+
+Or if you're using Docker:
+
+[source]
+----
+FROM open-liberty
+----
+
+Or take a look at our link:{url-prefix}/downloads/[Downloads page].
+
+[link=https://stackoverflow.com/tags/open-liberty]
+image::img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="center"]
+
+[#mp4_1]
+== MicroProfile 4.1
+
+MicroProfile 4.1 improves developer experience with updates to the Health feature. MicroProfile 4.1 also defines compatible implementation requirements for runtimes, which must pass all of the MicroProfile component specification `TCKs` including Config 2.0, Fault Tolerance 3.0, Rest Client 2.0, Health 3.1, Metrics 3.0, Open Tracing 2.0, Open API 2.0, and JWT propagation 1.2. The previously made available Open Liberty 21.0.0.9-beta release served as the compatible implementation for releasing MicroProfile 4.1, and the 21.0.0.9 release marks our first official release to include the feature.
+
+
+[source, xml]
+----
+<featureManager>
+    <feature>microProfile-4.1</feature>
+</featureManager>
+----
+
+To find out more take a look at the link:https://github.com/eclipse/microprofile/releases/tag/4.1[MicroProfile 4.1 Release].
+
+[#mpHealth3_1]
+=== MicroProfile Health 3.1
+
+MicroProfile Health enables you to provide your own health check procedures to be invoked by Open Liberty, to verify the health of your microservice. A service checks its own health by performing necessary self-checks and then reports its overall status by implementing the API provided by MicroProfile Health. A self-check can be a check on anything that the service needs, such as a dependency, a successful connection to an endpoint, a system property, a database connection, or the availability of required resources. MicroProfile offers checks for both Liveness and Readiness. MicroProfile Health 3.1 introduces a new Health Check called Startup, which allows applications to define startup probes that are used for initial verification of the application before the Liveness probe takes over. This is useful for applications which require additional startup time on their first initialization.
+
+In the previous versions of MicroProfile Health, there were no unique APIs or endpoints to distinguish the start up status of your microservices. MicroProfile Health 3.1 introduces a new convenient `@Startup` annotation to create your own health check procedures to verify that your microservices have fully initialized. The status of the Startup health checks of your microservices can be viewed with the new REST endpoint `/health/started`. You can now configure the Kubernetes Startup probe with this new endpoint as well. In Open Liberty, you can use the Startup endpoint, `/health/started`, to verify if your deployed applications have started or not.
+
+When deployed application(s) are not started yet, the overall default Startup status will be DOWN, with an empty payload response until all the deployed application(s) have started. A new MicroProfile Config property (`mp.health.default.startup.empty.response=UP`) is available to change the overall default Startup check status to `UP`, during application start up.
+
+Applications are expected to provide health check procedures by implementing the HealthCheck interface with the `@Startup`, `@Liveness`, or `@readiness` annotations. These are used by Open Liberty to verify the respective Startup, Liveness, or Readiness of the application. Add the logic of your health check in the `call()` method, and return the `HealthCheckResponse` object, by using the simple `up()`/`down()` methods from the API:
+
+[source, java]
+----
+**Startup Check**
+@Startup
+@ApplicationScoped
+public class StartupMemUsageCheck implements HealthCheck {
+...
+    @Override
+     public HealthCheckResponse call() {
+       ...
+       if (getMemUsage() < 0.95) {
+           return HealthCheckResponse.up("memUsage");
+       }
+       return HealthCheckResponse.down("memUsage");
+       ...
+     }
+}
+----
+
+To view the status of each health check, access the `http://<hostname>:<port>/health/started` endpoint.
+
+
+To enable the new features in your app, add them to your `server.xml`:
+
+[source, xml]
+----
+<feature>mpHealth-3.1</feature>
+----
+
+To find out more visit:
+
+* link:https://github.com/eclipse/microprofile-health/releases/tag/3.1[MicroProfile Health Check 3.1 Release Page]
+* link:https://github.com/eclipse/microprofile-health/blob/3.1/spec/src/main/asciidoc/release_notes.asciidoc[Release Notes]
+
+To get started with and learn more about MicroProfile Health, check out our link:{url-prefix}/guides/microprofile-health.html[MicroProfile Health guide].
+
+
+[#transaction]
+== Transaction Peer Recovery
+
+This update provides autonomous transactional peer recovery among groups of peer application servers either in a cloud or otherwise. This will allow 2 phase commit to be used in cloud environments for the first time and will enable the clearing of database locks held by servers that have been "reaped" by cloud runtimes. 
+
+In a cloud environment such as OpenShift, Open Liberty servers can be dynamically created or deleted, for example, to handle variations in system load. This possibility poses a problem for applications that use transactions. The sudden removal of a server instance might occur during two-phase commit (2PC) processing and leave transactional resources locked. This update alleviates this problem by allowing the configuration of Open Liberty servers to automatically recover transactions on behalf of other servers. This process is called peer recovery. 
+
+You can configure it by specifying the `recoveryGroup` and `recoveryIdentity` attributes in the `transaction` stanza of your `server.xml` file, as shown in the following example:
+
+[source, xml]
+----
+<transaction
+...
+recoveryGroup="peer-group-name"
+recoveryIdentity="${HOSTNAME}${wlp.server.name}"
+...
+/>
+----
+
+For more information regarding the Transaction Manager service, reference the server configuration link:{url-prefix}/docs/latest/reference/config/transaction.html[docs for transaction].
+
+
+[#tbasic]
+== TBASIC Logging Format
+
+A new logging format `TBASIC` has been made available for both `consoleFormat` and `messageFormat`.  Although a `BASIC` logging format already existed for `consoleFormat`, `messageFormat`, and `traceFormat` the output differed between `traceFormat` and `consoleFormat` and `messageFormat`.  The new `TBASIC` format has been added to match the existing `BASIC` format that was already available for `traceFormat`, providing the ability to have consistent formatting across all three logs.  The `TBASIC` format has also been added as a logging format for `traceFormat`, acting as an alias for the existing `BASIC` option.
+To summarize, if you want to have the same logging format in `consoleFormat` and `messageFormat` that you could get in `traceFormat` using `BASIC`, you now can by using the `TBASIC` logging format.
+
+The new options can be used in the `bootstrap.properties` file:
+
+[source]
+----
+com.ibm.ws.logging.message.format=tbasic
+com.ibm.ws.logging.console.format=tbasic
+com.ibm.ws.logging.trace.format=tbasic
+----
+
+You can also change the format by editing the `server.env` file and adding the following lines:
+
+[source]
+----
+WLP_LOGGING_MESSAGE_FORMAT=TBASIC
+WLP_LOGGING_CONSOLE_FORMAT=TBASIC
+----
+
+
+TBASIC Logs Example:
+
+[source, role="no_copy"]
+----
+[24/03/21 15:04:10:331 EDT] 00000001 FrameworkMana A   CWWKE0001I: The server defaultServer has been launched.
+[24/03/21 15:04:11:338 EDT] 00000001 FrameworkMana I   CWWKE0002I: The kernel started after 1.177 seconds
+[24/03/21 15:04:11:465 EDT] 0000003e FeatureManage I   CWWKF0007I: Feature update started.
+[24/03/21 15:04:11:635 EDT] 00000033 DropinMonitor A   CWWKZ0058I: Monitoring dropins for applications.
+----
+
+
+[#activeEndpoints]
+== New method to determine active endpoints
+
+The `ServerEndpointControlMBean` can currently be used to pause and resume endpoints, including `HTTP` and messaging ports. It can also determine if an endpoint is currently paused. However, there is no way to determine programmatically if an endpoint exists and is active. This update provides a new method on the `mbean`, `isActive`, that will determine if an endpoint exists, has started, and is not paused.
+A new method was added to the `ServerEndpointControlMBean`:
+
+`public boolean isActive(String targets);`
+
+The `targets` parameter is a comma separated list of endpoint names. 
+
+This mirrors the existing `isPaused` method. It will return true only if all of the endpoints listed exist, are started, and are not paused.
+
+[source, java]
+----
+// Check if the defaultHttpEndpoint is active
+boolean isEndpointActive = mbean.isActive("defaultHttpEndpoint");
+----
+
+For more information about `ServerEndpointControlMBean` methods, refer to the link:https://www.ibm.com/docs/en/was-liberty/nd?topic=SSAW57_liberty/com.ibm.websphere.javadoc.liberty.doc/com.ibm.websphere.appserver.api.kernel.service_1.0-javadoc/com/ibm/websphere/kernel/server/ServerEndpointControlMBean.html[API documentation].
+
+
+[#bugs]
+== Notable bugs fixed in this release
+
+We’ve spent some time fixing bugs. The following sections describe just some of the issues resolved in this release. If you’re interested, here’s the  link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A21009+label%3A%22release+bug%22[full list of bugs fixed in 21.0.0.9].
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/16700[Improve featureUtility performance with remote repository]
++
+Previously, the link:{url-prefix}/docs/latest/reference/command/command-overview.html#featureUtility[`featureUtility`] would take a long time to resolve features when using a remote repository with a slow network. Artifacts would be fetched one at a time which slowed things down dramatically. This issue was fixed by fetching and downloading multiple artifacts at the same time from Maven repository.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/18237[Ignore FFDC for IOExceptions in handleMessage]
++
+A bug was discovered where first failure data capture (FFDC) files were incorrectly produced. This would happen when bad JSON data was passed to REST APIs that are using the `jaxrs-2.1` feature with `BYO Jackson`. This issue could occur when a JAX-RS resource or provider throws any `IOException`, and was fixed by preventing FFDC from logging the `IOException`.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/18155[JSF faces-config parser throws NPE when namespace missing]
++
+Previous changes made in order to support Jakarta Faces 3.0 added logic to check for the new `https://jakarta.ee/xml/ns/jakartaee` namespace in `faces-config.xml` files. Because the new logic uses `String.contentEquals()`, if a `faces-config.xml` file declares a version but not a namespace, a `NullPointerException` would be thrown during app startup. This affects all JSF features on Liberty: jsf-2.0, jsf-2.2, jsf-2.3, and faces-3.0.  
+To fix this issue, the logic has now been changed to use `String.equals()`. Please note that while the NullPointerException has been fixed, valid `faces-config.xml` descriptors should declare valid namespaces, ie. `http://java.sun.com/xml/ns/javaee`, `http://xmlns.jcp.org/xml/ns/javaee`, or `https://jakarta.ee/xml/ns/jakartaee`.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/18009[Wrong char count in ServletOutputStream with non-ASCII characters skips content]
++
+A bug was discovered where the `ServletOutputStream` would skip characters when using `print` or `println` to print content with multi-byte non-ASCII characters. This bug was fixed by changing the `WCOutputStream` to write the length of the encoded bytes rather than the length of the original string.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/18002[@Schema(multipleOf = ) throws NumberFormatException in mpOpenAPI-2.0 feature]
++
+In the `mpOpenAPI-2.0` feature, a `NumberFormatException` could be incorrectly thrown when using the `multipleOf` attribute of the `@org.eclipse.microprofile.openapi.annotations.media.Schema` annotation. With `multipleOf = 1`, the server shows:
+
+[source, role="no_copy"]
+----
+[INFO] [ERROR ] CWWKO1650E: Validation of the OpenAPI document produced the following error(s):
+[INFO]
+[INFO] - Message: The Schema Object must have the "multipleOf" property set to a number strictly greater than zero, Location: #/components/schemas/...
+----
+
+The validation message was fixed by updating the `multipleOf` validation check, to ensure that it is checking that `multipleOf` is greater than zero, rather than one.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/17682[Exception stack trace is exposed in error returns from JMX REST APIs]
++
+When Liberty's `JMX` REST APIs encounter errors, a JSON object is returned which has a string field labelled 'stackTrace' containing the stack trace from the exception which caused the error. Returning the stack trace was flagged as a security concern, so this field has been removed. An extra string field labelled `error` has been added to the returned `JSON` object, containing the message from the java exception.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/17912[New Netty 4.1.66 release]
++
+We've pulled in the latest release of the Netty project, which is a dependency of our link:{url-prefix}/docs/latest/reference/feature/grpcClient-1.0.html[grpcClient-1.0 feature]. This new release includes multiple improvements and bugfixes, for more information see the link:https://netty.io/news/2021/07/16/4-1-66-Final.html[Netty release notes].
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/17444[Incorrect Expression Language (EL) Method Matching with Varargs]
++
+An `el-3.0` performance patch, for Open Liberty issue link:https://github.com/OpenLiberty/open-liberty/issues/14175[#14175], released in 21.0.0.3 inadvertently ported over new `varargs` matching code, which later exposed a bug in that code. The EL implementation could select the wrong method if `varargs` were used when overloading a method. The code has since been updated upstream in the Tomcat community (see Bugzilla Issue 65358), and it has also been ported over to Liberty.
+As for the fix itself, the `el-3.0` implementation has been updated to select methods as closely as possible to the Java compiler. However, due to ambiguity in the EL spec and the additional EL requirement of type coercion, the EL implementation may select different methods when `varargs` are defined. For more details please read link:https://bz.apache.org/bugzilla/show_bug.cgi?id=65358#c9[comment 9 in the Bugzilla issue] explaining the priority of matching. If an unintended method is selected under these circumstances, we recommend reworking the method definitions.
+The equivalent fix for expressionLangauge-4.0 (currently in beta) will be included in 21.0.0.10. 
+
+== Known issues
+
+link:https://github.com/OpenLiberty/open-liberty/issues/18393[SPNEGO does not work with Java 11 or higher]
++
+In this release, a regression was introduced which prevents the `Krb5LoginModule` class from being found when authenticating using Kerberos on Java 11 or higher. This issue can cause users to be presented with an `Error 403` or `Authentication Failed` when authenticating using the `spnego-1.0` feature.
+
+== Get Open Liberty 21.0.0.9 now
+
+Available through <<run,Maven, Gradle, Docker, and as a downloadable archive>>.
