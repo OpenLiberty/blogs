@@ -1,0 +1,78 @@
+---
+layout: post
+title: "Liberty Bikes- a microservices-based game built on Open Liberty"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/realModusOperandi
+author_github: https://github.com/realModusOperandi
+seo-title: Liberty Bikes- a microservices-based game built on Open Liberty - OpenLiberty.io
+seo-description: See how a multiplayer browser game can be implemented as microservices with a Open Liberty and MicroProfile.
+blog_description: See how a multiplayer browser game can be implemented as microservices with a Open Liberty and MicroProfile.
+open-graph-image: https://openliberty.io/img/blog/lb-title.png
+---
+= Liberty Bikes: a microservices-based game built on Open Liberty
+Liam Westby <https://github.com/realModusOperandi>
+:imagesdir: /
+:url-prefix: https://openliberty.io
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+[#Intro]
+
+image::img/blog/lb-title.png[Liberty Bikes, built on Open Liberty, align="center"]
+
+A while ago, the Open Liberty team was looking for some cool and interesting demos to show off some of the new features in Open Liberty, including MicroProfile. These demos would illustrate key concepts provided by this great technology and could be used as tutorials to show developers how to do cool things in their own code. That sounded like a fun project! A team of us (Olen Cook, Ryan Esch, Andy Guibert, and I, with art by Sarah Ishida) got together to come up with a submission. 
+
+But what to create? It should be more complex and sophisticated than Hello World, as well as being polished and interesting enough to draw people in who might be passing by a conference booth. Something that keeps bringing people back, not just to have a look at the code, but to keep using it again and again. 
+
+Something like... a game! We call it Liberty Bikes, and you can play it right here: link:http://libertybikes.mybluemix.net[Liberty Bikes]. It's all open source, so you can see how it works here: link:https://github.com/OpenLiberty/liberty-bikes[Liberty Bikes on GitHub]
+
+[#About]
+== What is Liberty Bikes?
+
+image::img/blog/lb-game-screen.png[screen capture of the Liberty Bikes game board, align="center"]
+
+link:http://libertybikes.mybluemix.net[Liberty Bikes] is a multiplayer game for up to four players (either on four separate computers or with four mobile device controllers and one hosting computer) in which you pilot a bike that leaves a trail as it moves around the arena. Your objective is to be the last player standing by avoiding other players' trails, the walls, and the obstacles scattered throughout the arena. You can steer your bike left or right, but you can't slow down or stop. 
+
+The game can be played in two ways: 
+- on a desktop or laptop, you can see the game board and steer using the arrow keys. 
+- on a mobile device, you'll get a touch-based gamepad, but you'll need to use a computer hosting the game as a spectator in order to see the board. 
+
+image::img/blog/lb-mobile-gamepad.png[screen capture of the Liberty Bikes mobile game pad, align="center"]
+
+Some player statistics are stored for each players, uch as wins and rounds played. As you play, you can see how you're doing and who among you is the best at staying in the game. You can play either as a guest or by signing in through one of several OAuth providers.
+
+[#Implementation]
+== How it works
+
+image::img/blog/lb-block-diagram.png[block diagram of Liberty Bikes, showing how the microservices communicate, align="center"]
+
+link:https://github.com/OpenLiberty/liberty-bikes[Liberty Bikes is implemented] as three backend microservices that power the link:https://github.com/OpenLiberty/liberty-bikes/tree/master/game-service[game itself] and the link:https://github.com/OpenLiberty/liberty-bikes/tree/master/player-service[player management and leaderboard features], as well as link:https://github.com/OpenLiberty/liberty-bikes/tree/master/auth-service[authenticating users]. Each of these services is a MicroProfile and Java-based application running on Open Liberty. The game's user interface is an Angular-based https://github.com/OpenLiberty/liberty-bikes/tree/master/frontend[front end application].
+
+Data flow among the services is best described by walking through what happens when you access the game. 
+
+image::img/blog/lb-login-page-start.png[screen capture of the Liberty Bikes login page, align="center"]
+
+First, when you load the game, the front end user interface makes a REST API call to the Authentication microservice to link:https://github.com/OpenLiberty/liberty-bikes/blob/master/auth-service/src/main/java/org/libertybikes/auth/service/AuthTypes.java[find out] which OAuth authentication providers have been configured (all REST APIs in Liberty Bikes are implemented with JAX-RS and MicroProfile OpenAPI). If you choose to log in with an available provider, the UI makes more REST calls to the Authentication service to set up the flow. 
+
+Once you are authenticated, the UI then makes a REST call to the Player microservice to link:https://github.com/OpenLiberty/liberty-bikes/blob/master/player-service/src/main/java/org/libertybikes/player/service/PlayerService.java[add you] to the Players database. Now you're logged in.
+
+image::img/blog/lb-logged-in-page.png[screen capture of a player logged in to Liberty Bikes ready to start a game, align="center"]
+
+Suppose you click Play Now to quickly get into a game. The UI makes a REST call to the Game microservice to link:https://github.com/OpenLiberty/liberty-bikes/blob/master/game-service/src/main/java/org/libertybikes/game/round/service/GameRoundService.java[create] a new game room, and then sets up the game board by opening a link:https://github.com/OpenLiberty/liberty-bikes/blob/master/game-service/src/main/java/org/libertybikes/game/round/service/GameRoundWebsocket.java[websocket] between your browser and the Game service. This connection sends your control inputs to the Game service so it knows which direction to move you in the next frame. It also allows quick communication of the location of players and obstacles in every frame. Since we want to update the board every 50 milliseconds, speed is essential.
+
+image::img/blog/lb-game-screen.png[screen capture of the Liberty Bikes game board, align="center"]
+
+When the round completes, the Game service sends the UI the information to join a new round. Behind the scenes, the Game service also makes a REST call (using MicroProfile REST Client) to link:https://github.com/OpenLiberty/liberty-bikes/blob/master/game-service/src/main/java/org/libertybikes/restclient/PlayerService.java[update] the player statistics for everyone in the round.
+
+[#MicroProfile]
+== Liberty Bikes and MicroProfile
+Apart from using link:https://openliberty.io/guides/rest-intro.html[JAX-RS], link:https://openliberty.io/guides/microprofile-openapi.html[MicroProfile OpenAPI], and link:https://openliberty.io/guides/microprofile-rest-client.html[MicroProfile REST Client] to provide and consume the REST APIs used to communicate between services, several other MicroProfile features were used that provide useful capabilities:
+
+- link:https://openliberty.io/guides/microprofile-config-intro.html[MicroProfile Config] allows for each service's settings to be configured at runtime via environment files or variables. For example, the OAuth providers' keys and secrets.
+- link:https://openliberty.io/guides/microprofile-metrics.html[MicroProfile Metrics] collects various metrics from each of the services. Check out the link:https://github.com/OpenLiberty/liberty-bikes/tree/master/monitoring[Prometheus config and Grafana dashboard] included with Liberty Bikes.
+- link:https://openliberty.io/guides/microprofile-jwt.html[MicroProfile JSON Web Token (JWT)] allows Liberty Bikes to secure service-to-service communication and check that users are authorized to play as their player names.
+
+[#Try]
+== Give it a try!
+So that's Liberty Bikes! Give it a try and have a look at the source code. Everything you need to build and run it is in the readme file at the root of the link:https://github.com/OpenLiberty/liberty-bikes[repository]. We hope you have as much fun playing and exploring Liberty Bikes as we did building it!
