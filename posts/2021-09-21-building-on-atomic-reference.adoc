@@ -1,20 +1,20 @@
 ---
 layout: post
-title: "Must there no more be done? Exactly-once invocation guarantees with AtomicReference"
+title: "Java concurrency — fixing races with AtomicReference"
 # Do NOT change the categories section
 categories: blog
 author_picture: https://avatars3.githubusercontent.com/joe-chacko
 author_github: https://github.com/joe-chacko
-seo-title: Must there no more be done? Exactly-once invocation guarantees with AtomicReference - OpenLiberty.io
-seo-description: Java's AtomicReference does not guarantee that an update function gets called exactly once. We describe a helpful, thread-safe mechanism that builds on AtomicReference to provide such a guarantee. This can be used for lazy initialization, clean-up, or any state change processing that is to happen exactly once.
-blog_description: "Java's AtomicReference does not guarantee that an update function gets called exactly once. We describe a helpful, thread-safe mechanism that builds on AtomicReference to provide such a guarantee. This can be used for lazy initialization, clean-up, or any state change processing that is to happen exactly once."
+seo-title: Java concurrency — fixing races with AtomicReference - OpenLiberty.io
+seo-description: Java's AtomicReference does not guarantee that an update function gets called exactly once. We describe a helpful, thread-safe mechanism that builds on AtomicReference to resolve any such race conditions. This can be used for lazy initialization, clean-up, or any state change processing that is required to happen exactly once.
+blog_description: "Java's AtomicReference does not guarantee that an update function gets called exactly once. We describe a helpful, thread-safe mechanism that builds on AtomicReference to resolve any such race conditions. This can be used for lazy initialization, clean-up, or any state change processing that is required to happen exactly once."
 open-graph-image: https://openliberty.io/img/twitter_card.jpg
 additional_authors:
 - name: Neil Richards
   github: https://github.com/ngmr
   image: https://avatars0.githubusercontent.com/ngmr
 ---
-= Must there no more be done? Exactly-once invocation guarantees with AtomicReference
+= Java concurrency: fixing races with AtomicReference
 Joe Chacko <https://github.com/joe-chacko>
 :imagesdir: /
 :url-prefix:
@@ -23,7 +23,9 @@ Joe Chacko <https://github.com/joe-chacko>
 
 The https://devdocs.io/openjdk/java.base/java/util/concurrent/atomic/atomicreference[`AtomicReference`] and other `Atomic...` classes in the `java.util.concurrent` package allow multiple threads to read and update values safely.
 Yet `AtomicReference` alone is of limited use in writing thread-safe code.
-This article describes a helpful mechanism to provide a more useful thread-safe reference.
+This article describes an approach to using AtomicReference that can resolve race conditions.
+This approach can be used for thread-safe state transitions _without_ dedicated threads.
+These transitions could include lazy initialization or resource clean-up tasks.
 
 == Something is rotten in the state transition
 Consider the https://devdocs.io/openjdk~15/java.base/java/util/concurrent/atomic/atomicreference#updateAndGet(java.util.function.UnaryOperator)[`updateAndGet()`] method.
@@ -280,12 +282,15 @@ You can https://github.com/OpenLiberty/open-liberty/search?q=AcidReference[searc
 === The undiscover'd country, from whose bourn no traveller returns
 There is a trap for the unwary in `AcidReference` too. Observe the line in the `update()` method that calls `neededUpdate.get()`.
 This calls out to some external code, provided by the caller, _while effectively holding a lock_.
-Whenever this happens, there is a risk of the called code simply not returning.
+Whenever this happens, there is a risk of the called code simply not returning, and the lock never being released.
 
 There is a more insidious risk that the called code proceeds to obtain another lock _in an inconsistent order with this effective lock_.
 That is to say, another thread might obtain the other lock first before calling our `update()` method, giving rise to deadlock.
-A caveat should be provided to the caller not to obtain other locks from the supplied update method.
-Sadly, this risk goes hand-in-hand with the exactly-once invocation guarantee.
+
+AtomicReference insisted that update functions be completely side-effect free, and implied that they should not be expensive to invoke.
+AcidReference allows update functions that modify state, and it guarantees that they are only called once.
+Care and attention are still required.
+
 
 Concurrent programming in Java is hard.
 Time for a coffee, and maybe a Danish.
