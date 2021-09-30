@@ -121,17 +121,13 @@ Happy Java 17 experimenting!
 == Java 17 resources
 
 For further reading on Java 17, here are a few resources you might find useful:
-- Highlights of new features in Java 17 are found in the link:https://openjdk.java.net/projects/jdk/17/[Java 17 features page]
-- More detailed release information can be seen in the link:https://jdk.java.net/17/release-notes[release notes for Java 17]
-- Peruse link:https://docs.oracle.com/en/java/javase/17/docs/api/index.html[Javadocs for Java 17]
+* Highlights of new features in Java 17 are found in the link:https://openjdk.java.net/projects/jdk/17/[Java 17 features page]
+* More detailed release information can be seen in the link:https://jdk.java.net/17/release-notes[release notes for Java 17]
+* Peruse link:https://docs.oracle.com/en/java/javase/17/docs/api/index.html[Javadocs for Java 17]
 
-For migration to Java 17, please check out:
-- link:https://blogs.oracle.com/javamagazine/migrate-to-java-17[Oracle Java 17 migration blog]
-- link:https://docs.oracle.com/en/java/javase/17/migrate/getting-started.html
+For migration to Java 17, please check out link:https://blogs.oracle.com/javamagazine/migrate-to-java-17[Oracle Java 17 migration blog] and link:https://docs.oracle.com/en/java/javase/17/migrate/getting-started.html[Getting started with JDK 17].
 
-For Java 17 release roadmaps and availability:
-- link https://adoptium.net/support.html?variant=openjdk17&jvmVariant=hotspot[Adoptium release roadmap]
-- link https://www.oracle.com/java/technologies/java-se-support-roadmap.html[Oracle commercial JDK roadmap]
+For Java 17 release roadmaps and availability refer to the link:https://adoptium.net/support.html?variant=openjdk17&jvmVariant=hotspot[Adoptium release roadmap] and link:https://www.oracle.com/java/technologies/java-se-support-roadmap.html[Oracle commercial JDK roadmap].
 
 And finally, for a comprehensive discussion on Java modules with a little hands on practice, read link:https://www.baeldung.com/java-9-modularity[this article from Baeldung].
 
@@ -142,7 +138,32 @@ We’ve spent some time fixing bugs. The following sections describe just some o
 
 * link:https://github.com/OpenLiberty/open-liberty/issues/18393[SPNEGO does not work with Java 11 or higher]
 +
-In the release of Open Liberty 21.0.0.9, a regression was introduced which prevented the `Krb5LoginModule` class from being found when authenticating using Kerberos on Java 11 or higher. This issue caused some users to be presented with an `Error 403` or `Authentication Failed` when authenticating using the `spnego-1.0` feature. This issue has been fixed by reverting the underlying code back to the way it was prior to it being modified. 
+In the release of Open Liberty 21.0.0.9, a regression was introduced which prevented the `Krb5LoginModule` class from being found when authenticating using Kerberos on Java 11 or higher. This issue caused some users to be presented with an `Error 403` or `Authentication Failed` when authenticating using the `spnego-1.0` feature. This issue was fixed by changing how classes are loaded to work with Java 11 and higher releases.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/18559[Liberty is vulnerable to Information Disclosure (CVE-2021-29842 CVSS 3.7)]
++
+In the 21.0.0.9 release, an Information Disclosure vulnerability was discovered which could cause sensitive information to unintentionally be revealed. This issue has now been fixed in Open Liberty 21.0.0.10.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/18475[Servlet ReadListener does not receive all HTTP request data]
++
+An issue was discovered where in rare cases an app's `javax.servlet.ReadListener` could be invoked with `onAllDataRead()` prematurely, before all of the bytes sent along with the request have been made available to the `ReadListener`. In an affected scenario, `onDataAvailable()` would be incorrectly invoked after the premature `onAllDataRead()` to provide notification for any remaining request data. This issue has been fixed with an update to the HTTP implementation which prevents HTTP request bodies from being prematurely marked as complete.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/18552[JAX-RS 2.0 and 2.1 implementation is executing resource method when Content-Type or Accept header contains invalid values]
++
+An issue was discovered in 21.0.0.9 which meant that Liberty's JAX-RS (2.0 and 2.1) implementation would execute resource code when bad requests were made using invalid `Content-Type` or `Accept` headers, rather than returning a 400 (Bad Request). A fix has now been implemented to ensure that if a request is made with invalid `Content-Type` or `Accept` headers, the implementation returns a 400 (Bad Request).
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/18348[ContainerRequestContext.getAcceptableLanguages() - fails with IllegalArgumentException when invalid locales are specified in the Accept-Language header]
++
+A bug was discovered which meant that `ContainerRequestContext.getAcceptableLanguages()` would throw an `IllegalArgumentException` when requests were made with invalid locales specified in the `Accept-Language` header. This `getAcceptableLanguages()` call should succeed and return the list from the headers as submitted. This issue has now been fixed to ensure that the `Accept-Language` header is handled consistently.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/18437[JSF throws ClassNotFoundException for o.a.m.el.convert.ValueExpressionToValueBinding]
++
+Previously, A JSF application using [Application.createValueBinding(String)](https://docs.oracle.com/javaee/6/api/javax/faces/application/Application.html#createValueBinding(java.lang.String)) and `jsf-2.2` or `jsf-2.3` could encounter a `ClassNotFoundException` for the internal `MyFaces` class `ValueExpressionToValueBinding`, even if that class wasn't directly referenced by the app. This issue occured because the `org.apache.myfaces.el.convert` package was not made available (by Liberty's `jsf-2.2` and `jsf-2.3` bundles) to the thread context `classloader`. This visibility issue was fixed by updating those bundles.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/18503[RuntimeCodebase cannot be located on collocated call]
++
+When invoking a Remote EJB in the same server, the call will be routed internally (collocated) rather than via the network. If the calling app, and the called app have different versions of the same class, negotiation is required between them via the `RuntimeCodebase` object. An issue was discovered where the `RuntimeCodebase` was not available for collocated calls. This issue was fixed in Open Liberty 21.0.0.10, meaning that `Yoko` now supports these collocated calls.
+
 
 == Get Open Liberty 21.0.0.10 now
 
