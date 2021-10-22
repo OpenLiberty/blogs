@@ -12,10 +12,9 @@ open-graph-image: https://openliberty.io/img/blog/ol-stack-jpa-app-db-bind-brows
 = Bind an operator-managed PostgreSQL database to a JPA application in a Kubernetes cluster
 Edward Mezarina <https://github.com/mezarin>
 
-Binding your microservice application to operator-based services, such as a database, is now easier, thanks to the Service Binding Operator and OpenShift Do (odo). These frameworks enable the automatic collection of service data and easier resource data sharing, while abstracting resource configuration and deployment details.
+Binding your microservice application to operator-based services, such as a database, is now easier, thanks to OpenShift Do (odo). This framework enables the automatic collection of service data and easier resource data sharing, while abstracting resource configuration and deployment details.
 
-In this post, we’ll use the Open Liberty devfile stack, Openshift odo, and the Service Binding Operator to easily deploy an application that uses the Java Persistence API (JPA) and bind a PostgreSQL database to the application.
-
+In this post, we’ll use the Open Liberty devfile stack and OpenShift Do to easily deploy an application that uses the Java Persistence API (JPA) and bind a PostgreSQL database to the application.
 
 == Open Liberty devfile stack
 
@@ -25,28 +24,20 @@ The Open Liberty devfile stack provides two fully configured link:https://docs.d
 
 == OpenShift Do (odo)
 
-link:https://odo.dev[Odo] is a simple CLI tool to create devfile-based components that interact directly with your Kubernetes cluster. With odo, you can set up the environment, and also build, deploy, access, and debug your application. Directives to manage the environment and application are provided by a component's devfile.
-
-== Service Binding Operator
-
-The link:https://github.com/redhat-developer/service-binding-operator/blob/master/README.md[Service Binding Operator] makes it easier for developers to bind operator-managed services such as databases to applications. The operator generates a binding secret for the purpose of storing information from the routes, services, secrets, and configMaps owned by the backing service.
+link:https://odo.dev[Odo] is a simple CLI tool to create devfile-based components that interact directly with your Kubernetes cluster. With odo, you can set up the environment, you can build, deploy, access, and debug your application, and you can link/bind a service to your application. Directives to manage the environment and application are provided by a component's devfile.
 
 == Try it out
 
 To begin, you need three things:
 
 - Kubernetes cluster. For this blog, an OpenShift cluster is used. Be sure to log in. Odo will interact with your Kubernetes cluster.
-- OpenShift Do. If you have not already installed odo, do so now by following the instructions outlined in the link:https://odo.dev[odo] documentation. Be sure to install version 2.2.4 and above.
+- OpenShift Do. If you have not already installed odo, do so now by following the instructions outlined in the link:https://odo.dev[odo] documentation. Be sure to install version 2.4.0 and above.
 - An application that uses a PostgreSQL database. For this post, we'll use the Open Liberty stack link:https://github.com/OpenLiberty/application-stack-samples/tree/main/jpa[sample JPA application].
 
 
 === Install the needed operators
 
-If you have the right privileges, you can use the OpenShift console to install these operators. You do this by navigating to `Operators->OperatorHub` and searching/selecting/installing a couple of operators from the catalog.
-
-- Service Binding Operator (provided by Red Hat)
-
-Use the OpenShift console (`Operators->OperatorHub`) to install this operator. Be sure to install version 0.9.1 and above.
+If you have the right privileges, you can use the OpenShift console to install operators. You do this by navigating to `Operators->OperatorHub` and searching/selecting/installing the operators from the catalog.
 
 - PostgreSQL Operator (provided by Dev4Ddevs.com)
 
@@ -58,32 +49,6 @@ odo project create service-binding-demo
 ----
 
 Use the OpenShift console (`Operators->OperatorHub`) to install this operator. Be sure to pick `service-binding-demo` as the namespace in which to install it.
-
-=== Provide service resource access to the Service Binding Operator
-
-Starting with link:https://github.com/redhat-developer/service-binding-operator/releases/tag/v0.10.0[v0.10.0], the Service Binding Operator requires explicit permissions to access service resources. 
-
-Grant the Service Binding Operator's controller permission to get/list `Database` custom resource instances. The `Database` custom resource is provided by the Dev4Devs PostgreSQL operator you installed in the previous step.
-
-[source,sh]
-----
-cat <<EOF | kubectl apply -f-
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: sbo-service-view
-  labels:
-    service.binding/controller: "true"
-rules:
-  - apiGroups:
-      - postgresql.dev4devs.com
-    resources:
-      - databases
-    verbs:
-      - get
-      - list
-EOF
-----
 
 === Create a Java Open Liberty-based component and the database resource service
 
@@ -151,9 +116,11 @@ metadata:
     service.binding/db_user: 'path={.spec.databaseUser}'
 ----
 
-Adding the annotations ensures that the Service Binding Operator will inject the `databaseName`, `databasePassword` and `databaseUser` spec values into the application. Note that the instance name you configure will be used as part of the name of various artifacts and resource references. Be sure to change it.
+Be sure to change `metadata.name` from the generated value to `sampledatabase` in order to match the instructions below.
 
-Now that we are done customizing the `Database` resource with bindable data, generate its devfile configuration.
+Additionally, note that the included annotations ensure that odo will inject the `databaseName`, `databasePassword` and `databaseUser` spec values into the application as environment variables ( `DATABASE_DB_NAME`, `DATABASE_DB_USER`, `DATABASE_DB_PASSWORD`), which follow service binding naming conventions. These environment variables are used in the server.xml configuration file to set the value of the associated properties in the `datasource` element associated with postgreSQL database. 
+
+Now that we are done customizing the `Database` resource config yaml with bindable data, generate its devfile configuration.
 
 [source,sh]
 ----
@@ -166,29 +133,7 @@ The following configuration is automatically added to `devfile.yaml`:
 ----
 ...
 - kubernetes:
-    inlined: |
-      apiVersion: postgresql.dev4devs.com/v1alpha1
-      kind: Database
-      metadata:
-        annotations:
-          service.binding/db_name: path={.spec.databaseName}
-          service.binding/db_password: path={.spec.databasePassword}
-          service.binding/db_user: path={.spec.databaseUser}
-        name: sampledatabase
-      spec:
-        databaseCpu: 30m
-        databaseCpuLimit: 60m
-        databaseMemoryLimit: 512Mi
-        databaseMemoryRequest: 128Mi
-        databaseName: sampledb
-        databaseNameKeyEnvVar: POSTGRESQL_DATABASE
-        databasePassword: samplepwd
-        databasePasswordKeyEnvVar: POSTGRESQL_PASSWORD
-        databaseStorageRequest: 1Gi
-        databaseUser: sampleuser
-        databaseUserKeyEnvVar: POSTGRESQL_USER
-        image: centos/postgresql-96-centos7
-        size: 1
+    uri: kubernetes/odo-service-sampledatabase.yaml
   name: sampledatabase
 ...
 ----
@@ -240,27 +185,7 @@ The following configuration is automatically added to `devfile.yaml`:
 ----
 ...
 - kubernetes:
-    inlined: |
-      apiVersion: binding.operators.coreos.com/v1alpha1
-      kind: ServiceBinding
-      metadata:
-        creationTimestamp: null
-        name: mysboproj-database-sampledatabase
-      spec:
-        application:
-          group: apps
-          name: mysboproj-app
-          resource: deployments
-          version: v1
-        bindAsFiles: false
-        detectBindingResources: true
-        services:
-        - group: postgresql.dev4devs.com
-          kind: Database
-          name: sampledatabase
-          version: v1alpha1
-      status:
-        secret: ""
+    uri: kubernetes/odo-service-mysboproj-database-sampledatabase.yaml
   name: mysboproj-database-sampledatabase
 ...
 ----
@@ -309,7 +234,7 @@ After you save the data to the PostgreSQL database, notice that you are re-direc
 [.img_border_light]
 image::/img/blog/ol-stack-jpa-app-db-bind-browser-show-data.png[Data Display Page,width=70%,align="center"]
 
-You just used Open Liberty devfile stack, Openshift odo, and the Service Binding Operator to deploy an application, bind a PostgreSQL database to the application, and successfully test the interaction between the application and the database.
+You just used Open Liberty devfile stack and OpenShift Do to deploy an application, bind a PostgreSQL database to the application, and successfully test the interaction between the application and the database.
 
 == Learn more
 
