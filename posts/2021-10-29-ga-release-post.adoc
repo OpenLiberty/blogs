@@ -1,0 +1,276 @@
+---
+layout: post
+title: "Config variables using Kubernetes secrets, installation of user features, and more exciting enhancements in Open Liberty 21.0.0.11"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/ryan-storey
+author_github: https://github.com/ryan-storey
+seo-title: Config variables using Kubernetes secrets, installation of user features, and more exciting enhancements in Open Liberty 21.0.0.11 - makes sure it ends with - OpenLiberty.io
+seo-description: Open Liberty 21.0.0.11 comes with plenty of exciting improvements including Kubernetes secrets as Liberty config variables, new ways to install user features, and a new HTTP access log format option for the ephermal port of the client. This update also comes with many significant bug fixes.
+blog_description: Open Liberty 21.0.0.11 comes with plenty of exciting improvements including Kubernetes secrets as Liberty config variables, new ways to install user features, and a new HTTP access log format option for the ephermal port of the client. This update also comes with many significant bug fixes.
+open-graph-image: https://openliberty.io/img/blog/210011-kube-secrets-2.png
+---
+= Config variables using Kubernetes secrets, installation of user features, and more exciting enhancements in Open Liberty 21.0.0.11
+Ryan Storey <https://github.com/ryan-storey>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+Open Liberty 21.0.0.11 comes with plenty of exciting improvements including Kubernetes secrets as Liberty config variables, new ways to install user features, and a new HTTP access log format option for the ephermal port of the client. This update also comes with many significant bug fixes.
+
+In link:{url-about}[Open Liberty] 21.0.0.11:
+
+* <<kubernetes_secrets, Using Kubernetes secrets as Liberty config variables>>
+* <<user_features, Enable installation of user features on Open Liberty>>
+* <<log_format, New HTTP access log format option for the ephemeral port of the client>>
+
+View the list of fixed bugs in link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A21.0.0.11+label%3A%22release+bug%22[21.0.0.11].
+
+[#run]
+== Run your apps using 21.0.0.11
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], here are the coordinates:
+
+[source,xml]
+----
+<dependency>
+    <groupId>io.openliberty</groupId>
+    <artifactId>openliberty-runtime</artifactId>
+    <version>21.0.0.11</version>
+    <type>zip</type>
+</dependency>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+dependencies {
+    libertyRuntime group: 'io.openliberty', name: 'openliberty-runtime', version: '[21.0.0.11,)'
+}
+----
+
+Or if you're using Docker:
+
+[source]
+----
+FROM open-liberty
+----
+
+Or take a look at our link:{url-prefix}/downloads/[Downloads page].
+
+[link=https://stackoverflow.com/tags/open-liberty]
+image::img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="center"]
+
+[#kubernetes_secrets]
+== Using Kubernetes secrets as Liberty config variables
+
+In a cloud environment, sensitive information such as passwords and OAuth tokens may be stored in Kubernetes secrets. To access these secrets today in Liberty via configuration variables they would need to be exposed as environment variables in a Kubernetes pod. This update will allow configuration variables to be automatically populated from Kubernetes secrets without having to expose them as environment variables.
+
+To make use of this function, the Kubernetes secrets need to be mapped to the file system. This can be done by mounting the secrets to a volume in the pod definition, or by using a third party product to automatically handle the mapping. Files will be read from the locations defined in the `VARIABLE_SOURCE_DIRS` environment variable, which defaults to `WLP_CONFIG_DIR/variables`. The variable name will be taken from the name of the file, and the value will be the contents of the file.
+
+For example, we may have a Kubernetes secret named 'accountdb' that contains a username and password:
+
+image::/img/blog/210011-kube-secrets-1.png[Kubernetes Secret,align="left"]
+
+A utility such as Hashicorp's Vault agent can automatically map that secret to the file system, or it could be done manually in a deployment definition:
+
+image::/img/blog/210011-kube-secrets-2.png[Deployment definition, align="left"]
+
+The above definition will result in the files `/config/variables/accountdb/username` and `/config/variables/accountdb/password` being created when the pod is created. Liberty will create variables from both files, and users can access them using normal Liberty variable syntax, `${accountdb/username}` and `${accountdb/password}`.
+For more information visit link:https://kubernetes.io/docs/concepts/configuration/secret/[Kubernetes Secrets] or check out the link:https://kubernetes.io/docs/tutorials/configuration/configure-java-microservice/configure-java-microservice/[Externalizing config using MicroProfile, ConfigMaps and Secrets] Interactive Tutorial which runs on Open Liberty!
+
+[#user_features]
+== Enable installation of user features on Open Liberty
+
+FeatureUtility command line tool, Liberty Maven and Gradle Plugin will now enable installation of user features onto Open Liberty runtime from Maven Central and on-premise Maven repository. Prior to this update, users had to use `InstallUtility` command line tool from commercial liberty.
+
+Usage is as follows:
+Create `features-bom` (bill of Materials) file for the user feature. The `features-bom` artifact in each groupId provides the bill of materials (`BOM`) for each maven artifact.
+
+[source,xml]
+----
+<project>
+ <modelVersion>4.0.0</modelVersion>
+ <groupId>userTest.user.test.features</groupId>
+ <artifactId>features-bom</artifactId>
+ <version>21.0.0.7</version>
+ <packaging>pom</packaging>
+ <name>user features bill of materials</name>
+ <description>user features bill of materials</description>
+
+ <dependencyManagement>
+   <dependencies>
+     <dependency>
+       <groupId>userTest.user.test.features</groupId>
+       <artifactId>testesa1</artifactId>
+       <version>21.0.0.7</version>
+       <type>esa</type>
+       <scope>provided</scope>
+     </dependency>
+   </dependencies>
+ </dependencyManagement>
+</project>
+----
+
+Generate the `features.json` file with Liberty Maven or Gradle plugin. The `features.json` file is the `JSON` file that contains the information found within a feature's `ESA` manifest file. `JSON`s are a key requirement for installation of any liberty features(s) from a maven repository. Provide the maven coordinate of the custom made `features-bom` file.
+
+If you’re using Maven, use the `prepare-feature` goal:
+
+[source,xml]
+----
+<plugin>
+   <groupId>io.openliberty.tools</groupId>
+   <artifactId>liberty-maven-plugin</artifactId>
+   <executions>
+       ...
+       <execution>
+           <id>prepare-feature</id>
+           <phase>prepare-package</phase>
+           <goals>
+               <goal>prepare-feature</goal>
+           </goals>
+       </execution>
+       ...
+   </executions>
+   <configuration>
+      <installDirectory>/opt/ibm/wlp</installDirectory>
+      <serverName>test</serverName>
+   </configuration>
+</plugin>
+
+<dependencyManagement>
+   <dependencies>
+     <dependency>
+       <groupId>userTest.user.test.features</groupId>
+       <artifactId>features-bom</artifactId>
+       <version>21.0.0.7</version>
+       <type>pom</type>
+     </dependency>
+   </dependencies>
+ </dependencyManagement>
+----
+
+Or for Gradle, use the `prepareFeature` task:
+
+[source]
+----
+dependencies {
+    featuresBom 'userTest.user.test.features:features-bom:19.0.0.8'
+}
+----
+
+Install the user feature using the `featureUtility` command line tool, Liberty Maven or Gradle plugin. Provide the maven coordinate of the custom made `features-bom` file.
+
+|===
+|Tool               |  Usage
+
+|featureUtility | `featureUtility installFeature testesa1 --featuresBom=userTest.user.test.features:features-bom:19.0.0.8` 
+|Maven Plugin| `install-feature`with features-bom dependency 
+|Gradle Plugin| `installFeature` with featuresBom dependency
+|===
+
+[#log_format]
+== New HTTP access log format option for the ephemeral port of the client
+
+When using the link:https://www.openliberty.io/docs/latest/access-logging.html[HTTP access log], it's sometimes useful to print the ephemeral port of the client for each incoming HTTP request to directly correlate to network trace in a lightweight way.
+
+Previously, the main way to correlate HTTP requests to network trace used WebContainer trace which is quite heavy. The new `%{remote}p` HTTP access log format option allows for a lightweight way to correlate to network trace to help investigate network errors or performance issues. A TCP socket is uniquely identified by the tuple (local IP, local port, remote IP, remote port). In the case of Liberty as an HTTP server, the client uses a local ephemeral port and this is the key to uniquely identifying the request in the network trace.
+
+Add the `%{remote}p` format option to the HTTP access log configuration (`<accessLogging />`). For example:
+
+[source, xml]
+----
+<httpEndpoint id="defaultHttpEndpoint" httpPort="9080" httpsPort="9443">
+  <accessLogging filepath="${server.output.dir}/logs/http_access.log" logFormat="%h %u %t &quot;%r&quot; %s %b %D %{R}W %{remote}p %p" />
+</httpEndpoint>
+----
+
+Example log entry written to `http_access.log`:
+
+[source, role="no_copy"]
+----
+127.0.0.1 - [16/Aug/2021:10:42:24 -0700] "GET /swat/ HTTP/1.1" 200 21983 5625 3708 59212 9080
+----
+
+In this example, `59212` is the client's ephemeral port and `9080` is the Liberty HTTP port. Here is an example Wireshark network capture showing the same conversation:
+
+image::/img/blog/210011-log-format.png[An example Wireshark network capture,width=70%,align="center"]
+
+To find out more visit link:https://www.openliberty.io/docs/latest/access-logging.html[HTTP access logging] in the Open Liberty documentation.
+
+[#bugs]
+== Notable bugs fixed in this release
+
+We’ve spent some time fixing bugs. The following sections describe just some of the issues resolved in this release. If you’re interested, here’s the link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A21.0.0.11+label%3A%22release+bug%22[full list of bugs fixed in 21.0.0.11].
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/18866[Fix PasswordUtil.passwordEncode() with "hash" option]
++
+Previously, the `PasswordUtil` `passwordEncode()` with the "hash" option was not working, as the api returned null.
+There was an issue with the API code where some default information needed to hash the data was not getting populated.
+This bug was fixed so that `PasswordUtil.passwordEncode(password, "hash")` now returns a hashed string. The method was returning null due to missing information needed to create the hashed string. The default values for the missing information was not being used.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/18674[HTTP/2 streams closed due to client window update delay]
++
+Liberty's HTTP/2 implementation enforces a non-configurable timeout for pending writes that are waiting for a window update from the client. That is, when a stream cannot write data due to a window size limitation, then the stream will only wait for the timeout period for a window update to arrive from the client - and once that deadline elapses the stream is reset. Previously this timeout was ~8s, which is insufficient for some scenarios - Liberty should've waited for at least the configured `writeTimeout` period. This issue has now been fixed, and streams waiting on write window updates are closed less aggressively by Liberty, and streams are no longer closed before the `writeTimeout` period has elapsed.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/17972[@Schema(multipleOf = ) can throw NumberFormatException in mpOpenAPI-2.0 feature]
+Previously, when certain non-integer numbers were used as the value for `@Schema.multipleOf`, no OpenAPI documentation was produced and the following error was seen in the log:
++
+[source]
+----
+CWWKO1661E: An error occurred when processing application <application name> and an OpenAPI document was not produced. The error was: java.lang.NumberFormatException.
+----
++
+This was caused by a bit manipulation bug in Jandex and was fixed by updating to the latest version.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/18492[gRPC service registration broken for EAR deployments]
++
+Previously, `gRPC` services deployed on Liberty via `grpc-1.0` were not registered correctly when they were embedded in an `EAR` (rather than a `WAR`). This resulted in the services never being made available. Additionally, the following `FFDC` would be logged:
++
+[source, role="no_copy"]
+----
+Exception = com.ibm.wsspi.adaptable.module.UnableToAdaptException
+Source = io.openliberty.grpc.internal.servlet.GrpcServerComponent
+probeid = 230
+Stack Dump = com.ibm.wsspi.adaptable.module.UnableToAdaptException: CWWKM0453E: WebSphere Application Server internal error occurred. Please contact WebSphere Application Server support with the following data: Container is not a module com.ibm.ws.adaptable.module.internal.InterpretedContainerImpl@1e2a2e4f ( <app_location_and_name> )
+	at com.ibm.ws.container.service.annocache.internal.WebAnnotationsAdapterImpl.adapt(WebAnnotationsAdapterImpl.java:54)
+	at com.ibm.ws.container.service.annocache.internal.WebAnnotationsAdapterImpl.adapt(WebAnnotationsAdapterImpl.java:33)
+	at com.ibm.ws.adaptable.module.internal.AdapterFactoryServiceImpl.adapt(AdapterFactoryServiceImpl.java:200)
+	at com.ibm.ws.adaptable.module.internal.AdaptableContainerImpl.adapt(AdaptableContainerImpl.java:174)
+	at com.ibm.ws.adaptable.module.internal.InterpretedContainerImpl.adapt(InterpretedContainerImpl.java:203)
+	at com.ibm.ws.container.service.annocache.AnnotationsBetaHelper.getWebAnnotations(AnnotationsBetaHelper.java:268)
+	at io.openliberty.grpc.internal.servlet.GrpcServerComponent.initServicesHelper(GrpcServerComponent.java:243)
+        ...
+----
++
+This issue has now been resolved, meaning that the `gRPC` services should start as expected and no `FFDC`s should be logged.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/13990[SAML JSP gets unexpected 500 error due to ClassCastException]
++
+Previously, the SAML JSP would get an unexpected 500 error, as a ClassCastException was returned instead of a normal SAML error during certain SAML SSO login errors. The issue was caused by a 'jarentry' being handled by the wrong classload processor. However, this issue has now been fixed and it will now be handled by the correct bundle processor. Note that 'jar' types are still handled correctly.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/16598[ServletContainerInitializer is passed invalid @HandlesTypes classes]
++
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/18419[ExpressionFactory#getClassNameServices fails if META-INF/services/javax.el.ExpressionFactory contains comments]
++
+Previously, link:https://github.com/OpenLiberty/open-liberty/blob/2fd4a880754c37a988c5ed9ac4f1ea5988e465d6/dev/com.ibm.websphere.javaee.el.3.0/src/javax/el/ExpressionFactory.java#L406[ExpressionFactory#getClassNameServices(ClassLoader tccl)] failed when `META-INF/services/javax.el.ExpressionFactory` did not contain a qualified class name in its first line.
+This was a problem with the el-3.0 implementation, and was fixed by porting over the patch in link:https://bz.apache.org/bugzilla/show_bug.cgi?id=64097[BZ 64097].
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/18411[Liberty message.log has repeating servlet lifecycle messages]
++
+The following messages appeared many times in the Liberty log for certain apps that used JSP with a TLD file, beginning with 21.0.0.7.
++
+[source, role="no_copy"]
+----
+SRVE0242I: [ ... ] Initialization successful.
+SRVE0253I: [ ... ] Destroy successful.
+----
++
+Each time a JSP is accessed, if included files have been updated since last compile it causes a new JSP compile. This would cause the message: `SRVE0253I: [ ... ] Destroy successful`. The issue is that a `TLD` file under `/WEB-INF` in the `WAR` wasn't being checked correctly, causing it to appear to always be out of date, therefore causing the JSP to compile every time it is accessed and resulting in a `SRVE0253I`. In a heavily used app, the `SRVE0253I` might have caused excessive logging due to the frequency of its occurrence. The issue happened when the following was set: `<applicationManager autoExpand="false"/>``. This issue has now been fixed, meaning that in the above scenario SRVE0253I does not occur.
+
+== Get Open Liberty 21.0.0.11 now
+
+Available through <<run,Maven, Gradle, Docker, and as a downloadable archive>>.
