@@ -254,6 +254,34 @@ Previously, the SAML JSP would get an unexpected 500 error, as a ClassCastExcept
 
 * link:https://github.com/OpenLiberty/open-liberty/issues/16598[ServletContainerInitializer is passed invalid @HandlesTypes classes]
 +
+@HandlesTypes is used on a ServletContainerInitializer to specify classes which should be passed to its `onStartup(java.util.Set<java.lang.Class<?>>, javax.servlet.ServletContext)` at application startup time.  Liberty correctly includes the implementations of the `@HandlesTypes` classes - however if a class specified in the `@HandlesTypes` parameter is not defined via `@interface` then it will also be included in the `onStartup` set.  This issue fixed the problem where the `@interface` annotation was not used in the `@HandlesTypes` so that the specify classes can be passed into the `onStartup()`. The usage is as follows:
++
+[source, java]
+----
+public interface MyInterface { ... }
+
+public MyInterfaceImpl implements MyInterface
+
+@HandlesTypes({MyInterface.class})
+public class MyServletContainerInitializer implements ServletContainerInitializer {
+  @Override
+  public void onStartup(Set<Class<?>> scanResult, ServletContext ctx) throws ServletException {
+    // scanResult should contain all implementations of MyInterface;
+    // current Liberty will pass in:
+    // { MyInterfaceImpl.class, MyInterface.class }
+  }
+}
+----
++
+The above can also be written using annotation format:
++
+[source, java]
+----
+public @interface MyInterface
+
+@MyInterface
+public MyInterfaceImpl
+----
 
 * link:https://github.com/OpenLiberty/open-liberty/issues/18419[ExpressionFactory#getClassNameServices fails if META-INF/services/javax.el.ExpressionFactory contains comments]
 +
