@@ -213,6 +213,101 @@ Open Liberty now provides a way to control response headers for a given HTTP end
 
 We’ve spent some time fixing bugs. The following sections describe just some of the issues resolved in this release. If you’re interested, here’s the  link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A21.0.0.12+label%3A%22release+bug%22[full list of bugs fixed in 21.0.0.12].
 
+* link:https://github.com/OpenLiberty/open-liberty/issues/19087[Throughput performance degradation in eclipselink due to Thread.getStackTrace calls]
++
+We discovered an issue where a change to the `org.eclipse.persistence.internal.helper.ConcurrencyManager` class caused a ~75% throughput performance degradation in eclipselink. This lost throughput was caused by calls to `Thread.getStackTrace()`. This regression showed up for `jpa-2.2` in 21.0.0.8 and `persistence-3.0` in 21.0.0.9. This issue has now been fixed by removing the `getStackTrace()` calls.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/17428[MicroProfile OpenAPI 2.0 includes non-public fields in the generated documentation]
++
+Previously, when a schema was created for a class which includes a private field, the private field would be listed in the generated OpenAPI document, for example:
++
+[source, java]
+----
+@Schema
+public class Example {
+    private String field1;
+    public String field2;
+}
+----
++
+results in
++
+[source, yaml]
+----
+  schemas:
+    Example:
+      type: object
+      properties:
+        field1:
+          type: string
+        field2:
+          type: string
+----
++
+The field `field1` should not have appeared in the generated OpenAPI document as it is private. This issue has been fixed by setting the `mp.openapi.extensions.smallrye.private-properties.enable` property to disable non-public properties by default.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/19057[Port bind skipped at server startup]
++
+Previously, in an extremely rare scenario, configured ports could silently fail to bind - preventing Liberty from using them. This issue was caused by a subtle race condition in the code responsible for delaying the port bind until the server is ready to handle traffic.
++
+In the failing scenario, the port started message would not be emitted - for example the following message would be missing:
++
+`CWWKO0219I: TCP Channel defaultHttpEndpoint has been started and is now listening for requests on host *  (IPv4) port 9080.`
++
+and the following FFDC will be seen:
++   
+[source]
+----
+Exception = java.lang.RuntimeException
+Source = com.ibm.ws.tcpchannel.internal.NBAcceptChannelSelector
+probeid = 254
+Stack Dump = java.lang.RuntimeException: java.nio.channels.NotYetBoundException
+	at com.ibm.ws.tcpchannel.internal.NBAcceptChannelSelector.performRequest(NBAcceptChannelSelector.java:358)
+	at com.ibm.ws.tcpchannel.internal.ChannelSelector.run(ChannelSelector.java:257)
+	at java.base/java.lang.Thread.run(Thread.java:866)
+Caused by: java.nio.channels.NotYetBoundException
+	at java.base/sun.nio.ch.ServerSocketChannelImpl.begin(ServerSocketChannelImpl.java:246)
+	at java.base/sun.nio.ch.ServerSocketChannelImpl.accept(ServerSocketChannelImpl.java:283)
+	at com.ibm.ws.tcpchannel.internal.NBAcceptChannelSelector.performRequest(NBAcceptChannelSelector.java:278)
+	... 2 more
+----
++
+This issue has now been fixed so that all configured ports should start, or if there is a problem some meaningful error message should be logged.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/18992[Application fails to restart in server.xml update scenario]
++
+We discovered an issue where an application would fail to restart, due to a race condition during server reconfiguration when multiple apps are installed. The problem occurs when one app starts before another app is finished uninstalling. In theory this shouldn't be a problem - however for this scenario these apps are sharing a VirtualHost configuration object, and in this case one app updates the parent VirtualHost as part of its uninstall process in such a way that the other gets into an invalid state. The server log will show an warning such as `CWWKZ0020I: Application <app_name> not updated`. This issue was fixed by fixing the race condition that caused the failure.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/17599[HTTP upgrade to WebSocket can cause quiesce errors]
++
+When a websocket connection is started, it starts as an HTTP connection. Previously, If an error occured during the transition between an HTTP and a websocket connection, which was known to be a websocket upgrade, the error processing would neglect to decrement a connection counter, which then caused the server to believe there is an open connection during server stop.
+There were two scenarios where these quiesce errors would occur:
++
+** When a read error occured during the transition between an HTTP and a websocket connection, the error processing neglected to decrement a connection counter, which then causes the server to believe there is an open connection during server stop.
++
+** If a client immediately closed the websocket connection after it was opened, the original upgrade request handling may not have had enough time to close properly on the server. Once again, the connection counter failed to decrement leading the server to believe there is an open connection during the server stop.
++
+This issue has been fixed by adding a new flag called `decrementNeeded` which helps to ensure that the decrement is not neglected.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/19193[Stop allowing creation of HTTP/2 streams if server is closing]
++
+Quiesce is meant to allow chains to gracefully finish active request/responses during the configured time threshold. During quiesce, the accept selectors should no longer allow for new connections to be made. However, since `HTTP/2` uses existing connections, it was previously possible for new `HTTP/2` streams to be created during the quiesce period. Thus, we worked to disallow creation of new streams when the kernel signals that the framework is closing down, which should help diminish the cases where quiesce fails to finish due to `HTTP/2` connections. Now, during quiesce, connections should begin closing down. In `HTTP/1.1` this implies disabling keep-alive. In `HTTP/2`, sending a `GOAWAY` once quiesce begins.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/19227[Ensure ServletRequestListener#requestDestroyed is always called]
++
+We discovered a bug where the `ServletRequestListener#requestDestroyed` call does not occur, if an exception occurs during async servlet while an `appSecurity-x.0` is enabled. For this bug to occur, two conditions must be met: the `webContainer` property `deferServletRequestListenerDestroyOnError` is true and an `appSecurity-x.0` feature is enabled. This issue has now been resolved.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/19197[ClassCastException in JSP relating to JDT internal classes]
++
+Open Liberty 21.0.0.9 introduced a bug where the following error occured for certain class lookups in JSP:
++
+[source]
+----
+Error 500: java.lang.ClassCastException: class org.eclipse.jdt.internal.compiler.lookup.PlainPackageBinding cannot be cast to class org.eclipse.jdt.internal.compiler.lookup.TypeBinding (org.eclipse.jdt.internal.compiler.lookup.PlainPackageBinding and org.eclipse.jdt.internal.compiler.lookup.TypeBinding are in unnamed module of loader org.eclipse.osgi.internal.loader.EquinoxClassLoader @3522bc53)
+----
++
+This issue has now been fixed, as the private `isPackage(String)` method needed to be updated to correctly identify that `org.apache.jsp.test_jsp$1InnerClass` is a class and not a package.
+
 == Get Open Liberty 21.0.0.12 now
 
 Available through <<run,Maven, Gradle, Docker, and as a downloadable archive>>.
