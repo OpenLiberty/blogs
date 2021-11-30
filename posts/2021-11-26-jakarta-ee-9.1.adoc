@@ -1,0 +1,429 @@
+---
+layout: post
+title: "Jakarta EE 9.1 support and configurable response headers in Open Liberty 21.0.0.12"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/ryan-storey
+author_github: https://github.com/ryan-storey
+seo-title: Jakarta EE 9.1 support and configurable response headers in Open Liberty 21.0.0.12 - OpenLiberty.io
+seo-description: Jakarta EE 9.1 support is now available as part of Open Liberty 21.0.0.12, alongside configurable response headers, which offer more granular control over response headers! Several significant bug fixes are also part of this release.
+blog_description: Jakarta EE 9.1 support is now available as part of Open Liberty 21.0.0.12, alongside configurable response headers, which offer more granular control over response headers! Several significant bug fixes are also part of this release.
+open-graph-image: img/blog/jakarta_ee.png
+---
+= Jakarta EE 9.1 support and configurable response headers in Open Liberty 21.0.0.12
+Ryan Storey <https://github.com/ryan-storey>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+Jakarta EE 9.1 support is now available as part of Open Liberty 21.0.0.12, alongside configurable response headers, which offer more granular control over response headers! Several significant bug fixes are also part of this release.
+ 
+In link:{url-about}[Open Liberty] 21.0.0.12:
+
+* <<jee_9.1, Jakarta EE 9.1 support>>
+* <<response_headers, Configurable Response Headers>>
+* <<bugs, Notable bug fixes>>
+
+Along with the new features and functions added to the runtime, we've also made <<guides, updates to our guides>>.
+
+
+[#run]
+== Run your apps using 21.0.0.12
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], here are the coordinates:
+
+[source,xml]
+----
+<dependency>
+    <groupId>io.openliberty</groupId>
+    <artifactId>openliberty-runtime</artifactId>
+    <version>21.0.0.12</version>
+    <type>zip</type>
+</dependency>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+dependencies {
+    libertyRuntime group: 'io.openliberty', name: 'openliberty-runtime', version: '[21.0.0.12,)'
+}
+----
+
+Or if you're using Docker:
+
+[source]
+----
+FROM open-liberty
+----
+
+Or take a look at our link:{url-prefix}/downloads/[Downloads page].
+
+[link=https://stackoverflow.com/tags/open-liberty]
+image::img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="center"]
+
+[#jee_9.1]
+== Jakarta EE 9.1 support
+
+image::img/blog/jakarta_ee.png[align="center"]
+
+Jakarta EE 9.1 support is now available in Open Liberty!!  This support allows you to run Jakarta EE 9.1 applications using Java 8, 11, or 17 with other Open Liberty value-add features that are updated to support Jakarta EE 9.1.  Many of you have followed our progress for delivering Jakarta EE 9.1 via our beta releases and corresponding blogs, and we'd like to thank those that provided feedback along the way.  
+If you're targeting a new application for Jakarta EE 9.1, make sure to use the `jakarta` namespace.  For existing applications that you'd like to move from Java EE (and its `javax` namespace) to Jakarta EE (and its `jakarta` namespace) we recommend trying the link:https://github.com/eclipse/transformer[Eclipse Transformer], an open source project originally developed by members of the Open Liberty team and then contributed to the Eclipse Foundation.  
+
+With the RESTful Web Services 3.0 (formerly called JAXRS) support in Open Liberty, there is a significant performance improvement for applications which use the RESTful Web Services function.  This performance improvement was achieved by moving our RESTful Web Services implementation from Apache CXF to using RestEasy.  With this new version, CDI is enabled by default, and JSON Binding is not enabled by default with the feature being specified in your `server.xml`.   
+
+Any Liberty features with API and/or SPI functions that use Jakarta EE APIs as part of their method signatures have been updated to have their package versions be reset to 10.0 when using those API / SPIs with Jakarta EE 9.1.  Any bundles used for user features that depend on those packages will need to change the import package version range when updating the user feature to use Jakarta EE 9.1.
+
+With the introduction of Jakarta EE 9.1, the Jakarta Enterprise Beans 4.0 specification includes a few minor changes over the prior version of the specification, Enterprise JavaBeans (EJB) 3.2, as follows:
+  
+*  Note the new names of the features; all of the same features exist, but the feature name prefix has changed from `ejb` to `enterpriseBeans`.  For example, `enterpriseBeansLite-4.0` is the new version of `ejbLite-3.2`.
+* The API package has changed from `javax.ejb` to `jakarta.ejb`
+* The `@Schedule` annotation is now repeatable
+* The following API methods have been removed:
+** `javax.ejb.EJBContext.getCallerIdentity()` -> use `getCallerPrincipal()`
+** `javax.ejb.EJBContext.getEnvironment()` -> use `JNDI` lookup in `java:comp/env`
+** `javax.ejb.EJBContext.isCallerInRole(java.security.Identity)` -> use `isCallerInRole(String)`
+** `javax.ejb.SessionContext.getMessageContext()` (removed with `JAX-RPC`)
+   
+All other capabilities of Enterprise Beans remain the same as the prior specification version (3.2).
+
+Although many of the Jakarta EE 9.1 features have only received a version update, the majority have also had their name changed.  The following table lists the features for which both the short name and the version number are changed. To update one of these features for Jakarta EE 9.1, you must change both the feature short name and version number in your `server.xml` file.
+
+.Jakarta EE 9.1 feature updates, short name and version
+|===
+|Jakarta EE 9.1 feature name | Java EE/Jakarta EE 8 short name and version | Jakarta EE 9.1 short name and version
+
+| Jakarta Enterprise Beans
+| ejb-3.2
+| enterpriseBeans-4.0
+
+| Jakarta Enterprise Beans Home Interfaces
+| ejbHome-3.2
+| enterpriseBeansHome-4.0
+
+| Jakarta Enterprise Beans Lite
+| ejbLite-3.2
+| enterpriseBeansLite-4.0
+
+| Jakarta Enterprise Beans Persistent Timers
+| ejbPersistentTimer-3.2
+| enterpriseBeansPersistentTimer-4.0
+
+| Jakarta Enterprise Beans Remote
+| ejbRemote-3.2
+| enterpriseBeansRemote-4.0
+
+| Jakarta Expression Language
+| el-3.0
+| expressionLanguage-4.0
+
+| Jakarta Authorization
+| jacc-1.5
+| appAuthorization-2.0
+
+| Jakarta Authentication
+| jaspic-1.1
+| appAuthentication-2.0
+
+| Jakarta EE Platform
+| javaee-8.0
+| jakartaee-9.1
+
+| Jakarta EE Application Client
+| javaeeClient-8.0
+| jakartaeeClient-9.1
+
+| Jakarta Mail
+| javaMail-1.6
+| mail-2.0
+
+| Jakarta XML Binding
+| jaxb-2.2
+| xmlBinding-3.0
+
+| Jakarta RESTful Web Services
+| jaxrs-2.1
+| restfulWS-3.0
+
+| Jakarta RESTful Web Services Client
+| jaxrsClient-2.1
+| restfulWSClient-3.0
+
+| Jakarta XML Web Services
+| jaxws-2.2
+| xmlWS-3.0
+
+| Jakarta Connectors
+| jca-1.7
+| connectors-2.0
+
+| Jakarta Connectors Inbound Security
+| jcaInboundSecurity-1.0
+| connectorsInboundSecurity-2.0
+
+| Jakarta Messaging
+| jms-2.0
+| messaging-3.0
+
+| Jakarta Persistence
+| jpa-2.2
+| persistence-3.0
+
+| Jakarta Persistence Container
+| jpaContainer-2.2
+| persistenceContainer-3.0
+
+| Jakarta Server Faces
+| jsf-2.3
+| faces-3.0
+
+| Jakarta Server Faces Container
+| jsfContainer-2.3
+| facesContainer-3.0
+
+| Jakarta Server Pages
+| jsp-2.3
+| pages-3.0
+
+| Messaging Server Client
+| wasJmsClient-2.0
+| messagingClient-3.0
+
+| Messaging Server Security
+| wasJmsSecurity-1.0
+| messagingSecurity-3.0
+
+| Messaging Server
+| wasJmsServer-1.0
+| messagingServer-3.0
+|===
+
+For a full overview of what has changed, visit the link:{url-prefix}/docs/latest/jakarta-ee9-feature-updates.html[Jakarta EE 9.1 feature updates] page.
+
+To enable the Jakarta EE 9.1 features, add the corresponding feature to your `server.xml`. You can enable either the individual features you want or you can add the Jakarta EE 9.1 convenience features.  For example, to enable all of the Jakarta EE 9.1 features at once add:
+
+[source,xml]
+----
+<featureManager>
+    <feature>jakartaee-9.1</feature>
+</featureManager>
+----
+
+Or you can add the Web Profile convenience feature to enable all of the Jakarta EE 9.1 Web Profile features at once:
+
+[source,xml]
+----
+<featureManager>
+    <feature>webProfile-9.1</feature>
+</featureManager>
+----
+
+For details regarding the APIs and SPIs, check out the link:{url-prefix}/docs/latest/reference/javadoc/liberty-jakartaee9.1-javadoc.html[Jakarta EE 9.1 javadoc].
+
+[#response_headers]
+== Configurable Response Headers
+
+You can now configure Open Liberty to modify response headers.  The available configuration options allow for headers to be appended, for existing headers to be overwritten, for missing headers to be added, and for undesired headers to be removed from all responses being serviced by an HTTP endpoint. This configuration offers more granular control over response headers, which offers a solution to modifying headers without the need to change existing applications, filters, or otherwise. 
+
+To use configurable response headers, begin by defining a new element called `<headers>` in the `server.xml`.  You can configure this for individual HTTP endpoints or for all endpoints at once. 
+
+Configuring for individual HTTP endpoints:
+
+[source, xml]
+----
+<httpEndpoint id="defaultHttpEndpoint"
+                  httpPort="9080"
+                  httpsPort="9443">
+	 
+    <headers>
+        <add>foo:bar</add>
+        <add>foo:bar2</add>
+        <set>customHeader:customValue</set>
+        <setIfMissing>X-Forwarded-Proto:https</setIfMissing>
+        <remove>Via</remove>
+    </headers>  		
+</httpEndpoint>
+----
+
+Configuring for all HTTP endpoints:
+
+[source, xml]
+----
+<httpEndpoint id="defaultHttpEndpoint"
+                  httpPort="9080"
+		  httpsPort="9443"
+                  headersRef="myHeadersID">
+</httpEndpoint>
+ 
+<httpEndpoint id="otherHttpEndpoint"
+                  httpPort="9081"
+                  httpsPort="9444"
+                  headersRef="myHeadersID">
+</httpEndpoint> 
+     
+<headers id="myHeadersID">
+    <add>foo:bar</add>
+    <add>foo:bar2</add>
+    <set>customHeader:customValue</set>
+    <setIfMissing>X-Forwarded-Proto:https</setIfMissing>
+    <remove>Via</remove>
+</headers>  
+----
+
+The `add` attribute allows multiple headers with the same name to be added to a response, similar to the HttpServletResponse's `addHeader` API. Similarly, the `set` attribute is analogous to the `setHeader` API, which sets a response header to the given name and value. This overwrites existing headers that share the same name. The `setIfMissing` attribute will only set the configured headers if they are not already present on the response. Lastly, the `remove` attribute will remove any response headers whose name matches a name defined by the configuration. 
+
+Each header entry for the `add`, `set`, and `setIfMissing` attributes can be provided as a stand-alone header name. Optionally, a header value can be added by appending the colon `:` character after every header name. Note, however, that the `remove` attribute only expects header names and not a header name:value pair.
+
+As seen in the example above, one way to configure the `<headers>` element is to declare each individual header within it own `add`, `set`, `setIfMissing`, or `remove` attribute. In addition to this configuration, headers can be provided as a comma delimited list. 
+
+The following server.xml configuration declares individual headers within the desired configuration attributes: 
+
+[source, xml]
+----
+<headers>
+    <add>foo:bar</add>
+    <add>foo:bar2</add>
+    <set>customHeader:customValue</set>
+    <setIfMissing>X-Forwarded-Proto:https</setIfMissing>
+    <remove>Via</remove>
+</headers>
+----
+
+This configuration can also be declared as comma delimited lists, such as: 
+
+[source, xml]
+----
+<headers add="foo:bar, foo:bar2" set="customHeader:customValue" setIfMissing="X-Forwarded-Proto:https" remove="Via"/>
+----
+
+There are three warning messages relating to misconfigurations for this feature. Note that if a configuration value is considered to be misconfigured, it will not be utilized. Furthermore, if the misconfigured value had a non-empty header name, any further configurations with this same name will also be ignored.
+
+The first warning message, `CWWKT0042W`, will be logged whenever a header name is left empty. While header values are completely optional, the configuration does expect a non-empty header name. 
+
+The `add` configuration allows for multiple headers with the same name to be configured. However, it would be ambiguous to repeat a header name in any other configuration attribute. For instance, consider the `set` attribute option, which is meant to overwrite an existing header that shared the declared header name. If the `set` configuration contained two headers with the same name, it would be unclear which of the two values should be chosen. Similarly, if the same header name is present in two or more configurations, the same ambiguity is true. As such, and excluding repetitions in the `add` configuration, whenever a header name is found to be used more than once,  the warning message `CWWKT0043W` will be logged. 
+
+The third warning message, `CWWKT0044W`, is logged if a header that has already been flagged as a duplicate by the `CWWKT0043W` warning message, continues to be utilized by further configurations. 
+
+**Warning Message Descriptions:** 
+
+`CWWKT0042W` : An empty header name was found when the 'set` configuration was parsed. This value is ignored.
+
+`CWWKT0043W` : A duplicate header name was found in the [foo] header using the `set` configuration. All configurations for the [foo] header are ignored. Any header that is defined by the remove, add, set, or setIfMissing configurations must be unique across all configurations.
+
+`CWWKT0044W` : The [foo] header, which is marked as a duplicate header name, was found in the `set` configuration. The [foo] header is ignored. Any header that is defined by the `set` configuration must contain unique header names.
+
+**Summary**
+
+Open Liberty now provides a way to control response headers for a given HTTP endpoint. These can be appended, configured to overwrite, to only be added if not already present, or completely removed from all responses. Try it out for yourself! 
+
+[#bugs]
+== Notable bugs fixed in this release
+
+
+We’ve spent some time fixing bugs. The following sections describe just some of the issues resolved in this release. If you’re interested, here’s the  link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A210012+label%3A%22release+bug%22[full list of bugs fixed in 21.0.0.12].
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/19087[Throughput performance degradation in eclipselink due to Thread.getStackTrace calls]
++
+We discovered an issue where a change to the `org.eclipse.persistence.internal.helper.ConcurrencyManager` class caused a ~75% throughput performance degradation in eclipselink. This lost throughput was caused by calls to `Thread.getStackTrace()`. This regression showed up for `jpa-2.2` in 21.0.0.8 and `persistence-3.0` in 21.0.0.9. This issue has now been fixed by removing the `getStackTrace()` calls.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/17428[MicroProfile OpenAPI 2.0 includes non-public fields in the generated documentation]
++
+Previously, when a schema was created for a class which includes a private field, the private field would be listed in the generated OpenAPI document, for example:
++
+[source, java]
+----
+@Schema
+public class Example {
+    private String field1;
+    public String field2;
+}
+----
++
+results in
++
+[source, yaml]
+----
+  schemas:
+    Example:
+      type: object
+      properties:
+        field1:
+          type: string
+        field2:
+          type: string
+----
++
+The field `field1` should not have appeared in the generated OpenAPI document as it is private. This issue has been fixed by setting the `mp.openapi.extensions.smallrye.private-properties.enable` property to disable non-public properties by default.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/19057[Port bind skipped at server startup]
++
+Previously, in an extremely rare scenario, configured ports could silently fail to bind - preventing Liberty from using them. This issue was caused by a subtle race condition in the code responsible for delaying the port bind until the server is ready to handle traffic.
++
+In the failing scenario, the port started message would not be emitted - for example the following message would be missing:
++
+`CWWKO0219I: TCP Channel defaultHttpEndpoint has been started and is now listening for requests on host *  (IPv4) port 9080.`
++
+and the following FFDC will be seen:
++   
+[source, no_copy]
+----
+Exception = java.lang.RuntimeException
+Source = com.ibm.ws.tcpchannel.internal.NBAcceptChannelSelector
+probeid = 254
+Stack Dump = java.lang.RuntimeException: java.nio.channels.NotYetBoundException
+	at com.ibm.ws.tcpchannel.internal.NBAcceptChannelSelector.performRequest(NBAcceptChannelSelector.java:358)
+	at com.ibm.ws.tcpchannel.internal.ChannelSelector.run(ChannelSelector.java:257)
+	at java.base/java.lang.Thread.run(Thread.java:866)
+Caused by: java.nio.channels.NotYetBoundException
+	at java.base/sun.nio.ch.ServerSocketChannelImpl.begin(ServerSocketChannelImpl.java:246)
+	at java.base/sun.nio.ch.ServerSocketChannelImpl.accept(ServerSocketChannelImpl.java:283)
+	at com.ibm.ws.tcpchannel.internal.NBAcceptChannelSelector.performRequest(NBAcceptChannelSelector.java:278)
+	... 2 more
+----
++
+This issue has now been fixed so that all configured ports should start, or if there is a problem some meaningful error message should be logged.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/18992[Application fails to restart in server.xml update scenario]
++
+We discovered an issue where an application would fail to restart, due to a race condition during server reconfiguration when multiple apps are installed. The problem occurs when one app starts before another app is finished uninstalling. In theory this shouldn't be a problem - however for this scenario these apps are sharing a VirtualHost configuration object, and in this case one app updates the parent VirtualHost as part of its uninstall process in such a way that the other gets into an invalid state. The server log will show a warning such as `CWWKZ0020I: Application <app_name> not updated`. This issue was fixed by fixing the race condition that caused the failure.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/17599[HTTP upgrade to WebSocket can cause quiesce errors]
++
+When a WebSocket connection is started, it starts as an HTTP connection. Previously, If an error occurred during the transition between an HTTP and a WebSocket connection, which was known to be a WebSocket upgrade, the error processing would neglect to decrement a connection counter, which then caused the server to believe there is an open connection during server stop.
+There were two scenarios where these quiesce errors would occur:
++
+** When a read error occurred during the transition between an HTTP and a WebSocket connection, the error processing neglected to decrement a connection counter, which then causes the server to believe there is an open connection during server stop.
++
+** If a client immediately closed the WebSocket connection after it was opened, the original upgrade request handling may not have had enough time to close properly on the server. Once again, the connection counter failed to decrement leading the server to believe there is an open connection during the server stop.
++
+This issue has been fixed by adding a new flag called `decrementNeeded` which helps to ensure that the decrement is not neglected.
+
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/19227[Ensure ServletRequestListener#requestDestroyed is always called]
++
+We discovered a bug where the `ServletRequestListener#requestDestroyed` call does not occur, if an exception occurs during async servlet while an `appSecurity-x.0` is enabled. For this bug to occur, two conditions must be met: the `webContainer` property `deferServletRequestListenerDestroyOnError` is true and an `appSecurity-x.0` feature is enabled. This issue has now been resolved.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/19197[ClassCastException in JSP relating to JDT internal classes]
++
+Open Liberty 21.0.0.9 introduced a bug where the following error occurred for certain class lookups in JSP:
++
+[source]
+----
+Error 500: java.lang.ClassCastException: class org.eclipse.jdt.internal.compiler.lookup.PlainPackageBinding cannot be cast to class org.eclipse.jdt.internal.compiler.lookup.TypeBinding (org.eclipse.jdt.internal.compiler.lookup.PlainPackageBinding and org.eclipse.jdt.internal.compiler.lookup.TypeBinding are in unnamed module of loader org.eclipse.osgi.internal.loader.EquinoxClassLoader @3522bc53)
+----
++
+This issue has now been fixed.
+
+[#guides]
+== New and updated guides since the previous release
+
+As Open Liberty features and functionality continue to grow, we continue to add link:https://openliberty.io/guides/?search=new&key=tag[new guides] to link:http://openliberty.io/[openliberty.io] on those topics to make their adoption as easy as possible.  Existing guides also receive updates in order to address any reported bugs/issues, keep their content current, and expand what their topic covers.
+
+* link:{url-prefix}/guides/maven-multimodules.html[Creating a multi-module application]
+** Previously the guide demonstrated how to build an application with multiple modules using Maven and Open Liberty.  With this update, it now also introduces how to use the link:https://github.com/OpenLiberty/ci.maven[Liberty Maven plug-in] to develop a multi-module application in development mode without having to prebuild the JAR and WAR files.
+
+== Get Open Liberty 21.0.0.12 now
+
+Available through <<run,Maven, Gradle, Docker, and as a downloadable archive>>.
