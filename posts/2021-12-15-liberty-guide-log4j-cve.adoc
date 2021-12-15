@@ -1,13 +1,13 @@
 ---
 layout: post
-title: "Liberty Guide on Log4j CVE-2021-44228 (Log4Shell)"
+title: "Liberty Guide on Log4j CVE-2021-44228, CVE-2021-4104 and CVE-2021-45046"
 # Do NOT change the categories section
 categories: blog
 author_picture: https://avatars.githubusercontent.com/u/10999780?s=460&u=1a66e468c70e84f54bf5a75c27881cc6133ccc20&v=4
 author_github: https://github.com/Emily-Jiang
-seo-title: Liberty Guide on Log4j CVE-2021-44228 (Log4Shell)
-seo-description: Open Liberty Guide on understanding and solving Log4j CVE-2021-44228 (Log4Shell)
-blog_description: Open Liberty provides this essential guide for Open Liberty customers to understand Log4j CVE-2021-44228 (Log4Shell) and the suggestions how to mitigate this threat 
+seo-title: Liberty Guide on Log4j CVE-2021-44228, CVE-2021-4104 and CVE-2021-45046
+seo-description: Open Liberty Guide on understanding and solving Log4j CVE-2021-44228, CVE-2021-4104 and CVE-2021-45046
+blog_description: Open Liberty provides this essential guide for Open Liberty customers to understand Log4j CVE-2021-44228, CVE-2021-4104 and CVE-2021-45046 and the suggestions how to mitigate this threat 
 open-graph-image: https://openliberty.io/img/twitter_card.jpg
 additional_authors:
 - name: Alasdair Nottingham
@@ -41,36 +41,44 @@ However log4j is a widely used framework and your applications may make use of L
 
 You should update the version of `log4j2` to the latest version or `2.16` at a minimum. 
 
-* Q2. If I am running with latest version of Java, am i protected? Do i still need to follow remediate steps? 
+* Q2. If I am running with latest version of Java, am I protected? Do I still need to follow remediate steps? 
 
-`CVE-2021-44228`is specific to Log4J V2 and has nothing to do with Java or its level. Features in the most recent releases of Java mitigate some, but not all of the risk. 
+Log4Shell (`CVE-2021-44228`) is a vulnerability in the log4j2 open source project. Features in the most recent releases of Java mitigate some, but not all of the risk introduced by the Log4Shell vulnerability.
 
 
 * Q3. It will take a long time to update all our applications is there anything we can do to mitigate in the meantime?
 
-Provided `log4j` 2.10 or newer is being used setting the Java System property log4j2.formatMsgNoLookups to true will mitigate the issue. Setting an environment variable to `LOG4J_FORMAT_MSG_NO_LOOKUPS=true` will also have the same effect. These steps will not mitigate `CVE-2021-45046`.
+Provided `log4j` `2.10` or newer is being used setting the Java System property `log4j2.formatMsgNoLookups` to `true` will mitigate the `Log4Shell` vulnerability, but it will not protect against `CVE-2021-4104` or `CVE-2021-45046`. It should be noted that `Log4Shell` is CVSS 10 and the others require non-default configuration of log4j.
 
 
-* Q4 How can I configure Liberty with log4j2.formatMsgNoLookups?
+* Q4 How can I configure Liberty with `log4j2.formatMsgNoLookups`?
 
-Create a jvm.options file in `${wlp.user.dir}/shared/jvm.options` with `-Dlog4j2.formatMsgNoLookups=true` on a line by itself. Then restart all servers for it to take effect. This will apply to all servers in that user dir.
+Create a `jvm.options` file in `${wlp.user.dir}/shared/jvm.options` with `-Dlog4j2.formatMsgNoLookups=true` on a line by itself. Then restart all servers for it to take effect. This will apply to all servers in that user dir.
 
 
 * Q5. I cannot find `org/apache/logging/log4j/core/lookup/JndiLookup.class` in my log4j jar, am I vulnerable?
 
-It is unlikely you are vulnerable. Most likely you are running log4j1 which is not vulnerable to CVE-2021-44228.
+It is unlikely you are vulnerable. Most likely you are running `log4j1` which is not vulnerable, however you will be vulnerable to `CVE-2021-4104`.
 
 
 * Q6. Could setting `log4j2.formatMsgNoLookups=true` have an effect on log4j 1.x or other non-log4j applications? Is it safe to set this parameter until we have checked every custom written part in our WAS environments? 
 
-The setting should have no affect on non-log4j or log4j 1.x libraries. It is a property related to log4j 2.x behavior.
-
+The setting should have no affect on non-log4j or log4j 1.x. It is a property related to log4j 2.x behavior. It also does not protect against `CVE-2021-45046`.
 
 * Q7. If I set `log4j2.formatMsgNoLookups` to `true` will it affect my application use of log4j2?
 
-Yes, that will be visible to any and all copies of `log4j2` that are in the JVM.
+Yes, that will be visible to any and all copies of `log4j2` that are in the JVM. This setting is not sufficient to protect against `CVE-2021-45046`.
 
-If you are WebSphere Application Server customers, please refer to https://www.ibm.com/support/pages/security-bulletin-vulnerability-apache-log4j-affects-websphere-application-server-cve-2021-44228[this blog] to learn about more on how to respond to this CVE.
+* Q8. We are still running our own applications on Java 7 that use log4j2,  but the fixed version of log4j2 requires Java 8
+
+The Apache Logging project released `2.12.2` which supports Java 7, upgrade to this version or a newer 3rd diget release. 
+
+* Q9. Is IBM Java affected by this vulnerability?
+
+IBM Java does not include the affected library, so it is not directly affected by this vulnerability. However, applications running on top of IBM Java may include vulnerable copies of the affected library and need their own remediation.
+
+
+If you are WebSphere Application Server customers, please refer to https://www.ibm.com/support/pages/node/6525860[this blog] to learn about more on how to respond to these CVEs.
 You might find the following blogs to be useful: 
 
 * https://www.infoq.com/news/2021/12/log4j-zero-day-vulnerability/[Vulnerability Affecting Multiple Log4j Versions Permits RCE Exploit]
