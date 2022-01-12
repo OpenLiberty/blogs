@@ -1,0 +1,275 @@
+---
+layout: post
+title: "TITLE"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/ryan-storey
+author_github: https://github.com/ryan-storey
+seo-title: TITLE - makes sure it ends with - OpenLiberty.io
+seo-description: Open Liberty 22.0.0.1 offers many exciting new features including MicroProfile 5.0, enabling applications to use MicroProifle APIs together with Jakarta EE 9.1. This update also comes with several significant bug fixes.
+blog_description: Open Liberty 22.0.0.1 offers many exciting new features including MicroProfile 5.0, enabling applications to use MicroProifle APIs together with Jakarta EE 9.1. This update also comes with several significant bug fixes.
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+---
+= TITLE
+Ryan Storey <https://github.com/ryan-storey>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+Open Liberty 22.0.0.1 offers many exciting new features including MicroProfile 5.0, enabling applications to use MicroProifle APIs together with Jakarta EE 9.1. This update also comes with several significant bug fixes.
+
+In link:{url-about}[Open Liberty] 22.0.0.1:
+
+* <<mp5, MicroProfile 5.0>>
+* <<mpOpenApi, Support multiple applications in mpOpenApi-2.0>>
+* <<jvm, JVM Working Directory>>
+* <<jwe, Support JWE for OpenID Connect Client and Social Media Login>>
+* <<deployment_descriptor_parsing, Improvements to Deployment Descriptor Parsing>>
+* <<expansion_variables, Using expansion variables in server.env>>
+* <<stale_connection_identification, Customizing Stale Connection Identification>>
+
+View the list of fixed bugs in link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A22.0.0.1+label%3A%22release+bug%22[22.0.0.1].
+
+[#run]
+== Run your apps using 22.0.0.1
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], here are the coordinates:
+
+[source,xml]
+----
+<dependency>
+    <groupId>io.openliberty</groupId>
+    <artifactId>openliberty-runtime</artifactId>
+    <version>22.0.0.1</version>
+    <type>zip</type>
+</dependency>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+dependencies {
+    libertyRuntime group: 'io.openliberty', name: 'openliberty-runtime', version: '[22.0.0.1,)'
+}
+----
+
+Or if you're using Docker:
+
+[source]
+----
+FROM open-liberty
+----
+
+// // // // // // // //
+// Above:
+// Replace the 22.0.0.1 with the Open Liberty release number e.g. 20.0.0.4
+// // // // // // // //
+
+Or take a look at our link:{url-prefix}/downloads/[Downloads page].
+
+[link=https://stackoverflow.com/tags/open-liberty]
+image::img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="center"]
+
+[#mp5]
+== MicroProfile 5.0
+
+MicroProfile 5.0 enables applications to use MicroProifle APIs together with Jakarta EE 9.1. MicroProfile 5.0 does not provide any other functional updates except aligning with Jakarta EE 9.1.  MicroProfile 5.0 includes Config 3.0, Fault Tolerance 4.0, Rest Client 3.0, Health 4.0, Metrics 4.0, Open Tracing 3.0, Open API 3.0, and JWT propagation 2.0. This is the first release that allows you to use Jakarta namespace together with MicroProfile APIs. As a part of this release, Open Liberty consumes RESTEasy for its implementation for MicroProfile Rest Client 3.0 while the previous version of MicroProfile Rest Client uses Apache CXF - this change brings with it some behavior and property changes (most of which are already documented as link:https://draft-openlibertyio.mybluemix.net/docs/22.0.0.1/reference/jaxrs-dif.html[differences] between jaxrs-2.1 and restfulWS-3.0).
+
+Add the feature to the `server.xml`:
+
+[source, xml]
+----
+<server>
+  <featureManager>
+    <feature>microProfile-5.0</feature>
+  </featureManager>
+</server>
+----
+
+[#mpOpenApi]
+== Support multiple applications in mpOpenApi-2.0
+
+MicroProfile OpenAPI helps you document the REST endpoints of your application by creating and serving documentation in the OpenAPI format.
+
+MicroProfile OpenAPI can now create OpenAPI documentation for more than one application. Previously, only the first deployed web module which included a JAX-RS application would be documented. When two or more web modules containing JAX-RS applications are deployed, the MicroProfile OpenAPI feature can now create documentation for each of them and then merge that documentation together.
+
+To enable this functionality, you must set the MicroProfile Config property `mp.openapi.extensions.liberty.merged.include=all`, e.g. by adding this to your `server.xml`:
+
+[source, xml]
+----
+<variable name="mp.openapi.extensions.liberty.merged.include" value="all"/>
+----
+
+With this property set, deploy several JAX-RS applications and visit `/openapi/ui` on your Open Liberty server where you should see documentation for all the applications.
+
+The following MP Config properties can be used to configure this feature:
+
+|===
+|Name               |Description              |Default               |Values
+
+|`mp.openapi.extensions.liberty.merged.include` | List of modules which should be included in the merged OpenAPI documentation | `first`
+a|
+* `all` (to include all applications)
+* `first` (to include only the first web module deployed, matching the previous behavior)
+* comma-separated list of `<appname>` (to include individual applications) and `<appname>/<modulename>` (to include individual modules within an EAR)
+|`mp.openapi.extensions.liberty.merged.exclude`
+a|
+* List of modules which should be excluded from the merged OpenAPI documentation
+* Takes priority over the list of included modules
+| `none`
+a|
+* `none` (to exclude nothing)
+* comma-separated list of <appname> (to exclude individual applications) and <appname>/<modulename> (to exclude individual modules within an EAR)
+|`mp.openapi.extensions.liberty.merged.info`| This property sets the info section of the final Open API document | N/A 
+a|
+* The value must be a valid OpenAPI info section in JSON format. If this property is set, the info section in the final OpenAPI document is replaced with the value of the property. This replacement is made after any merging is completed.
+|===
+
+For more information, refer to the documentation available link:{url-prefix}/docs/latest/documentation-openapi.html#multi-module[here]
+
+[#jvm]
+== JVM Working Directory
+
+This enhancement would allow the user to specify the `SERVER_WORKING_DIR` environment variable and set the `JVM` working directory location to something other than the `${WLP_OUTPUT_DIR}/serverName location`. The request from the `RFE` is to NOT make this a fully qualified path for portability purposes. Thus a path that is relative to the `${WLP_OUTPUT_DIR}/serverName` location can be used, as well as, an absolute path(one that contains a `c:\` on Windows, or a `/` on linux based operating systems).
+
+So for example, the user could set the Open Liberty `JVM` output to be added to the `${WLP_OUTPUT_DIR}/serverName/logs` location so that all `JVM` related data would be in with the server log data (relative path example):
+
+`SERVER_WORKING_DIR=logs`
+
+Or the end user could move the information outside of the `${WLP_OUTPUT_DIR}/serverName` location by doing something similar to the following (which would put the data in the `/wlp/usr/servers/logs/` folder and is an absolute path example for Linux based operating systems):
+
+`SERVER_WORKING_DIR=/wlp/usr/servers/logs/`
+
+An absolute path example on on Windows would look similar to the following:
+
+`SERVER_WORKING_DIR=c:\wlp\usr\servers\logs\`
+
+This enhancement gives users more flexibility regarding the location of the Open Liberty JVM output.
+
+NOTE: This function is being implemented at the scripting level and will not support property substitution values as part of the `SERVER_WORKING_DIR` environment variable.
+
+[#jwe]
+== Support JWE for OpenID Connect Client and Social Media Login
+
+With this release, the OpenID Connect Client 1.0 and Social Media Login 1.0 features support receiving tokens in the JSON Web Encryption (`JWE`) format. A `JWE` is a way to represent encrypted content using `JSON`. In addition to supporting `JWE`, the OpenID Connect Client 1.0 feature provides an option to temporarily cache access token validation results for inbound propagation. Both features add support for the `RS384`, `RS512`, `HS384`, `HS512`, `ES256`, `ES384`, and `ES512` signature algorithms.
+
+Prior to this release, the OpenID Connect Client 1.0 and Social Media Login 1.0 features did not support consuming access or ID tokens in `JWE` format. This limited our interoperability with other `OIDC` clients and providers that use `JWEs` to propagate access tokens or provide identifying information about the authenticated user. With this release, the OpenID Connect Client 1.0 and Social Media Login 1.0 features will be able to interoperate with OpenID Connect Providers that provide `JWE` formatted access and ID tokens.
+
+You can configure a Liberty OpenID Connect Relying Party to process access and ID tokens that are in a `JWE` format. The corresponding OpenID Connect Provider should support creating JWE access or ID tokens.
+
+* Set the OpenID Connect Provider with the OpenID Connect Relying Party's public key that is used to encrypt the Content Encryption Key according to the OpenID Connect Provider's documentation.
+* Set the `keyManagementKeyAlias` attribute to the private key alias of the key management key that is used to decrypt the Content Encryption Key of JWE token. The key must exist in the keyStore configured for the SSL configuration referred by the sslRef attribute. For example,
++
+[source, xml]
+----
+<openidConnectClient keyManagementKeyAlias="privateKeyAlias" />
+----
+
+Optional: Configure access token cache.
+You can configure a Liberty OpenID Connect Relying Party to cache access token validation results for inbound propagation.
+
+* Set the `accessTokenCacheEnabled` attribute to `true`.
+* Set the `accessTokenCacheTimeout` attribute to a duration specifying how long an authenticated subject that is created by using a propagated access token is cached.
+* Set the `tokenReuse` attribute to `true` if the OpenID Connect Relying Party must cache results for a `JWT` access token that includes a `jti` claim.
++
+Although enabling this support may result in a performance improvement, it is recommended that the value for the `accessTokenCacheTimeout` attribute is short to reduce the possibility of a stale result as compared to what a validation call to the OpenID Connect Provider would have produced.
+
+You can also configure Liberty OIDC Social Login to process ID tokens that are in a `JWE` format. The corresponding OpenID Connect Provider should support creating `JWE` ID tokens.
+
+* Set the OpenID Connect Provider with the OIDC Social Login's public key that is used to encrypt the Content Encryption Key according to the OpenID Connect Provider's documentation.
+* Set the `keyManagementKeyAlias` attribute to the private key alias of the key management key that is used to decrypt the Content Encryption Key of JWE token. The key must exist in the keyStore configured for the SSL configuration referred by the sslRef attribute. For example,
++
+[source, xml]
+----
+<oidcLogin keyManagementKeyAlias="privateKeyAlias" />
+----
+
+The signatureAlgorithm attributes of both elements now support the `RS384`, `RS512`, `HS384`, `HS512`, `ES256`, `ES384`, and `ES512` signature algorithms.
+
+[source, xml]
+----
+<openidConnectClient signatureAlgorithm="RS384"/>
+<oidcLogin signatureAlgorithm="RS384"/>
+----
+
+[#deployment_descriptor_parsing]
+== Improvements to Deployment Descriptor Parsing
+
+This update updates the parsing of application deployment descriptor resources and updates the parsing of application bindings and extensions resources. These resources are `XML` format files which provide metadata for the application. Deployment descriptors are community defined, and include `XML` files `application.xml`, `ejb-jar.xml`, `web.xml`, `application-client.xml` and `ra.xml`. Bindings and extensions resources are in addition to the community defined resources, and are vendor specific. IBM defined bindings and extensions resources include `ibm-application-bnd.xml`, `ibm-application-ext.xml`, and several others. This update modifies the parsing of these `XML` resources in two ways. First, by relaxing rules relating to the header elements of the resources. The parsing rules were relaxed, allowing `XML` resources to have less header information than was previously required. Before the update, several header elements were required. After the update, only a version or a `namespace-URI` value are required. Second, this update improves the error messages which are displayed if there are problems parsing a resource. Error messages are now more specific, and contain more accurate information which describes where the errors occurred.
+
+[#expansion_variables]
+== Using expansion variables in server.env
+
+This update allows you to specify environment variables in the server.env file on Linux which are resolved when the server starts. This capability already exists on Windows.
+
+Prior to this update, it might be necessary to provide custom packaged servers with hard-coded values in the server.env. Now server.env can consume these values from the system environment.
+On Windows this capability already existed, though it was not documented anywhere.
+
+On Windows, this capability is enabled by default and has always existed. Since this is new to all other operating systems, it is necessary to enable the new capability by adding a comment line near the top of the file:
+
+`# enable_variable_expansion`
+
+Environment variables are specified using `${variable_name}` syntax, except on Windows where the syntax is `!variable_name!`
+In the examples below the `LOG_FILE` variable is assigned the value of an environment variable. This example changes the name of the log file from the default name of `console.log`.
+
+Example `server.env` on Windows:
+
+[source]
+----
+keystore_password=XASEvZMKn3wG6XuTaVYFr8C
+LOG_FILE=!CONSOLE_LOG!
+----
+
+Example `server.env` on Linux:
+
+[source]
+----
+# enable_variable_expansion
+keystore_password=XASEvZMKn3wG6XuTaVYFr8C
+LOG_FILE=${CONSOLE_LOG}
+----
+
+For more information check out the link:https://openliberty.io/docs/21.0.0.11/reference/config/server-configuration-overview.html[Server configuration overview] and link: https://www.ibm.com/docs/en/was-liberty/core?topic=manually-customizing-liberty-environment[Customizing the Liberty environment] documentation.
+
+[#stale_connection_identification]
+== Customizing Stale Connection Identification
+
+Open Liberty maintains a pool of `JDBC` connections to improve performance. It is necessary for Open Liberty to be able to identify when connections have become stale and are no longer usable so that such connections can be removed from the pool. Open Liberty leverages multiple standards made available by the `JDBC` and `SQL` specifications, as well as relying on some built-in knowledge of vendor-specific behavior for some `JDBC` drivers in order to achieve this.
+
+Not all `JDBC` drivers completely follow the `JDBC`/`SQL` specifications in identifying stale connections. If you are using such a `JDBC` driver, it is now possible for you to provide additional configuration for a data source that helps identify the vendor-specific `SQL` states and error codes that are raised by the `JDBC` driver, enabling Liberty to better maintain the connection pool.
+
+Configure one or more `<identifyException>` subelements under `<dataSource>` to provide the `SQLException` identification detail.
+
+[source, xml]
+----
+<featureManager>
+  <feature>jdbc-4.2</feature>
+  <feature>jndi-1.0</feature>
+  ... other features
+</featureManager>
+
+<dataSource id="DefaultDataSource" jndiName="jdbc/myDataSource">
+    <jdbcDriver libraryRef="myJDBCLib"/>
+    <properties databaseName="TESTDB" serverName="localhost" portNumber="1234"/>
+    <!-- identify the following as stale connections, -->
+    <identifyException sqlState="08000" as="StaleConnection"/>
+    <identifyException errorCode="2468" as="StaleConnection"/>
+    <!-- remove built-in identification of SQL state S1000 -->
+    <identifyException sqlState="S1000" as="None"/>
+</dataSource>
+
+<library id="myJDBCLib">
+    <file name="C:/drivers/some-jdbc-driver.jar"/>
+</library>
+----
+
+[#bugs]
+== Notable bugs fixed in this release
+
+We’ve spent some time fixing bugs. The following sections describe just some of the issues resolved in this release. If you’re interested, here’s the  link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A22.0.0.1+label%3A%22release+bug%22[full list of bugs fixed in 22.0.0.1].
+
+== Get Open Liberty 22.0.0.1 now
+
+Available through <<run,Maven, Gradle, Docker, and as a downloadable archive>>.
