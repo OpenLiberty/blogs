@@ -1,0 +1,422 @@
+---
+layout: post
+title: "MicroProfile 5.0, JWE support in OIDC and Social Media Login, and many more exciting new features in Open Liberty 22.0.0.1"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/ryan-storey
+author_github: https://github.com/ryan-storey
+seo-title: MicroProfile 5.0, JWE support in OIDC and Social Media Login, and many more exciting new features in Open Liberty 22.0.0.1 - OpenLiberty.io
+seo-description: Open Liberty 22.0.0.1 offers many exciting new features including MicroProfile 5.0, enabling applications to use MicroProfile APIs together with Jakarta EE 9.1. Other enhancements include MicroProfile RestClient's implementation switching from Apache CXF to RESTEasy, MicroProfile OpenAPI receiving an update to support multiple applications, and JWE support being added to OpenID Connect Client and Social Media Login. Several other features and many bug fixes are also included in 22.0.0.1, as well as the introduction of signature files for our downloadable release binaries.
+blog_description: Open Liberty 22.0.0.1 offers many exciting new features including MicroProfile 5.0, enabling applications to use MicroProfile APIs together with Jakarta EE 9.1. Other enhancements include MicroProfile RestClient's implementation switching from Apache CXF to RESTEasy, MicroProfile OpenAPI receiving an update to support multiple applications, and JWE support being added to OpenID Connect Client and Social Media Login. Several other features and many bug fixes are also included in 22.0.0.1, as well as the introduction of signature files for our downloadable release binaries.
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+---
+= MicroProfile 5.0, JWE support in OIDC and Social Media Login, and many more exciting new features in Open Liberty 22.0.0.1
+Ryan Storey <https://github.com/ryan-storey>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+Open Liberty 22.0.0.1 offers many exciting new features including MicroProfile 5.0, enabling applications to use MicroProfile APIs together with Jakarta EE 9.1. Other enhancements include MicroProfile RestClient's implementation switching from Apache CXF to RESTEasy, MicroProfile OpenAPI receiving an update to support multiple applications, and JWE support being added to OpenID Connect Client and Social Media Login. Several other features and many bug fixes are also included in 22.0.0.1, as well as the introduction of signature files for our downloadable release binaries.
+
+In link:{url-about}[Open Liberty] 22.0.0.1:
+
+* <<mp5, MicroProfile 5.0>>
+** <<mpRestClient, MicroProfile Rest Client 3.0 - Switching to RESTEasy>>
+* <<mpOpenApi, Support multiple applications in mpOpenApi-2.0>>
+* <<jwe, Support JWE for OpenID Connect Client and Social Media Login>>
+* <<block_classes, Block Loading of Classes with Known Vulnerabilities>>
+* <<release_packages, Release packages are now signed>>
+* <<expansion_variables, Using expansion variables in server.env>>
+* <<jvm, JVM Working Directory>>
+* <<stale_connection_identification, Customizing Stale Connection Identification>>
+* <<deployment_descriptor_parsing, Improvements to Deployment Descriptor Parsing>>
+
+View the list of fixed bugs in link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A22001+label%3A%22release+bug%22[22.0.0.1].
+
+[#run]
+== Run your apps using 22.0.0.1
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], here are the coordinates:
+
+[source,xml]
+----
+<dependency>
+    <groupId>io.openliberty</groupId>
+    <artifactId>openliberty-runtime</artifactId>
+    <version>22.0.0.1</version>
+    <type>zip</type>
+</dependency>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+dependencies {
+    libertyRuntime group: 'io.openliberty', name: 'openliberty-runtime', version: '[22.0.0.1,)'
+}
+----
+
+Or if you're using Docker:
+
+[source]
+----
+FROM open-liberty
+----
+
+
+Or take a look at our link:{url-prefix}/downloads/[Downloads page].
+
+[link=https://stackoverflow.com/tags/open-liberty]
+image::img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="center"]
+
+[#mp5]
+== MicroProfile 5.0
+
+MicroProfile 5.0 enables applications to use MicroProfile APIs together with Jakarta EE 9.1. MicroProfile 5.0, which includes Config 3.0, Fault Tolerance 4.0, Rest Client 3.0, Health 4.0, Metrics 4.0, Open Tracing 3.0, Open API 3.0, and JWT propagation 2.0, does not provide any other functional updates except aligning with the Jakarta namespace.  
+
+[#mpRestClient]
+=== MicroProfile Rest Client 3.0 - Switching to RESTEasy
+
+Although all features included in MicroProfile 5 received updates to make them compatible with Jakarta EE 9, Rest Client 3.0 deserves extra attention as its Open Liberty implementation is switching to RESTEasy (previously it used Apache CXF).  This change brings with it some behavior and property changes (most of which are already documented as link:{url-prefix}/docs/latest/reference/jaxrs-dif.html[differences] between jaxrs-2.1 and restfulWS-3.0).
+
+Add the feature to the `server.xml`:
+
+[source, xml]
+----
+<server>
+  <featureManager>
+    <feature>microProfile-5.0</feature>
+  </featureManager>
+</server>
+----
+
+[#mpOpenApi]
+== Support multiple applications in mpOpenApi-2.0
+
+MicroProfile OpenAPI helps you document the REST endpoints of your application by creating and serving documentation in the OpenAPI format.
+
+MicroProfile OpenAPI can now create OpenAPI documentation for more than one application. Previously, only the first deployed web module which included a JAX-RS application would be documented. When two or more web modules containing JAX-RS applications are deployed, the MicroProfile OpenAPI feature can now create documentation for each of them and then merge that documentation together.
+
+To enable this functionality, you must set the MicroProfile Config property `mp.openapi.extensions.liberty.merged.include=all`, e.g. by adding this to your `server.xml`:
+
+[source, xml]
+----
+<variable name="mp.openapi.extensions.liberty.merged.include" value="all"/>
+----
+
+With this property set, deploy several JAX-RS applications and visit `/openapi/ui` on your Open Liberty server where you should see documentation for all the applications.
+
+The following MP Config properties can be used to configure this feature:
+
+|===
+|Name               |Description              |Default               |Values
+
+|`mp.openapi.extensions.liberty.merged.include` | List of modules which should be included in the merged OpenAPI documentation | `first`
+a|
+* `all` (to include all applications)
+* `first` (to include only the first web module deployed, matching the previous behavior)
+* comma-separated list of `<appname>` (to include individual applications) and `<appname>/<modulename>` (to include individual modules within an EAR)
+|`mp.openapi.extensions.liberty.merged.exclude`
+a|
+* List of modules which should be excluded from the merged OpenAPI documentation
+* Takes priority over the list of included modules
+| `none`
+a|
+* `none` (to exclude nothing)
+* comma-separated list of <appname> (to exclude individual applications) and <appname>/<modulename> (to exclude individual modules within an EAR)
+|`mp.openapi.extensions.liberty.merged.info`| This property sets the info section of the final Open API document | N/A 
+a|
+* The value must be a valid OpenAPI info section in JSON format. If this property is set, the info section in the final OpenAPI document is replaced with the value of the property. This replacement is made after any merging is completed.
+|===
+
+For more information, refer to the link:{url-prefix}/docs/latest/documentation-openapi.html#multi-module[openAPI multi-module documentation].
+
+[#jwe]
+== Support JWE for OpenID Connect Client and Social Media Login
+
+With this release, the OpenID Connect Client 1.0 and Social Media Login 1.0 features support receiving tokens in the JSON Web Encryption (`JWE`) format. A `JWE` is a way to represent encrypted content using `JSON`. In addition to supporting `JWE`, the OpenID Connect Client 1.0 feature provides an option to temporarily cache access token validation results for inbound propagation. Both features add support for the `RS384`, `RS512`, `HS384`, `HS512`, `ES256`, `ES384`, and `ES512` signature algorithms.
+
+Prior to this release, the OpenID Connect Client 1.0 and Social Media Login 1.0 features did not support consuming access or ID tokens in `JWE` format. This limited our interoperability with other `OIDC` clients and providers that use `JWEs` to propagate access tokens or provide identifying information about the authenticated user. With this release, the OpenID Connect Client 1.0 and Social Media Login 1.0 features will be able to interoperate with OpenID Connect Providers that provide `JWE` formatted access and ID tokens.
+
+You can configure a Liberty OpenID Connect Relying Party to process access and ID tokens that are in a `JWE` format. The corresponding OpenID Connect Provider should support creating JWE access or ID tokens.
+
+* Set the OpenID Connect Provider with the OpenID Connect Relying Party's public key that is used to encrypt the Content Encryption Key according to the OpenID Connect Provider's documentation.
+* Set the `keyManagementKeyAlias` attribute to the private key alias of the key management key that is used to decrypt the Content Encryption Key of JWE token. The key must exist in the keyStore configured for the SSL configuration referred by the sslRef attribute. For example,
++
+[source, xml]
+----
+<openidConnectClient keyManagementKeyAlias="privateKeyAlias" />
+----
+
+Optional: Configure access token cache.
+You can configure a Liberty OpenID Connect Relying Party to cache access token validation results for inbound propagation.
+
+* Set the `accessTokenCacheEnabled` attribute to `true`.
+* Set the `accessTokenCacheTimeout` attribute to a duration specifying how long an authenticated subject that is created by using a propagated access token is cached.
+* Set the `tokenReuse` attribute to `true` if the OpenID Connect Relying Party must cache results for a `JWT` access token that includes a `jti` claim.
++
+Although enabling this support may result in a performance improvement, it is recommended that the value for the `accessTokenCacheTimeout` attribute is short to reduce the possibility of a stale result as compared to what a validation call to the OpenID Connect Provider would have produced.
+
+You can also configure Liberty OIDC Social Login to process ID tokens that are in a `JWE` format. The corresponding OpenID Connect Provider should support creating `JWE` ID tokens.
+
+* Set the OpenID Connect Provider with the OIDC Social Login's public key that is used to encrypt the Content Encryption Key according to the OpenID Connect Provider's documentation.
+* Set the `keyManagementKeyAlias` attribute to the private key alias of the key management key that is used to decrypt the Content Encryption Key of JWE token. The key must exist in the keyStore configured for the SSL configuration referred by the sslRef attribute. For example,
++
+[source, xml]
+----
+<oidcLogin keyManagementKeyAlias="privateKeyAlias" />
+----
+
+The signatureAlgorithm attributes of both elements now support the `RS384`, `RS512`, `HS384`, `HS512`, `ES256`, `ES384`, and `ES512` signature algorithms.
+
+[source, xml]
+----
+<openidConnectClient signatureAlgorithm="RS384"/>
+<oidcLogin signatureAlgorithm="RS384"/>
+----
+[#block_classes] 
+== Block Loading of Classes with Known Vulnerabilities (e.g. Apache log4j "JndiLookup")
+
+Applications deployed to Liberty may run versions of Log4j2 that are affected by Log4Shell (CVE-2021-44228) and related vulnerabilities.
+
+This new function modifies the application and library class loaders to block the loading of the `org.apache.logging.log4j.core.lookup.JndiLookup` class, which is the cause of the vulnerability.
+
+Users should analyze their applications for use of Log4j2 with urgency; in the meantime this functionality may help mitigate Log4Shell and other vulnerabilities related to the `org.apache.logging.log4j.core.lookup.JndiLookup` class. However, one should note that this will not protect in cases where the Log4j2 classes have been renamed (a process known as "shading") or if Log4j2 is loaded by other class loaders, such the Java system class loader or user-created class loaders. 
+
+[#release_packages]
+== Release packages are now signed 
+
+Starting in 22.0.0.1 release, we are signing our downloadable binaries. You can use these signature files and the corresponding public key to verify the authenticity and integrity of an Open Liberty release package.
+
+The Open Liberty project uses its private key to digitally sign each Open Liberty release. You can use the Open Liberty public key to check the signature, verify that the package was released by Open Liberty, and that it was not modified since its release.
+
+You can verify a release package either locally, by using the openssl command and a `*.sig` file, or on Maven Central, by using the gpg command.
+
+*Verifying Open Liberty packages with OpenSSL*
+
+To verify an Open Liberty release package locally, you must first download an Open Liberty `.zip` package, the corresponding `.sig` file, and the Open Liberty public key. You can then run the `openssl` command to verify the package.
+
+Go to the link:{url-prefix}/start/#runtime_releases[Download package section of the Get Started page] and download an Open Liberty `.zip` package and its corresponding `.sig` file.
+
+Obtain the public key file by using the public key link on the Get Started page.
+
+After you download the files, use the `openssl` command from the command line to verify the package. For example:
+
+[source]
+----
+openssl dgst -sha256 -verify WebSphereLiberty_06-02-2021.pem -signature openliberty-javaee8-22.0.0.1.zip.sig openliberty-javaee8-22.0.0.1.zip
+
+Verified OK
+----
+
+This example uses the WebSphereLiberty_06-02-2021.pem public key file and openliberty-javaee8-22.0.0.1.zip.sig signature file to verify the openliberty-javaee8-22.0.0.1.zip release package. Replace the signature file and package version values according to the package that you want to verify. If the verification is successful, the command produces the following console output.  
+
+*Verify Liberty packages on Maven Central*
+
+To verify Open Liberty packages on Maven Central, you must first download the public key to your local machine by using the `gpg` or `gpg2` command. You must edit the trust level for the key owner. You can then use this key to remotely verify an Open Liberty `.asc` release file on Maven Central.
+
+Run the following command to download the public key file. The key ID value for the public key is `46102B8E`.
+
+[source]
+----
+gpg2 --keyserver hkp://keyserver.ubuntu.com --recv-keys 46102B8E
+----
+
+Use the `gpg2 --edit-key` command to set the trust for the key owner to 5. When you run the `gpg2 --edit-key` command, the console displays information about the key owner, followed by an internal command prompt. At this prompt, enter the `trust` command. You are then prompted to select a level of trust. Enter `5`.
+
+[source]
+----
+gpg2 --edit-key "WebSphere Liberty"
+gpg> trust
+
+Set trust 5
+----
+
+Verify the file by running the `gpg2 --verify` command. The following example verifies the Open Liberty 22.0.0.1 release package:
+
+[source]
+----
+gpg2 --verify openliberty-runtime-22.0.0.1.zip.asc
+
+gpg: assuming signed data in 'openliberty-runtime-22.0.0.1.zip'
+gpg: Signature made Wed Nov 24 09:02:44 2021 EST
+gpg: using RSA key 91FFD9A642D060B66B802B9D4D210F6946102B8E
+gpg: Good signature from "WebSphere Liberty (Works for IBM) contbld@uk.ibm.com" [ultimate]
+gpg: aka "WebSphereLiberty" [ultimate]
+----
+
+[#expansion_variables]
+== Using expansion variables in server.env
+
+This update allows you to specify environment variables in the server.env file on Linux which are resolved when the server starts. This capability already exists on Windows.
+
+Prior to this update, it might be necessary to provide custom packaged servers with hard-coded values in the server.env. Now server.env can consume these values from the system environment.
+On Windows this capability already existed, though it was not documented anywhere.
+
+On Windows, this capability is enabled by default and has always existed. Since this is new to all other operating systems, it is necessary to enable the new capability by adding a comment line near the top of the file:
+
+`# enable_variable_expansion`
+
+Environment variables are specified using `${variable_name}` syntax, except on Windows where the syntax is `!variable_name!`
+In the examples below the `LOG_FILE` variable is assigned the value of an environment variable. This example changes the name of the log file from the default name of `console.log`.
+
+Example `server.env` on Windows:
+
+[source]
+----
+keystore_password=XASEvZMKn3wG6XuTaVYFr8C
+LOG_FILE=!CONSOLE_LOG!
+----
+
+Example `server.env` on Linux:
+
+[source]
+----
+# enable_variable_expansion
+keystore_password=XASEvZMKn3wG6XuTaVYFr8C
+LOG_FILE=${CONSOLE_LOG}
+----
+
+For more information check out the link:{url-prefix}/docs/latest/reference/config/server-configuration-overview.html[Server configuration overview] documentation.
+
+[#jvm]
+== JVM Working Directory
+
+This enhancement introduces a new `SERVER_WORKING_DIR` environment variable which allows the user to set the `JVM` working directory location to something other than the `${WLP_OUTPUT_DIR}/serverName location`.  For portability purposes, the path supports not only absolute paths (one that contains a `c:\` on Windows, or a `/` on linux based operating systems), but also allows users to specify relative paths to the `${WLP_OUTPUT_DIR}/serverName` directory.
+
+For example, the user could set the Open Liberty `JVM` output to be added to the `${WLP_OUTPUT_DIR}/serverName/logs` location so that all `JVM` related data would be in with the server log data (relative path example) by setting the following:
+
+`SERVER_WORKING_DIR=logs`
+
+Or the user could move the information outside of the `${WLP_OUTPUT_DIR}/serverName` location by doing something similar to the following (which would put the data in the `/wlp/usr/servers/logs/` folder and is an absolute path example for Linux based operating systems):
+
+`SERVER_WORKING_DIR=/wlp/usr/servers/logs/`
+
+An absolute path example on Windows would look similar to the following:
+
+`SERVER_WORKING_DIR=c:\wlp\usr\servers\logs\`
+
+This enhancement gives users more flexibility regarding the location of the Open Liberty JVM output.
+
+NOTE: This function is being implemented at the scripting level and will not support property substitution values as part of the `SERVER_WORKING_DIR` environment variable.
+
+[#stale_connection_identification]
+== Customizing Stale Connection Identification
+
+Open Liberty maintains a pool of `JDBC` connections to improve performance. It is necessary for Open Liberty to be able to identify when connections have become stale and are no longer usable so that such connections can be removed from the pool. Open Liberty leverages multiple standards made available by the `JDBC` and `SQL` specifications, as well as relying on some built-in knowledge of vendor-specific behavior for some `JDBC` drivers in order to achieve this.
+
+Not all `JDBC` drivers completely follow the `JDBC`/`SQL` specifications in identifying stale connections. If you are using such a `JDBC` driver, it is now possible for you to provide additional configuration for a data source that helps identify the vendor-specific `SQL` states and error codes that are raised by the `JDBC` driver, enabling Liberty to better maintain the connection pool.
+
+Configure one or more `<identifyException>` subelements under `<dataSource>` to provide the `SQLException` identification detail.
+
+[source, xml]
+----
+<featureManager>
+  <feature>jdbc-4.2</feature>
+  <feature>jndi-1.0</feature>
+  ... other features
+</featureManager>
+
+<dataSource id="DefaultDataSource" jndiName="jdbc/myDataSource">
+    <jdbcDriver libraryRef="myJDBCLib"/>
+    <properties databaseName="TESTDB" serverName="localhost" portNumber="1234"/>
+    <!-- identify the following as stale connections, -->
+    <identifyException sqlState="08000" as="StaleConnection"/>
+    <identifyException errorCode="2468" as="StaleConnection"/>
+    <!-- remove built-in identification of SQL state S1000 -->
+    <identifyException sqlState="S1000" as="None"/>
+</dataSource>
+
+<library id="myJDBCLib">
+    <file name="C:/drivers/some-jdbc-driver.jar"/>
+</library>
+----
+
+
+[#deployment_descriptor_parsing]
+== Improvements to Deployment Descriptor Parsing
+
+This update updates the parsing of application deployment descriptor resources and updates the parsing of application bindings and extensions resources. These resources are `XML` format files which provide metadata for the application. Deployment descriptors are community defined, and include `XML` files `application.xml`, `ejb-jar.xml`, `web.xml`, `application-client.xml` and `ra.xml`. Bindings and extensions resources are in addition to the community defined resources, and are vendor specific. IBM defined bindings and extensions resources include `ibm-application-bnd.xml`, `ibm-application-ext.xml`, and several others. This update modifies the parsing of these `XML` resources in two ways. First, by relaxing rules relating to the header elements of the resources. The parsing rules were relaxed, allowing `XML` resources to have less header information than was previously required. Before the update, several header elements were required. After the update, only a version or a `namespace-URI` value are required. Second, this update improves the error messages which are displayed if there are problems parsing a resource. Error messages are now more specific, and contain more accurate information which describes where the errors occurred.
+
+[#bugs]
+== Notable bugs fixed in this release
+
+We’ve spent some time fixing bugs. The following sections describe just some of the issues resolved in this release. If you’re interested, here’s the link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A22001+label%3A%22release+bug%22[full list of bugs fixed in 22.0.0.1].
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/19631[featureUtility installServerFeature fails when user feature is listed]
++
+featureUtility installServerFeatures previously contained bugs when the user configured a product extension in their server.xml, e.g.
++
+[source, xml]
+----
+<feature>myExt:userfeature-1.0</feature>
+----
++
+If the user feature file doesn't contain the following regex (Liberty version), `\\d\\d\\.\\d\\.\\d\\.\\d\\.esa`, the user feature would not be installed to the defined product extension. The user feature doesn't need to have the same version as the Liberty version.
+The tool didn't fetch the installed features properly.
+Changes have been made to the underlying code to ensure that the feature name is extracted correctly from the filename.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/19589[ArrayIndexOutOfBoundsException during startup with mpOpenApi]
++
+During startup, `mpOpenApi` uses `jandex` to index classes and the following exception was observed:
++
+[source]
+----
+java.lang.ArrayIndexOutOfBoundsException: Index 0 out of bounds for length 0
+	at org.jboss.jandex.Indexer.updateTypeTarget(Indexer.java:1120)
+	at org.jboss.jandex.Indexer.updateTypeTargets(Indexer.java:842)
+	at org.jboss.jandex.Indexer.index(Indexer.java:1970)
+	at io.openliberty.microprofile.openapi20.utils.IndexUtils.indexContainer(IndexUtils.java:110)
+	at io.openliberty.microprofile.openapi20.utils.IndexUtils.indexContainer(IndexUtils.java:122)
+  ...
+----
++
+This exception should not occur, however this was an issue in `jandex` which was fixed in version 2.4.1, therefore we fixed this issue by updating `jandex` to version 2.4.1.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/19585[Classes are still indexed by mpOpenAPI when mp.openapi.scan.disable=true]
++
+When the config option `mp.openapi.scan.disable=true`, application classes were still indexed using Jandex even though the result is discarded and isn't used to generate the OpenAPI document.
+This was unhelpful since scanning is a relatively slow operation. We expect classes to not be scanned at all. A fix has been implemented so that classes are not scanned at all when scanning is disabled.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/19567[Memory Leak with mpJWT]
++
+When using `JWTs` to authenticate into a server, there was a chance a memory leak would occur after running for a long time leading to an `OutOfMemory` error. A workaround was to disable the `authCache` by adding the following to the server.xml.
++
+[source, xml]
+----
+<authentication id="Basic" cacheEnabled="false" />
+----
++
+In this case, the `HashMap` in `AuthenticationGuard` never had entries removed from it because the key used for the put (`hashtableAuthData`) is different from the key used later to see if it should be removed (`authenticationData`). This eventually leads to a large `HashMap` and OOM Error. The change here to fix the issue was to make sure the same key is used in `relinquishAccess` that was used in `requestAccess`, which ensures that entries are removed from the `HashMap`.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/19547[New HTTP/2 streams still accepted while server is closing]
++
+Due to an oversight in a previous fix, HTTP/2 streams could still be accepted after the server shutdown process begins.
+This would happen during server shutdown, with a quiesce timeout active, and an HTTP/2 connection actively generating new streams. As long as new streams keep the connection open during the quiesce timeout, the quiesce warning message would be invoked. A similar warning would be logged:
++
+[source]
+----
+CWWKE1106W: 1 shutdown operations did not complete during the quiesce period.
+----
++
+During quiesce, connections should begin closing down. In HTTP/1.1 this implies disabling keep-alive. In HTTP/2, sending a GOAWAY once quiesce begins. We have worked on improving the HTTP/2 server shutdown behaviour to fix this issue.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/19522[Unresolved gRPC bundles in feature when used alongside servlet-5.0]
++
+Previously, the components within the `grpc` monitor bundles did not properly resolve when running on the Jakarta EE9 `servlet-5.0` feature. This bug occurred when `gRPC` runs alongside the `servlet-5.0` feature and some monitoring feature is enabled. For instance, this bug would occur with `grpc-1.0` and `mpMetrics-4.0`. This bug was fixed by updating the range of `io.grpc` versions for EE9.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/19433[JNDI lookup to CORBA URL can hang]
++
+A naming lookup that results in the first call to the CORBA COSNaming NameService should cause the service to be activated. However, previously, if two concurrent naming lookups found the service not yet activated, a race condition could have occurred, and one of the calls could have hung.
+This happened because the activator incorrectly propagates an exception:
++
+`org.omg.PortableServer.POAPackage.AdapterAlreadyExists`
++
+The `NamingServiceAdapterActivator` should simply return `false` to indicate that activation failed.
+One call should activate the service and use it, and the other call should use the already-activated service. Both calls should succeed. A fix has been implemented to solve this issue.
+
+== Get Open Liberty 22.0.0.1 now
+
+Available through <<run,Maven, Gradle, Docker, and as a downloadable archive>>.
