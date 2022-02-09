@@ -1,0 +1,136 @@
+---
+layout: post
+title: "Changes to JPA persistence properties and a number of significant bug fixes in Open Liberty 22.0.0.2"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/ryan-storey
+author_github: https://github.com/ryan-storey
+seo-title: Changes to JPA persistence properties and a number of significant bug fixes in Open Liberty 22.0.0.2 - OpenLiberty.io
+seo-description: Open Liberty 22.0.0.2 offers changes to JPA persistence properties, adding the ability to declare "default" JPA persistence properties to all container-managed persistence contexts, as a Liberty server.xml configuration. This release also provides a number of significant bug fixes.
+blog_description: Open Liberty 22.0.0.2 offers changes to JPA persistence properties, adding the ability to declare "default" JPA persistence properties to all container-managed persistence contexts, as a Liberty server.xml configuration. This release also provides a number of significant bug fixes.
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+---
+= Changes to JPA persistence properties and a number of significant bug fixes in Open Liberty 22.0.0.2
+Ryan Storey <https://github.com/ryan-storey>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+Open Liberty 22.0.0.2 offers changes to JPA persistence properties, adding the ability to declare "default" JPA persistence properties to all container-managed persistence contexts, as a Liberty server.xml configuration. This release also provides a number of significant bug fixes.
+
+In link:{url-about}[Open Liberty] 22.0.0.2:
+
+* <<jpa, Define JPA persistence properties at server scope>>
+
+View the list of fixed bugs in link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A22.0.0.2+label%3A%22release+bug%22[22.0.0.2].
+
+[#run]
+== Run your apps using 22.0.0.2
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], here are the coordinates:
+
+[source,xml]
+----
+<dependency>
+    <groupId>io.openliberty</groupId>
+    <artifactId>openliberty-runtime</artifactId>
+    <version>22.0.0.2</version>
+    <type>zip</type>
+</dependency>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+dependencies {
+    libertyRuntime group: 'io.openliberty', name: 'openliberty-runtime', version: '[22.0.0.2,)'
+}
+----
+
+Or if you're using Docker:
+
+[source]
+----
+FROM open-liberty
+----
+
+Or take a look at our link:{url-prefix}/downloads/[Downloads page].
+
+[link=https://stackoverflow.com/tags/open-liberty]
+image::img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="center"]
+
+[#jpa]
+=== Define JPA persistence properties at server scope
+
+This new JPA enhancement adds the ability to declare "default" JPA persistence properties, to all container-managed persistence contexts, as a Liberty `server.xml` configuration.
+
+Previously, if a persistence property needed to be set for all `persistence.xml` configuration files, a user would manually update all `persistence.xml` files in all applications. This could end up requiring hundreds of manual updates and/or rebuilding of applications.
+With this enhancement, users can specify persistence properties, in the `server.xml`, that will propagate to all container-managed persistence units for applications installed on that server.
+
+In order to start using the new feature, users need only add the new `<defaultProperties>` configuration to their `<jpa>` configuration, in `server.xml`, along with the persistence properties that they want to apply to all container-managed persistence units :
+
+*Example 1:*
+
+[source, xml]
+----
+<server>
+    <featureManager>
+        <feature>persistenceContainer-3.0</feature>
+    </featureManager>
+
+    <jpa defaultPersistenceProvider="org.hibernate.jpa.HibernatePersistenceProvider">
+        <defaultProperties>
+            <property name="javax.persistence.lock.timeout" value="4000"/>
+            <property name="hibernate.dialect" value="org.hibernate.dialect.Oracle12cDialect"/>
+        </defaultProperties>
+    </jpa>
+</server>
+----
+
+*Example 2:*
+
+[source, xml]
+----
+<server>
+    <featureManager>
+        <feature>jpa-2.1</feature>
+    </featureManager>
+
+    <jpa>
+        <defaultProperties>
+            <property name="javax.persistence.lock.timeout" value="12345"/>
+            <property name="eclipselink.cache.shared.default" value="false"/>
+        </defaultProperties>
+    </jpa>
+</server>
+----
+
+*Technical description*
+
+These `defaultProperties`, integration-level persistence properties will be supplied to the persistence provider specified when the `PersistenceProvider.createContainerEntityManagerFactory` method is called by the JPA Container.
+
+According to the JPA specification (3.4.4.3):
+[source]
+----
+If the same property or hint is specified more than once, the following order of overriding applies, in order of decreasing precedence:
+
+* argument to method of EntityManager, Query, or TypedQuery interface
+* specification to NamedQuery (annotation or XML)
+* argument to createEntityManagerFactory method
+* specification in persistence.xml
+----
+
+This means these new `defaultProperties` persistence property values will override the properties specified in persistence.xml with the same name. However, property values specified through PersistenceContext annotation, or the `persistence-context-ref` deployment descriptor element, or Query Hints property will override these `defaultProperties`.
+   
+For more information check out the link:https://github.com/OpenLiberty/open-liberty/issues/15979[GitHub issue] for this feature.
+
+[#bugs]
+== Notable bugs fixed in this release
+
+We’ve spent some time fixing bugs. The following sections describe just some of the issues resolved in this release. If you’re interested, here’s the  link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A22.0.0.2+label%3A%22release+bug%22[full list of bugs fixed in 22.0.0.2].
+
+== Get Open Liberty 22.0.0.2 now
+
+Available through <<run,Maven, Gradle, Docker, and as a downloadable archive>>.
