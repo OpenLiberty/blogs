@@ -1,0 +1,232 @@
+---
+layout: post
+title: "TITLE"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/ryan-storey
+author_github: https://github.com/ryan-storey
+seo-title: Concurrency 3.0 for Jakarta EE 10 in Open Liberty 22.0.0.3-beta - OpenLiberty.io
+seo-description: Open Liberty 22.0.0.3-beta offers Concurrency 3.0 for Jakarta EE 10, which introduces a variety of new enhancements including resource definition annotations that put applications in control of defining the concurrency constraints and thread context types that the application requires, context-aware completion stages that are managed by the container, and more.
+blog_description: Open Liberty 22.0.0.3-beta offers Concurrency 3.0 for Jakarta EE 10, which introduces a variety of new enhancements including resource definition annotations that put applications in control of defining the concurrency constraints and thread context types that the application requires, context-aware completion stages that are managed by the container, and more.
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+---
+= Concurrency 3.0 for Jakarta EE 10 in Open Liberty 22.0.0.3-beta
+Ryan Storey <https://github.com/ryan-storey>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+Open Liberty 22.0.0.3-beta offers Concurrency 3.0 for Jakarta EE 10, which introduces a variety of new enhancements including resource definition annotations that put applications in control of defining the concurrency constraints and thread context types that the application requires, context-aware completion stages that are managed by the container, and more.
+
+== All Beta Features package
+The All Beta features package for link:{url-about}[Open Liberty] contains all Open Liberty beta features and GA features and functions.
+
+This means that you can now try out our in-development Open Liberty features by just adding the relevant coordinates to your build tools.
+
+If you try the beta package, <<feedback, let us know what you think>>.
+
+The All Beta Features package includes the following beta features:
+
+* <<concurrency, Concurrency 3.0 for Jakarta EE 10>>
+
+[#concurrency]
+=== Concurrency 3.0 for Jakarta EE 10
+
+The Jakarta Concurrency specification enhances the set of parallel and reactive programming models available to applications, enabling tasks and completion stage actions to run with the thread context of the submitter.
+
+Concurrency 3.0 introduces a variety of enhancements, including...
+
+* Resource definition annotations that put applications in control of defining the concurrency constraints and thread context types that the application requires.
+* Context-aware completion stages that are managed by the container.
+* Asynchronous methods that are backed by context-aware completion stages.
+* Improvements to Triggers for customizing the scheduling of business logic according to dates and times within one's own time zone.
+* Standardized integration for third-party providers of thread context.
+
+While in beta, Open Liberty allows this Jakarta EE 10 feature to be used alongside Jakarta EE 9 features so that you can try it out with existing applications. Enable the `concurrent-3.0` feature in your `server.xml`,
+
+[source, xml]
+----
+<featureManager>
+    <feature>concurrent-3.0</feature>
+</featureManager>
+----
+
+You can still configure `<managedExecutorService>` and other Concurrency resource types in `server.xml` as you did for previous versions of the feature.
+
+However, Conurrency 3.0 gives you the ability to define those resources within application components:
+
+[source, java]
+----
+import static jakarta.enterprise.concurrent.ContextServiceDefinition.ALL_REMAINING;
+import static jakarta.enterprise.concurrent.ContextServiceDefinition.APPLICATION;
+import static jakarta.enterprise.concurrent.ContextServiceDefinition.SECURITY;
+import static jakarta.enterprise.concurrent.ContextServiceDefinition.TRANSACTION;
+
+import jakarta.annotation.Resource;
+import jakarta.enterprise.concurrent.ContextServiceDefinition;
+import jakarta.enterprise.concurrent.ManagedExecutorDefinition;
+import jakarta.enterprise.concurrent.ManagedExecutorService;
+import jakarta.inject.Inject;
+import jakarta.servlet.http.*;
+
+import java.sql.*;
+import java.util.concurrent.CompletionException;
+
+@ContextServiceDefinition(name = "java:app/concurrent/AppContextOnly",
+        propagated = APPLICATION,
+        cleared = { TRANSACTION, SECURITY },
+        unchanged = ALL_REMAINING)
+@ManagedExecutorDefinition(name = "java:module/concurrent/MyExecutor",
+        context = "java:app/concurrent/AppContextOnly",
+        maxAsync = 5)
+public class MyServlet extends HttpServlet {
+    @Resource(name = "java:module/env/concurrent/MyExecutorRef",
+              lookup = "java:module/concurrent/MyExecutor")
+    ManagedExecutorService myExecutor;
+
+    @Inject AccountsBean accounts;
+    ...
+----
+
+With the CDI feature enabled, methods that return a `CompletionStage` or `CompletableFuture` can be designated to run asynchronously by annotating them with `@Asynchronous`.
+
+[source, java]
+----
+import jakarta.enterprise.concurrent.Asynchronous;
+import jakarta.inject.Singleton;
+
+import java.sql.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+
+import javax.naming.InitialContext;
+import javax.naming.NamingException;
+import javax.sql.DataSource;
+
+@Singleton
+public class AccountsBean {
+
+    @Asynchronous(executor = "java:module/concurrent/MyExecutor")
+    CompletableFuture<List<Account>> findOverdue(int minDaysLate) {
+        List<Account> overdueAccounts = new ArrayList<Account>();
+        try {
+            // Resource reference lookup requires context of the application component,
+            DataSource db = InitialContext.doLookup("java:comp/env/jdbc/account-db-ref");
+            ...
+            return Asynchronous.Result.complete(overdueAccounts);
+        } catch (NamingException | SQLException x) {
+            throw new CompletionException(x);
+        }
+    }
+
+    ...
+----
+
+When the application invokes the asynchronous method, the container intercepts the invocation and hands back a completion stage representing its eventual completion, which is arranged by the `ManagedExecutorService`.
+
+[source, java]
+----
+    public void doGet(HttpServletRequest req, HttpServletResponse res) {
+        ...
+        accounts.findOverdue(60).thenAccept(this::sendReminder);
+        ...
+    }
+
+    void sendReminder(List<Account> overdue) {
+        try {
+            // Resource reference lookup requires context of the application component,
+            DataSource db = InitialContext.doLookup("java:comp/env/jdbc/customer-db-ref");
+            ...
+        } catch (NamingException | SQLException x) {
+            throw new CompletionException(x);
+        }
+    }
+----
+
+The Concurrency 3.0 specification hasn't been published yet because Jakarta EE 10 is still under development. However, you can preview a draft of it in asciidoc link:https://github.com/eclipse-ee4j/concurrency-api/blob/2abe74ce30589ef53e248009fcb446491fd42a27/specification/src/main/asciidoc/jakarta-concurrency.adoc[here].
+
+Similarly, the API jar will not be available on Maven until the specification is released. In the mean time, a draft copy of it is made available on DHE at the link:http://public.dhe.ibm.com/ibmdl/export/pub/software/olrepo/io/openliberty/jakarta/enterprise/concurrent/jakarta.enterprise.concurrent-api/3.0.0.20220120/[following location].
+
+[source, xml]
+----
+    <repositories>
+        <repository>
+            <id>ibmdhe</id>
+            <name>IBM_DHE File Server</name>
+            <url>https://public.dhe.ibm.com/ibmdl/export/pub/software/olrepo</url>
+        </repository>
+    </repositories>
+    <dependencies>
+        <dependency>
+            <groupId>io.openliberty.jakarta.enterprise.concurrent</groupId>
+            <artifactId>jakarta.enterprise.concurrent-api</artifactId>
+            <version>3.0.0.20220120</version>
+        </dependency>
+    <dependencies>
+----
+
+=== Try it now 
+
+To try out these features, just update your build tools to pull the Open Liberty All Beta Features package instead of the main release. The beta works with Java SE 15, Java SE 11, or Java SE 8.
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], here are the coordinates:
+
+[source,xml]
+----
+<dependency>
+  <groupId>io.openliberty.beta</groupId>
+  <artifactId>openliberty-runtime</artifactId>
+  <version>22.0.0.3-beta</version>
+  <type>pom</type>
+</dependency>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+dependencies {
+    libertyRuntime group: 'io.openliberty.beta', name: 'openliberty-runtime', version: '[22.0.0.3-beta,)'
+}
+----
+
+Or take a look at our link:{url-prefix}/downloads/#runtime_betas[Downloads page].
+
+[#jakarta]
+== Jakarta EE 9 Features
+
+As of 21.0.0.12 the Jakarta EE 9.1 features are now out of beta and fully supported. Check out the link:https://openliberty.io/blog/2021/11/26/jakarta-ee-9.1.html[release blog post] for these features.
+
+=== Try it now
+
+To try out these Jakarta EE 9 features on Open Liberty in a lightweight package, just update your build tools to pull the Open Liberty Jakarta EE 9 Beta Features package instead of the main release. The beta works with Java SE 15, Java SE 11, or Java SE 8.
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], here are the coordinates:
+
+[source,xml]
+----
+<dependency>
+    <groupId>io.openliberty.beta</groupId>
+    <artifactId>openliberty-jakartaee9</artifactId>
+    <version>22.0.0.3-beta</version>
+    <type>zip</type>
+</dependency>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+dependencies {
+    libertyRuntime group: 'io.openliberty.beta', name: 'openliberty-jakartaee9', version: '[22.0.0.3-beta,)'
+}
+----
+
+Or take a look at our link:{url-prefix}/downloads/#runtime_betas[Downloads page].
+
+
+[#feedback]
+== Your feedback is welcomed
+
+Let us know what you think on link:https://groups.io/g/openliberty[our mailing list]. If you hit a problem, link:https://stackoverflow.com/questions/tagged/open-liberty[post a question on StackOverflow]. If you hit a bug, link:https://github.com/OpenLiberty/open-liberty/issues[please raise an issue].
