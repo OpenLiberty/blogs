@@ -1,13 +1,13 @@
 ---
 layout: post
-title: "Changes to JPA persistence properties and a number of significant bug fixes in Open Liberty 22.0.0.2"
+title: "Enhancements to JPA persistence properties and a number of significant bug fixes in Open Liberty 22.0.0.2"
 # Do NOT change the categories section
 categories: blog
 author_picture: https://avatars3.githubusercontent.com/ryan-storey
 author_github: https://github.com/ryan-storey
 seo-title: Enhancements to JPA persistence properties and a number of significant bug fixes in Open Liberty 22.0.0.2 - OpenLiberty.io
-seo-description: Open Liberty 22.0.0.2 adds the ability to declare "default" JPA persistence properties to all container-managed persistence contexts, as a Liberty server.xml configuration. This release also provides a number of significant bug fixes.
-blog_description: Open Liberty 22.0.0.2 adds the ability to declare "default" JPA persistence properties to all container-managed persistence contexts, as a Liberty server.xml configuration. This release also provides a number of significant bug fixes.
+seo-description: Open Liberty 22.0.0.2 adds the ability to declare "default" JPA persistence properties to all container-managed persistence contexts as part of the Liberty configuration. This release also provides a number of significant bug fixes.
+blog_description: Open Liberty 22.0.0.2 adds the ability to declare "default" JPA persistence properties to all container-managed persistence contexts as part of the Liberty configuration. This release also provides a number of significant bug fixes.
 open-graph-image: https://openliberty.io/img/twitter_card.jpg
 ---
 = Enhancements to JPA persistence properties and a number of significant bug fixes in Open Liberty 22.0.0.2
@@ -17,7 +17,7 @@ Ryan Storey <https://github.com/ryan-storey>
 :url-about: /
 //Blank line here is necessary before starting the body of the post.
 
-Open Liberty 22.0.0.2 adds the ability to declare "default" JPA persistence properties to all container-managed persistence contexts, as a Liberty server.xml configuration. This release also provides a number of significant bug fixes.
+Open Liberty 22.0.0.2 adds the ability to declare "default" JPA persistence properties to all container-managed persistence contexts as part of the Liberty configuration. This release also provides a number of significant bug fixes.
 
 In link:{url-about}[Open Liberty] 22.0.0.2:
 
@@ -69,7 +69,7 @@ This new JPA enhancement adds the ability to declare "default" JPA persistence p
 Previously, if a persistence property needed to be set for all `persistence.xml` configuration files, a user would manually need to update all `persistence.xml` files in all applications. This could end up requiring hundreds of manual updates and/or rebuilding of applications.
 With this enhancement, users can specify persistence properties, in the `server.xml`, that will propagate to all container-managed persistence units for applications installed on that server.
 
-In order to start using the new feature, users need only add the new `<defaultProperties>` configuration to their `<jpa>` configuration, in `server.xml`, along with the persistence properties that they want to apply to all container-managed persistence units :
+In order to start using the new feature, users need only add the new `<defaultProperties>` configuration to their `<jpa>` configuration, in `server.xml`, along with the persistence properties that they want to apply to all container-managed persistence units:
 
 *Example 1:*
 
@@ -130,6 +130,61 @@ For more information check out the link:https://github.com/OpenLiberty/open-libe
 == Notable bugs fixed in this release
 
 We’ve spent some time fixing bugs. The following sections describe just some of the issues resolved in this release. If you’re interested, here’s the  link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A22002+label%3A%22release+bug%22[full list of bugs fixed in 22.0.0.2].
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/19545[OpenIdConnectClient cookies not getting deleted after logout]
++
+Previously, OpenID Connect nonce cookies could accumulate over multiple logins and not be cleared after logout. Instead, we would expect all cookies to be cleared after logout or on next login instead of accumulating. This issue was caused by not using the correct cookie name when clearing the nonce cookie and has now been fixed.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/19831[The output of ./wlp/bin/productInfo featureInfo missing new lines]
++
+Previously, the output of `./wlp/bin/productInfo featureInfo` was missing new line characters.
+For example:
++
+[source]
+----
+acmeCA-2.0adminCenter-1.0appClientSupport-1.0appSecurity-1.0appSecurity-2.0appSecurity-3.0appSecurityClient-1.0audit-1.0batch-1.0batchManagement-1.0beanValidation-1.1beanValidation-2.0bells-1.0cdi-1.2cdi-2.0cloudant-1.0concurrent-1.0constra ...
+----
++
+There are now line breaks between each of the feature names, as shown below:
++
+[source]
+----
+acmeCA-2.0
+adminCenter-1.0
+appClientSupport-1.0
+appSecurity-1.0
+appSecurity-2.0
+appSecurity-3.0
+appSecurityClient-1.0
+...
+----
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/19860[Updating MicroProfile versions on server.xml causes issues with install manager]
++
+Previously, updating to MicroProfile 5.0 in the `server.xml` and `pom.xml` would cause issues with the install manager. After resolving the features which are needed, the `RepositoryResolver` has to create lists of which features to install. There's a list of everything needed for each requested feature and one for each auto-feature. When creating the install lists, it traversed the dependencies but stopped traversing when it founds a dependency which was installed. If `distributedMap-1.0` is installed but `distributedMapInternal-1.0` is not, it stops traversing dependencies when it hits `distributedMap-1.0` and `distributedMapInternal-1.0` is not added to the list. This bug was fixed by tracing down the entire dependency tree, building the list and finally removing any features which are already installed.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/19826[MP Fault Tolerance annotations at the class level of a Rest Client interface are ignored]
++
+A bug was discovered which led to MP Fault Tolerance annotations to be ignored when annotated at the class level of a Rest Client interface. However it would be picked up if annotated at method level. This issue was fixed by updating the rest client builder to check for fault tolerance annotations on the interface as well as on the method when deciding whether to add the `@FaultTolerance` annotation.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/19177[(JPA 2.2) EclipseLink: Deliver Bug #412391]
++
+JPA 2.2 has been updated to fix the EclipseLink bug link:https://bugs.eclipse.org/bugs/show_bug.cgi?id=412391[#412391] - static weaving output failing silently on runtime when subclass entity has the same attribute as superclass entity.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/19897["ERROR: Input redirection is not supported, exiting the process immediately" reported with Open Liberty as a service on Win]
++
+When running Open Liberty as a service on Windows, the following error was output when the timeout/retry logic was executed on start or stop: 
++
+[source]
+----
+ERROR: Input redirection is not supported, exiting the process immediately.
+----
++
+The expected behaviour would be for the server start script to loop the specified number of times, waiting for the server to start properly *without* echoing the `ERROR` message to the console. This issue has been fixed by updating the `server.bat` with ping command as opposed to timeout command. This behaviour should no longer occur.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/18941[NullPointerException in JSP after upgrade]
++
+A bug was introduced in 21.0.0.9 which caused apps to crash with a NullPointerException. This issue has now been fixed, as it was caused by a `taglib` referencing a `tld` file that didn't exist.
 
 == Get Open Liberty 22.0.0.2 now
 
