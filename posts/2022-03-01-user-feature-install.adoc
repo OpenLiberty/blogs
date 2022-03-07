@@ -17,10 +17,13 @@ Jiwoo Lim <https://github.com/jjiwooLim>
 :url-about: /
 :source-highlighter: highlight.js
 
-A feature can consist of a single OSGi bundle and a feature manifest file. In this post, we’ll use Maven plugins to build and install the Liberty feature. 
+You can expand the capability of Liberty by writing your own Liberty features and installing them onto the Liberty server. For example, you can develop a user feature to configure a custom authentication provider or incorporate custom functions that aren't shipped with Liberty. Liberty also provides various System Programming Interfaces (SPIs) that you can use to extend the runtime environment.  
+
+== Feature
+A Liberty feature consists of a definition file (feature manifest), and a collection of OSGi bundles that provide classes and services corresponding to a particular capability in the Liberty runtime environment. In this post, we’ll use Maven plugins to build and install the custom Liberty feature. 
 
 
-== OSGI bundle
+=== OSGi bundle
 
 The link:https://www.ibm.com/docs/en/wasdtfe?topic=overview-osgi-bundles[OSGi bundle] is a Java™ archive file(JAR) file that contains Java code, resources, and a manifest that describes the bundle and its dependencies. The bundle is the unit of deployment for an application. The OSGi manifest file contains metadata that enables the OSGi Framework to process the modular aspects of the bundle. 
 
@@ -28,9 +31,9 @@ The link:https://www.ibm.com/docs/en/wasdtfe?topic=overview-osgi-bundles[OSGi bu
 == Try it out
 
 We will be using `Eclipse` to create Maven projects. 
-For more info, check out link:https://www.ibm.com/docs/en/wasdtfe?topic=projects-creating-maven[Creating Maven projects].
+For more information, check out link:https://www.ibm.com/docs/en/wasdtfe?topic=projects-creating-maven[Creating Maven projects].
 
-In this blog, you will do the followings :
+In this post, we walk through the following steps of developing a user feature:
 
 - Create an OSGi bundle containing your Java classes using link:https://felix.apache.org/documentation/subprojects/apache-felix-maven-bundle-plugin-bnd.html#_using_the_plugin[Apache Felix Maven Bundle Plugin (BND)]
 - Package your OSGi bundle to Enterprise Subsystem Archive (ESA) file with link:https://aries.apache.org/documentation/modules/esamavenpluginproject.html[ESA Maven Plugin]
@@ -87,16 +90,16 @@ public class Activator implements BundleActivator {
 
 . Build the Bundle
 +
-To use the maven-bundle-plugin, explicitly specify `packaging` to "bundle" in the `pom.xml`. 
+To use the maven-bundle-plugin, explicitly specify `packaging` as `bundle` in the `pom.xml` file. 
 +
 [source, xml]
 ----
 <packaging>bundle</packaging>
 ----
 +
-We also need to specify the configuration. `Bundle-SymbolicName` is the only required header; Other headers are optional, but it's good practice to include name and version.
+We also need to specify the configuration. The `Bundle-SymbolicName` is the only required header for most cases but may require other OSGi headers depending on your implementation. 
 +
-In the previous step, we created a Java class that implements OSGi `BundleActivator`. To activate the BundleActivator, we need to identify the bundle activator class to the OSGi framework by adding the `Bundle-Activator` header. 
+In the previous step, we created a Java class that implements OSGi `BundleActivator`. We need to dentify the bundle activator class to the OSGi framework by adding the `Bundle-Activator` header. Other headers are optional, but including the `Bundle-Name` and `Bundle-version` headers is a good practice.
 +
 [source, xml]
 ----
@@ -191,18 +194,18 @@ Tool: Bnd-3.3.0.201609221906
 
 '''
 === Building an Enterprise Subsystem Archive
-The Enterprise Subsystem Archive (ESA) is an archive file (i.e. zip) containing the SUBSYSTEM.MF manifest file. The contents of this manifest file provides information on how to install, resolve and start the bundle.
-
-A Liberty feature requires the following headers:
-
-- *Subsystem-SymbolicName* : Specifies the identity and visibility of the feature; 
-- *Subsystem-Content* : Comma-separated list of bundles and subsystems that are required to run this feature;
-- *IBM-Feature-Version* : Identifies which version of feature support is required by the runtime environment. Must be set to 2;
-- *Subsystem-Type* : All features are currently of the same subsystem type `osgi.subsystem.feature`;
-
-For details about the format of a feature manifest file, see link:https://www.ibm.com/docs/en/was-liberty/base?topic=manually-liberty-feature-manifest-files[Liberty feature manifest files].
+The Enterprise Subsystem Archive (ESA) is an archive file (i.e. zip) containing the SUBSYSTEM.MF manifest file. The contents of this manifest file provide information on how to install, resolve and start the bundle.
 
 We will use the link:https://aries.apache.org/documentation/modules/esamavenpluginproject.html[esa-maven-plugin] to package our bundle and to generate SUBSYSTEM.MF file. Set the `packaging` type to *esa* and add the OSGi bundle dependency and appropriate headers. 
+
+A Liberty feature requires that the the SUBSYTEM.MF file includes following headers:
+
+- *Subsystem-SymbolicName* : Specifies the identity and visibility of the feature
+- *Subsystem-Content* : Comma-separated list of bundles and subsystems that are required to run this feature
+- *IBM-Feature-Version* : Identifies which version of feature support is required by the runtime environment; Must be set to 2
+- *Subsystem-Type* : All Liberty features are currently of the same subsystem type `osgi.subsystem.feature`
+
+For details about the format of a feature manifest file, see link:https://www.ibm.com/docs/en/was-liberty/base?topic=manually-liberty-feature-manifest-files[Liberty feature manifest files].
 
 .pom.xml
 [source, xml]
@@ -251,9 +254,7 @@ We will use the link:https://aries.apache.org/documentation/modules/esamavenplug
   </build>
 </project>
 ----
-By default it will not generate a manifest, so we have to set the `generateManifest` header to *true*. Note that in order to install the feature, we need to set the *visibility* directive to "public". We can do so by setting the `Subsystem-SymbolicName` header to "_Bundle-SymbolicName;visibility:=public_". If the *visibility* is set to `protected|private`, Liberty Maven Plugin will not be able to resolve the feature. Also, the mandatory header `Subsystem-Content` will be created automatically by the plugin. 
-
-
+By default it will not generate a manifest, so we have to set the `generateManifest` header to *true*. To install the feature, we need to set the *visibility* directive to "public". We can do so by setting the `Subsystem-SymbolicName` header to "_Bundle-SymbolicName;visibility:=public_". If the *visibility* is set to `protected|private`, Liberty Maven Plugin will not be able to resolve the feature. Also, the mandatory header `Subsystem-Content` will be created automatically by the plugin. `IBM-ShortName` is optional header alias to `Subsystem-SymbolicName``.
 
 Run `**_mvn clean install_**` to create an ESA file. Inside the ESA file, you will find your bundle JAR and SUBSYSTEM.MF.
 
@@ -272,7 +273,7 @@ Subsystem-Vendor: IBM
 ----
 '''
 === Creating Bill of Materials (BOM) 
-Create a Bill of Materials (BOM) for the user feature ESA file. The BOM is a pom file that manages the dependencies of the project. Liberty Maven Plugin's `prepare-feature` goal and `install-feature` goal require the BOM file to install the Liberty user feature onto Liberty runtime. 
+Create a Bill of Materials (BOM) for the user feature ESA file. The BOM is a pom file that manages the dependencies of the project. The Liberty Maven Plugin `prepare-feature` and `install-feature` goals require a BOM file to install a Liberty user feature onto Liberty runtime. 
 [source, xml]
 .pom.xml
 ----
@@ -323,7 +324,7 @@ Run `**_mvn clean install_**` to create `features-bom.pom` BOM file.
 
 . Specify the feature to install for the `test` server.
 +
-Open `${project.build.testOutputDirectory}/wlp/server.xml` file and add the user feature. The extension `usr` indicates that the feature will be installed to `${project.build.testOutputDirectory}/wlp/usr` directory. It also tells the server where to find the user feature when the server starts. 
+Open `${project.build.testOutputDirectory}/wlp/server.xml` file and add the user feature. The `usr` extension indicates that the feature will be installed to the `${project.build.testOutputDirectory}/wlp/usr` directory. It also tells the server where to find the user feature when the server starts. 
 +
 [source, xml]
 .server.xml
@@ -374,5 +375,7 @@ A CWWKE0036I: The server test stopped after 21 minutes, 4.4
 
 == Learn more
 
-- To learn more about OSGi applications, see https://www.ibm.com/docs/en/wasdtfe?topic=developing-osgi-applications[Developing OSGi applications].
-- For more information on Liberty Maven Plugins, see link:https://github.com/OpenLiberty/ci.maven[ci.maven].
+- To learn more about product extension and features, see link:https://www.ibm.com/docs/en/was-liberty/base?topic=overview-product-extension[Product extension]
+- To learn more about OSGi applications, see link:https://www.ibm.com/docs/en/wasdtfe?topic=developing-osgi-applications[Developing OSGi applications]
+- For more information on Liberty Maven Plugins, see link:https://github.com/OpenLiberty/ci.maven[ci.maven]
+- To develop user features to secure Liberty, see link:https://www.ibm.com/docs/en/was-liberty/base?topic=applications-developing-extensions-liberty-security-infrastructure[Developing extensions to the Liberty security infrastructure]
