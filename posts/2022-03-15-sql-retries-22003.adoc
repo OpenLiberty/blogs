@@ -1,0 +1,155 @@
+---
+layout: post
+title: "Retrying SQL operations in transaction recovery logs and more in Open Liberty 22.0.0.3"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/ryan-storey
+author_github: https://github.com/ryan-storey
+seo-title: Retrying SQL operations in transaction recovery logs and more in Open Liberty 22.0.0.3 - OpenLiberty.io
+seo-description: Open Liberty 22.0.0.3 allows SQL Operations to be retried in transaction recovery logs. This release also includes several significant bug fixes. In addition, we have published a brand new Open Liberty guide on containerizing microservices with Podman!
+blog_description: Open Liberty 22.0.0.3 allows SQL Operations to be retried in transaction recovery logs. This release also includes several significant bug fixes. In addition, we have published a brand new Open Liberty guide on containerizing microservices with Podman!
+
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+---
+= Retrying SQL operations in transaction recovery logs and more in Open Liberty 22.0.0.3
+Ryan Storey <https://github.com/ryan-storey>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+Open Liberty 22.0.0.3 allows SQL Operations to be retried in transaction recovery logs. This release also includes several significant bug fixes. In addition, we have published a brand new Open Liberty guide on containerizing microservices with Podman!
+In link:{url-about}[Open Liberty] 22.0.0.3:
+
+* <<sql, Allow SQL Operations to be retried in transaction recovery logs>>
+* <<bugs, Notable bug fixes>>
+
+Along with the new features and functions added to the runtime, we’ve also made <<guides, updates to our guides>>.
+
+View the list of fixed bugs in link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A22003+label%3A%22release+bug%22+[22.0.0.3].
+
+[#run]
+== Run your apps using 22.0.0.3
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], here are the coordinates:
+
+[source,xml]
+----
+<dependency>
+    <groupId>io.openliberty</groupId>
+    <artifactId>openliberty-runtime</artifactId>
+    <version>22.0.0.3</version>
+    <type>zip</type>
+</dependency>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+dependencies {
+    libertyRuntime group: 'io.openliberty', name: 'openliberty-runtime', version: '[22.0.0.3,)'
+}
+----
+
+Or if you're using Docker:
+
+[source]
+----
+FROM open-liberty
+----
+
+Or take a look at our link:{url-prefix}/downloads/[Downloads page].
+
+[link=https://stackoverflow.com/tags/open-liberty]
+image::img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="center"]
+
+[#sql]
+=== Allow SQL Operations to be retried in transaction recovery logs
+
+In Liberty, transaction services are implicitly activated when you specify features that use transactions, such as  `jpa-2.0`, `jdbc-4.0`, and `wasJmsServer-1.0`.
+
+When Liberty detects a failure to write to its transaction recovery logs, it invalidates the logs and disallows further global transactions. To resume transactional work, you have to restart the server and reload any applications, which can take considerable time in some cases.
+
+Under certain circumstances, such as when the recovery log failure is caused by transient database connection errors, the condition can be handled by retrying the database operation thus avoiding the need to shutdown the server and reload the apps.
+
+A new attribute is available for the `transaction` configuration element in the Liberty `server.xml` file that enables these transaction log SQL operations to be retried. It is named `enableLogRetries` and should be set to `true` to enable retries. For example,
+
+[source,xml]
+----
+<transaction
+dataSourceRef="tranlogDataSource"
+recoverOnStartup="true"
+waitForRecovery="false"
+heuristicRetryInterval="10"
+enableLogRetries="true"
+/>
+----
+
+By default the new functionality is disabled.
+
+For more information on the storing or Transaction Recovery Logs in an `RDBMS`, please refer to link:{url-prefix}/docs/latest/transaction-service.html#log[Transaction log management] doc.
+
+
+[#bugs]
+== Notable bugs fixed in this release
+
+We’ve spent some time fixing bugs. The following sections describe just some of the issues resolved in this release. If you’re interested, here’s the  link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A22003+label%3A%22release+bug%22+[full list of bugs fixed in 22.0.0.3].
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/20165[jsonpContainer-2.0 and jsonbContainer-2.0 features incorrectly use default providers]
++
+The `jsonpContainer-2.0` and `jsonbContainer-2.0` features incorrectly used default providers. These features have been updated to include the BELLS feature and remove Liberty's default implementations of JSON-P and JSON-B. This allows for a user to include their own third party library for these JSON technologies. 
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/12050[@RolesAllowed rejects unauthenticated users when they mapped to an allowed (EVERYONE) role]
++
+Previously, the special-subject `EVERYONE` did not work correctly with the `@RolesAllowed` annotation on `JAX-RS` resources. When the special-subject `EVERYONE` is bound to a `security-role`, unauthenticated users should be considered to be in that role and should have access to the endpoints allowed for that role. The `@RolesAllowed` annotation would reject unauthenticated users when they were mapped to an allowed (`EVERYONE`) role. This issue has since been resolved.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/19673[JWT access token inbound propagation fails when a JWT sent as segments starts with "Bearer"]
++
+In 22.0.0.2, `JWT` access token inbound propagation failed when a `JWT` sent as segments starts with `Bearer`. Liberty has support to accept multiple headers from `WebSeal` that include portions of a `JWT` access token. The first header, `Authorization-segments`, for example, indicates how many "n" segments follow. The rest of the headers `Authorization-1` through `Authorization-n` contain the `JWT` access token. When `Authorization-1` started with `Bearer`, the access token could not be parsed correctly for inbound propagation. If JWT segments are sent and the first header, `Authorization-segments-1`, starts with `Bearer`, it should be processed correctly as when a JWT is sent using the `Authorization: Bearer`.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/19960[OpenID Connect: Double URL Encoded State Parameter in Redirect location]
++
+Previously, when receiving a state parameter from the relying party (RP) it appears Liberty returned the state double encoded. The issue appears to occur when processing the Liberty page to authorize the RP:
++
+[source]
+----
+https://www.oauth-login.com/oidc/endpoint/rp/authorize
+Payload state: yyyyyyyyyyyyyyyyy
+----
++
+Which results in a response code `302`: and a redirect location of:
++
+`https://rp.example.com/oauth2callback/openid?code=xxxxxxxx&state=zzzzzzzzzzzzzzzzzz`
++
+The payload state in the redirect URL is now returned in the same state as it was received.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/20063[Server commands not working on IBM i after checkpoint changes]
++
+On IBM i, with the changes introduced to the server command line script, the server command with any option failed on 22.0.0.2 with this error:
++
+[source]
+----
+server: 001-0050 Syntax error on line 1339: token "!" not expected.
+----
++
+This issue has now been resolved.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/19780[Adding Monitor Filter increases Startup Time]
++
+Previously, a user would experience slower startup (around 4 or 5 seconds) if `mpMetrics-2.3` or newer is enabled and a monitor filter that does not include `ThreadPoolStats` in the `server.xml`. This issue is now fixed by asynchronously loading the `ThreadPoolStats` related `MBeans` in a separate thread. As a result it will not affect the sequential start-up of the bundle and hence the server.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/20206[Servers stop can fail in products that embed Liberty]
++
+A long running thread was added in 22.0.0.1 to gather CPU statistics. It was created as a non-daemon thread. This caused problems with stopping the server in products that embed Liberty and prevent the JVM from stopping until all non-daemon threads have exited. The server should stop cleanly. This problem was fixed by running the `CpuInfo` thread as a daemon.
+
+[#guides]
+== New and updated guides since the previous release
+As Open Liberty features and functionality continue to grow, we continue to add link:https://openliberty.io/guides/?search=new&key=tag[new guides to openliberty.io] on those topics to make their adoption as easy as possible.  Existing guides also receive updates in order to address any reported bugs/issues, keep their content current, and expand what their topic covers.
+
+* link:{url-prefix}/guides/containerize-podman.html[Containerizing microservices with Podman]
+** This guide will teach you how to containerize and run your microservices on Open Liberty using Podman.
+
+== Get Open Liberty 22.0.0.3 now
+
+Available through <<run,Maven, Gradle, Docker, and as a downloadable archive>>.
