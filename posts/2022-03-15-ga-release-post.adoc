@@ -94,8 +94,54 @@ Add the feature to the `server.xml`:
 [#bugs]
 == Notable bugs fixed in this release
 
-
 We’ve spent some time fixing bugs. The following sections describe just some of the issues resolved in this release. If you’re interested, here’s the  link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A22003+label%3A%22release+bug%22+[full list of bugs fixed in 22.0.0.3].
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/20165[jsonpContainer-2.0 and jsonbContainer-2.0 features incorrectly use default providers]
++
+The `jsonpContainer-2.0` and `jsonbContainer-2.0` features incorrectly used default providers. These features have been updated to include the BELLS feature and remove Liberty's default implementations of JSON-P and JSON-B. This allows for a user to include their own third party library for these JSON technologies. Additionally this fix updates the `JSON` container `FAT` tests to run against the 2.0 json container features (Jakarta EE 9) to verify this fixed functionality.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/12050[@RolesAllowed rejects unauthenticated users when they mapped to an allowed (EVERYONE) role]
++
+Previously, the special-subject `EVERYONE` did not play well with the `@RolesAllowed` annotation on `JAX-RS` resources. When the special-subject `EVERYONE` is bound to a `security-role`, unauthenticated users should be considered to be in that role and should have access to the endpoints allowed for that role. The `@RolesAllowed` annotation would reject unauthenticated users when they were mapped to an allowed (`EVERYONE`) role. This issue has since been resolved.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/19673[JWT access token inbound propagation fails when a JWT sent as segments starts with "Bearer"]
++
+In 22.0.0.2, `JWT` access token inbound propagation failed when a `JWT` sent as segments starts with `Bearer`. Liberty has support to accept multiple headers from `WebSeal` that include portions of a `JWT` access token. The first header, `Authorization-segments`, for example, indicates how many "n" segments follow. The rest of the headers `Authorization-1` through `Authorization-n` contain the `JWT` access token. When `Authorization-1` started with `Bearer`, the access token could not be parsed correctly for inbound propagation. If JWT segments are sent and the first header, `Authorization-segments-1`, starts with `Bearer`, it should be processed correctly as when a JWT is sent using the `Authorization: Bearer`.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/19960[OpenID Connect: Double URL Encoded State Parameter in Redirect location]
++
+Previously, when receiving a state parameter from the RP it appears Liberty returned the state double encoded. The issue appears to occur when processing the liberty page to authorize the RP:
++
+[source]
+----
+https://www.oauth-login.com/oidc/endpoint/rp/authorize
+Payload state: yyyyyyyyyyyyyyyyy
+----
++
+Which results in a response code `302`: and a redirect location of:
++
+`https://oauth-openshift.apps.ocp4.example.com/oauth2callback/openid?code=xxxxxxxx&state=zzzzzzzzzzzzzzzzzz`
++
+The payload state in the redirect URL is now returned in the same state as it was received.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/20063[Server commands not working on IBM i after checkpoint changes]
++
+On IBM i, with the changes introduced to the server command line script, the server command with any option failed on 22.0.0.2 with this error:
++
+[source]
+----
+server: 001-0050 Syntax error on line 1339: token "!" not expected.
+----
++
+This issue has now been resolved.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/19780[Adding Monitor Filter increases Startup Time]
++
+Previously, a user would experience slower startup (around 4 or 5 seconds) if `mpMetrics-2.3` or newer is enabled and a monitor filter that does not include `ThreadPoolStats` in the `server.xml`. This issue is now fixed by asynchronously loading the `ThreadPoolStats` related `MBeans` in a separate thread. As a result it will not affect the sequential start-up of the bundle and hence the server.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/20206[Servers stop can fail in products that embed Liberty]
++
+A long running thread was added in 22.0.0.1 to gather CPU statistics. It was created as a non-daemon thread. This caused problems with stopping the server in products that embed Liberty and prevent the JVM from stopping until all non-daemon threads have exited. The server should stop cleanly. This problem was fixed by running the `CpuInfo` thread as a daemon.
 
 [#guides]
 == New and updated guides since the previous release
