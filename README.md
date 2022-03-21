@@ -76,16 +76,16 @@ These steps are to be completed by the author of the blog post.
     
           ~~The draft site build starts running.~~
 
-6. When the build is finished, check that the blog renders correctly on either the [blog-draft site](https://blog-draft-openlibertyio.mybluemix.net/blog/) or the [full draft site](https://draft-openlibertyio.mybluemix.net/blog/).  
+6. When the build is finished, check that the blog renders correctly on either the [blogs-draft site](https://blogs-draft-openlibertyio.mybluemix.net/blog/) or the [full draft site](https://draft-openlibertyio.mybluemix.net/blog/).  
 
-   In addition to the existing [full draft site](https://draft-openlibertyio.mybluemix.net/blog/) we now have a [blog-draft site](https://blog-draft-openlibertyio.mybluemix.net/blog/), which contains only the blog content, allowing it to build and deploy much quicker. However, since this site contains only the blog content, any links to other parts of openliberty.io will not resolve. In general, use the blog-draft site to review content because it updates much quicker than the full site. However, if you need to review content that links to pages on openliberty.io that are not in the blogs, use the full draft site.
+   In addition to the existing [full draft site](https://draft-openlibertyio.mybluemix.net/blog/) we now have a [blogs-draft site](https://blogs-draft-openlibertyio.mybluemix.net/blog/), which contains only the blog content, allowing it to build and deploy much quicker. However, since this site contains only the blog content, any links to other parts of openliberty.io will not resolve. In general, use the blogs-draft site to review content because it updates much quicker than the full site. However, if you need to review content that links to pages on openliberty.io that are not in the blogs, use the full draft site.
 
-   If you see any problems , such as formatting issues or typos, resolve them first in your branch. Then, create another PR into `draft` branch, link the PR to the issue again,  and get the PR merged. Wait for IBM Cloud to rebuild [blog-draft site](https://blog-draft-openlibertyio.mybluemix.net/blog/) or [draft site](https://draft-openlibertyio.mybluemix.net/blog/) and verify the change.
+   If you see any problems , such as formatting issues or typos, resolve them first in your branch. Then, create another PR into `draft` branch, link the PR to the issue again,  and get the PR merged. Wait for IBM Cloud to rebuild [blogs-draft site](https://blogs-draft-openlibertyio.mybluemix.net/blog/) or [draft site](https://draft-openlibertyio.mybluemix.net/blog/) and verify the change.
 
 7. When you're happy with the post:
    - Create a PR from your branch (_not_ from the `draft` branch) to the `staging` branch.
    - Link the PR to the issue.
-   - In the PR, provide a link to your post on the [blog-draft site](https://blog-draft-openlibertyio.mybluemix.net/blog/) or [draft site](https://draft-openlibertyio.mybluemix.net/blog/). 
+   - In the PR, provide a link to your post on the [blogs-draft site](https://blogs-draft-openlibertyio.mybluemix.net/blog/) or [draft site](https://draft-openlibertyio.mybluemix.net/blog/). 
    - Ideally, also paste a screenshot of the entire blog post page as this will allow reviewers to see the rendered post content even while the sites are innaccessible (e.g. redeploys). 
    - Add @GraceJansen, as well as your technical reviewer and any other reviewers to get their final approval for both content and format.
 8. The editors will now review and edit the post. Please respond to any questions they ask or suggestions they make. Their aim is to make the post readable and useful to its target audience.
@@ -95,7 +95,7 @@ These steps are to be completed by the author of the blog post.
    - Create a PR to the `draft` branch 
    - Link the PR to the issue
    - Merge the PR
-   - Once the site rebuilds, check that everything is correct on the [blog-draft site](https://blog-draft-openlibertyio.mybluemix.net/blog/) or [draft site](https://draft-openlibertyio.mybluemix.net/blog/).
+   - Once the site rebuilds, check that everything is correct on the [blogs-draft site](https://blogs-draft-openlibertyio.mybluemix.net/blog/) or [draft site](https://draft-openlibertyio.mybluemix.net/blog/).
 10. Get reviewers to review the updates in your new PR.
 
 You're done! The editors will handle the rest.
@@ -106,11 +106,11 @@ Please note that if you have a specific date in mind that you want this blog to 
 
 These steps are completed by the editors of the blog. As editor, you might ask questions or make suggestions to the author of the post. You might also make edits directly in the post to prepare it for publishing.
 
-1. Review the post on the [blog-draft site](https://blog-draft-openlibertyio.mybluemix.net/blog/) or [draft site](https://draft-openlibertyio.mybluemix.net/blog/) as linked from the issue.
+1. Review the post on the [blogs-draft site](https://blogs-draft-openlibertyio.mybluemix.net/blog/) or [draft site](https://draft-openlibertyio.mybluemix.net/blog/) as linked from the issue.
 
    Ask the author to make changes by adding review comments to the PR.
 
-   For edits such as punctuation, formatting, highlighting, adding SEO details, or larger changes discussed with the author, the editor can make the edits directly in the author's branch and push the changes to `draft` branch, which automatically rebuilds the [blog-draft site](https://blog-draft-openlibertyio.mybluemix.net/blog/) and [draft site](https://draft-openlibertyio.mybluemix.net/blog/) where you can verify the changes.
+   For edits such as punctuation, formatting, highlighting, adding SEO details, or larger changes discussed with the author, the editor can make the edits directly in the author's branch and push the changes to `draft` branch, which automatically rebuilds the [blogs-draft site](https://blogs-draft-openlibertyio.mybluemix.net/blog/) and [draft site](https://draft-openlibertyio.mybluemix.net/blog/) where you can verify the changes.
    
    To check out the author's branch locally: `git fetch origin` then `git checkout -b branch_name origin/branch_name`, which creates a new local branch that's linked to their remote branch. When you've made changes, push them back to `origin/branch_name`.
 
@@ -171,7 +171,7 @@ If a published post on openliberty.io/blog contains an error or needs updating i
 
 3. If the blog tags need correcting, update the [blogs_tags.json](./blog_tags.json) file. If you add new tags, make sure to add the blog post's slug to the beginning of the `posts` arrays (1-2 entries per line) for each tag.
 
-4. Create a PR from your branch to the `draft` branch. After the PR is merged, wait for IBM Cloud to rebuild the [blog-draft site](https://blog-draft-openlibertyio.mybluemix.net/blog/) or [full draft site](https://draft-openlibertyio.mybluemix.net/blog/). If you have access to [this Slack channel](https://app.slack.com/client/T15GKHBT4/C01GXGW1DGQ), you can use it to track build/deploy progress.  Verify the changes on the [blog-draft site](https://blog-draft-openlibertyio.mybluemix.net/blog/) or [draft site](https://draft-openlibertyio.mybluemix.net/blog/).
+4. Create a PR from your branch to the `draft` branch. After the PR is merged, wait for IBM Cloud to rebuild the [blogs-draft site](https://blogs-draft-openlibertyio.mybluemix.net/blog/) or [full draft site](https://draft-openlibertyio.mybluemix.net/blog/). If you have access to [this Slack channel](https://app.slack.com/client/T15GKHBT4/C01GXGW1DGQ), you can use it to track build/deploy progress.  Verify the changes on the [blogs-draft site](https://blogs-draft-openlibertyio.mybluemix.net/blog/) or [draft site](https://draft-openlibertyio.mybluemix.net/blog/).
 
    Make any changes in your branch, then push to the `draft` branch again  and verify the changes after rebuild.
 
