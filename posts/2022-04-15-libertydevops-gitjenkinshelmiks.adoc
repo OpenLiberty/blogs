@@ -1,0 +1,74 @@
+---
+layout: post
+title: "Using Jenkins for CI/CD with Liberty"
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/shamjithantholi
+author_github: https://github.com/shamjithantholi
+seo-title: TITLE - OpenLiberty.io
+seo-description: DESCRIPTION
+blog_description: "A high level explanation about how to build a devops pipeline with Jenkins as the core controller component "
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+---
+= Using Jenkins for CI/CD with Liberty
+Shamjith Antholi https://github.com/shamjithantholi
+:imagesdir: /
+:url-prefix:
+:url-about: /
+
+[#Intro]
+== What is DevOps
+DevOps is a culture or a process which enables the integration of the software development (dev) and IT operations (ops) which will facilitate the setup of deployment pipeline as well as helps to improve the speed of software delivery. Automation of the entire build, test and deployment of the software applications can be achieved through DevOps process. There are tons of efficient applications and process methodologies available in the market which can be readily integrated to the DevOps pipeline which will help to achieve the desired results 
+
+== CI/CD and Jenkins
+CI/CD are acronym's for contineous integration and contineous delivery/deployment used in DevOps. Contineous integration is a process where developers frequently merge code changes into a central repository and kick start code build, security scan and test execution using automation or manual methods. Contineous delivery/deployment is a process of application deployment into deployment destination.
+
+Jenkins is an opensource automation server which helps to automate application code build, test and deployment. Jenkins comes with a vast variety of plugins which eases the various devops pipeline tool integrations into the build/deployment pipeline. In this blog, we will focus on how jenkins can be used as a piller of contineous integration and contineous deployment process for java based openliberty application deployment link:https://openliberty.io[OpenLiberty] along with GitHub, Helm and IBM Cloud kubernetes service (IKS)  
+
+== Getting ready
+Install jenkins with all the recommended plugins, make sure that the following plugins are installed
+
+* Maven
+* Pipeline
+* Helm (not a plugin, but install helm on master or any jenkins slave server )
+* Docker
+* <to be added>
+* <to be added>
+
+Create a custom image registry in IBM cloud to push the docker image which will be used for docker deployment. Docker repositories in tools like artifactory can be used for this purpose (open source softwares for this purpose are DockerHub, GitLab container registry, Nexus repository etc).  
+
+== Creating pipeline script and integrating it with jenkins jobs
+Setup the required credentials in jenkins, either directly on jenkins or  integrate external credential store applications like Vault to Jenkins and use the credentials from the same in Jenkins build jobs.  
+Credentials can be created from link:http://localhost:8080/credentials/store/system/domain/_/newCredentials[Jenkins] (sample page)
+
+For adhering to the concept of infrastructure as a code (IaaC), use pipeline or multibranch pipeline type jenkins job for the CI/CD process. Only CLI commands can be used in pipeline code, on the other side, free style and maven type job has the advantage of UI based configuration.
+Pipeline code syntax can be found at link:https://www.jenkins.io/doc/pipeline/tour/hello-world/[pipeline syntax]. On jenkins, use this page to generate pipeline code link:http://localhost:8080/job/pipeline_test/pipeline-syntax/[Jenkins] (sample page)
+
+Pipeline code can be directly written on jenkins or saved on Jenkins file in github and map the same onto the pipeline job. For using multi branch pipeline job, the plugin "Multibranch Scan Webhook Trigger" need to be installed on jenkins.
+
+Create multiple stages in pipeline code for SCM checkout, code build, security scan and helm command execution etc. Jenkins job can be executed on jenkins master itself or on containerized slave (setup done using kubernetes pod template) or on virtual servers. The selection of this execution environment are based on the size of the application
+
+== Code build, packaging and security scan
+In the first pipeline stage, checkout the code into the workspace, and then initiate the code build using maven. For resolving dependencies from any private maven repository (like nexus or artifactory), use the maven settings files uploaded in "managed files" or as secret files.  
+
+After the code build and unit test execution, liberty application code should be packaged to .war file. You can consider the common practices like persistent storage of code package in nexus/artifactory because of compliance requirement or to directly download it to docker container thus by avoiding the risk of exposing application code in case of a compromized docker image. Application jar upload to nexus/artifactory can be done on runtime using distributionmanagement tag in maven pom.  
+
+Automatic security scan alomg with every code build is a most important part of CI/CD pipeline which ensures the security of the every version of deployed application. Static code analysis and opensource jar scan should be completed before proceeding to deployment. Static code analysis can be done using tools like SonarQube, features like quality gate can be used to fail the code build in case of not satisfying the required code quality and coverage. Jar scan can be done with tools like nexusiq or checkmarx or you can scan the docker image using the tools like Aqua or Synk. Maven build command can be integrated with scan related CLI commands or these can be done on a different pipeline stage.
+
+When code packaging is completed and ready for deployment, the current branch of code can be added to a git tag for any rebuilding purpose. This can be inititad from jenkins itself.  
+
+== Docker image
+When the appliction packaging process is completed, next stage should be to manage the docker image generation and its storage. 
+
+
+
+
+// // // // // // // //
+// LINKS
+//
+// OpenLiberty.io site links:
+// link:/guides/microprofile-rest-client.html[Consuming RESTful Java microservices]
+// 
+// Off-site links:
+// link:https://openapi-generator.tech/docs/installation#jar[Download Instructions]
+//
+// // // // // // // //
