@@ -52,12 +52,57 @@ In the first pipeline stage, checkout the code into the workspace, and then init
 
 After the code build and unit test execution, liberty application code should be packaged to .war file. You can consider the common practices like persistent storage of code package in nexus/artifactory because of compliance requirement or to directly download it to docker container thus by avoiding the risk of exposing application code in case of a compromized docker image. Application jar upload to nexus/artifactory can be done on runtime using distributionmanagement tag in maven pom.  
 
-Automatic security scan alomg with every code build is a most important part of CI/CD pipeline which ensures the security of the every version of deployed application. Static code analysis and opensource jar scan should be completed before proceeding to deployment. Static code analysis can be done using tools like SonarQube, features like quality gate can be used to fail the code build in case of not satisfying the required code quality and coverage. Jar scan can be done with tools like nexusiq or checkmarx or you can scan the docker image using the tools like Aqua or Synk. Maven build command can be integrated with scan related CLI commands or these can be done on a different pipeline stage.
+Automatic security scan along with every code build is a most important part of CI/CD pipeline which ensures the security of the every version of deployed application. Static code analysis and opensource jar scan should be completed before proceeding to deployment. Static code analysis can be done using tools like SonarQube, features like quality gate can be used to fail the code build in case of not satisfying the required code quality and coverage. Jar scan can be done with tools like nexusiq or checkmarx or you can scan the docker image using the tools like Aqua or Synk. Maven build command can be integrated with scan related CLI commands or these can be done on a different pipeline stage.
 
 When code packaging is completed and ready for deployment, the current branch of code can be added to a git tag for any rebuilding purpose. This can be inititad from jenkins itself.  
 
 == Docker image
 When the appliction packaging process is completed, next stage should be to manage the docker image generation and its storage. 
+
+You can use various repository options like dockerhub, IBM cloud registry, artifactory etc.
+
+All the credentials shall be saved either directly on Jenkins or integrate jenkins with vault (or any other credential store) and retrive the credentials from it. For vault-jenkins integration, you can use "HashiCorp Vault" jenkins plugin.
+
+Some helpful cli commands to use in Jenkins are given below (use any Jenkins plugins if available):
+
+* docker build -t <docker-image-name>:<version> --build-arg <arg-name>=<arg-value> .
+* docker login <repository host name> -u "${USERNAME}" -p "${PASSWORD}"
+* docker tag <docker-image-name>:<version> <repository host name>/<repository name>/<docker-image-name>:<version>
+* docker push <repository host name>/<repository name>/<docker-image-name>:<version>
+
+If cloud authentication and cluster selection is required, use the API key authentication method
+
+* ibmcloud login --apikey <ibm cloud api key> -g <ibm cloud resource group>
+
+== Deployment with Helm
+Run the "helm install" or "helm upgrade" to create the resources in the kubernetes cluster. Maintain all the helm resources in a separate folder in the git repository and make the modifications as per the requirement.
+
+The name of the new docker image generated on the docker build can be updated on the helm file on run time (if you are adopting to this run time image change strategy), you can use the "Git Push Plugin" for this purpose on Jenkins. 
+
+Some helpful cli commands for using in Jenkins are given below
+
+* ibmcloud plugin install container-service
+* ibmcloud config --check-version=false
+* ibmcloud ks cluster config --cluster <ibm cloud cluster id>
+* helm uninstall <release name> -n <namespace>
+* helm install <release name> . --namespace <namespace>
+
+== Kubernetes monitoring tools
+Several enterprise and open source options are available in market for kubernetes cluster resource monitoring and log monitoring. Some working example resources are given below. 
+
+* OpenSource :
+
+    -> https://grafana.com/oss/loki/
+    -> https://medium.com/nerd-for-tech/logging-at-scale-in-kubernetes-using-grafana-loki-3bb2eb0c0872
+    -> https://prometheus.io
+    -> https://k21academy.com/docker-kubernetes/prometheus-grafana-monitoring/
+
+* Enterprise :
+
+    -> https://www.splunk.com/en_us/blog/platform/deploy-splunk-enterprise-on-kubernetes-splunk-connect-for-kubernetes-and-splunk-insights-for-containers-beta-part-1.html
+    -> https://www.dynatrace.com/support/help/setup-and-configuration/setup-on-container-platforms/kubernetes
+
+
 
 
 
