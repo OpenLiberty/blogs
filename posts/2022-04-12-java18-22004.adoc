@@ -1,0 +1,218 @@
+---
+layout: post
+title: "Java 18 support and enhancements to client certificates in Open Liberty 22.0.0.4"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/ryan-storey
+author_github: https://github.com/ryan-storey
+seo-title: Java 18 support and enhancements to client certificates in Open Liberty 22.0.0.4 - OpenLiberty.io
+seo-description: Open Liberty 22.0.0.4 provides support for Java 18, which includes many new exciting features and changes. This releases also provides support for client certificates with urlencoded strings. We've also made a number of significant bug fixes and guide updates.
+blog_description: Open Liberty 22.0.0.4 provides support for Java 18, which includes many new exciting features and changes. This releases also provides support for client certificates with urlencoded strings. We've also made a number of significant bug fixes and guides updates.
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+---
+= TITLE
+Ryan Storey <https://github.com/ryan-storey>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+Open Liberty 22.0.0.4 provides support for Java 18, which includes many new exciting features and changes. This releases also provides support for client certificates with urlencoded strings. We've also made a number of notable bug fixes.
+
+In link:{url-about}[Open Liberty] 22.0.0.4:
+
+* <<java18, Java 18 Support>>
+* <<certificate, Support client certificate with urlencoded strings>>
+* <<CVEs, Security Vulnerability (CVE) Fixes>>
+* <<bugs, Notable bug fixes>>
+
+Along with the new features and functions added to the runtime, we’ve also made <<guides, updates to our guides>>.
+
+View the list of fixed bugs in link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A22004+label%3A%22release+bug%22[22.0.0.4].
+
+[#run]
+== Run your apps using 22.0.0.4
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], here are the coordinates:
+
+[source,xml]
+----
+<dependency>
+    <groupId>io.openliberty</groupId>
+    <artifactId>openliberty-runtime</artifactId>
+    <version>22.0.0.4</version>
+    <type>zip</type>
+</dependency>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+dependencies {
+    libertyRuntime group: 'io.openliberty', name: 'openliberty-runtime', version: '[22.0.0.4,)'
+}
+----
+
+Or if you're using Docker:
+
+[source]
+----
+FROM open-liberty
+----
+
+Or take a look at our link:{url-prefix}/downloads/[Downloads page].
+
+[link=https://stackoverflow.com/tags/open-liberty]
+image::img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="center"]
+
+[#java18]
+== Java 18 Support
+
+Java 18 has arrived, and with it the following features and changes:
+
+* link:https://openjdk.java.net/jeps/400[UTF-8 by Default]
+* link:https://openjdk.java.net/jeps/408[Simple Web Server]
+* link:https://openjdk.java.net/jeps/413[Code Snippets in Java API Documentation]
+* link:https://openjdk.java.net/jeps/416[Reimplement Core Reflection with Method Handles]
+* link:https://openjdk.java.net/jeps/417[Vector API (Third Incubator)]
+* link:https://openjdk.java.net/jeps/418[Internet-Address Resolution SPI]
+* link:https://openjdk.java.net/jeps/419[Foreign Function & Memory API (Second Incubator)]
+* link:https://openjdk.java.net/jeps/420[Pattern Matching for switch (Second Preview)]
+* link:https://openjdk.java.net/jeps/421[Deprecate Finalization for Removal]
+
+[NOTE] 
+====
+Java Security support has been removed with Java 18+ in Liberty.  If "websphere.java.security" is set in `bootstrapping.properties`, it will produce the following error in the log:
+```
+CWWKE0955E: Java Security was requested in bootstrapping.properties while using JDK "18", however this option is no longer valid when using Java 18 and later.
+```
+====
+
+To use Java 18 with Liberty, link:https://jdk.java.net/18/[download] the general availibility release, <<run, install 22.0.0.4>> version of Open Liberty, and edit your Liberty server's link:{url-prefix}/docs/latest/reference/config/server-configuration-overview.html#server-env[server.env file] to point `JAVA_HOME` to your Java 18 installation.
+
+For more information on Java 18, please visit the Java 18 link:https://jdk.java.net/18/release-notes[release notes page], link:https://download.java.net/java/early_access/jdk18/docs/api/[API Javadoc page] or link:https://jdk.java.net/18/[download page].
+For more information on Open Liberty, please visit our link:{url-prefix}/docs[documentation page].
+
+[#certificate]
+== Support client certificates with urlencoded strings
+
+An X.509 certificate is a digital certificate that is used to manage identity and security in internet communications and computer networking.
+
+Intermediate servers, such as a web server, proxy server, or load balancer can send X.509 certificates to Open Liberty servers. Due to the deprecation of long lines folding in the `HTTP` header continuation, some open source intermediate servers might send a client certificate in the Privacy-Enhanced Mail (`PEM`) url-encoded format.
+
+Open Liberty 22.0.0.4 adds the ability to auto detect and process this new format.
+
+An example of a truncated url-encoded certificate sent to application server:app-name:
+
+[source, no_copy]
+----
+[-----BEGIN%20CERTIFICATE-----%0AMIIDODCCAiCgAwIBAgIIHbO76YfCH1cwDQYJKoZIhvcNAQELBQAw
+OjELMAkGA1UE%0ABhMCVVMxDDAKBgNVBAoTA0lCTTEMMAoGA1UECxMDVFdTMQ8wDQYDVQQDEwZDbGll%0AbnQ
+wHhcNMTUxMTAzMTYyODM1WhcNMzUxMDMwMTYyODM1WjA6MQswCQYDVQQGEwJV%0AUzEMMAoGA1UEChMDSUJNM
+QwwCgYDVQQLEwNUV1MxDz%2F%2Bpo%2FF%2Bzi%2F0sfAUwRdfgMm%2FAKAGzwMQufOYeKCgMULtq14QAJQnL
+mq4M%2FM00%0AC5QyeYtdaTou%2BMsLmoa1tkq2VSDVxAcktJyRSRsox36G7EHDLV4U2gtR6xczNEjw%0A2%2
+Bsj772FjdAMXRSR%0A-----END%20CERTIFICATE-----%0A]
+----
+
+Note: 
+
+* (1) The header (i.e BEGIN ) and footer (i.e END) information are appended before sending to application server.
+* (2) The encoded character (i.e %) presents in the certificate.
+
+Prior to Open Liberty 22.0.0.4, this new url-encoded certificate was not supported. Any request with this new format was rejected and the request terminated.
+
+For more information, check out the link:https://github.com/OpenLiberty/open-liberty/issues/11680[GitHub issue] for this new feature.
+
+[#CVEs]
+== Security vulnerability (CVE) fixes in this release
+
+There are no security vulnerability fixes in Open Liberty 22.0.0.4.
+
+For a list of past security vulnerability fixes, reference the link:{url-prefix}/docs/latest/security-vulnerabilities.html[Security vulnerability (CVE) list].
+
+[#bugs]
+== Notable bugs fixed in this release
+
+We’ve spent some time fixing bugs. The following sections describe just some of the issues resolved in this release. If you’re interested, here’s the  link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A22004+label%3A%22release+bug%22[full list of bugs fixed in 22.0.0.4].
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/20310[Rebuild OpenAPI UI to fix CSS links in OpenAPI UI]
++
+In 22.0.0.3, the OpenAPI CSS links in the html files which didn't match with the actual CSS file names. This resulted in OpenAPI UI having no styling. This issue has now been resolved and the page displays correctly.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/20441[Timing window where cancellation of scheduled task is ignored]
++
+There was a brief timing window between the completion (or skip) of a `ManagedScheduledExecutorService` task execution and the scheduling of the next execution where a cancel that is issued can be overwritten and ignored. Due to this issue, you might have intermittently seen subsequent executions of a scheduled task be attempted even though the application had requested to cancel the task. This issue was caused by code that was using `AtomicReference.set` rather than `AtomicReference.compareAndSet` in order to take into account the possibility of an intermediate state change. This issue has been resolved, and the scheduled task should now stop attempting subsequent executions after it is canceled.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/19627[MP JWT 1.2 fails to load all relevant MP Config properties]
++
+Previously, the `mpJwt-1.2` feature might have failed to load MP Config properties related to MicroProfile JWT 1.2. The MP JWT feature uses an `OSGi` service (`MpConfigProxyService`) to load MP Config properties related to the feature. There are currently implementation classes for two versions of that service - 1.1 and 1.2 - that load the MP Config properties specific to each respective MP JWT release. It was possible for the 1.1 version of the service to be activated and set as the service to use in the `MicroProfileJwtTAI` class before the 1.2 version of the service is activated. That caused the MP JWT feature to ignore any MP Config properties specific to MP JWT 1.2. This has now been fixed meaning that the MP Config properties for the MP JWT feature version in use is now loaded correctly.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/18177[Liberty OP configured with SAML IdP, logout at OP is not propagated to the IdP]
++
+We have configured our ELM applications (RP) with Liberty OP which is further delegated to a SAML IDP.
+In this case we had issues with application logout which were solved by adding the attribute `spLogout="true"` in the `samlWebSso20` configuration. To achieve SSO between our applications configured with Liberty OP and other applications configured with the SAML IDP we set the value `forceAuthn="false"` within the `samlWebSso20` config.
+When we set `forceAuthn="false"` the SSO between Liberty OP and Other applications connected to SAML IDP worked, but then the `Logout` would not. We have now resolved this issue and now `Logout` should work with `forceAuthn="false"` parameter.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/19937[context-root for web-ext is no longer honored with WLP 22.0.0.1]
++
+Specifying the the context-root in a web-ext element, e.g:
++
+[source, xml]
+----
+<web-ext id="namehere" moduleName="namehere" context-root="/" />
+----
++
+was ignored starting with the 22.0.0.1 release.
+The context root for the app in the above example becomes `/namehere` instead of `/`.
+This issue was caused by the new code only looking for module info in the non-persistent cache when the parent overlay is not `null`.
++
+This issue is now resolved.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/20247[webContainer property skipMetaInfResourcesProcessing=true can cause NullPointerException in JSP taglib]
++
+In Liberty, if `webContainer` property `skipMetaInfResourcesProcessing` is `true`, and a `JSP` references a taglib with a path under `WEB-INF`, it could cause a `NullPointerException` on the call to the `JSP` resulting in just the message `Error 500: java.lang.NullPointerException`. The error in `messages.log` was as follows:
++
+[source, no_copy]
+----
+java.lang.NullPointerException
+at java.base/java.io.File.(File.java:278)
+at com.ibm.ws.jsp.webcontainerext.JspDependent.isOutdated(JspDependent.java:84)
+at com.ibm.ws.jsp.webcontainerext.JspDependent.toString(JspDependent.java:129)
+at java.base/java.text.MessageFormat.subformat(MessageFormat.java:1302)
+at java.base/java.text.MessageFormat.format(MessageFormat.java:885)
+at java.base/java.text.Format.format(Format.java:158)
+at java.base/java.text.MessageFormat.format(MessageFormat.java:860)
+at com.ibm.ws.logging.internal.impl.BaseTraceFormatter.formatMessage(BaseTraceFormatter.java:301)
+at com.ibm.ws.logging.internal.impl.BaseTraceFormatter.formatVerboseMessage(BaseTraceFormatter.java:373)
+at com.ibm.ws.logging.internal.impl.BaseTraceService.publishTraceLogRecord(BaseTraceService.java:1072)
+at com.ibm.ws.logging.internal.impl.BaseTraceService.publishLogRecord(BaseTraceService.java:1043)
+at com.ibm.ws.logging.internal.impl.BaseTraceService$2.publish(BaseTraceService.java:285)
+at java.logging/java.util.logging.Logger.log(Logger.java:979)
+at com.ibm.ws.logging.internal.WsLogger.log(WsLogger.java:138)
+at com.ibm.ws.logging.internal.WsLogger.logp(WsLogger.java:336)
+at com.ibm.ws.logging.internal.WsLogger.exiting(WsLogger.java:465)
+at com.ibm.ws.jsp.webcontainerext.JspDependent.(JspDependent.java:58)
+at com.ibm.ws.jsp.webcontainerext.AbstractJSPExtensionServletWrapper.loadClassInformation(AbstractJSPExtensionServletWrapper.java:233)
+at com.ibm.ws.jsp.webcontainerext.AbstractJSPExtensionServletWrapper.handleRequest(AbstractJSPExtensionServletWrapper.java:214)
+at com.ibm.ws.webcontainer.filter.WebAppFilterManager.invokeFilters(WebAppFilterManager.java:1227)
+at com.ibm.ws.webcontainer.webapp.WebApp.handleRequest(WebApp.java:5049)
+... 20 more
+----
++
+We've fixed this issue so that the `JSP` now returns to the client without a `NPE` even in file not found situations.
+
+[#guides]
+== New and updated guides since the previous release
+As Open Liberty features and functionality continue to grow, we continue to add link:https://openliberty.io/guides/?search=new&key=tag[new guides to openliberty.io] on those topics to make their adoption as easy as possible.  Since our last release, we've added the following two guides:
+
+* link:{url-prefix}/guides/openliberty-operator-intro.html[Deploying a microservice to Kubernetes by using Open Liberty Operator]
+** Explore how to deploy a microservice to Kubernetes by using Open Liberty Operator.
+* link:{url-prefix}/guides/openliberty-operator-openshift.html[Deploying a microservice to OpenShift 4 by using Open Liberty Operator]
+** Explore how to deploy a microservice to Red Hat OpenShift 4 by using Open Liberty Operator.
+
+Existing guides also receive updates in order to address any reported bugs/issues, keep their content current, and expand what their topic covers.  Since our last release, we've updated the majority of the guides to align with MicroProfile 5 and Jakarta EE 9.  Furthermore, our cloud hosted versions of the guides have also received various improvements.  For further information on these updates, refer to the link:{url-prefix}/blog/2022/04/12/guides-updated-mp5-jakartaee9.html[Learn MicroProfile 5.0 and Jakarta EE 9.1 from our newly enhanced cloud-hosted guides] blog post.
+
+== Get Open Liberty 22.0.0.4 now
+
+Available through <<run,Maven, Gradle, Docker, and as a downloadable archive>>.
