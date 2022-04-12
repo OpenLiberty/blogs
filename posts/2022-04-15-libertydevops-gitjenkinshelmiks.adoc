@@ -142,46 +142,27 @@ image::/img/blog/jenkins-cred-binding-and-corresponding-param.png[Pipeline crede
 
 There are multiple options/tools to trigger the application deployment into Kubernetes from Jenkins (CLI, Helm, Travis CI, Circle CI etc). We will consider command line (CLI) option here.
 
+Create a new stage in the above given sample pipeline code and write all the required commands between the shell option (sample commands give below)
+                   sh '''
+
+                   '''
+
 -> Maintain all the kubernetes configuration files in the same code repository (you can choose a different repository as well for this) 
 
-image::/img/blog/kubernetes-configuration-files-in-github.png[Kubernetes configuration files in github,width=30%,align="center"]
+image::/img/blog/kubernetes-configuration-files-in-github.png[Kubernetes configuration files in github,width=50%,align="center"]
 
 -> Sample kubernetes deployment file
 
-image::/img/blog/sample-k8s-app-deployment-file.png[Sample kubernetes deployment configuration files in github,width=30%,align="center"]
+image::/img/blog/sample-k8s-app-deployment-file.png[Sample kubernetes deployment configuration files in github,width=40%,align="center"]
 
+ -> Set the kubernetes context as per the requirement, for example, if we need to deploy into development cluster, then the context should be set to development cluster, for deployment into QA environment, set it into QA context ( this context setting is depending on the design of the cluster)
 
-Helm is a good option to facilitate the application deployment on the cloud platform, it eases deployment/maintenance steps. But we can do the application deployment on kubernetes using CLI commands directly from Jenkins shell or pipeline stages. 
-
-=== CLI Deployment
-When a Docker image is generated and saved on a repositories like K8s/OCP registry, IBM cloud remote registry, artifactory etc, then the docker deployment is very straightforward using kubernetes CLI commands. Either you can generate new image tag on every docker build and update this new name/tag on the deployment yaml file on GitHub (using git push) or you can depend on a single image name/tag for a particular feature release and change it to new on every subsequent release (This change can be done only on the current jenkins workspace file as well if not required to save the information on the github for reference purpose, also if multiple repositories are used for code and container configurations, this push method is helpful).  
-
-As explained in the earlier section, after the kubernetes context is set to the required environment, run the kubectl commands to deploy and components like deployments, services, route, serviceaccount, secrets etc. The yaml files should be already available in the current Jenkins workspace downloaded as explained in the earlier stage (if code and container are part of same repository).   
+Sample commands: 
+ ibmcloud ks cluster config --cluster <cluster name or id> 
+ kubectl config current-context
+ kubectl create -f deployment.yaml ( simple k8s deployment command )
 
 link:https://kubernetes.io/docs/reference/kubectl/cheatsheet/[Kubernetes sample commands] 
-
-=== Helm deployment
-In this stage, we are ready to start the application deployment using Helm link:https://helm.sh/docs/helm/helm/[Helm]. Helm is already available from jenkins server (or on any attached jenkins slave - if we are using virtual machine as the slave, make sure helm is installed on that server and available for all users, if containerized slave are used, make sure the helm installation is done through the dockerfile of the attached image to the slave)
-
-All the deployment related configirations, like, Pod, deployment, service should be completed and checked into github prior to appliction deployment trigger in the helm chart directory link:https://helm.sh/docs/helm/helm_create/[Helm create]
-
-Run the "helm install" or "helm upgrade" from Jenkins shell or pipeline code to create the resources in the kubernetes cluster. Maintain all the helm resources in a separate folder in the git repository and make the modifications as per the requirement.
-
-The name of the new docker image generated on the docker build can be updated on the helm file on run time (if you are adopting to this run time image name change strategy), you can use the "Git Push Plugin" for this purpose on Jenkins. 
-
-Some helpful cli commands for using in Jenkins are given below
-
-* ibmcloud plugin install container-service
-* ibmcloud config --check-version=false
-* ibmcloud ks cluster config --cluster <ibm cloud cluster id>
-* helm uninstall <release name> -n <namespace>
-* helm install <release name> . --namespace <namespace>
-
-link:https://phoenixnap.com/kb/helm-commands-cheat-sheet[Helm commands]
-
-Use the kubectl commands to  check the status of deployment or go to the kubernetes dashboard and check the status of the deployment
-
-image::/img/blog/K8S-dashboard.png[Kubernetes dashboard example ,width=70%,align="center"]
 
 == QA testing options
 Apart from running JUnit test cases along with the code build phase, we can configure jenkins and deployment configurations to trigger the funtional/integration QA test cases automatically after the deployment in each environment. 
