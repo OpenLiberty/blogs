@@ -82,7 +82,7 @@ Basic additional tools required on CI/CD pipeline apart from Jenkins are
     
 == Jenkins pipeline scripting introduction
 
-Its recommended to adhere to the concept of infrastructure as a code (IaaC) in DevOps pipeline, pipeline scripting based jenkins jobs are a good example of this (you can use maven or freestyle jenkins jobs as well for the pipeline setup). You can use any 3 style of jenkins job setup shown below.
+It's recommended to adhere to the concept of infrastructure as a code (IaaC) in DevOps pipeline, pipeline scripting based jenkins jobs are a good example of this (you can use maven or freestyle jenkins jobs as well for the pipeline setup). You can use any 3 style of jenkins job setup shown below.
 
 Writing pipeline code directly in Jenkins (need to take the backup of this jenkins instance to secure the code)
 
@@ -96,16 +96,38 @@ Writing pipeline code on Jenkinsfile in git on different environments and mappin
 
 image::/img/blog/multiple-branch-pipeline-jenkinsview-with-corresponding-gitview.png[Multi branch pipeline setup and corresponding git view,width=60%,align="left"]
 
-
-
-Create the code build jobs in Jenkins, for adhering to the concept of infrastructure as a code (IaaC), use pipeline or multibranch pipeline type jenkins job for the CI/CD process. Only CLI commands can be used in pipeline code, on the other side, free style and maven type job have the advantage of UI based configuration.
+Only CLI commands can be used in pipeline code, on the other side, free style and maven type job have the advantage of UI based configuration.
 Pipeline code syntax can be found at link:https://www.jenkins.io/doc/pipeline/tour/hello-world/[pipeline syntax]. On jenkins, use this page to generate pipeline code link:http://localhost:8080/job/pipeline_test/pipeline-syntax/[Jenkins] (sample page).
 
-Pipeline code can be directly written on jenkins job or saved on Jenkinsfile in github and map the same onto the newly created jenkins pipeline type job. For using multi branch pipeline job, the plugin "Multibranch Scan Webhook Trigger" need to be installed on jenkins which will help to trigger the mapped jenkins on any change on github code.
+== Code build, packaging and Docker image
 
-Create multiple stages in pipeline code for source code (SCM) checkout, code build, security scan and helm command execution etc. Jenkins job can be executed on jenkins master itself or on containerized slave (setup done using kubernetes pod template) or on virtual servers. The selection of this execution environment are based on the size of the application.
+You are now ready for testing code build, packaging and generating docker image and push it to any remote docker repository. Remote docker repository is not required if your containerization application is providing the facility of local docker respository(like RedHat OpenShift )
 
-== Code build, packaging and security scan 
+A sample pipeline code for performing code build, packaging and generating docker image and pushing the same to remote docker repository is given below. You can use it by modifying the parameter section (<>)
+
+ pipeline {
+     agent any
+     stages {
+       stage('Build') {
+           steps {
+                checkout([$class: 'GitSCM', branches: [[name: '*/main']], extensions: [], userRemoteConfigs: [[credentialsId: ‘<git token>, url: 'https://github.com/liberty/app.git']]])
+		configFileProvider([configFile('<settings_file.xml>’)]) {
+                          sh '''
+                                 mvn -U package
+                                 docker login <remote-docker-image-repository-url> -u "${USERNAME}" -p “${PASSWORD}”
+				  docker tag liberty-$<code identifier>:$<docker image version> <remote-docker-image-repository-url>/<docker-repo-name>/liberty-$<code identifier>:$<docker image version>
+ 				  docker push <remote-docker-image-repository-url>/<docker-repo-name>/liberty-$<code identifier>:$<docker image version>
+
+                           '''   
+                   }}}}}
+
+
+Following are the parameter used in this example code
+
+* git token: Generate the personal access token from github and paste the same at this location
+* settings_file.xml: If you are using special proxy settings files to resolve the dependencies from any private maven repository, you can upload the same to config files page in jenkins and provide the same of the same at this location. Alternatively you can upload the settings file as secure credential files as well. Maven settings file can be generated from link:http://localhost:8080/configfiles/addConfig[generate maven settings file] or use turorials like link:https://www.baeldung.com/maven-settings-xml[generate maven settings file] to generate it
+* remote-docker-image-repository-url : Docker image registry/repository url
+
 
 You can now ready to start writing the actual code which does everything from code build, application deployment artifact packaging, vulnerability scanning and initiating the application deployment. 
 
