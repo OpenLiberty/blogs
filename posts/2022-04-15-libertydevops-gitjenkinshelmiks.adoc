@@ -33,6 +33,33 @@ In this blog i will give you a high level overview of using jenkins as a "Code b
 
 This blog explain the steps to deploy the application on Kubernetes, i am using IBM cloud kubernetes service for deployment, but same steps can be used to work with any other kubernetes service except connectivity commands to IBM cloud. 
 
+Docker and Kubernetes knowledge is mandatory to understand the details given in this blog. 
+
+The standard Dockerfile which you use in general will not be enough to do the Liberty application deployment on containerized environment, a sample OpenLiberty compliant Dockerfile snipped in given below, please configure it as per your requirement
+
+  FROM icr.io/appcafe/open-liberty:kernel-slim-java8-openj9-ubi
+  # Add Liberty server configuration including all necessary features
+COPY --chown=1001:0  server.xml /config/
+# Modify feature repository (optional)
+# A sample is in the 'Getting Required Features' section below
+COPY --chown=1001:0 featureUtility.properties /opt/ol/wlp/etc/
+# This script will add the requested XML snippets to enable Liberty features and grow image to be fit-for-purpose using featureUtility. 
+# Only available in 'kernel-slim'. The 'full' tag already includes all features for convenience.
+RUN features.sh
+# Add interim fixes (optional)
+#COPY --chown=1001:0  interim-fixes /opt/ol/fixes/
+.
+.
+.
+.
+RUN cp <open-liberty-application>.war /config/dropins/
+RUN chmod 755 /config/dropins/<open-liberty-application>.war
+RUN chown 1001:0 /config/dropins/<open-liberty-application>.war
+WORKDIR /
+# This script will add the requested server configurations, apply any interim fixes and populate caches to optimize runtime
+RUN configure.sh
+
+
 === Installing and configuring jenkins and additional tools ===
 
 Install *jenkins* with all the recommended plugins link:https://www.jenkins.io/doc/book/installing/[install Jenkins], make sure that the following plugins are installed. You can install jenkins on any physical/virtual servers or it can be running as a container on Kubernetes itself.
