@@ -25,9 +25,9 @@ These steps are to be completed by the author of the blog post.
 
      Create a normal issue. In the title, make clear that it's for the beta release and which release version.
 
-2. Clone the repo and create a branch off the default `prod` branch. Be sure to clone using SSH (`git clone git@github.com:OpenLiberty/blogs.git`), not HTTPS, or you won't be able to push to the repo in GitHub. From the `prod` branch, run: `git checkout -b branch_name`, where `branch_name` is a name you give your new branch.
+2. Clone the repo and create a branch off the default `prod` branch. From the `prod` branch, run: `git checkout -b branch_name`, where `branch_name` is a name you give your new branch.
 
-    Do _all_ your editing in this branch so that the blog editors can make any necessary edits directly in the branch before publishing your post. You'll push this branch directly to the shared repo (not a fork) in a later step.
+    Do _all_ your editing in this branch so that the blog editors can make any necessary edits directly in the branch before publishing your post.
 
 3. Create your blog post using [Asciidoc](https://asciidoctor.org/docs/asciidoc-syntax-quick-reference/) markup (use an editor such as [VSCode with the Asciidoc plugin](https://marketplace.visualstudio.com/items?itemName=joaompinto.asciidoctor-vscode)):
 
