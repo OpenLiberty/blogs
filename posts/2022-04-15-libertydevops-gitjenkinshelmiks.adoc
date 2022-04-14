@@ -157,11 +157,9 @@ image::/img/blog/multiple-branch-pipeline-gitview.png[Multi branch pipeline setu
 Only CLI commands can be used in pipeline code, on the other side, free style and maven type job have the advantage of UI based configuration.
 Pipeline code syntax can be found at link:https://www.jenkins.io/doc/pipeline/tour/hello-world/[pipeline syntax]. On jenkins, use this page to generate pipeline code link:http://localhost:8080/job/pipeline_test/pipeline-syntax/[Jenkins] (sample page).
 
-== Code build, packaging and Docker image
+== Building the Liberty Java code, packaging and generating Docker image
 
-You are now ready for testing code build, packaging and generating docker image and push it to any remote docker repository. Remote docker repository is not required if your containerization application is providing the facility of local docker repository(like RedHat OpenShift )
-
-A sample pipeline code for performing code build, packaging and generating docker image and pushing the same to remote docker repository is given below. You can use it by modifying the parameter section (<>)
+Below given sample pipeline code can perform the code build, packaging and generating docker image and pushing the same to remote docker hub. You can use it by modifying the parameter section (<>)
 
  pipeline {
      agent any
@@ -169,30 +167,27 @@ A sample pipeline code for performing code build, packaging and generating docke
        stage('Build') {
            steps {
                 checkout([$class: 'GitSCM', branches: [[name: '*/main']], extensions: [], userRemoteConfigs: [[credentialsId: ‘<git token>, url: 'https://github.com/liberty/app.git']]])
-		configFileProvider([configFile('<settings_file.xml>’)]) {
-                          sh '''
-                                 mvn -U package
-                                 docker login <remote-docker-image-repository-url> -u "${USERNAME}" -p “${PASSWORD}”
-				  docker tag liberty-$<code identifier>:$<docker image version> <remote-docker-image-repository-url>/<docker-repo-name>/liberty-$<code identifier>:$<docker image version>
- 				  docker push <remote-docker-image-repository-url>/<docker-repo-name>/liberty-$<code identifier>:$<docker image version>
 
-                           '''   
-                   }}}}}
+                    sh '''
+                            mvn -U package
+                            docker login <remote-docker-image-repository-url> -u "${USERNAME}" -p “${PASSWORD}”
+            docker tag liberty-$<code identifier>:$<docker image version> <remote-docker-image-repository-url>/<docker-repo-name>/liberty-$<code identifier>:$<docker image version>
+            docker push <remote-docker-image-repository-url>/<docker-repo-name>/liberty-$<code identifier>:$<docker image version>
+
+                    '''   
+                   }}}}
 
 
 Following are the parameter used in this example code
 
-* git token: Generate the personal access token from github and paste the same at this location
-* settings_file.xml: If you are using special proxy settings files to resolve the dependencies from any private maven repository, you can upload the same to config files page in jenkins and provide the same of the same at this location. Alternatively you can upload the settings file as secure credential files as well. Maven settings file can be generated from link:http://localhost:8080/configfiles/addConfig[generate maven settings file] or use turorials like link:https://www.baeldung.com/maven-settings-xml[generate maven settings file] to generate it
-* remote-docker-image-repository-url : Docker image registry/repository url
-* USERNAME/PASSWWORD: user name and password to connect to docker registry, this can be saved securely as jenkins cedentials and do the binding of the same to the pipeline job created.
+* git token: Personal access token generated from github.
+* remote-docker-image-repository-url : Docker hub repository url.
+* USERNAME/PASSWWORD: user name and password to connect to docker registry.
 
 image::/img/blog/jenkins-cred-binding-and-corresponding-param.png[Pipeline credential binding and corresponding param,width=30%,align="center"]
 
 * code identifier: This is optional, a unique docker image identifier
-* docker image version: docker image version number, a unique identifier
-
-*important:* There are 2 ways to package the docker image, with or without embedding application code in the docker image. Downloading the code into container at runtime (in entrypoint file) will secure the application code if docker image repository is compromised.    
+* docker image version: docker image version number, a unique identifier   
 
 *Security scan* For static code analysis, we can use SonarQube community edition. Install sonarqube server by either using file startup type from cli downloading the package in link:https://www.sonarqube.org/success-download-community-edition/[SonarQube server install package] or use docker way as explained in link:https://docs.sonarqube.org/latest/setup/get-started-2-minutes/[Sonarqube server install steps]. SonarQube jenkins client setup details are given in this page link:https://docs.sonarqube.org/latest/analysis/scan/sonarscanner-for-jenkins/[SonarQube client for jenkins]. Features like quality gate on sonarqube can be used to fail the code build in case of not satisfying the required code quality and coverage. Maven build command can be integrated with scan related CLI commands or these can be done on a different pipeline stage. Detailed steps to perform security scan will be available in another blog
 
