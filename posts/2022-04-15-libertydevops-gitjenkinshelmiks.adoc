@@ -198,44 +198,31 @@ For Docker image scan, you can use link:https://hub.docker.com/r/aquasec/trivy/[
 
 == Deployment (CLI) 
 
-There are multiple options/tools to trigger the application deployment into Kubernetes from Jenkins (CLI, Helm, Travis CI, Circle CI etc). We will consider only command line (CLI) option here.
+For simplicity, I will use the command line (CLI) option to configure Jenkins to deploy a Liberty application to Kubernetes. You could use one of many tools though, such as Helm, Travis CI, Circle CI, etc.
 
-Create a new stage in the above given sample pipeline code and write all the required commands between the shell option (sample commands give below)
+Create a new stage in the pipeline code and write all the required commands between the shell option (sample commands give below)
                            
                            sh '''
-                               --> command to connect to IBM cloud (if you are using IKS)
-                               --> command to connect to dev/qa/prod cluster
-                               --> kubeclt commands to deploy, create service, route etc
-                               --> any other commands  
+                              ibmcloud ks cluster config --cluster $CLUSTER-ID
+                              kubectl config current-context
+                              kubectl create -f deploy/deployment.yaml #( simple k8s deployment command )
+                              kubectl create -f deploy/service.yaml #( simple k8s deployment command )
+                              kubectl create -f deploy/route.yaml #( simple k8s deployment command )
                               '''
 
--> Maintain all the kubernetes configuration files in the same code repository (you can choose a different repository as well for this) 
+Maintain all the kubernetes configuration files in the same code repository (under a folder called "deploy") 
 
-image::/img/blog/kubernetes-configuration-files-in-github.png[Kubernetes configuration files in github,width=50%,align="center"]
-
--> Sample kubernetes deployment file
-
-image::/img/blog/sample-k8s-app-deployment-file.png[Sample kubernetes deployment configuration files in github,width=40%,align="center"]
-
-When code checkout is done for code build into Jenkins, all these  kubernetes configurations files will be downloaded to jenkins workspace, you can run the required IBM cloud/k8s commands to connect to the kubernetes cluster and deploy the application. 
+When Jenkins has checked out the Liberty Java application code for the code build, all the Kubernetes configuration files are also downloaded to the Jenkins workspace so that Jenkins can run the IBM Cloud and Kubernetes commands to connect to the Kubernetes cluster and deploy the application.
 
  -> Set the kubernetes context as per the requirement, for example, if we need to deploy into development cluster, 
  then the context should be set to development cluster, for deployment into QA environment, 
  set it into QA context ( this context setting is depending on the design of the cluster)
 
-Sample commands: 
-
-* ibmcloud ks cluster config --cluster <cluster name or id>
-* kubectl config current-context
-* kubectl create -f deployment.yaml ( simple k8s deployment command )
-* kubectl create -f service.yaml ( simple k8s deployment command )
-* kubectl create -f route.yaml ( simple k8s deployment command )
-
 All the other required application deployment commands are available in this kubernetes command page which is very straightforward
 link:https://kubernetes.io/docs/reference/kubectl/cheatsheet/[Kubernetes sample commands] 
 
 == QA testing options
-Apart from running JUnit test cases along with the code build phase, we can configure jenkins and deployment configurations to trigger the functional/integration QA test cases automatically after the deployment in each environment. 
+Apart from running JUnit test cases along with the code build phase, Jenkins can trigger functional and integration QA test cases automatically after deploying the Liberty application.
 
 Configure the test cases on jenkins job and test it manually. Create an "Authentication Token" in "Trigger builds remotely" section under "Build Triggers". Trigger this test case from docker "entrypoint" file using remote rest api call using this authentication token as the identifier
 
@@ -254,17 +241,12 @@ For persistence of logs and usage stats, there are sevaral applications availabl
 
 These tools are deployed in kubernetes cluster itself where the application is running and exposed using route and access the gathered details from UI.
 
-* OpenSource :
-
     -> https://grafana.com/oss/loki/
     -> https://medium.com/nerd-for-tech/logging-at-scale-in-kubernetes-using-grafana-loki-3bb2eb0c0872
     -> https://prometheus.io
     -> https://k21academy.com/docker-kubernetes/prometheus-grafana-monitoring/
 
-* Enterprise :
 
-    -> https://www.splunk.com/en_us/blog/platform/deploy-splunk-enterprise-on-kubernetes-splunk-connect-for-kubernetes-and-splunk-insights-for-containers-beta-part-1.html
-    -> https://www.dynatrace.com/support/help/setup-and-configuration/setup-on-container-platforms/kubernetes
 
 == Conclusion
-DevOps is a vast ocean and hence i cannot include all details in one blog. Above given details will defenitely help you to get an idea of Jenkins based devops pipeline and will help you to setup a simple pipeline following the steps and explanations. Detailed implementatio of involved components will be covered in a separate blog  
+There are many ways in which you can configure your DevOps pipeline. This blog post is a quick introduction to how you can use Jenkins to set up a simple CI/CD pipeline to build and deploy your Liberty Java applications.
