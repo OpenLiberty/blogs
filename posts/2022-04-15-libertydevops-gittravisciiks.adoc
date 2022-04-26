@@ -1,6 +1,6 @@
 ---
 layout: post
-title: "Continuous integration and delivery (CI/CD) of Open Liberty applications to Kubernetes using Travis CI"
+title: "Continuous integration and delivery (CI/CD) of Open Liberty applications to OpenShift using Travis CI"
 categories: blog
 author_picture: https://avatars3.githubusercontent.com/shamjithantholi
 author_github: https://github.com/shamjithantholi
@@ -9,7 +9,7 @@ seo-description: DESCRIPTION
 blog_description: "A high level explanation about how to build a devops pipeline with Travis CI. "
 open-graph-image: https://openliberty.io/img/twitter_card.jpg
 ---
-= Continuous integration and delivery (CI/CD) of Open Liberty applications to Kubernetes using Travis CI
+= Continuous integration and delivery (CI/CD) of Open Liberty applications to OpenShift using Travis CI
 Shamjith Antholi https://github.com/shamjithantholi
 :imagesdir: /
 :url-prefix:
@@ -17,25 +17,25 @@ Shamjith Antholi https://github.com/shamjithantholi
 
 [#Intro]
 == What is DevOps
-DevOps is a culture or a process which enables the integration of the software development (dev) and IT operations (ops) which will facilitate the setup of deployment pipeline as well as helps to improve the speed of software delivery. Automation of the entire build, test and deployment of the software applications can be achieved through DevOps process. There are tons of efficient applications and process methodologies available in the market which can be readily integrated to the DevOps pipeline which will help to achieve the desired results. 
+DevOps is a culture or a process, which enables the integration of the software development (dev) and IT operations (ops). It can facilitate the setup of deployment pipeline and helps to improve the speed of software delivery. Automation of the entire build, test, and deployment of the software applications can be achieved through DevOps process. There are tons of efficient applications and process methodologies available in the market that can be readily integrated to the DevOps pipeline, which can help to achieve the wanted results.
 
 == CI/CD and Travis CI
-CI/CD are acronym's for contineous integration and contineous delivery/deployment used in DevOps. Contineous integration is a process where developers frequently merge code changes into a source code  repository which automatically start code build, security scan and test execution and deployment. Automation of this process enables organizations to release on a more frequent basis without compromising on quality.
+CI/CD are acronym’s for continuous integration, and continuous delivery or deployment used in DevOps. Continuous integration is a process where developers frequently merge code changes into a source code repository, which automatically start code build, security scan, and test execution and deployment. Automation of this process enables organizations to release on a more frequent basis without compromising on quality.
 
 Travis CI is a contienous integration service use to build and test the code. Travis CI works with various Git flavors ( eg: GitHub, Bitbucket).
 
-Open Liberty is a lightweight Java runtime for building cloud-native applications and microservices. In this blog, we'll discuss how you can use jenkins in CI/CD pipeline for java based openliberty application build/test/deployment link:https://openliberty.io[OpenLiberty] 
+OpenShift is a containerization platform from RedHat. Contiainer orchastration in OpenShift are managed by Kubernetes and its build around linux containers.
+
+Open Liberty is a lightweight Java runtime for building cloud-native applications and microservices. In this blog, it details how you can use Jenkins in CI/CD pipeline for Java based Openliberty application build/test/deployment Openliberty link:https://openliberty.io[OpenLiberty] .
 
 == Getting ready
 Below given is a generic architecture of a simple one dimensional devops pipeline (single environment view).
 
 image::/img/blog/liberty-devops-generic-architecture.png[Liberty devops generic architecture diagram ,width=70%,align="center"]
 
-In this blog i will give you a high level overview of using travis CI as a "code build tool" (with sample codes and required explanations), how you can connect with IBM cloud kubernetes service, docker image generation, scan the source code and opensource jar files, save the image to dockerhub repository and initiate the kubernetes deployment. Detailed explanation of technologies used in this blog, tool installation, complex devops pipeline design details of multi-environment application deployment are not in the scope of this blog. 
+In this blog i will give you a high level overview of using travis CI as a "code build tool" (with sample codes and required explanations), how you can setup Projects on OpenShift, how you can connect with OpenShift and perform the application deployment, docker registry concepts, security scanning, unit and functional testing with Travis etc. Detailed explanation of technologies used in this blog, tool installation, complex devops pipeline design details of multi-environment application deployment are not in the scope of this blog. 
 
-This blog explain the steps to deploy to IBM cloud kubernetes service for deployment (also added IBM cloud connectivity commands), but same steps explained will work for deployment on any other kubernetes service. 
-
-Basic understanding of git, Docker, Kubernetes are a prerequisite for this blog.
+Basic understanding of git, Docker and containerization concepts are a prerequisite for this blog.
 
 The standard Dockerfile which you use in general will not be enough to do the Liberty application deployment on containerized environment, a sample OpenLiberty compliant Dockerfile snipped in given below, please configure it as per your requirement
 
@@ -76,7 +76,6 @@ image::/img/blog/travis-integrated-gitrepo.png[Travis CI - Github integration ,w
      --> Activate the required project as shown in the above screenshot
 
 
-
 *Additional tools*
 
 Basic additional tools required on CI/CD pipeline apart from Jenkins are 
@@ -85,20 +84,6 @@ Basic additional tools required on CI/CD pipeline apart from Jenkins are
 
      Provision a public or private github repository (github.com) and checkin your code into it. 
      Create any branching strategy of your choice (example: develop --> qa --> develop branch hierarchy). More details about branch are available here "https://www.atlassian.com/git/tutorials/comparing-workflows/gitflow-workflow" 
-
-* A credential store application like harshicorp vault (optional)
-
-     Your credentials (like dockerhub credentials, artifactory api credentials, IKS api token, github personal access 
-     token etc) can be securely saved within Jenkins itself on the page,  
-     "http://localhost:8080/credentials/store/system/domain/_/newCredentials++". 
-     Consider using external credential store application like vault for better security
-
-* Maven repository and Docker image repository, like artifactory (optional)
-
-     Create an IBM cloud image registry if required by following the steps in 
-     "https://cloud.ibm.com/docs/Registry?topic=Registry-getting-started" for pushing the docker images created for 
-     deployment. You can use public docker hub registry as well for this.Artifactory is another popular software 
-     in the market for this "https://www.jfrog.com/confluence/display/JFROG/Getting+Started+with+Artifactory+as+a+Docker+Registry"
 
 * Vulnerability scanning tools, like Aqua, Trivy, NexusIQ, Sonarqube (optional)
 
@@ -114,10 +99,10 @@ Basic additional tools required on CI/CD pipeline apart from Jenkins are
       Softwares like Aqua (docker image scan - "https://www.aquasec.com") and Aqua trivy ("https://www.aquasec.com/products/trivy/"), SonarQube (static code analysis - "https://www.sonarqube.org"), NexusIQ (jar scan - "https://help.sonatype.com/iqserver") are popular in market for this. 
       More details are given in the below sections.
 
-* Kubernetes 
+* OpenShift container platform 
 
-     I am using IKS (https://www.ibm.com/ca-en/cloud/kubernetes-service) for this blog, provision the kubernetes 
-     cluster on IBM cloud kubernetes service(IKS) , generate IKS API key for CLI connectivity, verify the basic 
+     I am using OpenShift (https://www.redhat.com/en/technologies/cloud-computing/openshift) for this blog. Provision the OpenShift  
+     cluster on IBM cloud (https://cloud.ibm.com), generate OpenShift token for CLI connectivity, verify the basic 
      k8s cluster login commands to various clusters or namespaces (like dev cluster, qa cluster etc). 
      You can use any other kubernetes service of your choice.     
 
@@ -127,13 +112,13 @@ Basic additional tools required on CI/CD pipeline apart from Jenkins are
      resources in an efficient way. Memory usage stats and application storage plan is important in this perspective 
      because the choice of memory/CPU numbers can be set based on this stats, also choice of storage devices and 
      its amount allocation also can be selected based on these data.
-     Also, kubernetes does not store any logs or memory stats permanently. There are applications like dynatrace and 
+     Also, OpenShift/kubernetes does not store any logs or memory stats permanently. There are applications like dynatrace and 
      grafana available in market for storing memory stats permanently and applications like prometheus and splunk in 
      market for storing application and cluster log permanently. 
      More details about the tools and k8s commands are given in below sections
     
 
-== Jenkins pipeline scripting introduction
+== OpenShift project setup
 
 It's recommended to adhere to the concept of infrastructure as a code (IaaC) in DevOps pipeline, pipeline scripting based jenkins jobs are a good example of this
 
