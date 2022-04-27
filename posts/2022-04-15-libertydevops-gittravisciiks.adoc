@@ -62,7 +62,7 @@ WORKDIR /
 RUN configure.sh
 
 
-=== Travis CI setup and features ===
+=== Travis CI setup ===
 
 Provision *Travis CI* from link:https://www.travis-ci.com/?_gl=1%2A1tiil9q%2A_ga%2AMTIwMjg2NTQ2NS4xNjUwNTUwODU5%2A_ga_XRYGSZFQ0P%2AMTY1MDkwOTQwMC40LjAuMTY1MDkwOTQwOC41Mg..[Travis CI] and integrate your GitHub repository with it (when your personal profile or repository is integrated with travis CI, presense of a *.travis.yml* file in the repository will be enough for syncing that repository with travis CI). 
 
@@ -74,7 +74,6 @@ image::/img/blog/travisci-homepage.png[Travis CI - Github integration ,width=50%
 image::/img/blog/travis-integrated-gitrepo.png[Travis CI - Github integration ,width=50%,align="center"]
 
      --> Activate the required project as shown in the above screenshot
-
 
 *Additional tools*
 
@@ -118,7 +117,7 @@ Basic additional tools required on CI/CD pipeline apart from Jenkins are
      More details about the tools and k8s commands are given in below sections
     
 
-== OpenShift project setup
+== OpenShift project setup and manual deployment
 
 The first step is to complete the openshift platform setup to make it ready for application deployment. After installing/provisioning a managed OpenShift, login to it using username and password and get the authentication token which is going to be used in Travis CI for connectivity
 
@@ -130,40 +129,26 @@ Login to OpenShift from CLI and create a new project/namespace and change to tha
 
 image::/img/blog/ocp-login.png[OpenShift login details ,width=70%,align="center"]
 
-create an OpenShift secret to checkout the code from GitHub to OpenShift
+Create an OpenShift secret to checkout the code from GitHub to OpenShift (upload the public to github )
      
-     1. Generate GitHub public key and private key
-          $git clone <git-ssh-url:<sample-project>
-          $cd sample-project
-          $ssh-kegen
-     2. Copy the public key to GitHub project settings
-     3. Run this command to create a source secret in OpenShift
-
         oc create secret generic ssh-git \
               --from-file=ssh-privatekey=/Users/<username>/.ssh/id_rsa \
               --type=kubernetes.io/ssh-auth           
 
+Create a new application on OpenShift
 
-It's recommended to adhere to the concept of infrastructure as a code (IaaC) in DevOps pipeline, pipeline scripting based jenkins jobs are a good example of this
+        oc new-app git@github.ibm.com:shamjith-antholi/traviscidemo.git --source-secret=<ssh-git>
 
-You can write link:https://www.jenkins.io/doc/book/pipeline/syntax/[Jenkins pipeline code] in one of the following ways:
+This command will create the uild, deployment, service and routes on OpenShift. When the build is completed, docker image will be stored in the OpenShift internal image stream. Configure the OpenShift build to start the deployment automatically after a successfull deployment (generally this option is enable by default). Verify that this application is deployed properly on OpenShift and endpoints are reachable before moving ahead to automate the deployment process using Travis CI.
 
-1 -> Writing pipeline code directly in Jenkins (Need to take the backup of this jenkins instance to secure the code)
+------- copy paste some openshift UI pics of deployment/service/route etc-----------
 
-image::/img/blog/pipeline-code-on-jenkins.png[Pipeline code directly on Jenkins ,width=70%,align="center"]
+== Automating application deployment on OpenShift using Travis CI
 
-2 -> Writing pipeline code on Jenkinsfile (a plain text file) in git and mapping the same into Jenkins. 
+As explained earlier, *.travis.yml* file must be available on the base path of the GitHub repository. An example view of Github repository base path is given below
 
-image::/img/blog/pipeline-code-on-git.png[Pipeline code on Git ,width=50%,align="center"]
+      ------ Git repo base path screenshot ------------
 
-3 -> If you have specific build/deployment configurations for separate environments, such as dev, staging, and production, you create a separate Jenkinsfile for each environment and store it in that environment specific git repo  branches. 
-
-image::/img/blog/multiple-branch-pipeline-jenkinsview.png[Multi branch pipeline setup ,width=60%,align="center"]
-
-image::/img/blog/multiple-branch-pipeline-gitview.png[Multi branch pipeline setup git branch view,width=30%,align="center"]
-
-Only CLI commands can be used in pipeline code, on the other side, free style and maven type job have the advantage of UI based configuration.
-Pipeline code syntax can be found at link:https://www.jenkins.io/doc/pipeline/tour/hello-world/[pipeline syntax]. On jenkins, use this page to generate pipeline code link:http://localhost:8080/job/pipeline_test/pipeline-syntax/[Jenkins] (sample page).
 
 == Building the Liberty Java code, packaging and generating Docker image
 
