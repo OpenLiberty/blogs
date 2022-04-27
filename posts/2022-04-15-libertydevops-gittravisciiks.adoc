@@ -16,11 +16,10 @@ Shamjith Antholi https://github.com/shamjithantholi
 :url-about: /
 
 [#Intro]
-== What is DevOps
+== DevOps, CI/CD, Travis CI, OpenShift & OpenLiberty
 DevOps is a culture or a process, which enables the integration of the software development (dev) and IT operations (ops). It can facilitate the setup of deployment pipeline and helps to improve the speed of software delivery. Automation of the entire build, test, and deployment of the software applications can be achieved through DevOps process. There are tons of efficient applications and process methodologies available in the market that can be readily integrated to the DevOps pipeline, which can help to achieve the wanted results.
 
-== CI/CD and Travis CI
-CI/CD are acronym’s for continuous integration, and continuous delivery or deployment used in DevOps. Continuous integration is a process where developers frequently merge code changes into a source code repository, which automatically start code build, security scan, and test execution and deployment. Automation of this process enables organizations to release on a more frequent basis without compromising on quality.
+CI/CD are acronym’s for continuous integration, and continuous delivery or deployment used in DevOps. Continuous integration is a process where developers frequently merge code changes into a source code repository, which automatically start code build, security scan, and test execution and deployment. Automation of this process enables organizations to release on a more frequent basis without compromising on quality. There are various tools available to automate the CI/CD process. In this blog post we'll discuss how you can use Travis CI to automate the CI/CD process for building, testing, and deploying your Open Liberty Java applications 
 
 Travis CI is a contienous integration service use to build and test the code. Travis CI works with various Git flavors ( eg: GitHub, Bitbucket).
 
@@ -28,38 +27,11 @@ OpenShift is a containerization platform from RedHat. Contiainer orchastration i
 
 Open Liberty is a lightweight Java runtime for building cloud-native applications and microservices. In this blog, it details how you can use Jenkins in CI/CD pipeline for Java based Openliberty application build/test/deployment Openliberty link:https://openliberty.io[OpenLiberty] .
 
-== Getting ready
-Below given is a generic architecture of a simple one dimensional devops pipeline (single environment view).
+The following diagram shows a simple architecture for a pipeline that builds and deploys an Open Liberty application in a single Kubernetes environment. When a code change is detected by Travis CI, Travis builds the code, runs security and static analysis scans, and runs unit tests against the built code. Travis CI then generates a Docker image of the application with its Open Liberty server and saves the image to a Docker repository, Travis then trigger the deployment using CLI commands and deploy the Docker image to OpenShift.
 
-image::/img/blog/liberty-devops-generic-architecture.png[Liberty devops generic architecture diagram ,width=70%,align="center"]
-
-In this blog i will give you a high level overview of using travis CI as a "code build tool" (with sample codes and required explanations), how you can setup Projects on OpenShift, how you can connect with OpenShift and perform the application deployment, docker registry concepts, security scanning, unit and functional testing with Travis etc. Detailed explanation of technologies used in this blog, tool installation, complex devops pipeline design details of multi-environment application deployment are not in the scope of this blog. 
+image::/img/blog/liberty-devops-generic-architecture-travis-ocp.png[Liberty devops generic architecture diagram ,width=70%,align="center"]
 
 Basic understanding of git, Docker and containerization concepts are a prerequisite for this blog.
-
-The standard Dockerfile which you use in general will not be enough to do the Liberty application deployment on containerized environment, a sample OpenLiberty compliant Dockerfile snipped in given below, please configure it as per your requirement
-
-  FROM icr.io/appcafe/open-liberty:kernel-slim-java8-openj9-ubi
-  # Add Liberty server configuration including all necessary features
-COPY --chown=1001:0  server.xml /config/
-# Modify feature repository (optional)
-# A sample is in the 'Getting Required Features' section below
-COPY --chown=1001:0 featureUtility.properties /opt/ol/wlp/etc/
-# This script will add the requested XML snippets to enable Liberty features and grow image to be fit-for-purpose using featureUtility. 
-# Only available in 'kernel-slim'. The 'full' tag already includes all features for convenience.
-RUN features.sh
-# Add interim fixes (optional)
-#COPY --chown=1001:0  interim-fixes /opt/ol/fixes/
-.
-.
-.
-.
-RUN cp <open-liberty-application>.war /config/dropins/
-RUN chmod 755 /config/dropins/<open-liberty-application>.war
-RUN chown 1001:0 /config/dropins/<open-liberty-application>.war
-WORKDIR /
-# This script will add the requested server configurations, apply any interim fixes and populate caches to optimize runtime
-RUN configure.sh
 
 
 === Travis CI setup ===
