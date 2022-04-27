@@ -33,33 +33,7 @@ Basic understanding of Git, Docker, Kubernetes are a prerequisite for this blog.
 
 I will assume that you have a basic understanding of git, Docker, Kubernetes. In this blog post, I will assume that the Liberty Java application code is stored in link:https://github.com/[Github]. I will use link:https://hub.docker.com/[DockerHub] to store the containerized application (correction: Docker images)and I will deploy the containerized application to link:https://cloud.ibm.com/kubernetes/catalog/create[IBM Cloud Kubernetes Service].
 
-
-The standard Dockerfile that you use in general is not enough to do the Liberty application deployment on containerized environment. A sample Openliberty compliant Dockerfile snipped in given, you can configure it as needed.
-
-  FROM icr.io/appcafe/open-liberty:kernel-slim-java8-openj9-ubi
-  # Add Liberty server configuration including all necessary features
-  COPY --chown=1001:0  server.xml /config/
-  # Modify feature repository (optional)
-  # A sample is in the 'Getting Required Features' section below
-  COPY --chown=1001:0 featureUtility.properties /opt/ol/wlp/etc/
-  # This script will add the requested XML snippets to enable Liberty features and grow image to be fit-for-purpose using featureUtility. 
-  # Only available in 'kernel-slim'. The 'full' tag already includes all features for convenience.
-  RUN features.sh
-  # Add interim fixes (optional)
-  #COPY --chown=1001:0  interim-fixes /opt/ol/fixes/
-  .
-  .
-  .
-  .
-  RUN cp <open-liberty-application>.war /config/dropins/
-  RUN chmod 755 /config/dropins/<open-liberty-application>.war
-  RUN chown 1001:0 /config/dropins/<open-liberty-application>.war
-  WORKDIR /
-  # This script will add the requested server configurations, apply any interim fixes and populate caches to optimize runtime
-  RUN configure.sh
-
-
-=== Installing and configuring jenkins and additional tools ===
+== Installing and configuring Jenkins for CI/CD of Open Liberty applications
 
 Install *jenkins* with all the recommended plug-ins link:https://www.jenkins.io/doc/book/installing/[install Jenkins], make sure that the following plug-ins are installed. You can install Jenkins on any physical or virtual servers, or it can be running as a container on Kubernetes itself.
 
@@ -69,67 +43,7 @@ Install *jenkins* with all the recommended plug-ins link:https://www.jenkins.io/
 * Docker
 * Kubernetes
 
-If you are using *Helm* to automate the application deployment, install it on the server where Jenkins are installed. If you are running Jenkins on container, do this installation on the base image that is used for creating Jenkins image. If you are using any slave server to run the Jenkins job, install Helm on the slave server.
-
-_A note about jenkins slave_
-
-Jenkins builds the Liberty Java code by using Jenkins pipeline scripts. The script can run directly on your Jenkins installation (known as Jenkins master) but, if the application is large, you need to use a Jenkins slave agent (good configuration server (or container)). More details about Jenkins slave setup are provided at link:https://www.jenkins.io/doc/book/using/using-agents/[Jenkins slave setup], link:https://www.jenkins.io/doc/book/pipeline/syntax/[pipeline code details] 
-
-*Additional tools*
-
-Basic more tools that are needed on CI/CD pipeline apart from Jenkins are 
-
-* A source code management (SCM) tool like GitHub.
-
-     Provision a public or private GitHub repository (github.com) and put your code into it. 
-     Create any branching strategy of your choice (example: develop --> qa --> develop branch hierarchy). More details about branch are available here "https://www.atlassian.com/git/tutorials/comparing-workflows/gitflow-workflow" 
-
-* A credential store application like harshicorp vault (optional)
-
-     Your credentials (like dockerhub credentials, artifactory API credentials, IKS api token, github personal access 
-     token, etc.) can be securely saved within Jenkins itself on the page,  
-     "http://localhost:8080/credentials/store/system/domain/_/newCredentials++". 
-     Consider that using external credential store application like vault provides better security.
-
-* Maven repository and Docker image repository, like artifactory (optional)
-
-     Create an IBM cloud image registry if needed by following the steps in 
-     "https://cloud.ibm.com/docs/Registry?topic=Registry-getting-started" for pushing the docker images created for 
-     deployment. You can use public docker hub registry as well. Artifactory is another popular software 
-     in the market for this "https://www.jfrog.com/confluence/display/JFROG/Getting+Started+with+Artifactory+as+a+Docker+Registry"
-
-* Vulnerability scanning tools, like Aqua, Trivy, NexusIQ, SonarQube (optional)
-
-      Vulnerability scan will discover the critical issues in the source code and the open source jar files used 
-      in the application. 
-      Vulnerability scan can be done on multiple phases, either using CLI commands in jenkins along with the application 
-      code build commands or by manually uploading all the jars to the 
-      scanning software or by scanning the docker image created for deployment. 
-      Most of the scanning software's do have a recommendation section which we can use to select the correct jar (please 
-      verify the database against which those applications are comparing the vulnerability score and take the best decision for your application). 
-      Static code analysis can be done based on the code rules made available by the scanning product or you can develop 
-      your own custom rules against which you can scan your code before production deployment to find out any critical faults. 
-      Software's like Aqua (docker image scan - "https://www.aquasec.com"), SonarQube (static code analysis - "https://www.sonarqube.org"), NexusIQ (jar scan - "https://help.sonatype.com/iqserver") are popular in market for this. 
-      More details are given in the below sections.
-
-* Kubernetes 
-
-     For this blog, IBM Kubernetes Service(IKS) (https://www.ibm.com/ca-en/cloud/kubernetes-service) is used. Next, provision the kubernetes 
-     cluster on IBM cloud kubernetes service, generate IKS API key for CLI connectivity, verify the basic 
-     k8s cluster login commands to various clusters or namespaces (like dev cluster, qa cluster, etc.). 
-     You can use any other Kubernetes service of your choice.     
-
-* Logging and monitoring
-
- Since the cloud application's usage is charged based on time used, it's very important to design the use of cloud 
-resources in an efficient way. Memory usage stats and application storage plan are important in this perspective 
-because the choice of memory and CPU numbers can be set based on these stats, also choice of storage devices and 
-its amount allocation also can be selected based on these data.
-Also, Kubernetes does not store any logs or memory stats permanently. Applications like Dynatrace and 
-Grafana are available in market for storing memory stats permanently and applications like Prometheus and Splunk in 
-market for storing application and cluster log permanently. 
-More details about the tools and k8s commands are given in below sections
-    
+Jenkins builds the Liberty Java code by using Jenkins pipeline scripts. The script can run directly on your Jenkins installation (known as Jenkins master) but, if the application is big, you need to use a Jenkins slave agent (good configuration server (or container)). More details about Jenkins slave setup are provided at link:https://www.jenkins.io/doc/book/using/using-agents/[Jenkins slave setup], link:https://www.jenkins.io/doc/book/pipeline/syntax/[pipeline code details] 
 
 == Jenkins pipeline scripting introduction
 
@@ -137,23 +51,17 @@ It is recommended to adhere to the concept of infrastructure as a code (IaaC) in
 
 You can write link:https://www.jenkins.io/doc/book/pipeline/syntax/[Jenkins pipeline code] in one of the following ways:
 
-1 -> Writing pipeline code directly in Jenkins (Need to take the backup of this jenkins instance to secure the code)
+* Directly in the link:https://www.jenkins.io/doc/book/pipeline/getting-started/[Jenkins UI]. This is a useful way to get started. You would need to take a backup of the Jenkins instance to store the pipeline code because it is part of the Jenkins installation. 
 
 image::/img/blog/pipeline-code-on-jenkins.png[Pipeline code directly on Jenkins ,width=70%,align="center"]
 
-2 -> Writing pipeline code on Jenkinsfile (a plain text file) in Git and mapping the same into Jenkins. 
+* Jenkinsfile (a plain text file) in Git and mapping it to Jenkins. This is better for ensuring that your configuration is always under version control. If you have specific build and deployment configurations for separate environments, such as dev, staging, and production, you create a separate Jenkinsfile for each environment and store it in that environment specific Git repo  branches.
 
 image::/img/blog/pipeline-code-on-git.png[Pipeline code on Git ,width=50%,align="center"]
-
-
-3 -> If you have specific build and deployment configurations for separate environments, such as dev, staging, and production, you create a separate Jenkinsfile for each environment and store it in that environment specific Git repo  branches. 
 
 image::/img/blog/multiple-branch-pipeline-jenkinsview.png[Multi branch pipeline setup ,width=60%,align="center"]
 
 image::/img/blog/multiple-branch-pipeline-gitview.png[Multi branch pipeline setup Git branch view,width=30%,align="center"]
-
-Only CLI commands can be used in pipeline code, on the other hand, Free-style and Maven type job have the advantage of UI based configuration.
-Pipeline code syntax can be found at link:https://www.jenkins.io/doc/pipeline/tour/hello-world/[pipeline syntax]. On jenkins, use this page to generate pipeline code link:http://localhost:8080/job/pipeline_test/pipeline-syntax/[Jenkins] (sample page).
 
 == Building the Liberty Java code, packaging and generating Docker image
 
