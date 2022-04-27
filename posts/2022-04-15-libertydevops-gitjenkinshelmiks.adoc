@@ -63,9 +63,33 @@ image::/img/blog/multiple-branch-pipeline-jenkinsview.png[Multi branch pipeline 
 
 image::/img/blog/multiple-branch-pipeline-gitview.png[Multi branch pipeline setup Git branch view,width=30%,align="center"]
 
-== Building the Liberty Java code, packaging and generating Docker image
+== Building the Liberty Java code with Jenkins
 
-The given sample pipeline code can perform the code build, packaging and generating docker image and pushing the same to remote docker hub. You can use it by modifying the parameter section (<>)
+Before writing pipeline script to automate the deployment, you need to make a change in Dockerfile. The standard Dockerfile that you use in general is not enough to do the Liberty application deployment on containerized environment. A sample Openliberty compliant Dockerfile snipped in given, you can configure it as needed.
+
+  FROM icr.io/appcafe/open-liberty:kernel-slim-java8-openj9-ubi
+  # Add Liberty server configuration including all necessary features
+  COPY --chown=1001:0  server.xml /config/
+  # Modify feature repository (optional)
+  # A sample is in the 'Getting Required Features' section below
+  COPY --chown=1001:0 featureUtility.properties /opt/ol/wlp/etc/
+  # This script will add the requested XML snippets to enable Liberty features and grow image to be fit-for-purpose using featureUtility. 
+  # Only available in 'kernel-slim'. The 'full' tag already includes all features for convenience.
+  RUN features.sh
+  # Add interim fixes (optional)
+  #COPY --chown=1001:0  interim-fixes /opt/ol/fixes/
+  .
+  .
+  .
+  .
+  RUN cp <open-liberty-application>.war /config/dropins/
+  RUN chmod 755 /config/dropins/<open-liberty-application>.war
+  RUN chown 1001:0 /config/dropins/<open-liberty-application>.war
+  WORKDIR /
+  # This script will add the requested server configurations, apply any interim fixes and populate caches to optimize runtime
+  RUN configure.sh
+
+Below given sample pipeline code can perform the code build, packaging and generating docker image and pushing the same to remote docker hub. You can use it by modifying the parameter section (<>)
 
  pipeline {
      agent any
@@ -113,10 +137,9 @@ For Docker image scan, you can use link:https://hub.docker.com/r/aquasec/trivy/[
        '''
 
 
+== Deploying Liberty applications to Kubernetes with Jenkins
 
-== Deployment (CLI) 
-
-For simplicity, the command line (CLI) option is used to configure Jenkins to deploy a Liberty application to Kubernetes. You can use one of many tools though, such as Helm, Travis CI, and Circle CI.
+For simplicity, I will use the command line (CLI) option to configure Jenkins to deploy a Liberty application to Kubernetes. You could use one of many tools though, such as Helm, Travis CI, Circle CI, etc.
 
 Create a new stage in the pipeline code and write all the needed commands between the shell option (sample commands give below):
                            
@@ -128,18 +151,15 @@ Create a new stage in the pipeline code and write all the needed commands betwee
                               kubectl create -f deploy/route.yaml #( simple k8s deployment command )
                            '''
 
-Maintain all the Kubernetes configuration files in the same code repository (under a folder called "deploy") 
+Make sure that your Kubernetes configuration files are in the same source code repository (under a folder called "deploy") 
 
-When Jenkins checks out the Liberty Java application code for the code build, all the Kubernetes configuration files are also downloaded to the Jenkins workspace so that Jenkins can run the IBM Cloud and Kubernetes commands to connect to the Kubernetes cluster and deploy the application.
-
- -> Set the Kubernetes context as needed, for example, to deploy into development cluster, 
- then set the context to development cluster, for deployment into QA environment, 
- set it into QA context (this context setting is depending on the design of the cluster)
+When Jenkins has checked out the Liberty Java application code for the code build, all the Kubernetes configuration files are also downloaded to the Jenkins workspace so that Jenkins can run the IBM Cloud and Kubernetes commands to connect to the Kubernetes cluster and deploy the application.
 
 All the other needed application deployment commands are available in this Kubernetes command page that is straightforward 
 link:https://kubernetes.io/docs/reference/kubectl/cheatsheet/[Kubernetes sample commands].
 
-== QA testing options
+== QA testing Liberty applications with Jenkins
+
 Apart from running JUnit test cases along with the code build phase, Jenkins can trigger functional and integration QA test cases automatically after deploying the Liberty application.
 
 Configure the test cases on jenkins job and test it manually. Create an "Authentication Token" in "Trigger builds remotely" section under "Build Triggers". Trigger this test case from docker "entrypoint" file by using remote rest API call that uses this authentication token as the identifier
@@ -163,8 +183,6 @@ These tools are deployed in Kubernetes cluster itself where the application is r
     -> https://medium.com/nerd-for-tech/logging-at-scale-in-kubernetes-using-grafana-loki-3bb2eb0c0872
     -> https://prometheus.io
     -> https://k21academy.com/docker-kubernetes/prometheus-grafana-monitoring/
-
-
 
 == Conclusion
 There are many ways in which you can configure your DevOps pipeline. This blog post is a quick introduction to how you can use Jenkins to set up a simple CI/CD pipeline to build and deploy your Liberty Java applications.
