@@ -63,9 +63,9 @@ The MicroStream CDI extension, a new feature of MicroStream version 7, helps you
 This blog will show you how to use the MicroStream CDI extension when you develop your microservices on Open Liberty.
 
 
-== Basic MicroStream Usage
+== MicroStream Basics
 
-Let us review a basic usage of the MicroStream framework where we programmatically configure the data storage.
+Let's review a basic use of the MicroStream framework to programmatically configure the data storage.
 
 [source,Java]
 ----
@@ -90,21 +90,21 @@ The `EmbeddedStorage` instance provides you with all the MicroStream functionali
 
 == MicroProfile
 
-https://microprofile.io[MicroProfile] optimizes Enterprise Java for a Microservices Architecture. It is based on the Java EE/Jakarta EE standard plus MicroProfile API specifically for microservices such as Rest Client, Configuration, Open API, etc. But the specifications can be used in many application scenarios and are not only restricted to microservices.
+https://microprofile.io[MicroProfile] optimizes Enterprise Java for a microservices architecture. It is based on the Java EE/Jakarta EE standard plus MicroProfile APIs that are specifically for microservices, such as Rest Client, Configuration and Open API. These specifications can be used in many application scenarios and are not restricted to microservices.
 
 There are several runtimes available that implement the MicroProfile specifications. https://openliberty.io/[Open Liberty] is one of the best and provides you with a lightweight framework for building fast and efficient cloud-native Java microservices.
 
 In this blog, we will showcase the new MicroStream CDI extension on Open Liberty using a basic example that showcases some of the CDI extension functionalities.
 
-To get started easily, you can use the Open LIberty Starter to create the Maven project skeleton that is configured and ready to run with Open Liberty.
+To get started easily, you can use the Open Liberty Starter to create the Maven project skeleton that is configured and ready to run with Open Liberty.
 
-Go to the https://openliberty.io/start/[Open Liberty Starter website] and select
+Go to the https://openliberty.io/start/[Open Liberty Starter website] and complete the following steps.
 
 - Select _Jakarta EE 8.0_ as version
 - Update the Group Id and Artifact Id to your preference
 - Click on the _Generate Project_ button.
 
-The screen should look like this
+The screen should look like the following example.
 
 [.img_border_light]
 image::img/blog/blog_microstream_starter.png[Screenshot of Open Liberty Starter ,width=70%,align="center"]
@@ -135,21 +135,21 @@ The extension currently makes use of the Embedded Storage Manager so the data is
 
 The embedded storage manager is configured through a few MicroProfile configuration values.  For those that know MicroProfile Config, as long as the values are defined in a default or configured source, the application is able to read them at startup. If you want to know more about MicroProfile Config, have a look at the https://github.com/eclipse/microprofile-config/blob/master/spec/src/main/asciidoc/microprofile-config-spec.asciidoc[specification document].
 
-All the standard MicroStream properties, as listed in the https://docs.microstream.one/manual/storage/configuration/properties.html[reference manual],  are supported using the following convention;
+All the standard MicroStream properties, as listed in the https://docs.microstream.one/manual/storage/configuration/properties.html[reference manual], are supported by using the following convention.
 
 | All dashes are replaced by . (dot) and prefixed by ‘one.microstream.’
 
 
 So the property key `one.microstream.storage.directory` refers to the _storage_directory_ property.
 
-To store the data in a certain directory on your disk, you can add the following line to the _microprofile-config.properties_ file. (absolute paths are also supported). Remember that this kind of configuration should be specified outside of your application.  Here we use the _microprofile_config.properties_ file as a simple solution.
+To store the data in a certain directory on your disk, you can add the following line to the _microprofile-config.properties_ file. (absolute paths are also supported). You can store the property with the _server.xml_ file as `<variable name="one.microstream.storage.directory" value="target/data" />`. Alternatively, you can store this property as an environment variable or system property or other config sources as this kind of configuration should be specified outside of your application.
 
 [source]
 ----
 one.microstream.storage.directory=target/data
 ----
 
-The storage manager is also made available as a CDI bean in case you want to access some methods programmatically. But you don't need this as we will discuss some additional functionality of the CDI extension in a moment.
+The storage manager is also made available as a CDI bean in case you want to access some methods programmatically. But you don't need this yet as we will discuss some additional functionality of the CDI extension in a moment.
 
 [source,Java]
 ----
@@ -160,16 +160,16 @@ Private StorageManager storageManager
 
 == Define Root Instance
 
-As we have seen in the basic usage, we have to provide a _Root_ instance to the framework so that it can loop over the entire Object Graph and determine the instances that need to be stored and loaded at startup.
+As we saw in the basic usage, we have to provide a _Root_ instance to the framework so that it can loop over the entire Object Graph and determine the instances that need to be stored and loaded at startup.
 
-Since we no longer instantiate the Storage Manager ourselves, we need a way to indicate the root instance.  This can be done by annotating a class with
+Since we no longer instantiate the Storage Manager ourselves, we need a way to indicate the root instance.  Use the following annotation:
 
 [source,Java]
 ----
 one.microstream.integrations.cdi.types.Storage
 ----
 
-This marker, and we must use it only once in our application or the dependencies of the project we have, identifies the class that denotes the root instance. An instance is automatically instantiated, defined as a CDI bean, and linked with the storage manager so that data can be persisted.
+This marker identifies the class that denotes the root instance. An instance is automatically instantiated, defined as a CDI bean, and linked with the storage manager so that data can be persisted. We can use the marker only once in our application or the dependencies of the project.
 
 This is the _Root_ and _storage_ definition we have in the OpenLiberty example on GitHub.
 
@@ -193,12 +193,13 @@ public class Inventory {
     }
 ----
 
-By annotating it, we can have this object and the entire Object Graph, so including all the `Product`s we have gathered in the _Set_, marked as the _database_ that can be persisted. Besides the fact that we mark this class, we can implement all methods to perform operations on our inventory of products like adding, searching, updating, and deleting them.
+By annotating it, we can mark this object and the entire Object Graph,  including every `Product`  gathered in the _Set_, as the _database_ that can be persisted. Besides the fact that we mark this class, we can implement all methods to perform operations like adding, searching, updating, and deleting on our inventory of products.
+
 
 
 ##Indicate Store actions
 
-The last thing that we need to do is indicate when we want to store the Object Graph on disk.  A CDI interceptor is ideal for that, and the CDI extension has defined the annotation `@Store` for this purpose.
+Lastly, we need to indicate when we want to store the Object Graph on disk.  A CDI interceptor is ideal for that, and the CDI extension defines the `@Store` annotation  for this purpose.
 
 [source]
 ----
@@ -214,7 +215,7 @@ The last thing that we need to do is indicate when we want to store the Object G
 	}
 ----
 
-Whenever the method `save()` is executed, the interceptor makes sure the root instance, `Inventory` in our example since we have annotated it as such, is stored. The CDI extension tries to perform a few optimisations, but cannot exactly know what it needs to persist. For example, suppose we have the following Object Graph;
+Whenever the `save()`method is executed, the interceptor makes sure the root instance stored. In our example,  the root instance  is `Inventory`. The CDI extension tries to perform a few optimisations, but cannot exactly know what it needs to persist. For example, suppose we have the following Object Graph;
 
 Root
 -> Set<Person>; Person has reference to Address
