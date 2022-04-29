@@ -78,16 +78,59 @@ image::/img/blog/deployment-config-ui-view.png[OpenShift - DeploymentConfig UI v
 
 image::/img/blog/buildconfig-yaml-view.png[OpenShift - BuildConfig YAML view ,width=50%,align="center"]
 
-
-
 == Automating application deployment on OpenShift using Travis CI
 
 As explained earlier, *.travis.yml* file must be available on the base path of the GitHub repository. An example view of Github repository base path is given below
 
-      ------ Git repo base path screenshot ------------
+image::/img/blog/gitrepo-base-path.png[Git repo base path,width=50%,align="center"]
 
-Travis CI provides wide variety of configuration options, but i will be providing a simple workable confirguration sample code which is good enough to automate 
+Travis CI provides wide variety of configuration options, below given is a workable sample travis ci code which is good enough to automate the code build
 
+     language: java
+     jdk:
+       - openjdk8
+     services:
+       - docker  #enable internal docker service in travis ci
+     before_install: 
+       - oc login --token=$OCP_TOKEN --server=$OCP_SERVER --insecure-skip-tls-verify=true #ocp login command
+     script:
+       - mvn package #maven build command
+       - docker login -u $dockerhub_login -p $dockerhub_password  #login to dockerhub
+       - docker build -t $dockerhub_login/sampleapp:v1.0 --build-arg package=target/sampleapp.war . #docker build and pass the deployment package to Dockerfile 
+       - docker push $dockerhub_login/sampleapp:v1.0  #push docker image too dockerhub
+       - oc project demoproject #set the openshift project
+       - oc scale deployment/sampleapp --replicas 0 #scale the existing openshift to zero
+       - oc scale deployment/sampleapp --replicas 1 #scale the existing openshift to one (or more)
+     after_success:
+       - echo "success"
+
+The standard Dockerfile that you use in general is not enough to do the Liberty application deployment on containerized environment. A sample Openliberty compliant Dockerfile snipped in given, you can configure it as needed.
+
+  FROM icr.io/appcafe/open-liberty:kernel-slim-java8-openj9-ubi
+
+  USER root 
+
+  ARG package
+  COPY $package /config/dropins/
+  # Add Liberty server configuration including all necessary features
+  COPY --chown=1001:0  server.xml /config/
+  # Modify feature repository (optional)
+  # A sample is in the 'Getting Required Features' section below
+  COPY --chown=1001:0 featureUtility.properties /opt/ol/wlp/etc/
+  # This script will add the requested XML snippets to enable Liberty features and grow image to be fit-for-purpose using featureUtility. 
+  # Only available in 'kernel-slim'. The 'full' tag already includes all features for convenience.
+  RUN features.sh
+  # Add interim fixes (optional)
+  #COPY --chown=1001:0  interim-fixes /opt/ol/fixes/
+  .
+  .
+  .
+  .
+  RUN chmod 755 /config/dropins/<open-liberty-application>.war
+  RUN chown 1001:0 /config/dropins/<open-liberty-application>.war
+  WORKDIR /
+  # This script will add the requested server configurations, apply any interim fixes and populate caches to optimize runtime
+  RUN configure.sh
 
 
 == Building the Liberty Java code, packaging and generating Docker image
