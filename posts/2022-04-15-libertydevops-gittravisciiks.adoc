@@ -94,15 +94,24 @@ Travis CI and OpenShift provides wide variety of build/deployment options, below
      before_install: 
        - oc login --token=$OCP_TOKEN --server=$OCP_SERVER --insecure-skip-tls-verify=true #ocp login command
      script:
-       - mvn package #maven build command
+       - mvn package #maven build command #with sonarqube scan command: mvn package verify sonar:sonar -Dsonar.projectKey=sampleapp -Dsonar.host.url=http://localhost:9000 -Dsonar.login=7b13f240d8dff455efdfbff07ba0479b13d09ba8
        - docker login -u $dockerhub_login -p $dockerhub_password  #login to dockerhub
        - docker build -t $dockerhub_login/sampleapp:v1.0 --build-arg package=target/sampleapp.war . #docker build and pass the deployment package to Dockerfile 
        - docker push $dockerhub_login/sampleapp:v1.0  #push docker image too dockerhub
+       - docker run aquasec/trivy image --exit-code 1 --severity CRITICAL $docker_login/travisapp:v2.0  #with sonarqube scan command: mvn package verify sonar:sonar -Dsonar.projectKey=sampleapp -Dsonar.host.url=http://localhost:9000 -Dsonar.login=7b13f240d8dff455efdfbff07ba0479b13d09ba8
+
        - oc project demoproject #set the openshift project
        - oc scale deployment/sampleapp --replicas 0 #scale the existing openshift to zero
        - oc scale deployment/sampleapp --replicas 1 #scale the existing openshift to one (or more)
      after_success:
        - echo "success"
+
+Following are the execution steps in the above given travis ci code
+1. Maven build and packaging (if configured, will do the junit test execution and static code analysis with SonarQube) 
+2. Build the Dockerfile and generate the docker image
+3. Store the docker image in docker hub repository
+4. Run the docker image scan using aqua trivy
+5. Restart the OpenShift deployment by down scaling and up scaling (This works if the docker image generated here and the image version configured in the openshift deployment config are the same, otherwise you can programmatically change the image name/version from travis CI confiruration itself. Please note that this is only one way of doing the deployment) 
 
 The standard Dockerfile that you use in general is not enough to do the Liberty application deployment on containerized environment. A sample Openliberty compliant Dockerfile snipped in given, you can configure it as needed.
 
@@ -131,105 +140,8 @@ The standard Dockerfile that you use in general is not enough to do the Liberty 
   # This script will add the requested server configurations, apply any interim fixes and populate caches to optimize runtime
   RUN configure.sh
 
+For SonarQube server setup, we can use SonarQube community edition. Install sonarqube server by either using file startup type from cli downloading the package in link:https://www.sonarqube.org/success-download-community-edition/[SonarQube server install package] or use docker way as explained in link:https://docs.sonarqube.org/latest/setup/get-started-2-minutes/[Sonarqube server install steps]. 
 
-== Building the Liberty Java code, packaging and generating Docker image
-
-Below given sample pipeline code can perform the code build, packaging and generating docker image and pushing the same to remote docker hub. You can use it by modifying the parameter section (<>)
-
- pipeline {
-     agent any
-     stages {
-       stage('Build') {
-           steps {
-                checkout([$class: 'GitSCM', branches: [[name: '*/main']], extensions: [], userRemoteConfigs: [[credentialsId: ‘<git token>, url: 'https://github.com/liberty/app.git']]])
-
-                    sh '''
-                            mvn -U package
-                            docker login <remote-docker-image-repository-url> -u "${USERNAME}" -p “${PASSWORD}”
-            docker tag liberty-$<code identifier>:$<docker image version> <remote-docker-image-repository-url>/<docker-repo-name>/liberty-$<code identifier>:$<docker image version>
-            docker push <remote-docker-image-repository-url>/<docker-repo-name>/liberty-$<code identifier>:$<docker image version>
-
-                    '''   
-                   }}}}
-
-
-Following are the parameter used in this example code
-
-* git token: Personal access token generated from github.
-* remote-docker-image-repository-url : Docker hub repository url.
-* USERNAME/PASSWWORD: user name and password to connect to docker registry.
-
-image::/img/blog/jenkins-cred-binding-and-corresponding-param.png[Pipeline credential binding and corresponding param,width=30%,align="center"]
-
-* code identifier: This is optional, a unique docker image identifier
-* docker image version: docker image version number, a unique identifier   
-
-*Security scan* Security scan can be done along with maven build command (CLI commands way of application scanning) or can do it in a separate pipeline stage. 
-
-For static code analysis, we can use SonarQube community edition. Install sonarqube server by either using file startup type from cli downloading the package in link:https://www.sonarqube.org/success-download-community-edition/[SonarQube server install package] or use docker way as explained in link:https://docs.sonarqube.org/latest/setup/get-started-2-minutes/[Sonarqube server install steps]. SonarQube jenkins client setup details are given in this page link:https://docs.sonarqube.org/latest/analysis/scan/sonarscanner-for-jenkins/[SonarQube client for jenkins]. 
-
-For Docker image scan, you can use link:https://hub.docker.com/r/aquasec/trivy/[Docker image scan with trivy]. This scan will provide the vulnerability details of open source jars used in the application.Sample commands are given below
-
-       sh '''
-             docker login -u $docker_login -p $docker_password
-             docker build -t $docker_login/sampleapp:v1.0 .
-             docker push $docker_login/sampleapp:v1.0 
-             docker run aquasec/trivy image $docker_login/sampleapp:v1.0
-       '''
-
-
-
-== Deployment (CLI) 
-
-For simplicity, I will use the command line (CLI) option to configure Jenkins to deploy a Liberty application to Kubernetes. You could use one of many tools though, such as Helm, Travis CI, Circle CI, etc.
-
-Create a new stage in the pipeline code and write all the required commands between the shell option (sample commands give below)
-                           
-                           sh '''
-                              ibmcloud ks cluster config --cluster $CLUSTER-ID
-                              kubectl config current-context
-                              kubectl create -f deploy/deployment.yaml #( simple k8s deployment command )
-                              kubectl create -f deploy/service.yaml #( simple k8s deployment command )
-                              kubectl create -f deploy/route.yaml #( simple k8s deployment command )
-                              '''
-
-Maintain all the kubernetes configuration files in the same code repository (under a folder called "deploy") 
-
-When Jenkins has checked out the Liberty Java application code for the code build, all the Kubernetes configuration files are also downloaded to the Jenkins workspace so that Jenkins can run the IBM Cloud and Kubernetes commands to connect to the Kubernetes cluster and deploy the application.
-
- -> Set the kubernetes context as per the requirement, for example, if we need to deploy into development cluster, 
- then the context should be set to development cluster, for deployment into QA environment, 
- set it into QA context ( this context setting is depending on the design of the cluster)
-
-All the other required application deployment commands are available in this kubernetes command page which is very straightforward
-link:https://kubernetes.io/docs/reference/kubectl/cheatsheet/[Kubernetes sample commands] 
-
-== QA testing options
-Apart from running JUnit test cases along with the code build phase, Jenkins can trigger functional and integration QA test cases automatically after deploying the Liberty application.
-
-Configure the test cases on jenkins job and test it manually. Create an "Authentication Token" in "Trigger builds remotely" section under "Build Triggers". Trigger this test case from docker "entrypoint" file using remote rest api call using this authentication token as the identifier
-
-Eg: curl -I -u <auth-token> https://<jenkins-host>/job/<job-name>/build?token=<authentication-token>
-Note: Auth token can be generated from postman
-
-== Kubernetes monitoring tools
-
-Kubernetes provides commands to check the application/cluster logs and memory/cpu usage through the commands like 
-
-    -> kubectl logs ..
-    -> cat /sys/fs/cgroup/cpu/cpuacct.usage (after connecting to k8s pod)
-    -> cat /sys/fs/cgroup/memory/memory.usage_in_bytes (after connecting to k8s pod)
-
-For persistence of logs and usage stats, there are sevaral applications available in the market which can be integrated with kubernetes, details about some of those apps are given below
-
-These tools are deployed in kubernetes cluster itself where the application is running and exposed using route and access the gathered details from UI.
-
-    -> https://grafana.com/oss/loki/
-    -> https://medium.com/nerd-for-tech/logging-at-scale-in-kubernetes-using-grafana-loki-3bb2eb0c0872
-    -> https://prometheus.io
-    -> https://k21academy.com/docker-kubernetes/prometheus-grafana-monitoring/
-
-
-
+Any code commit in GitHub repository will start the travis CI build and OpenShift deployment will be done  
 == Conclusion
-There are many ways in which you can configure your DevOps pipeline. This blog post is a quick introduction to how you can use Jenkins to set up a simple CI/CD pipeline to build and deploy your Liberty Java applications.
+There are many ways in which you can configure your DevOps pipeline. This blog post is a quick introduction to how you can use Travis CI and OpenShift to set up a simple CI/CD pipeline to build and deploy your Liberty Java applications.
