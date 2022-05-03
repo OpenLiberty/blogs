@@ -1,0 +1,271 @@
+---
+layout: post
+title: "Easy and fast data access in Open Liberty with the MicroStream CDI extension"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/rdebusscher
+author_github: https://github.com/rdebusscher
+seo-title: Easy and fast data access in Open Liberty with the MicroStream CDI extension - OpenLiberty.io
+seo-description: The MicroStream CDI extension can be used to integrate the MicroStream framework into a MicroProfile application that runs on Open Liberty. It enables you to store Java object graphs natively and securely, with no heavyweight DBMS dependencies.
+blog_description: "The MicroStream CDI extension can be used to integrate the MicroStream framework into a MicroProfile application that runs on Open Liberty. It enables you to store Java object graphs natively and securely, with no heavyweight DBMS dependencies."
+open-graph-image: https://openliberty.io/img/blog/blog_microstream_starter.png
+additional_authors:
+- name: Otavio Santana
+  github: https://github.com/otaviojava
+  image: https://avatars0.githubusercontent.com/otaviojava
+---
+= Easy and fast data access in Open Liberty with the MicroStream CDI extension
+Rudy De Busscher <https://github.com/rdebusscher>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+// // // // // // // //
+// In the preceding section:
+// Do not insert any blank lines between any of the lines.
+//
+// "open-graph-image" is set to OL logo. Whenever possible update this to a more appriopriate/specific image (for example if present an image that is being used in the post).
+// However, it can be left empty which will set it to the default
+//
+//
+// Replace DESCRIPTION with a short summary (~60 words) of the release (a more succinct version of the first paragraph of the post).
+//
+//
+// If adding image into the post add :
+// -------------------------
+// [.img_border_light]
+// image::img/blog/FILE_NAME[IMAGE CAPTION ,width=70%,align="center"]
+// -------------------------
+// "[.img_border_light]" = This adds a faint grey border around the image to make its edges sharper. Use it around
+// screenshots but not around diagrams. Then double check how it looks.
+// There is also a "[.img_border_dark]" class which tends to work best with screenshots that are taken on dark backgrounds.
+// Once again make sure to double check how it looks
+// Change "FILE_NAME" to the name of the image file. Also make sure to put the image into the right folder which is: img/blog
+// change the "IMAGE CAPTION" to a couple words of what the image is
+// // // // // // // //
+
+Microservices is a buzzword when we talk about creating a scalable application. As with any software architecture decision, it has trade-offs and challenges. One of those challenges is the distributed nature of the environment. Data access is another challenge. Since many solutions make use of data that is stored in an entirely different format from the Java Objects, such as a database with tables and columns, accessing data can be slow due to the mapping that is required.
+
+Open Liberty is a great runtime for hosting microservices. It interacts well with many data access libraries. In this blog, we will look at how Open Liberty can work well with the https://microstream.one/platforms/microstream-for-java/[MicroStream framework] to provide fast data access within microservices.
+Let’s first have a quick tour of MicroStream.
+
+== Introduction to MicroStream
+
+MicroStream allows you to write a Java object graph to data storage very efficiently and quickly. This storage can be the disk, blob storage of a database, or any other medium. Since your data is stored in memory, it provides microsecond query time, low-latency data access, and gigantic data throughput because the data are just Java instances. No mapping and conversion to a database system is needed.
+
+Whenever the `StorageManger` instance is started, the previously stored content is loaded into memory. From that moment on, all data access is just accessing Java instances in memory, which is very fast and efficient. MicroStream storage is also highly secure. It stores only the instance variables and a class identification. It cannot reconstruct some arbitrary class instances as you do with Java serialization.
+
+After you update or change the data that needs to be stored, you perform a _store_ operation so data is placed on the external resource again and can be read the next time you start the application.
+
+The MicroStream CDI extension, a new feature of MicroStream version 7, helps you store the data and only requires you to add a few annotations. No MicroStream specific statements are required in your code. It is designed to work with MicroProfile runtimes and it uses the MicroProfile Config specification in addition to CDI.
+
+This blog will show you how to use the MicroStream CDI extension when you develop your microservices on Open Liberty.
+
+
+== MicroStream basics
+
+Let's review a basic use of the MicroStream framework to programmatically configure the data storage.
+
+[source,Java]
+----
+	// Application-specific root instance
+	final DataRoot root = new DataRoot();
+
+	// Initialize a storage manager ("the database") with the given directory and defaults for everything else.
+	final StorageManager storageManager = EmbeddedStorage.start(root, Paths.get("data"));
+
+	// print the root to show its loaded content (stored in the last execution).
+	System.out.println(root);
+
+	// Set content data to the root element, including the time to visualize changes on the next execution.
+	root.setContent("Hello World! @ " + new Date());
+
+	// Store the modified root and its content.
+	storageManager.storeRoot();
+----
+
+The `EmbeddedStorage` instance provides you with all the MicroStream functionality. It uses a directory on the disk to store and retrieve the binary representation of your data, the entire object graph, which is represented here by the `DataRoot` class.  Each time you store the root or an instance that is part of the object graph of the root with `store(Object)`, the content is saved for the next time you start your application.
+
+We can use Microstream in a MicroProfile application to achieve fast and secure data access. First, let's take a quick look at MicroProfile.
+
+== MicroProfile
+
+https://microprofile.io[MicroProfile] optimizes Enterprise Java for a microservices architecture. It is based on the Java EE/Jakarta EE standard plus MicroProfile APIs that are specifically designed for microservices, such as Rest Client, Configuration and Open API. These specifications can be used in many application scenarios and are not restricted to microservices.
+
+Several runtimes are available that implement the MicroProfile specifications. https://openliberty.io/[Open Liberty] is one of the best and provides you with a lightweight framework for building fast and efficient cloud-native Java microservices.
+
+In this blog, we will showcase the new MicroStream CDI extension on Open Liberty by using a basic example that showcases some of the CDI extension functions.
+
+To get started easily, you can use the Open Liberty Starter to create a Maven project skeleton that is configured and ready to run with Open Liberty.
+
+Go to the https://openliberty.io/start/[Open Liberty Starter website] and complete the following steps.
+
+- Select _Jakarta EE 8.0_ as version
+- Update the Group Id and Artifact Id to your preference
+- Click on the _Generate Project_ button.
+
+The screen should look like the following example.
+
+[.img_border_light]
+image::img/blog/blog_microstream_starter.png[Screenshot of Open Liberty Starter ,width=70%,align="center"]
+
+
+You get a ZIP file with the Maven POM file and a configuration that is ready to run the application with Open Liberty.
+
+You can also have a look at the example code in the https://github.com/microstream-one/microstream/tree/master/examples/openliberty[MicroStream repository].
+
+== CDI extension
+
+The CDI extension frees you from defining the `StorageManager` and explicitly calls the _store_ method by using the CDI facilities that are available with the Open Liberty runtime.
+
+To use it, just add the MicroStream CDI extension dependency to your Maven `pom.xml` file.
+
+[source,XML]
+----
+<dependency>
+	<groupId>one.microstream</groupId>
+	<artifactId>microstream-integrations-cdi</artifactId>
+	<version>07.00.00-MS-GA</version>
+</dependency>
+----
+
+The extension uses the Embedded Storage Manager so the data is stored on disk.
+
+== Configuring StorageManager
+
+The embedded storage manager is configured through a few MicroProfile configuration values.  For those that know MicroProfile Config, as long as the values are defined in a default or configured source, the application is able to read them at startup. If you want to know more about MicroProfile Config, have a look at the https://github.com/eclipse/microprofile-config/blob/master/spec/src/main/asciidoc/microprofile-config-spec.asciidoc[specification document].
+
+All the standard MicroStream properties, as listed in the https://docs.microstream.one/manual/storage/configuration/properties.html[reference manual], are supported by using the following syntax convention.
+
+ All dashes are replaced by periods and the property is prefixed by ‘one.microstream.’
+
+For example, the `one.microstream.storage.directory` property key refers to the _storage-directory_ property.
+
+To store the data in a certain directory on your disk, you can add the following line to the _microprofile-config.properties_ file. Absolute paths are also supported. You can store the property with the _server.xml_ file as `<variable name="one.microstream.storage.directory" value="target/data" />`. Alternatively, you can store this property as an environment variable or system property or other config sources as this kind of configuration should be specified outside of your application.
+
+[source,java]
+----
+one.microstream.storage.directory=target/data
+----
+
+The storage manager is also made available as a CDI bean in case you want to access some methods programmatically. But you don't need this yet as we will discuss some additional functionality of the CDI extension in a moment.
+
+[source,Java]
+----
+@Inject
+Private StorageManager storageManager
+----
+
+== Define the root instance
+
+As we saw in the basic usage, we have to provide a _Root_ instance to the framework so that it can loop over the entire object graph and determine the instances that need to be stored and loaded at startup.
+
+Since we no longer instantiate the Storage Manager ourselves, we need a way to indicate the root instance. Use the following annotation:
+
+[source,Java]
+----
+one.microstream.integrations.cdi.types.Storage
+----
+
+This marker identifies the class that denotes the root instance. An instance is automatically instantiated, defined as a CDI bean, and linked with the storage manager so that data can be persisted. We can use the marker only once in our application or the dependencies of the project.
+
+We have the following _Root_ and _storage_ definition in the Open Liberty example on GitHub.
+
+[source,Java]
+----
+@Storage
+public class Inventory {
+    private final Set<Product> products = new HashSet<>();
+
+    public void add(final Product product) {
+        Objects.requireNonNull(product, "product is required");
+        this.products.add(product);
+    }
+
+    public Set<Product> getProducts() {
+        return Collections.unmodifiableSet(this.products);
+    }
+
+    public Optional<Product> findById(final long id) {
+        return this.products.stream().filter(this.isIdEquals(id)).limit(1).findFirst();
+    }
+----
+
+By annotating it, we can mark this object and the entire object graph, including every `Product`  gathered in the _Set_, as the _database_ that can be persisted. Besides the fact that we mark this class, we can implement all methods to perform operations like adding, searching, updating, and deleting on our inventory of products.
+
+== Indicate Store actions
+
+Lastly, we need to indicate when we want to store the object graph on disk.  A CDI interceptor is ideal for that, and the CDI extension defines the `@Store` annotation  for this purpose.
+
+[source]
+----
+	@Inject
+	private Inventory inventory;
+
+
+	@Store
+	public Product save(final Product item)
+	{
+		this.inventory.add(item);
+		return item;
+	}
+----
+
+Whenever the `save()` method is executed, the interceptor makes sure the root instance stored. In our example,  the root instance is `Inventory`. The CDI extension tries to perform a few optimizations, but cannot exactly know what it needs to persist. For example, suppose we have the following object graph:
+
+[source,java]
+----
+Root
+-> Set<Person>; Person has reference to Address
+-> Set<Product>
+-> Set<Order>; Order has reference to Person and Product
+----
+
+When you have a method `updateAddress(Person, Address)`, you should ideally only store only the Person as that is the only change. But we cannot indicate this requirement through annotations. If you have a very large object graph, it is recommended to inject the `StorageManager` and trigger the persistence of a single instance yourself.
+
+MicroStream can handle partial updates perfectly and works in a similar fashion as Git.  You can store the entire object graph and later on only the updated instances.  At startup, it assembles all pieces to reconstruct the latest situation when you stored something in the previous run.
+There is also continuous housecleaning of the pieces going on so that old blobs are removed and others are reorganized to remove redundant info from the storage. You can configure the amount of time that is spent on this housecleaning to balance the impact on the application throughput.
+
+The `@Store` annotation can indicate to some extent what needs to be persisted by the CDI interceptor.
+
+[source,Java]
+----
+	@Store(fields = "products")
+	public Product save(final Product item)
+	{
+		this.inventory.add(item);
+		return item;
+	}
+----
+
+In this case, only the `products` field of our root is stored. In the example of the _Inventory_, `products` is the only field. However, in cases where our root contains collections for `Person`, `products`, and `Order`,  this is an important tuning.
+
+By default, the interceptor processes only the variables of type `Map` and `Iterable` (like the `List` type).  If you want to store the entire root object, including all non-collection type variables, use the member `root`
+
+[source,Java]
+----
+	@Store(root = true)
+----
+
+The code of this example is also available in the https://github.com/microstream-one/microstream/tree/master/examples/openliberty[MicroStream repository].
+
+== Conclusion
+
+With the MicroStream framework, you can quickly and efficiently query and manipulate the application data very as regular Java class instances that don't involve any mapping. You can also store the data to any kind of blob storage in a safe way that doesn't suffer the Java serialization security vulnerabilities.
+
+The CDI extension, a new feature of version 7 of the framework, allows you to abstract away the definition and handling in the Open Liberty runtime. It uses the CDI facilities to remove any explicit code reference to the MicroStream code, except for some annotations and configures the Embedded storage manager using the MicroProfile Configuration facilities.
+
+With all the features of Open Liberty for creating a microservice and MicroStream for the ultra-fast in-memory data processing within pure Java, some of the challenges of the microservices architecture are successfully overcome by this combo of technologies.
+
+
+// // // // // // // //
+// LINKS
+//
+// OpenLiberty.io site links:
+// link:/guides/microprofile-rest-client.html[Consuming RESTful Java microservices]
+//
+// Off-site links:
+// link:https://openapi-generator.tech/docs/installation#jar[Download Instructions]
+//
+// // // // // // // //
