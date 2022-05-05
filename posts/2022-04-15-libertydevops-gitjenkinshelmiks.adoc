@@ -1,6 +1,6 @@
 ---
 layout: post
-title: "Using Jenkins for CI/CD with Liberty"
+title: "Continuous integration and delivery (CI/CD) of Jakarta EE & MicroProfile applications with Open Liberty to Kubernetes by using Jenkins"
 categories: blog
 author_picture: https://avatars3.githubusercontent.com/shamjithantholi
 author_github: https://github.com/shamjithantholi
@@ -9,141 +9,178 @@ seo-description: DESCRIPTION
 blog_description: "A high level explanation about how to build a devops pipeline with Jenkins as the core controller component "
 open-graph-image: https://openliberty.io/img/twitter_card.jpg
 ---
-= Using Jenkins for CI/CD with Liberty
+= Continuous integration and delivery (CI/CD) of Jakarta EE & MicroProfile applications with Open Liberty to Kubernetes by using Jenkins
 Shamjith Antholi https://github.com/shamjithantholi
 :imagesdir: /
 :url-prefix:
 :url-about: /
 
 [#Intro]
-== What is DevOps
-DevOps is a culture or a process which enables the integration of the software development (dev) and IT operations (ops) which will facilitate the setup of deployment pipeline as well as helps to improve the speed of software delivery. Automation of the entire build, test and deployment of the software applications can be achieved through DevOps process. There are tons of efficient applications and process methodologies available in the market which can be readily integrated to the DevOps pipeline which will help to achieve the desired results 
+== DevOps, CI/CD, Jenkins & OpenLiberty ( to deploy Jakarta EE & MicroProfile application)
+DevOps is a culture or a process, which enables the integration of the software development (dev) and IT operations (ops). It can facilitate the setup of deployment pipeline and helps to improve the speed of software delivery. Automation of the entire build, test, and deployment of the software applications can be achieved through DevOps process. There are tons of efficient applications and process methodologies available in the market that can be readily integrated to the DevOps pipeline, which can help to achieve the wanted results.
 
-== CI/CD and Jenkins
-CI/CD are acronym's for contineous integration and contineous delivery/deployment used in DevOps. Contineous integration is a process where developers frequently merge code changes into a central repository and kick start code build, security scan and test execution using automation or manual methods. Contineous delivery/deployment is a process of application deployment into deployment destination.
+CI/CD are acronym’s for continuous integration, and continuous delivery or deployment used in DevOps. Continuous integration is a process where developers frequently merge code changes into a source code repository, which automatically start code build, security scan, and test execution and deployment. Automation of this process enables organizations to release on a more frequent basis without compromising on quality. There are various tools available to automate the CI/CD process. In this blog post we'll discuss how you can use Jenkins to automate the CI/CD process for building, testing, and deploying your Jakarta EE & MicroProfile applications 
 
-Jenkins is an opensource automation server which helps to automate application code build, test and deployment. Jenkins comes with a vast variety of plugins which eases the various devops pipeline tool integrations into the build/deployment pipeline. In this blog, we will focus on how jenkins can be used as a piller of contineous integration and contineous deployment process for java based openliberty application deployment link:https://openliberty.io[OpenLiberty] along with GitHub, Helm and IBM Cloud kubernetes service (IKS)  
+Jenkins is an open source automation server, which helps to automate application code build, test, and deployment. Jenkins comes with a hundred’s of plug-ins, which eases the various DevOps pipeline tool integrations into the DevOps pipeline.
 
-== Getting ready
-Below given is a generic architecture of a simple one dimensional devops pipeline (single environment view). In this blog, i am trying to substitute popular tools for the different generic tools/phases depicted in the diagram. 
+Open Liberty is a lightweight Java runtime for building cloud-native applications and microservices. In this blog, it details how you can use Jenkins in CI/CD pipeline for Jakarta EE & MicroProfile application build/test/deployment (to deploy using Openliberty ) . To try Openliberty link:https://openliberty.io[OpenLiberty] 
 
-image::/img/blog/liberty-devops-generic-architecture.png[Liberty devops generic architecture diagram ,width=70%,align="center"]
+The following diagram shows a simple architecture for a pipeline that builds and deploys a Jakarta EE & MicroProfile application in a single Kubernetes environment. When a code change is detected by Jenkins, Jenkins builds the code, runs security and static analysis scans, and runs unit tests against the built code. Jenkins then generates a Docker image of the application with its Open Liberty server and saves the image to a Docker repository, Jenkins then trigger the deployment using CLI commands and deploy the Docker image to Kubernetes..
 
-Setup the GitHub repository with the ideal branching strategy.   
-Install jenkins with all the recommended plugins, make sure that the following plugins are installed
+image::/img/blog/liberty-devops-generic-architecture-2.png[Liberty devops generic architecture diagram ,width=70%,align="center"]
+
+Basic understanding of Git, Docker, Kubernetes are a prerequisite for this blog.
+
+I will assume that you have a basic understanding of git, Docker, Kubernetes. In this blog post, I will assume that the Jakarta EE & MicroProfile application code are stored in link:https://github.com/[Github]. I will use link:https://hub.docker.com/[DockerHub] to store the containerized application (correction: Docker images)and I will deploy the containerized application to link:https://cloud.ibm.com/kubernetes/catalog/create[IBM Cloud Kubernetes Service].
+
+== Installing and configuring Jenkins to setup CI/CD of Jakarta EE & MicroProfile application
+
+Install *jenkins* with all the recommended plug-ins link:https://www.jenkins.io/doc/book/installing/[install Jenkins], make sure that the following plug-ins are installed. You can install Jenkins on any physical or virtual servers, or it can be running as a container on Kubernetes itself.
 
 * Maven
 * Pipeline
-* Helm (not a plugin, but install helm on master or any jenkins slave server )
+* Multibranch Scan Webhook Trigger
 * Docker
 * Kubernetes
 
-In general case, we will need a docker image store repository to push the docker image from local docker repo (on Jenkins master or slave node) for referring in deployment configurations, its not mandatory if we can use local image registry (like in openshift). For this purpose, create a custom image registry in IBM cloud or docker repositories can be created in tools like artifactory (open source softwares for this purpose are DockerHub, GitLab container registry, Nexus repository etc).  
+Jenkins builds the Jakarta EE & MicroProfile application code by using Jenkins pipeline scripts. The script can run directly on your Jenkins installation (known as Jenkins master) but, if the application is big, you need to use a Jenkins slave agent (good configuration server (or container)). More details about Jenkins slave setup are provided at link:https://www.jenkins.io/doc/book/using/using-agents/[Jenkins slave setup], link:https://www.jenkins.io/doc/book/pipeline/syntax/[pipeline code details] 
 
-Credential store server like vault and docker image scan server like aqua should be ready for the service (if you are not using any hosted services). 
+== Jenkins pipeline scripting introduction
 
-Apart from IKS, there are sevaral choices for the containeirzation question and we can choose any of them for the purpose. Azure kubernetes service (AKS), Amazon EKS, Google Kubernetes Engine (GKE) etc are some of the cloud services we can opt for, we can setup the kubernetes on our own data center as well. Veryfiy if the kubernetes context can be configured correctly to connect to particular cluster/namespace based on the environment choice (kubectl config current-context). i.e, on run time, if a deployment need to be done to QA cluster or namespace and this choice is done based on the run time parameters, then kubectl commands to redirect to required destination for proper deployments. 
+It is recommended to adhere to the concept of infrastructure as a code (IaaC) in DevOps pipeline, pipeline scripting-based jenkins jobs are a good example of IaaC.
 
-== Creating pipeline script and integrating it with jenkins jobs
-Setup the required credentials in jenkins (like dockerhub creds, artifactory api creds, IKS api token, github personal access token etc), either directly on jenkins or integrate external credential store applications like Vault to Jenkins and use the credentials from the same in Jenkins build jobs.  
-Credentials can be created from link:http://localhost:8080/credentials/store/system/domain/_/newCredentials[Jenkins] (sample page).
+You can write link:https://www.jenkins.io/doc/book/pipeline/syntax/[Jenkins pipeline code] in one of the following ways:
 
-For adhering to the concept of infrastructure as a code (IaaC), use pipeline or multibranch pipeline type jenkins job for the CI/CD process. Only CLI commands can be used in pipeline code, on the other side, free style and maven type job have the advantage of UI based configuration.
-Pipeline code syntax can be found at link:https://www.jenkins.io/doc/pipeline/tour/hello-world/[pipeline syntax]. On jenkins, use this page to generate pipeline code link:http://localhost:8080/job/pipeline_test/pipeline-syntax/[Jenkins] (sample page).
+* Directly in the link:https://www.jenkins.io/doc/book/pipeline/getting-started/[Jenkins UI]. This is a useful way to get started. You would need to take a backup of the Jenkins instance to store the pipeline code because it is part of the Jenkins installation. 
 
-Pipeline code can be directly written on jenkins job or saved on Jenkinsfile in github and map the same onto the newly created jenkins pipeline type job. For using multi branch pipeline job, the plugin "Multibranch Scan Webhook Trigger" need to be installed on jenkins which will help to trigger the mapped jenkins on any change on github code.
+image::/img/blog/pipeline-code-on-jenkins.png[Pipeline code directly on Jenkins ,width=70%,align="center"]
 
-Create multiple stages in pipeline code for source code (SCM) checkout, code build, security scan and helm command execution etc. Jenkins job can be executed on jenkins master itself or on containerized slave (setup done using kubernetes pod template) or on virtual servers. The selection of this execution environment are based on the size of the application.
+* Jenkinsfile (a plain text file) in Git and mapping it to Jenkins. This is better for ensuring that your configuration is always under version control. If you have specific build and deployment configurations for separate environments, such as dev, staging, and production, you create a separate Jenkinsfile for each environment and store it in that environment specific Git repo  branches. You can either use "Pipeline" type job or "Multibranch pipeline" type job in this case.
 
-== Code build, packaging and security scan 
-After declaring the jenkins slave label and other variables, create a stage for code checkout into the jenkins workspace, and then initiate the code build using maven commands (Multiple stages on pipeline is only for segrating the activities). For resolving dependencies from any private maven repository (like nexus or artifactory), use the maven settings files uploaded in "managed files" or as secret files (this is not required if your firewall allows to resolve the dependencies from maven central repository). There could be requirements to store the generated war file to a private repository, we will have to use settings file setup for this as well.  
+image::/img/blog/pipeline-code-on-git.png[Pipeline code on Git ,width=50%,align="center"]
 
-After the code build and unit test execution (we can enable and disable unit test execution through the tags configured on application pom.xml), liberty application code should be packaged to .war file. You can consider the common practices like persistent storage of code package in nexus/artifactory because of various reasons like organizations compliance requirements or to directly download it to docker container while deployment thus by avoiding the risk of exposing application code in case of a compromized docker image. Application jar upload to nexus/artifactory can be done on runtime using distributionmanagement tag in maven pom.  
+== Building the Jakarta EE & MicroProfile application with Open Liberty on Jenkins
 
-Running automatic security scan of source code and dependency jars along with every code build is a good practice which can be implemented as part of CI/CD pipeline which ensures the security of the every version of deployed application. Static code analysis and opensource jar scan should be completed before proceeding to deployment. Static code analysis can be done using tools like SonarQube, features like quality gate can be used to fail the code build in case of not satisfying the required code quality and coverage. Dependency jar file scan can be done with tools like nexusiq or checkmarx or you can scan the docker image using the tools like Aqua or Synk. Maven build command can be integrated with scan related CLI commands or these can be done on a different pipeline stage.
+Before writing pipeline script to automate the deployment, you need to make a change in Dockerfile. The standard Dockerfile that you use in general may not enough to do the Jakarta EE & MicroProfile application deployment (to OpenLiberty server) on containerized environment. A sample Openliberty compliant Dockerfile snipped in given, you can configure it as needed.
 
-When code packaging is completed and ready for deployment, the current branch of code can be added to a git tag for any rebuilding purpose. This can be inititad from jenkins itself.  
+    FROM icr.io/appcafe/open-liberty:full-java11-openj9-ubi
+    # Add Liberty server configuration including all necessary features
+    COPY --chown=1001:0  server.xml /config/
+    # Modify feature repository (optional)
+    COPY --chown=1001:0 featureUtility.properties /opt/ol/wlp/etc/
+    # This script will add the requested XML snippets to enable Liberty features and grow image to be fit-for-purpose using featureUtility. 
+    # Only available in 'kernel-slim'. The 'full' tag already includes all features for convenience.
+    RUN features.sh
+    # Add interim fixes (optional)
+    #COPY --chown=1001:0  interim-fixes /opt/ol/fixes/
+    .
+    .
+    .
+    .
+    COPY --chown=1001:0 src/main/liberty/config/ /config/
+    COPY --chown=1001:0 ./target/*.war /config/apps/
+    RUN configure.sh
 
-== Docker image
-When the appliction packaging process is completed, next stage should be to manage the docker image generation and its storage. Docker is a prerequistite for this phase (through the jenkins plugin or directly installing on jenkins master node).
+Below given sample pipeline code can perform the code build, packaging and generating docker image and pushing the same to remote docker hub. You can use it by modifying the parameter section (<>)
 
-As explained earlier, you have various repository options like dockerhub, IBM cloud registry, artifactory etc for the storage purpose.
-All the credentials to use in this stage and further shall be saved and retrieved either directly on jenkins or integrate jenkins with vault (or any other credential store) and retrive the credentials from it. For vault-jenkins integration, you can use "HashiCorp Vault" jenkins plugin.
+ pipeline {
+     agent any
+      stages {
+       stage('Build') {
+                    steps {
+              checkout([$class: 'GitSCM', branches: [[name: '*/main']], extensions: [], userRemoteConfigs: [[credentialsId: ‘<git token>, url: 'https://github.com/liberty/app.git']]])
+                    sh '''
+                         mvn -U package
+                         docker login <remote-docker-image-repository-url> -u "${USERNAME}" -p “${PASSWORD}”
+                         docker build -t liberty-$<code identifier>:$<docker image version> .
+                         #eg: docker build -t liberty-app:v1.0 .
+                         docker tag liberty-$<code identifier>:$<docker image version> <remote-docker-image-repository-url>/<docker-repo-name>/liberty-$<code identifier>:$<docker image version>
+                         #eg: docker tag liberty-app:v1.0 docker.io/someid/liberty-app:v1.0
+                         docker push <remote-docker-image-repository-url>/<docker-repo-name>/liberty-$<code identifier>:$<docker image version>
+                         #eg: docker push docker.io/someid/liberty-app:v1.0  
+                       '''   
+                  }
+               }
+            }
+          }
 
-Docker image can be generated by running CLI command on the directory where the "Dockerfile" is available (command is give below). When the docker build is successfull, an image is created in the local docker repository.  
 
-* docker build -t <docker-image-name>:<version> --build-arg <arg-name>=<arg-value> .
+Following are the parameter that is used in this example code
 
-Below given is a glimpse of activities like code checkout, code build, deployment artifact storage, docker image build. In this example, code package is directly embedded into the docker image which is easy though but not recommended. 
+* Git token: Personal access token generated from github.
+* remote-docker-image-repository-url : Docker hub repository URL.
+* USERNAME/PASSWWORD: username and password to connect to docker registry.
 
-image::/img/blog/pipeline-code-example.png[pipeline code example ,width=70%,align="center"]
+image::/img/blog/jenkins-cred-binding-and-corresponding-param.png[Pipeline credential binding and corresponding param,width=30%,align="center"]
 
-Next step is to push this local image to a remote repository from where the IBM cloud Kubernetes service can pull this for creating the containers. 
+* code identifier: This is optional, a unique docker image identifier
+* docker image version: docker image version number, a unique identifier   
 
-Some helpful cli commands to use in Jenkins are given below (use any Jenkins plugins for the same if available):
+*Security scan* can be done along with Maven build command (CLI commands way of application scanning) or can do it in a separate pipeline stage. 
 
-* docker login <repository host name> -u "${USERNAME}" -p "${PASSWORD}"
-* docker tag <docker-image-name>:<version> <repository host name>/<repository name>/<docker-image-name>:<version>
-* docker push <repository host name>/<repository name>/<docker-image-name>:<version>
+For static code analysis, SonarQube community edition can be used. Install SonarQube server by either using file start-up type from cli by downloading the package in link:https://www.sonarqube.org/success-download-community-edition/[SonarQube server installation package] or use docker way as explained in link:https://docs.sonarqube.org/latest/setup/get-started-2-minutes/[SonarQube server installation steps]. SonarQube jenkins client setup details are given at link:https://docs.sonarqube.org/latest/analysis/scan/sonarscanner-for-jenkins/[SonarQube client for jenkins]. 
+ 
+    CLI command example, integrated with Maven command: 
+    $ mvn package verify sonar:sonar -Dsonar.projectKey=sampleapp -Dsonar.host.url=http://localhost:9000 -Dsonar.login=7b13f240123456780479b13d09ba8
+   
+For Docker image scan, you can use link:https://hub.docker.com/r/aquasec/trivy/[Docker image scan with trivy]. This scan provides the vulnerability details of open source jars that are used in the application. Sample commands are given below
 
-If cloud authentication and cluster selection is required, use the API key authentication method
+       sh '''
+             docker run aquasec/trivy image $docker_login/sampleapp:v1.0
+             #eg: docker run aquasec/trivy image docker.io/someid/liberty-app:v1.0
+       '''
 
-* ibmcloud login --apikey <ibm cloud api key> -g <ibm cloud resource group>
 
-== Deployment (CLI and Helm) 
-Helm is a good option to facilitate the application deployment on the cloud platform, it eases deployment/maintenance steps and hence highly recommended. But we can do the application deployment on kubernetes using CLI commands directly from Jenkins shell or pipeline stages. 
+== Deploying Jakarta EE & MicroProfile applications with Open Liberty to Kubernetes with Jenkins
 
-=== CLI Deployment
-When a Docker image is generated and saved on a repositories like K8s/OCP registry, IBM cloud remote registry, artifactory etc, then the docker deployment is very straightforward using kubernetes CLI commands. Either you can generate new image tag on every docker build and update this new name/tag on the deployment yaml file on GitHub (using git push) or you can depend on a single image name/tag for a particular feature release and change it to new on every subsequent release (This change can be done only on the current jenkins workspace file as well if not required to save the information on the github for reference purpose, also if multiple repositories are used for code and container configurations, this push method is helpful).  
+For simplicity, I will use the command line (CLI) option to configure Jenkins to deploy a Jakarta EE & MicroProfile application with Open Liberty to Kubernetes. You could use one of many tools though, such as Helm, Travis CI, Circle CI, etc.
 
-As explained in the earlier section, after the kubernetes context is set to the required environment, run the kubectl commands to deploy and components like deployments, services, route, serviceaccount, secrets etc. The yaml files should be already available in the current Jenkins workspace downloaded as explained in the earlier stage (if code and container are part of same repository).   
+Create a new stage in the pipeline code and write all the needed commands between the shell option (sample commands give below):
+                           
+                           sh '''
+                              ibmcloud login --apikey $IBM_CLOUD_API_KEY -g $IBM_CLOUD_RSGRP
+                              ibmcloud ks cluster config --cluster $CLUSTER-ID
+                              kubectl config current-context
+                              kubectl create -f deploy/deployment.yaml #( simple k8s deployment command )
+                              kubectl create -f deploy/service.yaml #( simple k8s deployment command )
+                              kubectl create -f deploy/route.yaml #( simple k8s deployment command )
+                           '''
 
-link:https://kubernetes.io/docs/reference/kubectl/cheatsheet/[Kubernetes sample commands] 
+Make sure that your Kubernetes configuration files are in the same source code repository (under a folder called "deploy"), also the image name should be updated manually or programmatically 
 
-=== Helm deployment
-In this stage, we are ready for starting the application deployment using Helm link:https://helm.sh/docs/helm/helm/[Helm]. Helm is already available from jenkins server (or on any attached jenkins slave - if we are using virtual machine as the slave, make sure helm is installed on that server and available for all users, if containerized slave are used, make sure the helm installation is done through the dockerfile of the attached image to the slave)
+image::/img/blog/deploymentyaml.png[Image reference in deployment yaml,width=40%,align="center"]
 
-All the deployment related configirations, like, Pod, deployment, service should be completed and checked into github prior to appliction deployment trigger in the helm chart directory link:https://helm.sh/docs/helm/helm_create/[Helm create]
 
-Run the "helm install" or "helm upgrade" from Jenkins shell or pipeline code to create the resources in the kubernetes cluster. Maintain all the helm resources in a separate folder in the git repository and make the modifications as per the requirement.
+When Jenkins has checked out the Java application code for the code build, all the Kubernetes configuration files are also downloaded to the Jenkins workspace so that Jenkins can run the IBM Cloud and Kubernetes commands to connect to the Kubernetes cluster and deploy the application.
 
-The name of the new docker image generated on the docker build can be updated on the helm file on run time (if you are adopting to this run time image name change strategy), you can use the "Git Push Plugin" for this purpose on Jenkins. 
+All the other needed application deployment commands are available in this Kubernetes command page that is straightforward 
+link:https://kubernetes.io/docs/reference/kubectl/cheatsheet/[Kubernetes sample commands].
 
-Some helpful cli commands for using in Jenkins are given below
+== QA testing, Jakarta EE & MicroProfile applications with Jenkins
 
-* ibmcloud plugin install container-service
-* ibmcloud config --check-version=false
-* ibmcloud ks cluster config --cluster <ibm cloud cluster id>
-* helm uninstall <release name> -n <namespace>
-* helm install <release name> . --namespace <namespace>
+Apart from running JUnit test cases along with the code build phase, Jenkins can trigger functional and integration QA test cases automatically after deploying the Jakarta EE & MicroProfile application.
 
-link:https://phoenixnap.com/kb/helm-commands-cheat-sheet[Helm commands]
+Configure the test cases on jenkins job and test it manually. Create an "Authentication Token" in "Trigger builds remotely" section under "Build Triggers". Trigger this test case from docker "entrypoint" file by using remote rest API call that uses this authentication token as the identifier
 
-Use the kubectl commands to  check the status of deployment or go to the kubernetes dashboard and check the status of the deployment
-
-image::/img/blog/K8S-dashboard.png[Kubernetes dashboard example ,width=70%,align="center"]
-
-== QA testing options
-Apart from running JUnit test cases along with the code build phase, we can configure jenkins and deployment configurations to trigger the funtional/integration QA test cases automatically after the deployment in each environment. 
-
-Configure the test cases on jenkins job and test it manually. Create an "Authentication Token" in "Trigger builds remotely" section under "Build Triggers". Trigger this test case from docker "entrypoint" file using remote rest api call using this authentication token as the identifier
-
-Eg: curl -I -u <auth-token> https://<jenkins-host>/job/<job-name>/build?token=<authentication-token>
+For example: curl -I -u <auth-token> https://<jenkins-host>/job/<job-name>/build?token=<authentication-token>
 Note: Auth token can be generated from postman
 
 == Kubernetes monitoring tools
-Several enterprise and open source options are available in market for kubernetes cluster resource monitoring and log monitoring. Some working example resources are given below. 
 
-* OpenSource :
+Kubernetes provides commands to check the application or cluster logs and memory/cpu usage through the commands like 
+
+    $ kubectl logs ..
+    $ cat /sys/fs/cgroup/cpu/cpuacct.usage (after connecting to k8s pod)
+    $ cat /sys/fs/cgroup/memory/memory.usage_in_bytes (after connecting to k8s pod)
+
+For persistence of logs and usage stats, several applications are available in the market, which can be integrated with Kubernetes, details about some of those apps are given below
+
+These tools are deployed in Kubernetes cluster itself where the application is running and exposed by using route and access the gathered details from UI.
 
     -> https://grafana.com/oss/loki/
     -> https://medium.com/nerd-for-tech/logging-at-scale-in-kubernetes-using-grafana-loki-3bb2eb0c0872
     -> https://prometheus.io
     -> https://k21academy.com/docker-kubernetes/prometheus-grafana-monitoring/
 
-* Enterprise :
-
-    -> https://www.splunk.com/en_us/blog/platform/deploy-splunk-enterprise-on-kubernetes-splunk-connect-for-kubernetes-and-splunk-insights-for-containers-beta-part-1.html
-    -> https://www.dynatrace.com/support/help/setup-and-configuration/setup-on-container-platforms/kubernetes
-
-
+== Conclusion
+There are many ways in which you can configure your DevOps pipeline. This blog post is a quick introduction to how you can use Jenkins to set up a simple CI/CD pipeline to build and deploy your Jakarta EE & MicroProfile applications.
