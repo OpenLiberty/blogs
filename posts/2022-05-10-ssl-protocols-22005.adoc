@@ -1,0 +1,226 @@
+---
+layout: post
+title: "Support for configuring multiple SSL protocols, new schemaGen wrapper for ws-schemagen.jar and more in Open Liberty 22.0.0.5"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/ryan-storey
+author_github: https://github.com/ryan-storey
+seo-title: Support for configuring multiple SSL protocols, new schemaGen wrapper for ws-schemagen.jar and more in Open Liberty 22.0.0.5 - OpenLiberty.io
+seo-description: Open Liberty 22.0.0.5 offers support for configuring multiple SSL protocols, allowing users to create a small, custom set of protocols the server can use for SSL/TLS connections. Also in this release is a new schemaGen wrapper for ws-schemagen.jar, as well as several significant bug fixes.
+blog_description: Open Liberty 22.0.0.5 offers support for configuring multiple SSL protocols, allowing users to create a small, custom set of protocols the server can use for SSL/TLS connections. Also in this release is a new schemaGen wrapper for ws-schemagen.jar, as well as several significant bug fixes.
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+---
+= Support for configuring multiple SSL protocols, new schemaGen wrapper for ws-schemagen.jar and more in Open Liberty 22.0.0.5
+Ryan Storey <https://github.com/ryan-storey>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+Open Liberty 22.0.0.5 offers support for configuring multiple SSL protocols, allowing users to create a small, custom set of protocols the server can use for SSL/TLS connections. Also in this release is a new schemaGen wrapper for ws-schemagen.jar, as well as several significant bug fixes.
+
+In link:{url-about}[Open Liberty] 22.0.0.5:
+
+* <<ssl, Liberty support for configuring multiple SSL protocols>>
+* <<schemaGen, New schemaGen wrapper for ws-schemagen.jar>>
+* <<bugs, Notable bug fixes>>
+
+View the list of fixed bugs in link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A22005+label%3A%22release+bug%22[22.0.0.5].
+
+[#run]
+== Run your apps using 22.0.0.5
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], here are the coordinates:
+
+[source,xml]
+----
+<dependency>
+    <groupId>io.openliberty</groupId>
+    <artifactId>openliberty-runtime</artifactId>
+    <version>22.0.0.5</version>
+    <type>zip</type>
+</dependency>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+dependencies {
+    libertyRuntime group: 'io.openliberty', name: 'openliberty-runtime', version: '[22.0.0.5,)'
+}
+----
+
+Or if you're using Docker:
+
+[source]
+----
+FROM open-liberty
+----
+
+Or take a look at our link:{url-prefix}/downloads/[Downloads page].
+
+[link=https://stackoverflow.com/tags/open-liberty]
+image::img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="center"]
+
+[#ssl]
+=== Liberty support for configuring multiple SSL protocols
+
+This feature introduces the ability to configure multiple, specific `SSL`/`TLS` protocol values on the `sslProtocol` attribute of the `SSL`/`TLS` configuration.  
+
+Prior to this release, only a single value could be specified for the `sslProtocol` attribute which either set a single protocol, like in the case of `TLSv1`, or multiple protocols that are user unalterable, like in the case of `TLS` which enables TLS v1.0, v1.1, and v1.2 protocols in IBMJSSE2.  Starting with this release, a user can specify a list of specific protocols that they'd like to enable, allowing them to create small, custom set of protocols the server can use for `SSL`/`TLS` connections.  One likely usecase for this is to set the value to the two cryptographically strongest protocols: `TLSv1.2` and `TLSv1.3`.  Note that values that would enable multiple protocols, such as `TLS` cannot be included in the list.  
+
+To configure a comma separate list of protocol values can be set on the `sslProtocol` attribute in the `SSL` configuration.
+
+[source, xml]
+----
+<ssl id="defaultSSLConfig" keyStore="defaultKeyStore" sslProtocol="TLSv1.3,TLSv1.2"
+----
+
+With this configuration of inbound connections will only accept connection from client using either `TLSv1.3` or `TLSv1.2`. Outbound connections will be limited to the 2 protocols as well.
+
+Add the feature to the `server.xml`:
+
+[source, xml]
+----
+<server>
+  <featureManager>
+    <feature>transportSecurity-1.0</feature>
+  </featureManager>
+</server>
+----
+
+[#schemaGen]
+== New schemaGen wrapper for ws-schemagen.jar
+
+The existing `ws-schemagen.jar` tool, in the `wlp/bin/tools` directory, is used to generate the schema for a Liberty installation and other installed product extensions.
+
+Prior to 22.0.0.5, the way to run the tool was using the following syntax:
+
+[source]
+----
+java [JVM options] -jar ws-schemagen.jar [options] outputFile
+----
+
+In this release a `schemaGen` script is added to the `wlp/bin/tools` directory. This is simply a wrapper script that executes the `JAR` making the syntax a little easier:
+
+[source]
+----
+./schemaGen [options] outputFile
+----
+
+For more information, reference the link:{url-prefix}/docs/latest/reference/command/schemaGen.html[schemaGen command documentation].
+[#bugs]
+== Notable bugs fixed in this release
+
+We’ve spent some time fixing bugs. The following sections describe just some of the issues resolved in this release. If you’re interested, here’s the  link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A22005+label%3A%22release+bug%22[full list of bugs fixed in 22.0.0.5].
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/20818[JaxRS-Client fails performing PATCH-requests with Java17]
++
+Previously, when performing a `PATCH` request over `HTTPS`, `CXF` was unable to perform the request. It fell back to `POST`. Users would receive a stack trace similar to the following:
++
+[source, role="no_copy"]
+----
+14/04/2022, 13:55:52:682 CEST] 0000003b f.rt.transports.http.3.2:1.0.63.cl220420220328-1303(id=151)] W java.lang.reflect.InaccessibleObjectException: Unable to make field private final sun.net.www.protocol.https.DelegateHttpsURLConnection sun.net.www.protocol.https.HttpsURLConnectionImpl.delegate accessible: module java.base does not "opens sun.net.www.protocol.https" to unnamed module @51bce45d
+	at java.base/java.lang.reflect.AccessibleObject.checkCanSetAccessible(AccessibleObject.java:354)
+	at java.base/java.lang.reflect.AccessibleObject.checkCanSetAccessible(AccessibleObject.java:297)
+	at java.base/java.lang.reflect.Field.checkCanSetAccessible(Field.java:178)
+...
+----
++
+We have now updated the java9.options to correctly handle JAXRS PATCH requests. 
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/20693[SpringBoot application packaged with OL 22.0.0.3 failed to run]
++
+When using OL 22.0.0.3 to package a SpringBoot application into a jar file, users would experience the following exception.
++
+[source, role="no_copy"]
+----
+                   : Started Application in 2.764 seconds (JVM running for 6.19)
+2022-04-01 16:51:29.686  INFO 64794 --- [ecutor-thread-9] ConditionEvaluationReportLoggingListener : 
+
+Error starting ApplicationContext. To display the conditions report re-run your application with 'debug' enabled.
+2022-04-01 16:51:29.726 ERROR 64794 --- [ecutor-thread-9] o.s.boot.SpringApplication               : Application run failed
+
+javax.management.JMRuntimeException: Failed to load MBeanServerBuilder class com.ibm.ws.kernel.boot.jmx.internal.PlatformMBeanServerBuilder: java.lang.ClassNotFoundException: com.ibm.ws.kernel.boot.jmx.internal.PlatformMBeanServerBuilder
+	at java.management/javax.management.MBeanServerFactory.checkMBeanServerBuilder(MBeanServerFactory.java:502) ~[na:na]
+	at java.management/javax.management.MBeanServerFactory.getNewMBeanServerBuilder(MBeanServerFactory.java:535) ~[na:na]
+	at java.management/javax.management.MBeanServerFactory.newMBeanServer(MB
+----
++
+We've now resolved this issue and users should no longer experience an exception.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/20676[WebContainer threads hung while closing WebSockets]
++
+Previously, closing a secure WebSocket connection that has timed out could cause a WebContainer thread to hang as follows:
++
+[source, role="no_copy"]
+----
+ThreadMonitor W WSVR0605W:
+Thread "WebContainer : 1" (0000020d) has been active for 17823
+milliseconds and may be hung. There is/are 1 thread(s) in total
+in the server that may be hung.
+at java.lang.Object.wait(Native Method)
+at java.lang.Object.wait(Object.java:189)
+at com.ibm.ws.wsoc.WsocConnLink.finishReadBeforeClose(WsocConnL
+ink.java:812)
+at com.ibm.ws.wsoc.SessionImpl.close(SessionImpl.java:394)
+at com.ibm.ws.wsoc.EndpointManager.httpSessionExpired(EndpointM
+anager.java:166)
+...
+----
++
+We've now fixed this issue meaning that the WebSocket should close the connection and the WebContainer thread should exit as expected.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/20509[JSP included jar dependency check incorrect]
++
+When a `JSP` included another `JSP` that's contained in a `jar` under `WEB-INF/lib`, the out of date dependency checking exhibited two problems depending on the value of `jsp-attribute` `trackDependencies`. When `trackDependencies` is `true` (default) the date check can fail causing the `JSP` to recompile at each call. This has the symptom of repeating messages
++
+[source, role="no_copy"]
+----
+SRVE0242I: [ ... ] Initialization successful.
+SRVE0253I: [ ... ] Destroy successful.
+----
++
+When `trackDependencies` is `false`, there could be a `NullPointerException` as follows:
++
+[source, role="no_copy"]
+----
+java.lang.NullPointerException
+at com.ibm.ws.jsp.webcontainerext.AbstractJSPExtensionServletWrapper.isDependentOutdated(AbstractJSPExtensionServletWrapper.java:735)
+at com.ibm.ws.jsp.webcontainerext.AbstractJSPExtensionServletWrapper._checkForTranslation(AbstractJSPExtensionServletWrapper.java:416)
+at com.ibm.ws.jsp.webcontainerext.AbstractJSPExtensionServletWrapper.checkForTranslation(AbstractJSPExtensionServletWrapper.java:253)
+at com.ibm.ws.jsp.webcontainerext.AbstractJSPExtensionServletWrapper.handleRequest(AbstractJSPExtensionServletWrapper.java:163)
+....
+----
++
+Now, `JSP`s should not recompile on each call unless there is a valid update of an included file, and users should no longer experience `NullPointerExceptions`. This issue was caused by a failure to initialize a `dependentsList` when `trackDependencies` is `false`.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/20306[Bump netty dependencies to 4.1.75.Final]
++
+Netty components in Open Liberty were of the version `4.1.72.Final` which was released in December 2021. The latest version `4.1.75.Final` contains various bug fixes and improvements over the current version. We've pulled in the newest Netty release (`4.1.75`) to ensure Open Liberty stays up to date with upstream fixes and improvements.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/20782[FeatureUtility isf does not resolve already installed user feature]
++
+Since Open Liberty 22.0.0.3, `featureUtility` `installServerFeature` command failed to locate the user feature when the feature was installed to `WLP_USER_DIR`. We should expect the features to be installed or the user should be informed that the feature is already installed. We found that `WLP_USER_DIR` was being overwritten which caused issues when trying to find features which were already installed to `WLP_USER_DIR`. This issue has now been resolved.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/20476[NPE when outputting SimpleTimer close to the end of a full minute]
++
+When the `/metrics` endpoint is hit and a `SimpleTimer` metric is being formatted there are two explicit calls made to retrieve the value of the `SimpleTimer` (of the min time duration or max time duration). Previously, it could be that these two calls were made before and after the completion of a full minute. This could have lead to a `NullPointerException` if the `SimpleTimer` removed the value as part of the completion of the full minute (i.e. in that the previous full minute did not record any values to update the min/max values).
++
+[source, role="no_copy"]
+----
+SRVE0777E: Exception thrown by application class 'io.openliberty.microprofile.metrics30.internal.helper.PrometheusBuilder30.buildSimpleTimer30:111'
+java.lang.NullPointerException
+	at io.openliberty.microprofile.metrics30.internal.helper.PrometheusBuilder30.buildSimpleTimer30(PrometheusBuilder30.java:111)
+	at io.openliberty.microprofile.metrics30.internal.writer.PrometheusMetricWriter30.writeMetricMapAsPrometheus(PrometheusMetricWriter30.java:101)
+	at io.openliberty.microprofile.metrics30.internal.writer.PrometheusMetricWriter30.writeMetricsAsPrometheus(PrometheusMetricWriter30.java:47)
+	at com.ibm.ws.microprofile.metrics.writer.PrometheusMetricWriter.write(PrometheusMetricWriter.java:83)
+	at com.ibm.ws.microprofile.metrics.BaseMetricsHandler.handleRequest(BaseMetricsHandler.java:83)
+----
++
+We've patched this issue by ensuring that `PrometheusBuilder` does not make separate retrival of `SimpleTimer` max/min values but rather uses a saved value when formatting. This means that users no longer experience this `NullPointerException`.
+
+== Get Open Liberty 22.0.0.5 now
+
+Available through <<run,Maven, Gradle, Docker, and as a downloadable archive>>.
