@@ -35,13 +35,13 @@ These steps are to be completed by the author of the blog post.
     
       Copy the [post-single-author.adoc](./templates/post-single-author.adoc) file (or [post-multiple-authors.adoc](./templates/post-multiple-authors.adoc) for multiple authors) to the [posts](./posts) directory and rename the file using the format `YYYY-MM-DD-post-title.adoc`, where the date represents the expected publication date (e.g. `2021-11-21-open-liberty-is-awesome.adoc`).
 
-      Place any images in [img/blog](./img/blog/).
+      Place any images in [img/blog](./img/blog/). Add a [border to all screenshots](#troubleshooting-asciidoc) to neaten the edges.
   
     * **GA release blog post** (Open Liberty GA release announcements only)
 
       Copy the [ga-release-post.adoc](./templates/ga-release-post.adoc) file to the [posts](./posts) directory and rename the file using the format `YYYY-MM-DD-post-title.adoc`, where the date represents the expected publication date and the end of the file name is the release version number without periods (e.g. `2021-11-21-open-liberty-is-awesome-210011.adoc`).
 
-      Place any images in [img/blog](./img/blog/).
+      Place any images in [img/blog](./img/blog/).  Add a [border to all screenshots](#troubleshooting-asciidoc) to neaten the edges.
 
       Ensure that the Asciidoc tags (e.g. `// tag::intro[]` and `// end::intro[]`) in the template are retained around the relevant parts of the release post. These Asciidoc tags will be used to build alternative versions of the post content.
    
@@ -49,7 +49,7 @@ These steps are to be completed by the author of the blog post.
 
       Copy the [beta-release-post.adoc](./templates/beta-release-post.adoc) file to the [posts](./posts) directory and rename the file using the format `YYYY-MM-DD-post-title.adoc`, where the date represents the expected publication date and the end of the post title is the beta release version number without periods or hyphens (e.g. `2021-11-21-new-awesomeness-coming-soon-210012beta.adoc`).
 
-      Place any images in [img/blog](./img/blog/).
+      Place any images in [img/blog](./img/blog/).  Add a [border to all screenshots](#troubleshooting-asciidoc) to neaten the edges.
 
     * **Third-party blog post** (externally hosted posts only)
 
@@ -197,6 +197,15 @@ eg `= Minimise turnaround times with Open Liberty\'s dev mode`
    ----
    ````
    Where `xml` is the language used in your code snippet. See the [supported list of languages](https://docs.asciidoctor.org/asciidoctor/latest/syntax-highlighting/coderay/). If your languages isn't supported (eg a Dockerfile or shell script), remove the language attribute: `[source]`.
+
+* Screenshots look scruffy. To fix, place the custom border attribute on the line above the image tag for _all screenshots_:
+
+   ```
+   [.imageblock.img_border_light]
+   image::/img/blog/pipeline-code-on-jenkins.png[Pipeline code directly on Jenkins,width=70%,align="center"]
+   ```
+  If the screenshot has a dark background, use `.imageblock.img_border_dark` instead.
+  The aim is to harden the edges of the screenshot, not to create a strong border line.
 
 See also:
 * [Asciidoc quick syntax](https://asciidoctor.org/docs/asciidoc-syntax-quick-reference/)
