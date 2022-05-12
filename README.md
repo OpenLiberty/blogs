@@ -185,8 +185,18 @@ If a published post on openliberty.io/blog contains an error or needs updating i
 
 ## Troubleshooting Asciidoc
 
-Certain characters (eg apostrophe ' ) in the main heading are displayed incorrectly. To fix, escape with a backslash (`\`).
+* Certain characters (eg apostrophe ' ) in the main heading are displayed incorrectly. To fix, escape with a backslash (`\`).
 eg `= Minimise turnaround times with Open Liberty\'s dev mode`
+
+* Syntax highlighting in code snippets isn't displaying correctly. To fix, make sure you've put your code snippet in `source` tags:
+
+   ```
+   [source,xml]
+   ----
+   your code snippet here
+   ----
+   ````
+   Where `xml` is the language used in your code snippet. See the [supported list of languages](https://docs.asciidoctor.org/asciidoctor/latest/syntax-highlighting/coderay/). If your languages isn't supported (eg a Dockerfile or shell script), remove the language attribute: `[source]`.
 
 See also:
 * [Asciidoc quick syntax](https://asciidoctor.org/docs/asciidoc-syntax-quick-reference/)
