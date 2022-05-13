@@ -21,8 +21,8 @@ Continuous integration and continuous deployment (CI/CD) is a process in which d
 
 Jenkins is a popular open source automation server that has hundreds of plugins to help integrate it into your existing DevOps pipeline. The following diagram shows a simple architecture for a Jenkins deployment pipeline that builds and deploys a Jakarta EE and MicroProfile application in a single Kubernetes environment. When a code change in the Git repository is detected by Jenkins, Jenkins builds the code, runs Junit unit tests and then SonarQube security and static analysis scans against the built code. Jenkins then generates a Docker image of the application with its Open Liberty server, scans the image with Trivy, and saves the image to a Docker repository. Jenkins then triggers a deployment using CLI commands and deploys the Docker image to Kubernetes.
 
-[.imageblock.img_border_light]
-image::/img/blog/liberty-devops-generic-architecture-2.png[Liberty DevOps architecture diagram,width=70%,align="center"]
+
+image::/img/blog/liberty-devops-generic-architecture.png[Liberty DevOps architecture diagram,width=70%,align="center"]
 
 In this blog post, I will assume that you have a basic understanding of Git, Docker, Kubernetes. I will also assume that the Jakarta EE and MicroProfile application code is stored in link:https://github.com/[Github]. I will use link:https://hub.docker.com/[DockerHub] to store the Docker images and I will deploy the containerized application to link:https://cloud.ibm.com/kubernetes/catalog/create[IBM Cloud Kubernetes Service].
 
@@ -56,14 +56,14 @@ image::/img/blog/pipeline-code-on-git.png[Pipeline code stored in a Jenkinsfile 
 
 == Building the cloud-native Java application with Open Liberty on Jenkins
 
-Build your Dockerfile from the foundation code given below (gather the additional files mentioned in this code from Open Liberty support team).
+Build your Dockerfile from the foundation code given below. Additional files mentioned in the code can be downloaded from link:/extras/featureUtility.properties[featureUtility.properties] , link:/extras/server.xml[server.xml] 
 
 [source]
 ----
 FROM icr.io/appcafe/open-liberty:full-java11-openj9-ubi
 # Add Liberty server configuration including all necessary features
-COPY --chown=1001:0  server.xml /config/
-# Modify feature repository (optional)
+COPY --chown=1001:0 server.xml /config/
+# Modify feature repository (optional), this file contains the proxy settings to connect to private maven repository
 COPY --chown=1001:0 featureUtility.properties /opt/ol/wlp/etc/
 # This script will add the requested XML snippets to enable Liberty features and grow image to be fit-for-purpose using featureUtility. 
 # Only available in 'kernel-slim'. The 'full' tag already includes all features for convenience.
@@ -105,33 +105,30 @@ The following sample pipeline code builds the Liberty Java code, packages it int
           }
 ----
 
-Following are the parameter that is used in this example code
+Where:
 
-* git-token is the personal access token you have generated from your Github account.
-* remote-docker-image-repository-url is the location of the Docker image repository.
-* username is your user name for the Docker image repository.
-* password is your password for the Docker image repository.
-* docker-image-version is the version number of your Docker image, a unique identifier."
+* _git-token_ is the personal access token you have generated from your Github account.
+* _remote-docker-image-repository-url_ is the location of the Docker image repository.
+* _username_ is your user name for the Docker image repository.
+* _password_ is your password for the Docker image repository.
+* _docker-image-version_ is the version number of your Docker image, a unique identifier.
 
-[.imageblock.img_border_light]
-image::/img/blog/jenkins-cred-binding-and-corresponding-param.png[Pipeline credential binding and corresponding param,width=30%,align="center"]
-
-For static code analysis, SonarQube Community edition can be used. SonarQube's Jenkins client setup details are given at link:https://docs.sonarqube.org/latest/analysis/scan/sonarscanner-for-jenkins/[SonarScanner for Jenkins]. The following command packages the code with Maven and runs the SonarQube scan:
+For static code analysis, you can use SonarQube Community edition. SonarQube's Jenkins client setup details are given at link:https://docs.sonarqube.org/latest/analysis/scan/sonarscanner-for-jenkins/[SonarScanner for Jenkins]. The following Maven command packages the code with Maven and runs the SonarQube scan:
 
 [source]
 ----
-$ mvn package verify sonar:sonar -Dsonar.projectKey=sampleapp -Dsonar.host.url=http://localhost:9000 -Dsonar.login=7b13f240123456780479b13d09ba8
+mvn package verify sonar:sonar -Dsonar.projectKey=sampleapp -Dsonar.host.url=http://localhost:9000 -Dsonar.login=7b13f240123456780479b13d09ba8
 ----
 
-For Docker image scanning, you can use link:https://hub.docker.com/r/aquasec/trivy/[Trivy]. This scan provides the vulnerability details of open source JAR files that are used in the application. Sample commands are given below
+For Docker image scanning, you can use link:https://hub.docker.com/r/aquasec/trivy/[Trivy]. This scan provides the vulnerability details of open source JAR files that are used in the application. The following Docker command runs Trivy against your Docker image:
 
 [source]
 ----
-docker run aquasec/trivy image docker.io/shamjith/liberty-app:v1.0
+docker run aquasec/trivy image docker.io/<docker-repo>/liberty-app:v1.0
 ----
 
 Where:
-* `docker.io\shamjith\` is xxx
+* _docker-repo_ is the name of the Docker repository that contains your image
 
 == Deploying cloud-native Java applications with Open Liberty to Kubernetes with Jenkins
 
@@ -141,12 +138,12 @@ In your pipeline code, add these CLI commands in a new stage. The following samp
                            
 [source]
 ----
-            ibmcloud login --apikey $IBM_CLOUD_API_KEY -g $IBM_CLOUD_RSGRP
-            ibmcloud ks cluster config --cluster $CLUSTER-ID
-            kubectl config current-context
-            kubectl create -f deploy/deployment.yaml #( simple k8s deployment command )
-            kubectl create -f deploy/service.yaml #( simple k8s deployment command )
-            kubectl create -f deploy/route.yaml #( simple k8s deployment command )
+ibmcloud login --apikey $IBM_CLOUD_API_KEY -g $IBM_CLOUD_RSGRP
+ibmcloud ks cluster config --cluster $CLUSTER-ID
+kubectl config current-context
+kubectl create -f deploy/deployment.yaml #( simple k8s deployment command )
+kubectl create -f deploy/service.yaml #( simple k8s deployment command )
+kubectl create -f deploy/route.yaml #( simple k8s deployment command )
 ----
 
 Make sure that your Kubernetes configuration files are stored in the same git repository as your Jenkinsfile in a sub-directory called `deploy`. Also ensure that the Docker image name in the Kubernetes deployment configuration file updated manually (or programmatically, if it needs to change at run time):
@@ -180,9 +177,9 @@ Kubernetes provides commands to check the application or cluster logs and memory
 
 [source]
 ----
-    $ kubectl logs ..
-    $ cat /sys/fs/cgroup/cpu/cpuacct.usage (after connecting to k8s pod)
-    $ cat /sys/fs/cgroup/memory/memory.usage_in_bytes (after connecting to k8s pod)
+kubectl logs ..
+cat /sys/fs/cgroup/cpu/cpuacct.usage (after connecting to k8s pod)
+cat /sys/fs/cgroup/memory/memory.usage_in_bytes (after connecting to k8s pod)
 ----
 
 There are several applications available that you can integrate with Kubernetes to persist logs and usage statistics, such as link:https://grafana.com/oss/loki/[Grafana] and link:https://prometheus.io[Prometheus]. You can read more in the following articles:
