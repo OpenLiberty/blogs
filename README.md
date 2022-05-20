@@ -97,7 +97,7 @@ These steps are to be completed by the author of the blog post.
    - Merge the PR
    - Once the site rebuilds, check that everything is correct on the [blogs-draft site](https://blogs-draft-openlibertyio.mybluemix.net/blog/) or [draft site](https://draft-openlibertyio.mybluemix.net/blog/).
 10. Get reviewers to review the updates in your new PR.
-11. If you haven't already, create an account on DZone.com with your display name, username, and an email address, then send those details to @lauracowen. This gives DZone.com the option to syndicate our blog posts (they can only syndicate posts for authors who have DZone.com accounts).
+11. If you haven't already, create an account on [DZone.com](https://dzone.com/) with your display name, username, and an email address, then send those details to @lauracowen. This gives [DZone.com](https://dzone.com/) the option to syndicate our blog posts (they can only syndicate posts for authors who have [DZone.com](https://dzone.com/) accounts).
 
 You're done! The editors will handle the rest.
 
