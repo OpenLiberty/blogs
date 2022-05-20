@@ -17,9 +17,9 @@ Shamjith Antholi <https://github.com/shamjithantholi>
 
 [#Intro]
 
-Continuous integration and continuous deployment (CI/CD) is a process in which developers frequently merge code changes into a source code repository, which then triggers builds of the code, runs security scans, runs tests, and then deploys the application. Automation of this process, through adopting a DevOps culture, tools, and processes, enables organizations to release on a more frequent basis without compromising on quality. There are various tools available to automate the CI/CD process that can be readily integrated into a DevOps deployment pipeline. In this blog post we'll discuss how you can use link:https://www.jenkins.io/[Jenkins] to automate the CI/CD process for building, testing, and deploying your cloud-native Java applications running on link:https://openliberty.io[Open Liberty]. As the CI/CD process is triggered by source changes in Git, this is also known as the GitOps approach to DevOps.
+Continuous integration and continuous deployment (CI/CD) is a process in which developers frequently merge code changes into a source code repository, which then triggers code build, runs security scans, runs tests, and then deploys the application. Automation of this process, through adopting a DevOps culture, tools, and processes, enables organizations to release on a more frequent basis without compromising on quality. There are various tools available to automate the CI/CD process that can be readily integrated into a DevOps deployment pipeline. In this blog post we'll discuss how you can use link:https://www.jenkins.io/[Jenkins] to automate the CI/CD process for building, testing, and deploying your cloud-native Java applications running on link:https://openliberty.io[Open Liberty]. As the CI/CD process is triggered by source changes in Git, this is also known as the GitOps approach to DevOps.
 
-Jenkins is a popular open source automation server that has hundreds of plugins to help integrate it into your existing DevOps pipeline. The following diagram shows a simple architecture for a Jenkins deployment pipeline that builds and deploys a Jakarta EE and MicroProfile application in a single Kubernetes environment. When a code change in the Git repository is detected by Jenkins, link:https://www.jenkins.io[Jenkins] builds the code, runs Junit unit tests and then link:https://www.sonarqube.org[SonarQube] security and static analysis scans against the built code. Jenkins then generates a link:https://www.docker.com[Docker] container image of the application with Open Liberty as its runtime, scans the image with link:https://www.aquasec.com[Trivy], and saves the image to a Docker repository. Jenkins then triggers a deployment using CLI commands and deploys the Docker image to link:https://kubernetes.io[Kubernetes].
+Jenkins is a popular open source automation server that has hundreds of plugins to help integrate it into your existing DevOps pipeline. The following diagram shows a simple architecture for a Jenkins deployment pipeline that builds and deploys a Jakarta EE and MicroProfile application in a single Kubernetes environment. When a code change is done on the Git repository, GitHub will trigger the corresponding code build job in link:https://www.jenkins.io[Jenkins], runs Junit unit tests and then link:https://www.sonarqube.org[SonarQube] static code analysis scans against the built code. Jenkins then generates a link:https://www.docker.com[Docker] container image of the application with Open Liberty as its runtime, saves the image to a Docker repository and then scans the image with link:https://www.aquasec.com[Trivy]. Jenkins then triggers a deployment using CLI commands and deploys the Docker image to link:https://kubernetes.io[Kubernetes].
 
 
 image::/img/blog/liberty-devops-generic-architecture.png[Liberty DevOps architecture diagram,width=70%,align="center"]
@@ -28,7 +28,7 @@ In this blog post, I will assume that you have a basic understanding of Git, Doc
 
 == Installing and configuring Jenkins to set up CI/CD of a cloud-native Java application
 
-link:https://www.jenkins.io/doc/book/installing/[Install Jenkins] with the following plugins on the base image of your Jenkins container image, or on the Jenkins controller:
+link:https://www.jenkins.io/doc/book/installing/[Install Jenkins] with the following plugins on the base image of your Jenkins container image, or on the Jenkins controller (Jenkins host):
 
 * Maven, to build java code
 * Pipeline, for creating Jenkins pipeline jobs
@@ -36,20 +36,20 @@ link:https://www.jenkins.io/doc/book/installing/[Install Jenkins] with the follo
 * Docker or equivalent like link:https://podman.io[Podman], to build and push container images
 * Kubernetes, to use the Kubernetes template
 
-Jenkins builds your Java application code running on Liberty using Jenkins link:https://www.jenkins.io/doc/book/pipeline/syntax/[pipeline scripts]. The script can run directly on your Jenkins installation (known as the Jenkins controller) but, if the application is big, you need to use a Jenkins agent. For more information about about setting up Jenkins agents, see link:https://www.jenkins.io/doc/book/using/using-agents/[Using Jenkins agents].
+Jenkins builds your Java application code running on Liberty using Jenkins link:https://www.jenkins.io/doc/book/pipeline/syntax/[pipeline scripts]. The script can run directly on your Jenkins host (known as the Jenkins controller) but, if the application is in need of large memory, you need to use a Jenkins agent as the job execution environment. For more information about about setting up Jenkins agents, see link:https://www.jenkins.io/doc/book/using/using-agents/[Using Jenkins agents].
 
 == Writing Jenkins pipeline scripts
 
-It is good practice to adhere to the concept of Infrastructure as Code (IaC) when writing DevOps pipelines. Writing Jenkins jobs as pipeline scripts is a good example of IaC.
+It is a good practice to adhere to the concept of Infrastructure as Code (IaC) when creating DevOps pipelines. Creating Jenkins jobs with pipeline scripts is a good example of IaC.
 
 You can write link:https://www.jenkins.io/doc/book/pipeline/syntax/[Jenkins pipeline code] in one of the following ways:
 
-* As pipeline code written directly in the link:https://www.jenkins.io/doc/book/pipeline/getting-started/[Jenkins UI] and stored in the Jenkins controller. This is a useful way to get started. You would need to take a backup of the Jenkins instance to store the pipeline code because it is part of the Jenkins installation. 
+* As pipeline code written directly in the link:https://www.jenkins.io/doc/book/pipeline/getting-started/[Jenkins UI] and stored in the Jenkins controller(host). This is a useful way to get started. You would need to take a backup of the Jenkins instance in this case to save the pipeline code because code is directly written in jobs as part of the Jenkins installation(host). 
 
 [.img_border_light]
 image::/img/blog/pipeline-code-on-jenkins.png[Pipeline code directly on Jenkins,align="center"]
 
-* As plain text in a Jenkinsfile (a plain text file) in Git and mapping it to Jenkins. This is better for ensuring that your configuration is always under version control. If you have specific build and deployment configurations for separate environments, such as dev, staging, and production, you create a separate Jenkinsfile for each environment and store it in that environment-specific Git repository branches. You can use either the "Pipeline" or "Multibranch pipeline" type of job in this case.
+* As plain text in a Jenkinsfile (a plain text file) in Git and mapping it to Jenkins. This is better for ensuring that your configuration is always under version control. If you have specific build and deployment configurations for separate environments, such as dev, staging, and production, you can create a separate Jenkinsfile for each environment and store it in that environment-specific Git repository branches. You can use either the "Pipeline" or "Multibranch pipeline" type of job in this case.
 
 [.img_border_light]
 image::/img/blog/pipeline-code-on-git.png[Pipeline code stored in a Jenkinsfile on Git,align="center"]
@@ -96,10 +96,10 @@ For static code analysis, you can use SonarQube Community edition. The Jenkins c
 
 [source]
 ----
-mvn package verify sonar:sonar -Dsonar.projectKey=sampleapp -Dsonar.host.url=http://localhost:9000 -Dsonar.login=7b13f240123456780479b13d09ba8
+mvn package verify sonar:sonar -Dsonar.projectKey=sampleapp -Dsonar.host.url=http://localhost:9000 -Dsonar.login=<generated-login-key>
 ----
 
-For container image scanning for security purpose, you can use link:https://hub.docker.com/r/aquasec/trivy/[Trivy]. This scan provides the vulnerability details of open source JAR files that are used to resolve the dependencies while building the application. The following Docker command runs Trivy against your container image:
+For scanning the container image (security purpose), you can use link:https://hub.docker.com/r/aquasec/trivy/[Trivy]. This scan provides the vulnerability details of open source JAR files that are used to resolve the dependencies while building the application. The following Docker command runs Trivy against your container image:
 
 [source]
 ----
@@ -112,7 +112,7 @@ Where:
 
 == Deploying cloud-native Java applications with Open Liberty to Kubernetes with Jenkins
 
-For simplicity, I will use the command line (CLI) option to configure Jenkins to deploy a Jakarta EE and MicroProfile application with Open Liberty to Kubernetes. You could use one of many tools though, such as Helm, Travis CI, Circle CI, etc.
+For simplicity, I will use the command line (CLI) code in Jenkins pipeline job to deploy a Jakarta EE and MicroProfile application with Open Liberty into Kubernetes. 
 
 In your pipeline code, add these CLI commands in a new stage. The following sample pipeline code connects to IBM Cloud from the CLI and then connects to the Kubernetes cluster running inside that, then it runs all the Kubernetes deployment-related configurations.
                            
