@@ -42,7 +42,7 @@ Install link:https://www.jenkins.io/doc/book/installing/[Jenkins] with the follo
 * Docker or equivalent like link:https://podman.io[Podman], to build and push container images
 * Kubernetes, to use the Kubernetes template
 
-Jenkins builds your Java application code running on Liberty using Jenkins pipeline scripts. The script can run directly on your Jenkins installation (known as Jenkins controller) but, if the application is big, you need to use a Jenkins agent. For more information about about setting up Jenkins agents, see link:https://www.jenkins.io/doc/book/using/using-agents/[Using Jenkins agents] and link[https://www.jenkins.io/doc/book/pipeline/syntax/[Pipeline Syntax].
+Jenkins builds your Java application code running on Liberty using Jenkins pipeline scripts. The script can run directly on your Jenkins installation (known as Jenkins controller) but, if the application is big, you need to use a Jenkins agent. For more information about about setting up Jenkins agents, see link:https://www.jenkins.io/doc/book/using/using-agents/[Using Jenkins agents] and link:https://www.jenkins.io/doc/book/pipeline/syntax/[Pipeline Syntax].
 
 == Writing Jenkins pipeline scripts
 
@@ -53,36 +53,14 @@ You can write link:https://www.jenkins.io/doc/book/pipeline/syntax/[Jenkins pipe
 * As pipeline code written directly in the link:https://www.jenkins.io/doc/book/pipeline/getting-started/[Jenkins UI] and stored in the Jenkins controller. This is a useful way to get started. You would need to take a backup of the Jenkins instance to store the pipeline code because it is part of the Jenkins installation. 
 
 [.imageblock.img_border_light]
-image::/img/blog/pipeline-code-on-jenkins.png[Pipeline code directly on Jenkins,width=70%,align="center"]
+image::/img/blog/pipeline-code-on-jenkins.png[Pipeline code directly on Jenkins,width=70%,height=60%,align="center"]
 
 * As plain text in a Jenkinsfile (a plain text file) in Git and mapping it to Jenkins. This is better for ensuring that your configuration is always under version control. If you have specific build and deployment configurations for separate environments, such as dev, staging, and production, you create a separate Jenkinsfile for each environment and store it in that environment-specific Git repository branches. You can use either the "Pipeline" or "Multibranch pipeline" type of job in this case.
 
 [.imageblock.img_border_light]
-image::/img/blog/pipeline-code-on-git.png[Pipeline code stored in a Jenkinsfile on git,width=50%,align="center"]
+image::/img/blog/pipeline-code-on-git.png[Pipeline code stored in a Jenkinsfile on git,width=70%,height=60%,align="center"]
 
 == Building the cloud-native Java application with Open Liberty on Jenkins
-
-Build the container image for your application running on Liberty using a Dockerfile with the following content:
-
-[source]
-----
-FROM icr.io/appcafe/open-liberty:full-java11-openj9-ubi
-
-# This script will add the requested XML snippets to enable Liberty features and grow image to be fit-for-purpose using featureUtility. 
-# Only available in 'kernel-slim'. The 'full' tag already includes all features for convenience.
-RUN features.sh
-# Add interim fixes (optional)
-#COPY --chown=1001:0  interim-fixes /opt/ol/fixes/
-.
-.
-.
-.
-COPY --chown=1001:0 src/main/liberty/config/ /config/
-COPY --chown=1001:0 ./target/*.war /config/apps/
-RUN configure.sh
-----
-
-You can learn more about the Liberty container images available to you and best practices for creating a Dockerfile link:https://github.com/OpenLiberty/ci.docker/[here].
 
 The following sample pipeline code builds your Java application code, packages it into a Docker container image, and pushes the container image to a remote container image repository, such as Docker Hub or an equivalent within your enterprise:
 
@@ -118,14 +96,16 @@ Where:
 * _password_ is your password for the Docker image repository.
 * _docker-image-version_ is the version number of your Docker image, a unique identifier.
 
-For static code analysis, you can use SonarQube Community edition. SonarQube's Jenkins client setup details are given at link:https://docs.sonarqube.org/latest/analysis/scan/sonarscanner-for-jenkins/[SonarScanner for Jenkins]. The following Maven command packages the code with Maven and runs the SonarQube scan:
+Use this sample link:https://openliberty.io/guides/containerize.html[Dockerfile] to customize for the application in development
+
+For static code analysis, you can use SonarQube Community edition. SonarQube's Jenkins client setup details are given at link:https://docs.sonarqube.org/latest/analysis/scan/sonarscanner-for-jenkins/[SonarScanner for Jenkins]. The following sample Maven command packages the code with Maven and runs the SonarQube scan:
 
 [source]
 ----
 mvn package verify sonar:sonar -Dsonar.projectKey=sampleapp -Dsonar.host.url=http://localhost:9000 -Dsonar.login=7b13f240123456780479b13d09ba8
 ----
 
-For container image scanning for security purpose, you can use link:https://hub.docker.com/r/aquasec/trivy/[Trivy]. This scan provides the vulnerability details of open source JAR files that are used in the application. The following Docker command runs Trivy against your container image:
+For container image scanning for security purpose, you can use link:https://hub.docker.com/r/aquasec/trivy/[Trivy]. This scan provides the vulnerability details of open source JAR files that are used to resolve the dependencies while building the application. The following Docker command runs Trivy against your container image:
 
 [source]
 ----
@@ -148,11 +128,11 @@ ibmcloud login --apikey $IBM_CLOUD_API_KEY -g $IBM_CLOUD_RSGRP
 ibmcloud ks cluster config --cluster $CLUSTER-ID
 kubectl config current-context
 kubectl create -f deploy/deployment.yaml #( simple k8s deployment command )
-kubectl create -f deploy/service.yaml #( simple k8s deployment command )
-kubectl create -f deploy/route.yaml #( simple k8s deployment command )
+kubectl create -f deploy/service.yaml #( simple k8s service creation command )
+kubectl create -f deploy/route.yaml #( simple k8s route creation command )
 ----
 
-Make sure that your Kubernetes configuration files are stored in the same git repository as your Jenkinsfile in a sub-directory called `deploy`. Also ensure that the Docker image name in the Kubernetes deployment configuration file updated manually (or programmatically, if it needs to change at run time):
+Make sure that your Kubernetes configuration files are stored in the same git repository as your Jenkinsfile in a sub-directory called `deploy`. Also ensure that the Docker image name in the Kubernetes deployment configuration file are updated according to the container image name/tag in the Dockerfile ( manually or programmatically, if it needs to change at run time):
 
 [.imageblock.img_border_light]
 image::/img/blog/deploymentyaml.png[Image reference in deployment yaml,width=40%,align="center"]
