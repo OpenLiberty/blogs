@@ -24,11 +24,11 @@ Jenkins is a popular open source automation server that has hundreds of plugins 
 
 image::/img/blog/liberty-devops-generic-architecture.png[Liberty DevOps architecture diagram,width=70%,align="center"]
 
-In this blog post, I will assume that you have a basic understanding of Git, Docker, Kubernetes. I will also assume that the Jakarta EE and MicroProfile application code is stored in link:https://github.com/[GitHub]. I will use link:https://hub.docker.com/[Docker Hub] to store the Docker container images and I will deploy the containerized application to link:https://cloud.ibm.com/kubernetes/catalog/create[IBM Cloud Kubernetes Service].
+In this blog post, I will assume that you have a basic understanding of Git, Docker, and Kubernetes. I will also assume that the Jakarta EE and MicroProfile application code is stored in link:https://github.com/[GitHub]. I will use link:https://hub.docker.com/[Docker Hub] to store the Docker container images and I will deploy the containerized application to link:https://cloud.ibm.com/kubernetes/catalog/create[IBM Cloud Kubernetes Service].
 
 == Installing and configuring Jenkins to set up CI/CD of a cloud-native Java application
 
-Install link:https://www.jenkins.io/doc/book/installing/[Jenkins] with the following plugins on the base image of your Jenkins container image, or on the Jenkins controller.
+link:https://www.jenkins.io/doc/book/installing/[Install Jenkins] with the following plugins on the base image of your Jenkins container image, or on the Jenkins controller:
 
 * Maven, to build java code
 * Pipeline, for creating Jenkins pipeline jobs
@@ -36,7 +36,7 @@ Install link:https://www.jenkins.io/doc/book/installing/[Jenkins] with the follo
 * Docker or equivalent like link:https://podman.io[Podman], to build and push container images
 * Kubernetes, to use the Kubernetes template
 
-Jenkins builds your Java application code running on Liberty using Jenkins pipeline scripts. The script can run directly on your Jenkins installation (known as Jenkins controller) but, if the application is big, you need to use a Jenkins agent. For more information about about setting up Jenkins agents, see link:https://www.jenkins.io/doc/book/using/using-agents/[Using Jenkins agents] and link:https://www.jenkins.io/doc/book/pipeline/syntax/[Pipeline Syntax].
+Jenkins builds your Java application code running on Liberty using Jenkins link:https://www.jenkins.io/doc/book/pipeline/syntax/[pipeline scripts]. The script can run directly on your Jenkins installation (known as the Jenkins controller) but, if the application is big, you need to use a Jenkins agent. For more information about about setting up Jenkins agents, see link:https://www.jenkins.io/doc/book/using/using-agents/[Using Jenkins agents].
 
 == Writing Jenkins pipeline scripts
 
@@ -47,12 +47,12 @@ You can write link:https://www.jenkins.io/doc/book/pipeline/syntax/[Jenkins pipe
 * As pipeline code written directly in the link:https://www.jenkins.io/doc/book/pipeline/getting-started/[Jenkins UI] and stored in the Jenkins controller. This is a useful way to get started. You would need to take a backup of the Jenkins instance to store the pipeline code because it is part of the Jenkins installation. 
 
 [.imageblock.img_border_light]
-image::/img/blog/pipeline-code-on-jenkins.png[Pipeline code directly on Jenkins,width=70%,height=60%,align="center"]
+image::/img/blog/pipeline-code-on-jenkins.png[Pipeline code directly on Jenkins,align="center"]
 
 * As plain text in a Jenkinsfile (a plain text file) in Git and mapping it to Jenkins. This is better for ensuring that your configuration is always under version control. If you have specific build and deployment configurations for separate environments, such as dev, staging, and production, you create a separate Jenkinsfile for each environment and store it in that environment-specific Git repository branches. You can use either the "Pipeline" or "Multibranch pipeline" type of job in this case.
 
 [.imageblock.img_border_light]
-image::/img/blog/pipeline-code-on-git.png[Pipeline code stored in a Jenkinsfile on git,width=70%,height=60%,align="center"]
+image::/img/blog/pipeline-code-on-git.png[Pipeline code stored in a Jenkinsfile on Git,align="center"]
 
 == Building the cloud-native Java application with Open Liberty on Jenkins
 
@@ -92,7 +92,7 @@ Where:
 
 Use this link:/guides/containerize.html[sample Dockerfile] and customize it for your application.
 
-For static code analysis, you can use SonarQube Community edition. SonarQube's Jenkins client setup details are given at link:https://docs.sonarqube.org/latest/analysis/scan/sonarscanner-for-jenkins/[SonarScanner for Jenkins]. The following sample Maven command packages the code with Maven and runs the SonarQube scan:
+For static code analysis, you can use SonarQube Community edition. The Jenkins client setup details for SonarQube are given at link:https://docs.sonarqube.org/latest/analysis/scan/sonarscanner-for-jenkins/[SonarScanner for Jenkins]. The following sample Maven command packages the code with Maven and runs the SonarQube scan:
 
 [source]
 ----
@@ -114,7 +114,7 @@ Where:
 
 For simplicity, I will use the command line (CLI) option to configure Jenkins to deploy a Jakarta EE and MicroProfile application with Open Liberty to Kubernetes. You could use one of many tools though, such as Helm, Travis CI, Circle CI, etc.
 
-In your pipeline code, add these CLI commands in a new stage. The following sample pipeline code connects to IBM Cloud from CLI and then connects to Kubernetes cluster running inside that, further it runs all the Kubernetes deployment related configurations .
+In your pipeline code, add these CLI commands in a new stage. The following sample pipeline code connects to IBM Cloud from the CLI and then connects to the Kubernetes cluster running inside that, then it runs all the Kubernetes deployment-related configurations.
                            
 [source]
 ----
@@ -126,21 +126,20 @@ kubectl create -f deploy/service.yaml #( simple k8s service creation command )
 kubectl create -f deploy/route.yaml #( simple k8s route creation command )
 ----
 
-Make sure that your Kubernetes configuration files are stored in the same git repository as your Jenkinsfile in a sub-directory called `deploy`. Also ensure that the Docker image name in the Kubernetes deployment configuration file are updated according to the container image name/tag in the Dockerfile (manually, or programmatically if it needs to change at run time):
+Make sure that your Kubernetes configuration files are stored in the same git repository as your Jenkinsfile in a sub-directory called `deploy`. Also ensure that the Docker image name in the Kubernetes deployment configuration file is updated according to the container image name/tag in the Dockerfile (manually, or programmatically if it needs to change at run time):
 
 [.imageblock.img_border_light]
 image::/img/blog/deploymentyaml.png[Image reference in deployment yaml,width=40%,align="center"]
 
 When Jenkins has checked out the Java application code for the code build, all the Kubernetes configuration files are also downloaded to the Jenkins workspace so that Jenkins can run the IBM Cloud and Kubernetes commands to connect to the Kubernetes cluster and deploy the application.
 
-See the Kubernetes documentation for other commands:
-link:https://kubernetes.io/docs/reference/kubectl/cheatsheet/[kubectl Cheat Sheet].
+See the ink:https://kubernetes.io/docs/reference/kubectl/cheatsheet/[Kubernetes documentation] for other commands.
 
 == QA testing cloud-native Java applications with Jenkins
 
 Apart from running JUnit test cases along with the code build phase, Jenkins can trigger functional and integration QA test cases automatically after deploying the cloud-native Java application.
 
-Configure the test cases in the Jenkins job and test it manually. Create a remote job identifier authentication token in the "Trigger builds remotely" section under "Build Triggers". Trigger this test case from the Docker "entrypoint" file by using remote rest API call that uses this authentication token as the identifier.
+Configure the test cases in the Jenkins job and test it manually. Create a remote job identifier authentication token in the "Trigger builds remotely" section under "Build Triggers". Trigger this test case from the Docker "entrypoint" file by using a remote rest API call that uses this authentication token as the identifier.
 
 For example, run the following command in a terminal: 
 
