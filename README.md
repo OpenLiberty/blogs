@@ -200,7 +200,7 @@ eg `= Minimise turnaround times with Open Liberty\'s dev mode`
    [.img_border_light]
    image::/img/blog/pipeline-code-on-jenkins.png[Pipeline code directly on Jenkins,width=70%,align="center"]
    ```
-  If the screenshot has a dark background, use `.imageblock.img_border_dark` instead.
+  If the screenshot has a dark background, use `[.img_border_dark]` instead.
   The aim is to harden the edges of the screenshot, not to create a strong visible border line.
 
 See also:
