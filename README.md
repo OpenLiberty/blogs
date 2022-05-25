@@ -197,7 +197,7 @@ eg `= Minimise turnaround times with Open Liberty\'s dev mode`
 * Screenshot edges are untidy. To fix, place the custom border attribute on the line above the image tag for _all screenshots_:
 
    ```
-   [.imageblock.img_border_light]
+   [.img_border_light]
    image::/img/blog/pipeline-code-on-jenkins.png[Pipeline code directly on Jenkins,width=70%,align="center"]
    ```
   If the screenshot has a dark background, use `.imageblock.img_border_dark` instead.
