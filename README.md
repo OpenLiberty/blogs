@@ -35,13 +35,13 @@ These steps are to be completed by the author of the blog post.
     
       Copy the [post-single-author.adoc](./templates/post-single-author.adoc) file (or [post-multiple-authors.adoc](./templates/post-multiple-authors.adoc) for multiple authors) to the [posts](./posts) directory and rename the file using the format `YYYY-MM-DD-post-title.adoc`, where the date represents the expected publication date (e.g. `2021-11-21-open-liberty-is-awesome.adoc`).
 
-      Place any images in [img/blog](./img/blog/). Add a [border to all screenshots](#troubleshooting-asciidoc) to neaten the edges.
+      Place any images in [img/blog](./img/blog/). Add a [border to screenshots](#troubleshooting-asciidoc) to neaten the edges.
   
     * **GA release blog post** (Open Liberty GA release announcements only)
 
       Copy the [ga-release-post.adoc](./templates/ga-release-post.adoc) file to the [posts](./posts) directory and rename the file using the format `YYYY-MM-DD-post-title.adoc`, where the date represents the expected publication date and the end of the file name is the release version number without periods (e.g. `2021-11-21-open-liberty-is-awesome-210011.adoc`).
 
-      Place any images in [img/blog](./img/blog/).  Add a [border to all screenshots](#troubleshooting-asciidoc) to neaten the edges.
+      Place any images in [img/blog](./img/blog/).  Add a [border to screenshots](#troubleshooting-asciidoc) to neaten the edges.
 
       Ensure that the Asciidoc tags (e.g. `// tag::intro[]` and `// end::intro[]`) in the template are retained around the relevant parts of the release post. These Asciidoc tags will be used to build alternative versions of the post content.
    
@@ -49,7 +49,7 @@ These steps are to be completed by the author of the blog post.
 
       Copy the [beta-release-post.adoc](./templates/beta-release-post.adoc) file to the [posts](./posts) directory and rename the file using the format `YYYY-MM-DD-post-title.adoc`, where the date represents the expected publication date and the end of the post title is the beta release version number without periods or hyphens (e.g. `2021-11-21-new-awesomeness-coming-soon-210012beta.adoc`).
 
-      Place any images in [img/blog](./img/blog/).  Add a [border to all screenshots](#troubleshooting-asciidoc) to neaten the edges.
+      Place any images in [img/blog](./img/blog/).  Add a [border to screenshots](#troubleshooting-asciidoc) to neaten the edges.
 
     * **Third-party blog post** (externally hosted posts only)
 
@@ -69,12 +69,7 @@ These steps are to be completed by the author of the blog post.
    If you find there are a load of merge conflicts at this stage, see [Troubleshooting GitHub workflow](#troubleshooting-github-workflow).
 
 
-5. Currently, Travis is no longer building our non-prod sites. All the builds and deployments of non-prod sites have been moved to IBM Cloud and now build automatically whenever the a PR is merged into their respective branch. These builds are private and, therefore, their detailed build/deploy progress can't be tracked. However, if you have access to the [Slack channel](https://app.slack.com/client/T15GKHBT4/C01GXGW1DGQ), you can at least track when the builds start and finish.  
-   ~~Request a build of the [draft openliberty.io site](https://draft-openlibertyio.mybluemix.net/blog/):~~
-    1. ~~Sign in to [Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io/branches) with your GitHub account.~~
-    2. ~~Click **More Options > Trigger Build**. Type `draft` in the **Branch** field, then click **Trigger custom build**.~~
-    
-          ~~The draft site build starts running.~~
+5. Currently, Travis is no longer building our non-prod sites. All the builds and deployments of non-prod sites have been moved to IBM Cloud and now build automatically whenever the a PR is merged into their respective branch. These builds are private and, therefore, their detailed build/deploy progress can't be tracked. However, if you have access to the [Slack channel](https://app.slack.com/client/T15GKHBT4/C01GXGW1DGQ), you can at least track when the builds start and finish.
 
 6. When the build is finished, check that the blog renders correctly on either the [blogs-draft site](https://blogs-draft-openlibertyio.mybluemix.net/blog/) or the [full draft site](https://draft-openlibertyio.mybluemix.net/blog/).  
 
@@ -97,7 +92,7 @@ These steps are to be completed by the author of the blog post.
    - Merge the PR
    - Once the site rebuilds, check that everything is correct on the [blogs-draft site](https://blogs-draft-openlibertyio.mybluemix.net/blog/) or [draft site](https://draft-openlibertyio.mybluemix.net/blog/).
 10. Get reviewers to review the updates in your new PR.
-11. If you haven't already, create an account on DZone.com with your display name, username, and an email address, then send those details to @lauracowen. This gives DZone.com the option to syndicate our blog posts (they can only syndicate posts for authors who have DZone.com accounts).
+11. If you haven't already, create an account on [DZone.com](https://dzone.com/) with your display name, username, and an email address, then send those details to Laura Cowen (@lauracowen on Slack, if you're an IBMer; if you're not an IBMer, use whatever method you have used already). This gives [DZone.com](https://dzone.com/) the option to syndicate our blog posts (they can only syndicate posts for authors who have [DZone.com](https://dzone.com/) accounts).
 
 You're done! The editors will handle the rest.
 
@@ -199,14 +194,14 @@ eg `= Minimise turnaround times with Open Liberty\'s dev mode`
    ````
    Where `xml` is the language used in your code snippet. See the [supported list of languages](https://docs.asciidoctor.org/asciidoctor/latest/syntax-highlighting/coderay/). If your languages isn't supported (eg a Dockerfile or shell script), remove the language attribute: `[source]`.
 
-* Screenshots look scruffy. To fix, place the custom border attribute on the line above the image tag for _all screenshots_:
+* Screenshot edges are untidy. To fix, place the custom border attribute on the line above the image tag for _all screenshots_:
 
    ```
-   [.imageblock.img_border_light]
+   [.img_border_light]
    image::/img/blog/pipeline-code-on-jenkins.png[Pipeline code directly on Jenkins,width=70%,align="center"]
    ```
-  If the screenshot has a dark background, use `.imageblock.img_border_dark` instead.
-  The aim is to harden the edges of the screenshot, not to create a strong border line.
+  If the screenshot has a dark background, use `[.img_border_dark]` instead.
+  The aim is to harden the edges of the screenshot, not to create a strong visible border line.
 
 See also:
 * [Asciidoc quick syntax](https://asciidoctor.org/docs/asciidoc-syntax-quick-reference/)
