@@ -22,6 +22,8 @@ Open Liberty 22.0.0.6 offers MicroProfile GraphQL 2.0, which incorporates Jakart
 In link:{url-about}[Open Liberty] 22.0.0.6:
 
 * <<graphql, MicroProfile GraphQL 2.0>>
+* <<cve, Security Vulnerability (CVE) Fixes>>
+* <<bugs, Notable bug fixes>>
 
 View the list of fixed bugs in link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A22006+label%3A%22release+bug%22[22.0.0.6].
 
@@ -92,6 +94,50 @@ For a list of past security vulnerability fixes, reference the link:{url-prefix}
 == Notable bugs fixed in this release
 
 We’ve spent some time fixing bugs. The following sections describe just some of the issues resolved in this release. If you’re interested, here’s the  link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A22006+label%3A%22release+bug%22[full list of bugs fixed in 22.0.0.6].
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/21050[Liberty OIDC error is being returned with incorrect characters]
++
+Previously, Liberty's `OIDC` error was returned with incorrect characters. When invoking the OP's `/authorize` endpoint with missing or incorrect parameters in traditional Chinese, the returned error message had a number of `????` instead of Chinese characters. The same happened for other non-ascii languages.
++
+The error page showed:
++
+[source]
+----
+"Accept-Language: zh-TW"
+HTTP/1.1 200 OK
+X-Powered-By: Servlet/3.0
+Content-Language: en-DE
+Transfer-Encoding: chunked
+Date: Fri, 06 May 2022 08:42:36 GMT
+
+CWOAU0033E: ????????????client_id
+----
++
+This issue has now been fixed and the page should contain the properly translated error message instead of `????????????`.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/21079[Refresh token is not cleaned up when a JWT access_token had been issued]
++
+`OIDC` `end_session`'s `refresh_token` cleanup is different depending on the type of access_token issued.
+The Liberty OP can issue opaque or JWT `access_tokens`. When running `end_session`, the `refresh_token` is removed from the cache when creating opaque `access_tokens`, however when creating JWT `access_tokens`, the `refresh_token` was NOT removed. This issue has been resolved and running `end_session` on providers that generate JWT access_tokens should invalidate the `refresh_token`.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/21097[Custom claims not passed to the back end]
++
+When using MicroProfile Starter `start.microprofile.io` to generate `service-a` and `service-b` running on Open Liberty, the invocation to the service `b` no longer sent out the custom claim on invoking the JWT backend via `localhost:9080`. This defect was caused by the changes which exposed a hidden problem in the `Claims.putAll` method when there were claims with a null value and has since been fixed.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/21043[Bump netty dependencies to 4.1.77.Final]
++
+Netty components in Open Liberty were of the version `4.1.75.Final` released in March 2022. The latest version `4.1.77.Final` contains various bug fixes and improvements over the current version. These components have been updated to ensure that Open Liberty stays up to date with upstream fixes and improvements.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/20908[Default session meta cache name failed with RH DataGrid]
++
+When Liberty created `infinispan` caches name with percent encoding, Datagrid Administration GUI Console failed to retrieve the cache name. An example would be:
++
+[source]
+----
+com.ibm.ws.session.meta.default_host%2FGestionPedidos
+----
++
+Where `GestionPedidos` is the application web context, `%2F` is the encoded character for `/`. RH DataGrid failed to retrieve the above cache name.
 
 == Get Open Liberty 22.0.0.6 now
 
