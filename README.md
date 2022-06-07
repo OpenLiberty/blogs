@@ -25,9 +25,9 @@ These steps are to be completed by the author of the blog post.
 
      Create a normal issue. In the title, make clear that it's for the beta release and which release version.
 
-2. Clone the repo and create a branch off the default `prod` branch. From the `prod` branch, run: `git checkout -b branch_name`, where `branch_name` is a name you give your new branch.
+2. Clone the repo and create a branch off the default `prod` branch. Be sure to clone using SSH (`git clone git@github.com:OpenLiberty/blogs.git`), not HTTPS, or you won't be able to push to the repo in GitHub. From the `prod` branch, run: `git checkout -b branch_name`, where `branch_name` is a name you give your new branch.
 
-    Do _all_ your editing in this branch so that the blog editors can make any necessary edits directly in the branch before publishing your post.
+    Do _all_ your editing in this branch so that the blog editors can make any necessary edits directly in the branch before publishing your post. You'll push this branch directly to the shared repo (not a fork) in a later step.
 
 3. Create your blog post using [Asciidoc](https://asciidoctor.org/docs/asciidoc-syntax-quick-reference/) markup (use an editor such as [VSCode with the Asciidoc plugin](https://marketplace.visualstudio.com/items?itemName=joaompinto.asciidoctor-vscode)):
 
@@ -69,7 +69,7 @@ These steps are to be completed by the author of the blog post.
    If you find there are a load of merge conflicts at this stage, see [Troubleshooting GitHub workflow](#troubleshooting-github-workflow).
 
 
-5. Currently, Travis is no longer building our non-prod sites. All the builds and deployments of non-prod sites have been moved to IBM Cloud and now build automatically whenever the a PR is merged into their respective branch. These builds are private and, therefore, their detailed build/deploy progress can't be tracked. However, if you have access to the [Slack channel](https://app.slack.com/client/T15GKHBT4/C01GXGW1DGQ), you can at least track when the builds start and finish.
+5. All the builds and deployments of non-prod sites run on IBM Cloud and build automatically whenever a PR is merged into their respective branch. These builds are private and, therefore, their detailed build/deploy progress can't be tracked. However, if you have access to the [Slack channel](https://app.slack.com/client/T15GKHBT4/C01GXGW1DGQ), you can at least track when the builds start and finish.
 
 6. When the build is finished, check that the blog renders correctly on either the [blogs-draft site](https://blogs-draft-openlibertyio.mybluemix.net/blog/) or the [full draft site](https://draft-openlibertyio.mybluemix.net/blog/).  
 
@@ -92,7 +92,6 @@ These steps are to be completed by the author of the blog post.
    - Merge the PR
    - Once the site rebuilds, check that everything is correct on the [blogs-draft site](https://blogs-draft-openlibertyio.mybluemix.net/blog/) or [draft site](https://draft-openlibertyio.mybluemix.net/blog/).
 10. Get reviewers to review the updates in your new PR.
-11. If you haven't already, create an account on [DZone.com](https://dzone.com/) with your display name, username, and an email address, then send those details to Laura Cowen (@lauracowen on Slack, if you're an IBMer; if you're not an IBMer, use whatever method you have used already). This gives [DZone.com](https://dzone.com/) the option to syndicate our blog posts (they can only syndicate posts for authors who have [DZone.com](https://dzone.com/) accounts).
 
 You're done! The editors will handle the rest.
 
