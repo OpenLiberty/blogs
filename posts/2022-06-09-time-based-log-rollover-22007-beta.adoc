@@ -1,0 +1,146 @@
+---
+layout: post
+title: "Time-based log rollover and enhancements to LogRecordContext extension in Open Liberty 22.0.0.7-beta"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/ryan-storey
+author_github: https://github.com/ryan-storey
+seo-title: Time-based log rollover and enhancements to LogRecordContext extension in Open Liberty 22.0.0.7-beta - OpenLiberty.io
+seo-description: Open Liberty 22.0.0.7-beta offers time-based log rollover, which enables you to specify a time of day for log files to roll over. This release also includes the addition of the application name to the LogRecordContext Extension and a corresponding JSON logging field.
+blog_description: Open Liberty 22.0.0.7-beta offers time-based log rollover, which enables you to specify a time of day for log files to roll over. This release also includes the addition of the application name to the LogRecordContext Extension and a corresponding JSON logging field.
+open-graph-image: https://openliberty.io/img/blog/log_rollover.png
+---
+= Time-based log rollover and enhancements to LogRecordContext extension in Open Liberty 22.0.0.7-beta
+Ryan Storey <https://github.com/ryan-storey>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+Open Liberty 22.0.0.7-beta offers time-based log rollover, which enables you to specify a time of day for log files to roll over. This release also includes the addition of the application name to the LogRecordContext Extension and a corresponding JSON logging field.
+
+The link:{url-about}[Open Liberty] 22.0.0.7-beta includes the following beta features (along with all GA features):
+
+* <<log_rollover, Time-based log rollover for Liberty>>
+* <<logrecordcontext, Add application name to LogRecordContext Extension and as JSON logging field>>
+
+[#log_rollover]
+== Time-based log rollover for Liberty
+
+Liberty provides a few different log files; a `message.log` is created by default, and a `trace.log` and `http_access.log` can be enabled for tracing and `NCSA` access logs respectively. Previously, these log files could be rolled over only by either server restart or by limiting the maximum log file size with the `maxFileSize` logging attribute. Instead of file size-based log rollover, users may want to roll over their files at periodic times to facilitate their existing log cleaning or archival processes. 
+
+Now, you can enable time-based periodic rollover of those log files at their own specified time of day by using two new optional logging configuration attributes: `rolloverInterval` and `rolloverStartTime`. Upon roll over, the file names are appended with a timestamp that corresponds to the time that the log was rolled over.
+
+* `rolloverInterval` is the desired time interval between log rollovers. Set the attribute with a positive integer followed by a unit of time, which can be days (d), hours (h), or minutes (m). For example, specify 5 hours as `5h``. You can include multiple values in a single entry. For example, `1d5h`` is equivalent to 1 day and 5 hours.
+
+* `rolloverStartTime` is the time of day when logs first roll over and the first rollover interval duration begins. Valid values for this attribute follow a 24-hour ISO-8601 time format of HH:MM, where 00:00 represents midnight. 
+
+The two configuration attributes are optional. If neither of the attributes are set, then time-based log rollover is not enabled. If only one of the two attributes is set, then time-based log rollover is enabled, and the other attribute is set to its default. The default value for `rolloverInterval` is `1d`, and the default value for `rolloverStartTime` is `00:00`.
+
+Example `server.xml` file configuration for log rollover in the `messages.log` and `trace.log` files by specifying the new attributes in the `logging` element:
+
+[source, xml]
+----
+<server>
+   ...
+    <logging rolloverStartTime="00:00" rolloverInterval="1d"/>
+    ...
+</server>
+----
+
+Example `server.xml` file configuration for log rollover in the `http_access.log` file by specifying the new attributes in the `httpAccessLogging` element:
+
+[source, xml]
+----
+<server>
+   ...
+    <httpAccessLogging rolloverStartTime="00:00" rolloverInterval="1d" logFormat='%h %u %{t}W "%r" %s %b' />
+    ...
+</server>
+----
+
+Example `server.xml` configuration for access logging, using `<accessLogging/>` under `<httpEndpoint/>`, which handles `http_access.log` rollover:
+
+[source, xml]
+----
+<server>
+   ...
+   <httpEndpoint id="defaultHttpEndpoint">
+      <accessLogging rolloverStartTime="00:00" rolloverInterval="1d" logFormat='%h %i %u %t "%r" %s %b' />
+   </httpEndpoint>
+    ...
+</server>
+----
+
+Example result of logs, rolled over every minute, with a configuration of `rolloverInterval="1m"` and `rolloverStartTime="00:00"`:
+
+image::/img/blog/log_rollover.png[Example logs,width=70%,align="left"]
+
+For more information about this feature, refer to the link:{url-prefix}/docs/latest/reference/config/httpAccessLogging.html[HTTP Access Logging], link:{url-prefix}/docs/latest/reference/config/logging.html[Liberty Logging], and link:{url-prefix}/docs/latest/access-logging.html[Liberty Access Logging] documentation.
+
+[#logrecordcontext]
+== Add application name to LogRecordContext Extension and as JSON logging field
+
+Previously, Liberty logs did not contain the application name in the `LogRecordContext` extension. If you were using a log analysis tool, such as the ELK stack, you couldn't filter out application logs, since the `JSON` fields did not have a field for the application name. 
+
+In Open Liberty 22.0.0.7-beta, when application log messages are logged and the application name is known, the application name is added to the LogRecordContext, with the key `appName` and the value being the application name that the message was logged from. When JSON logging is enabled, a new default JSON field (`ext_appName`) is added to the JSON application logs, which contains the application name that the log message was logged from.
+
+You can use this function by enabling JSON logging support for your Liberty logs.
+
+Example JSON logging snippet: 
+
+[source, json]
+----
+{
+  "type":"liberty_message",
+  "host":"localhost",
+  "ibm_userDir":"\/wlp\/usr\/",
+  "ibm_serverName":"test_json",
+  "message":"TESTAP0001W: Test Message.",
+  "ibm_threadId":"0000005d",
+  "ibm_datetime":"2022-02-16T14:07:47.226-0500",
+  "ibm_messageId":"BADAP0001W",
+  "module":"com.ibm.ws.lumberjack.Message",
+  "loglevel":"WARNING",
+  "ibm_sequence":"1645038467226_000000000001F",
+  "ext_appName":"TestApp",
+  "ext_thread":"Default Executor-thread-31"
+}
+----
+
+For more information, check out the link:{url-prefix}/docs/latest/log-trace-configuration.html#json[JSON Logging] and link:{url-prefix}/docs/latest/json-log-events-list.html[JSON Log Events list] documentation.
+
+[#run]
+=== Try it now 
+
+To try out these features, just update your build tools to pull the Open Liberty All Beta Features package instead of the main release. The beta works with Java SE 18, Java SE 17, Java SE 11, and Java SE 8.
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], here are the coordinates:
+
+[source,xml]
+----
+<dependency>
+  <groupId>io.openliberty.beta</groupId>
+  <artifactId>openliberty-runtime</artifactId>
+  <version>22.0.0.7-beta</version>
+  <type>pom</type>
+</dependency>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+dependencies {
+    libertyRuntime group: 'io.openliberty.beta', name: 'openliberty-runtime', version: '[22.0.0.7-beta,)'
+}
+----
+
+Or take a look at our link:{url-prefix}/downloads/#runtime_betas[Downloads page].
+
+[#feedback]
+== Your feedback is welcomed
+
+Let us know what you think on link:https://groups.io/g/openliberty[our mailing list]. If you hit a problem, link:https://stackoverflow.com/questions/tagged/open-liberty[post a question on StackOverflow]. If you hit a bug, link:https://github.com/OpenLiberty/open-liberty/issues[please raise an issue].
+
+
