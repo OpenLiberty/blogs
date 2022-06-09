@@ -53,7 +53,7 @@ These steps are to be completed by the author of the blog post.
 
     * **Third-party blog post** (externally hosted posts only)
 
-      Copy the [third-party-blog-post.adoc](./templates/third-party-blog-post.adoc) file to the [posts](./posts) directory and rename the file using the format `YYYY-MM-DD-post-title.adoc`, where the date represents the expected publication date (e.g. `2021-11-21-open-liberty-is-awesome.adoc`).
+      Copy the [third-party-post.adoc](./templates/third-party-post.adoc) file to the [posts](./posts) directory and rename the file using the format `YYYY-MM-DD-post-title.adoc`, where the date represents the expected publication date (e.g. `2021-11-21-open-liberty-is-awesome.adoc`).
 
 4. If you are not employed by IBM, in at least one of your commits, sign off the commit using [the Developer Certificate process](./CONTRIBUTING.md).
 
