@@ -17,14 +17,14 @@ Joe McClure <https://github.com/jdmcclur>
 :url-about: /
 //Blank line here is necessary before starting the body of the post.
 
-The performance throughput of Open Liberty for applications secured using https://github.com/eclipse/microprofile-jwt-auth[MicroProfile JWT] has almost doubled in 22.0.0.6 when compared with 22.0.0.2, in a simple scenario. In this blog post I will discuss how we made these performance improvements.
+The performance throughput of Open Liberty for applications secured using https://github.com/eclipse/microprofile-jwt-auth[MicroProfile JWT] has almost doubled in 22.0.0.6 when compared with 22.0.0.2, in a simple scenario. In this blog post, I discuss how we made these performance improvements.
 
 [.img_border_light]
 image::/img/blog/mpjwt-prim-chart-1.png[MicroProfile JWT Performance Chart 1,width=70%,align="center"]
 
 == Performance Test
 
-To test Microprofile JWT, I wrote a simple primitive MicroProfile 5.0 application. The application has a RESTful endpoint that requires a JWT with one of the groups as “user”. If a client accesses the endpoint (/access/test) with a valid JWT in the Authorization Header, the application then looks at the injected token for any groups and returns the subject to the client.
+To test Microprofile JWT, I wrote a simple primitive MicroProfile 5.0 application. The application has a RESTful endpoint that requires a JWT with one of the groups as `user`. If a client accesses the endpoint `/access/test` with a valid JWT in the authorization header, the application then looks at the injected token for any groups and returns the subject to the client.
 
 [source,java]
 ----
@@ -59,7 +59,7 @@ I then used https://jmeter.apache.org[Apache JMeter] to apply a load with 100 cl
 
 == Performance Analysis
 
-So, how did we double throughput performance? It involved many changes, some big and some small. The first thing we noticed in a sampling profile was a lot of time spent (8.53%) doing a toString on the Subject. (Below is simplified output of our profiling tools)
+So, how did we double throughput performance? We made many changes, some big and some small. The first thing we noticed in a sampling profile was a lot of time spent (8.53%) doing a `toString` on the Subject. The following example shows the simplified output of our profiling tools.
 
 [source]
 ----
@@ -67,7 +67,7 @@ So, how did we double throughput performance? It involved many changes, some big
   8.53 javax/security/auth/Subject.toString()Ljava/lang/String;
 ----
 
-After reviewing the code, we discovered the toString() is only needed when audit is enabled, which is not the normal use case. 
+When we reviewed the code, we discovered the `toString()` is needed only when audit is enabled, which is not the normal use case. 
 
 https://github.com/jhanders34[Jared Anderson] fixed this with the following Pull Request (PR): https://github.com/OpenLiberty/open-liberty/pull/20334
 
@@ -101,7 +101,7 @@ We also noticed a few areas where we were compiling regular expressions on every
   0.58 java/util/regex/Pattern.compile(Ljava/lang/String;)Ljava/util/regex/Pattern;
 ----
 
-And found another spot where we were using a Stream API instead of a more efficient for loop.
+And found another spot where we were using a Stream API, instead of a more efficient `for` loop.
 [source]
 ----
 2.63 com/ibm/ws/security/authorization/util/RoleMethodAuthUtil.parseMethodSecurity(Ljava/lang/reflect/Method;Ljava/security/Principal;Ljava/util/function/Predicate;)
@@ -135,9 +135,9 @@ With these final two changes, throughput is now 97.8% better than in 22.0.0.2!
 [.img_border_light]
 image::img/blog/mpjwt-prim-chart-4.png[MicroProfile JWT Performance Chart 4 ,width=70%,align="center"]
 
-== More Complex Application
+== More complex application
 
-These results are with a very simple primitive, which does not resemble a real-world application. How much does throughput improve in a more normal microservices application? With link:{https://github.com/blueperf/acmeair-mainservice-java}[AcmeAirMS], which has two services that consume JWTs (booking and customer), performance improved 17.5% - still impressive!
+These results are with a very simple primitive, which does not resemble a real-world application. How much does throughput improve in a more normal microservices application? With link:https://github.com/blueperf/acmeair-mainservice-java[AcmeAirMS], which has two services that consume JWTs (booking and customer), performance improved 17.5% - still impressive!
 
 [.img_border_light]
 image::img/blog/mpjwt-acmeairms-chart.png[MicroProfile JWT Performance Chart 5 ,width=70%,align="center"]
