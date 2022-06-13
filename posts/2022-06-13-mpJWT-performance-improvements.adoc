@@ -1,0 +1,148 @@
+---
+layout: post
+title: "How we doubled throughput when securing microservices with JWT on Open Liberty"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/jdmcclur
+author_github: https://github.com/jdmcclur
+seo-title: How we doubled throughput when securing microservices with JWT on Open Liberty - OpenLiberty.io
+seo-description: Details of the many changes made in Open Liberty over the last few releases (22.0.0.2 to 22.0.0.6) to double MicroProfile JWT processing throughput.
+blog_description: "Details of the many changes made in Open Liberty over the last few releases (22.0.0.2 to 22.0.0.6) to double MicroProfile JWT processing throughput."
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+---
+= How we doubled throughput when securing microservices with JWT on Open Liberty
+Joe McClure <https://github.com/jdmcclur>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+The performance throughput of Open Liberty for applications secured using https://github.com/eclipse/microprofile-jwt-auth[MicroProfile JWT] has significantly improved over the last few releases (22.0.0.2 to 22.0.0.6). In this blog post, I discuss how we made these performance improvements using a simple scenario where throughput was doubled.
+
+[.img_border_light]
+image::/img/blog/mpjwt-prim-chart-1.png[MicroProfile JWT Performance Chart 1,width=70%,align="center"]
+
+== Performance Test
+
+To test Microprofile JWT, I wrote a simple primitive MicroProfile 5.0 application. The application has a RESTful endpoint that requires a JWT with one of the groups as `user`. If a client accesses the endpoint `/access/test` with a valid JWT in the authorization header, the application then looks at the injected token for any groups and returns the subject to the client.
+
+[source,java]
+----
+@Path("/access")
+public class JWTProtected {
+
+  @Inject private JsonWebToken jwt;
+  
+  @GET
+  @RolesAllowed("user")
+  @Path("/test")
+  public Response test() {
+    
+    Set<String> groups = jwt.getGroups();
+    if (!groups.contains("user")) {
+      System.out.println("Error");
+    }
+    
+    String subject = jwt.getSubject();
+    return Response.ok(subject).build();
+  }
+}
+----
+
+Example call to the endpoint with curl (JWTs are long)
+[source,bash]
+----
+curl -H "Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwOi8vYWNtZWFpci1tcyIsImV4cCI6MTY1NDIwMzk1NCwianRpIjoianRpIiwiaWF0IjoxNjU0MjAwMzU0LCJzdWIiOiJzdWJqZWN0IiwidXBuIjoic3ViamVjdCIsImdyb3VwcyI6WyJ1c2VyIl19.oiXaGhslxd_hGuCfBiXe3fdpfH4udcpCB-meMBw8bKYHFvYXuMmvuV6Jy98F53D5L3uwy9aeysstAfTIVIKpkMmWFdH2e9K93qRfiZnM4nR9uzMW7UGK2QClKvZGSLOUZeGSjyREGcMW9DQqG5mnRLDXTXc27IRfeEMhjxsQ90lwPMSAUZXQaZ14MBHnT-lftajdVo3B3FHlW7V4Bf5BBWgExNEMmfP880ba3tkKgl_mEB8Y6TRJXmLOleDM5cv_d-bsSCk1mzs3KyCLQZV5X-pq-XDgTL7m0DRV7o--AYEb-qC4S_asf7O5WngbOAK7T9DIeL2HFXXGQADcRR718w" http://localhost:9080/access/test
+----
+
+I then used https://jmeter.apache.org[Apache JMeter] to apply a load with 100 clients. Each client generates a JWT, uses it 20 times to access the endpoint, then generates a new JWT. 
+
+== Performance Analysis
+
+So, how did we double throughput performance? We made many changes, some big and some small. The first thing we noticed in a sampling profile was a lot of time spent (8.53%) doing a `toString` on the Subject. The following example shows the simplified output of our profiling tools.
+
+[source]
+----
+8.53 com/ibm/ws/webcontainer/security/WebAppSecurityCollaboratorImpl$4.run()Ljava/lang/String;
+  8.53 javax/security/auth/Subject.toString()Ljava/lang/String;
+----
+
+When we reviewed the code, we discovered the `toString()` is needed only when audit is enabled, which is not the normal use case. 
+
+https://github.com/jhanders34[Jared Anderson] fixed this with the following Pull Request (PR): https://github.com/OpenLiberty/open-liberty/pull/20334
+
+This change improved throughput 12.5% in 22.0.0.4.
+[.img_border_light]
+image::img/blog/mpjwt-prim-chart-2.png[MicroProfile JWT Performance Chart 2 ,width=70%,align="center"]
+
+Next, we noticed we were spending a lot of time parsing the JSON of the JWT (7.42%), and parsing the same JSON string multiple times. 
+
+[source]
+----
+1.51 org/jose4j/jwt/JwtClaims.<init>(Ljava/lang/String;Lorg/jose4j/jwt/consumer/JwtContext;)
+1.64 com/ibm/ws/security/mp/jwt/impl/utils/ClaimsUtils.parsePayloadAndCreateClaims(Ljava/lang/String;)
+1.93 org/jose4j/jwx/Headers.setEncodedHeader(Ljava/lang/String;)
+2.34 com/ibm/ws/security/common/jwk/utils/JsonUtils.claimsFromJsonObject(Ljava/lang/String;)
+  7.42 org/jose4j/json/JsonUtil.parseJson(Ljava/lang/String;)Ljava/util/Map;
+ 
+----
+
+Jared made this more efficient, and changed a few other related areas with the following PRs: +
+https://github.com/OpenLiberty/open-liberty/pull/20700 +
+https://github.com/OpenLiberty/open-liberty/pull/20723 +
+https://github.com/OpenLiberty/open-liberty/pull/20963 
+
+We also noticed a few areas where we were compiling regular expressions on every request when it was not needed.
+[source]
+----
+0.05 java/lang/String.split(Ljava/lang/String;I)[Ljava/lang/String;
+0.21 com/ibm/ws/security/AccessIdUtil.getUniqueId(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
+0.33 java/util/regex/Pattern.matches(Ljava/lang/String;Ljava/lang/CharSequence;)Z
+  0.58 java/util/regex/Pattern.compile(Ljava/lang/String;)Ljava/util/regex/Pattern;
+----
+
+And found another spot where we were using a Stream API, instead of a more efficient `for` loop.
+[source]
+----
+2.63 com/ibm/ws/security/authorization/util/RoleMethodAuthUtil.parseMethodSecurity(Ljava/lang/reflect/Method;Ljava/security/Principal;Ljava/util/function/Predicate;)
+  2.63  java/util/stream/ReferencePipeline.anyMatch(Ljava/util/function/Predicate;)Z
+----
+
+I fixed these issues with the following PRs: +
+https://github.com/OpenLiberty/open-liberty/pull/20753 +
+https://github.com/OpenLiberty/open-liberty/pull/20739 
+
+With these changes, Open Liberty was now 32% faster in 22.0.0.5 than 22.0.0.2.
+
+[.img_border_light]
+image::img/blog/mpjwt-prim-chart-3.png[MicroProfile JWT Performance Chart 3 ,width=70%,align="center"]
+
+Finally, the biggest change occurred when we discovered that our JWT Cache could perform much better. We were verifying the signature of the JWT on every request, even if it had already been processed before. 
+
+[source]
+----
+32.27 com/ibm/ws/security/jwt/internal/ConsumerUtil.getSigningKeyAndParseJwtWithValidation(Ljava/lang/String;Lcom/ibm/ws/security/jwt/config/JwtConsumerConfig;Lorg/jose4j/jwt/consumer/JwtContext;)
+  32.27 com/ibm/ws/security/jwt/internal/ConsumerUtil.parseJwtWithValidation(Ljava/lang/String;Lorg/jose4j/jwt/consumer/JwtContext;Lcom/ibm/ws/security/jwt/config/JwtConsumerConfig;Ljava/security/Key;)
+----
+
+https://github.com/ayoho[Adam Yoho] was able to improve this with: 
+https://github.com/OpenLiberty/open-liberty/pull/20733 
+
+Jared also made an additional change to improve the efficiency of regular expressions: https://github.com/OpenLiberty/open-liberty/pull/20922
+
+With these final two changes, throughput is now 97.8% better than in 22.0.0.2!
+
+[.img_border_light]
+image::img/blog/mpjwt-prim-chart-4.png[MicroProfile JWT Performance Chart 4 ,width=70%,align="center"]
+
+== More complex application
+
+These results are with a very simple primitive, which does not resemble a real-world application. How much does throughput improve in a more normal microservices application? With link:https://github.com/blueperf/acmeair-mainservice-java[AcmeAirMS], which has two services that consume JWTs (booking and customer), performance improved 17.5% - still impressive!
+
+[.img_border_light]
+image::img/blog/mpjwt-acmeairms-chart.png[MicroProfile JWT Performance Chart 5 ,width=70%,align="center"]
+
+== Summary
+
+In summary, we made many changes over the last few releases to improve the throughput performance of consuming MicroProfile JWTs by almost double. This blog post showed results when using a MicroProfile 5.0 application. We see similar improvements in older versions of MicroProfile since the code that was changed is common to the other versions. Cloud-native performance continues to be a key priority and focus area for us.
+
