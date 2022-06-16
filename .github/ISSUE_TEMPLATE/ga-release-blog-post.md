@@ -1,33 +1,36 @@
 ---
-name: Open Liberty GA release blog post
+name: Open Liberty GA and beta release blog posts
 about: Checklist that must be completed to create and publish Open Liberty release notes.
-title: Open Liberty GA release blog post for VERSION_NUMBER
+title: Open Liberty release blog post for VERSION_NUMBER
 labels: release
 assignees: ryan-storey
 
 ---
 
-This issue is to track the tasks involved in creating and publishing the releases notes for an Open Liberty 4-weekly release.
+This issue is to track the tasks involved in creating and publishing the GA and beta releases notes for an Open Liberty 4-weekly release.
 
-The Open Liberty release notes are presented in three places:
-- [Open Liberty blog](https://openliberty.io/blog/) (GA and beta features; [example](https://openliberty.io/blog/2020/05/07/EJB-persistent-timers-20005.html))
-- [Red Hat Runtimes release notes for Open LIberty](https://access.redhat.com/documentation/en-us/open_liberty/2020/) (GA features only; [example](https://access.redhat.com/documentation/en-us/open_liberty/2020/html/release_notes_for_open_liberty_20.0.0.5_on_red_hat_openshift_container_platform/features))
-- [Red Hat Developer blog](https://developers.redhat.com/blog/) (GA features only; [example](https://developers.redhat.com/blog/2020/05/13/open-liberty-20-0-0-5-brings-updates-to-ejb-persistent-timers-coordination-and-failover-across-members/))
+The Open Liberty release notes are published as a post on the [Open Liberty blog](https://openliberty.io/blog/):
+- [GA blog post example](https://openliberty.io/blog/2022/06/07/microprofile-graphql-2-22006.html)
+- [beta blog post example](https://openliberty.io/blog/2022/06/09/time-based-log-rollover-22007-beta.html)
 
+## Creating the blog posts
 
-## 1. Open Liberty release blog post
+The Open Liberty release blog posts are written in asciidoc and pushed to the [OpenLiberty/blogs](https://github.com/openliberty/blogs) repo. The repo README contains [instructions on how to create, build, and review](https://github.com/OpenLiberty/blogs/blob/prod/README.md) the posts, including template files to help you.
 
-The Open Liberty release blog post is written in asciidoc and pushed to the [OpenLiberty/blogs](https://github.com/openliberty/blogs) repo. The repo README contains [instructions on how to create, build, and review](https://github.com/OpenLiberty/blogs/blob/prod/README.md) the post, including a template file to help you.
+You need to create **two** separate posts:
 
-Follow the instructions in the README and the template file to complete the following tasks:
+- a GA release blog post
+- a beta release blog post
 
-- [ ] Create a draft release blog post in asciidoc, build to [the draft site](https://draft-openlibertyio.mybluemix.net/blog/), and create a PR to the `staging` branch with a link to the post on [the draft site](https://draft-openlibertyio.mybluemix.net/blog/). Add all the reviewers (see below) to the PR so that they can add all their review feedback and approvals in the PR.
-- [ ] Get the draft post reviewed by:
-  - [ ] All the people who contributed the content to the blog post.
-  - [ ] At least one of the following people: @mbroz2
+Follow the instructions in the README and the template file to complete the following tasks _for each post_:
+
+- [ ] Create a draft release or beta blog post in asciidoc and built on the draft website according to the [blog post instructions](https://github.com/OpenLiberty/blogs/blob/prod/README.md).
+- [ ] When you've compiled the whole blog and checked that it makes sense to the best of your knowledge, create a PR from your feature branch to the `staging` branch (as described in the [blog post instructions](https://github.com/OpenLiberty/blogs/blob/prod/README.md)).
+- [ ] Get the draft post reviewed by all the people who contributed the content to the blog post.
+- [ ] Then, when they're all happy, as @mbroz2 to review it.
 - [ ] Agree with @mbroz2 which feature will lead this blog post, then write a title, slug, summary first paragraph, and SEO front matter appropriately.
 - [ ] Get the post approved by @mbroz2.
-- [ ] On release day (usually a Friday) @mbroz2 will publish the post.
+- [ ] On release day (usually Tuesday for the GA release post and Thursday for the beta release post), @mbroz2 will publish the post.
 
 ## All done?
 
