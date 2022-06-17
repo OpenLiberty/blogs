@@ -17,30 +17,28 @@ Jiwoo Lim <https://github.com/jjiwooLim>
 :url-about: /
 :source-highlighter: highlight.js
 
-You can extend the capability of Open Liberty by writing your own features and installing them onto the runtime. For example, you can develop a user feature to configure a custom authentication provider or incorporate custom functions that aren't shipped with Open Liberty.
+You can extend the capability of Open Liberty by writing your own features, known as _user features_ and installing them onto the Open Liberty runtime. For example, you can develop a user feature to configure a custom authentication provider or incorporate custom functions that aren't shipped with Open Liberty.
 
-== What is an Open Liberty feature?
-An Open Liberty feature consists of a definition file, or feature manifest, and a collection of OSGi bundles that provide classes and services that correspond to providing a particular capability in the Open Liberty runtime environment. 
+== What is an Open Liberty user feature?
+An Open Liberty user feature is a customized Open Liberty feature which consists of a definition file, or feature manifest, and a collection of link:https://www.ibm.com/docs/en/wasdtfe?topic=overview-osgi-bundles[OSGi bundles]. The OSGi bundles provide classes and services that correspond to providing a particular capability in the Open Liberty runtime environment.  
 
-The link:https://www.ibm.com/docs/en/wasdtfe?topic=overview-osgi-bundles[OSGi bundle] is a Java archive file (JAR) file that contains Java code, resources, and a manifest that describes the bundle and its dependencies. 
+To develop the Open Liberty user feature, you need to create your own feature definition file and add your OSGi bundle(s). In this post, we’ll walk through the use of several Maven plug-ins to build and install a custom Open Liberty feature.
 
-To develop the user feature, you need to create your own feature definition file and add the OSGi bundle(s). In this post, we’ll walk through the use of several Maven plug-ins to build and install a custom Open Liberty feature.
+== Creating an Open Liberty user feature
 
-== Creating a user feature
-
-In this blog, we will use Eclipse with a link:https://start.openliberty.io[starter application] to create a Maven project for the user feature.
+In this blog, we will use Eclipse with an Open Liberty link:https://start.openliberty.io[starter application] to create a Maven project for the user feature.
 
 We will walk through the following steps of developing a user feature:
 
 - Create an OSGi bundle containing your Java classes using link:https://felix.apache.org/documentation/subprojects/apache-felix-maven-bundle-plugin-bnd.html#_using_the_plugin[Apache Felix Maven Bundle Plugin (BND)].
 - Package your OSGi bundle to Enterprise Subsystem Archive (ESA) file with link:https://aries.apache.org/documentation/modules/esamavenpluginproject.html[ESA Maven Plugin]. The ESA file is the file format required to install the user feature to an Open Liberty runtime environment.
-- Create a Bill of Materials (BOM) for your ESA file that will be consumed by Liberty Maven Plugin when preparing and installing the user feature.
+- Create a Bill of Materials (BOM) for your ESA file that will be consumed by Liberty Maven Plugin when preparing and installing the Open Liberty user feature.
 - Install your Open Liberty user feature on to Open Liberty runtime by using link:https://github.com/OpenLiberty/ci.maven[Liberty Maven Plugin].
 
 '''
 === Developing an OSGi bundle with simple activation
 
-The OSGi bundle is the unit of deployment for an application that has an independent lifecycle. You can create the OSGi bundle with any of your java classes, but in this example we will create a Java class that implements the `BundleActivator` interface to control the lifecycle of the OSGi bundle. When the OpenLiberty server starts and stops the bundle, the start and stop methods of the BundleActivator interface are called.
+The OSGi bundle is the unit of deployment for an application that has an independent lifecycle. You can create the OSGi bundle with any of your java classes, but in this example we will create a Java class that implements the `BundleActivator` interface to control the lifecycle of the OSGi bundle. When you start and stop the Open Liberty server, the start and stop methods of the `BundleActivator` interface are called.
 
 [start=1]
 . Create a Maven project to build the OSGi bundle:
@@ -51,7 +49,7 @@ Group Id : test.user.test.osgi
 Artifact Id : SimpleActivator
 ----
 
-. Add the `org.osgi.core` dependency:
+. Add the `org.osgi.core` dependency to import `org.osgi.framework` package:
 +
 [source, xml]
 ----
@@ -95,7 +93,7 @@ Build the OSGi bundle using the Apache Felix Maven Bundle Plugin (BND). Explicit
 +
 We also need to specify the configuration. The `Bundle-SymbolicName` is the only required header but may require other OSGi headers depending on your bundle implementation. To learn more about OSGi headers, check link:https://www.ibm.com/docs/en/SSHR6W/com.ibm.websphere.wdt.doc/topics/cbundles.html#osgibundlemanifestfile[OSGi bundle manifest file].
 +
-In the previous step, we created a Java class that implements OSGi `BundleActivator`. Hence, we need to identify the bundle activator class to the OSGi framework by adding the `Bundle-Activator` header. Other headers are optional, but including the `Bundle-Name` and `Bundle-version` headers is a good practice.
+In the previous step, we created the Java class that implements OSGi `BundleActivator`. Hence, we need to identify the bundle activator class to the OSGi framework by adding the `Bundle-Activator` header. Other headers are optional, but including the `Bundle-Name` and `Bundle-version` headers is a good practice.
 +
 [source, xml]
 ----
@@ -303,7 +301,7 @@ Run `mvn clean install` to create `features-bom.pom` BOM file.
 === Installing an Open Liberty user feature by using the Liberty Maven Plugin
 
 [start=1]
-. Create a starter application from OpenLiberty website. Then, add the following configuration to create a server. 
+. Create a link:https://start.openliberty.io[starter application] from Open Liberty website. Then, add the following configuration to create a server. 
 +
 ----
 <plugin>
@@ -320,7 +318,7 @@ Run `mvn clean install` to create `features-bom.pom` BOM file.
 
 . Specify the feature to install for the `test` server.
 +
-Open `${project.build.testOutputDirectory}/wlp/server.xml` file and add the user feature. The `usr` extension indicates that the feature will be installed to the `${project.build.testOutputDirectory}/wlp/usr` directory. It also tells the server where to find the user feature when the server starts.
+Open `${project.build.testOutputDirectory}/wlp/server.xml` file and add the user feature. The `usr` extension indicates that the feature will be installed to the `${project.build.testOutputDirectory}/wlp/usr` or `$WLP_USER_DIR` directory. It also tells the server where to find the user feature when the server starts.
 +
 [source, xml]
 .server.xml
