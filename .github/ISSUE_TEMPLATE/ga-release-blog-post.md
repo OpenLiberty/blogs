@@ -29,6 +29,7 @@ Follow the instructions in the README and the template file to complete the foll
 - [ ] Get the draft post reviewed by all the people who contributed the content to the blog post.
 - [ ] Then, when they're all happy, ask @mbroz2 to review it.
 - [ ] Agree with @mbroz2 which feature will lead this blog post, then write a title, slug, summary first paragraph, and SEO front matter appropriately.
+- [ ] Add relevant tags to the post in the `staging` branch (see [the blog post instructions](https://github.com/OpenLiberty/blogs#editors-editing-and-publishing-a-post)).
 - [ ] Get the post approved by @mbroz2.
 - [ ] On release day (usually Tuesday for the GA release post and Thursday for the beta release post), @mbroz2 will publish the post.
 
