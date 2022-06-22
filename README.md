@@ -15,7 +15,7 @@ These steps are to be completed by the author of the blog post.
 
    * **All blog posts except release blog posts**
 
-     Create [a normal issue](https://github.com/OpenLiberty/blogs/issues/new). In the description, give a simple outline of the purpose of the blog post. If there is a specific date by which the post must be available, mention that in the description too.
+     Create [a issue](https://github.com/OpenLiberty/blogs/issues/new). In the description, give a simple outline of the purpose of the blog post. If there is a specific date by which the post must be available, mention that in the description too.
 
    * **GA and beta release blog posts** (Open Liberty GA release announcements only)
 
