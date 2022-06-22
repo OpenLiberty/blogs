@@ -24,7 +24,7 @@ You need to create **two** separate posts:
 
 Follow the instructions in the README and the template file to complete the following tasks _for each post_:
 
-- [ ] Create a draft release or beta blog post in asciidoc and built on the draft website according to the [blog post instructions](https://github.com/OpenLiberty/blogs/blob/prod/README.md).
+- [ ] Create a draft blog post using either the [GA release blog post template](https://github.com/OpenLiberty/blogs/blob/prod/templates/ga-release-post.adoc) or the [beta release blog post template](https://github.com/OpenLiberty/blogs/blob/prod/templates/beta-release-post.adoc). Build the draft blog post on the draft website according to the [blog post instructions](https://github.com/OpenLiberty/blogs/blob/prod/README.md).
 - [ ] When you've compiled the whole blog and checked that it makes sense to the best of your knowledge, create a PR from your feature branch to the `staging` branch (as described in the [blog post instructions](https://github.com/OpenLiberty/blogs/blob/prod/README.md)).
 - [ ] Get the draft post reviewed by all the people who contributed the content to the blog post.
 - [ ] Then, when they're all happy, ask @mbroz2 to review it.
