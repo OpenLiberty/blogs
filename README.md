@@ -17,9 +17,9 @@ These steps are to be completed by the author of the blog post.
 
      Create [an issue](https://github.com/OpenLiberty/blogs/issues/new). In the description, give a simple outline of the purpose of the blog post. If there is a specific date by which the post must be available, mention that in the description too.
 
-   * **GA and beta release blog posts** (Open Liberty GA release announcements only)
+   * **GA and beta release blog posts** (Open Liberty GA and beta release announcements only)
 
-     Create [an issue using the `Open Liberty release notes` issue template](https://github.com/OpenLiberty/blogs/issues/new/choose). Make sure to select each task in the issue as you complete it to show progress.
+     Create [an issue using the `Open Liberty GA and beta release blog posts` issue template](https://github.com/OpenLiberty/blogs/issues/new/choose). Make sure to select each task in the issue as you complete it to show progress.
 
 2. Clone the repo and create a branch off the default `prod` branch. From the `prod` branch, run: `git checkout -b branch_name`, where `branch_name` is a name you give your new branch.
 
