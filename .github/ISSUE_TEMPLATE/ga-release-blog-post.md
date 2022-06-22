@@ -7,7 +7,7 @@ assignees: ryan-storey
 
 ---
 
-This issue is to track the tasks involved in creating and publishing the GA and beta releases notes for an Open Liberty 4-weekly release.
+This issue is to track the tasks involved in creating and publishing the GA and beta release notes for an Open Liberty release.
 
 The Open Liberty release notes are published as a post on the [Open Liberty blog](https://openliberty.io/blog/):
 - [GA blog post example](https://openliberty.io/blog/2022/06/07/microprofile-graphql-2-22006.html)
