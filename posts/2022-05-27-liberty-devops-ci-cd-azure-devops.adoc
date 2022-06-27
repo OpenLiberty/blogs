@@ -48,7 +48,7 @@ In this blog post, I will assume that you have a basic understanding of Git, Doc
                       2. **Azure Kubernetes service** Go to https://dev.azure.com/<your-org/ and select your Azure DevOps project. Click on the   
                          "Project settings" and click on "Service connections" under the section "Pipelines". Click on "New service connection" and search for "kubernetes", select "Kubernetes" from the search results and click "Next" button. Select "Azure Subscription" from the "Authentication method" and follow the further steps to create the service connection. + 
                       3. **Snyk** Go to https://dev.azure.com/<your-org/ and select your Azure DevOps project. Click on the   
-                         "Project settings" and click on "Service connections" under the section "Pipelines". Click on "New service connection" and search for "snyk", select "Snyk Authentication" and follow the further steps to create the service connection.     
+                         "Project settings" and click on "Service connections" under the section "Pipelines". Click on "New service connection" and search for "snyk", select "Snyk Authentication" and follow the further steps to create the service connection. Steps to generate API token from snyk portal is explained in this service connection setup page.     
 
 == Azure DevOps contineous integration pipeline setup steps
 
@@ -89,10 +89,67 @@ At this stage a pipeline yaml will be generated which you should configure accor
                                 steps:
                                 - script: mvn package
 
-              * Add "Snyk" details after the build step to scan all the dependency jar files used in this application. Keep the cursor user the above "mvn package" step and search for Snyk on the "Task" section on the right side of the page
+              * Add "Snyk" details after the build step to scan all the dependency jar files used in this application. Keep the cursor above "mvn package" step and search for Snyk on the "Task" section on the right side of the page. Select the API token and "Application" in "What do you want to test?" dropdown anc click "Add" button
 
 image::/img/blog/add-snyk-scan-to-stage.png[Add snyk scan to stage,width=90%,align="center"]
 
+              * When the "Docker" task is completed, docker image will be created based on the instructions on "Dockerfile" and uploaded to Azure container registry. 
+
+              * The last task required on build pipeline is to copy the deployment config file to azure staging repository for accessing the same on azure deployment pipeline (like the file 'azure-aks.yaml' in the below given example code). A sample Azure build pipeline code is given below. Save this code and run the pipeline 
+
+                                    trigger:
+                                    - main
+
+                                    resources:
+                                    - repo: self
+
+                                    variables:
+                                      # Container registry service connection established during pipeline creation
+                                      dockerRegistryServiceConnection: '********'
+                                      imageRepository: 'liberty-app'
+                                      containerRegistry: '<registry-name>.azurecr.io'
+                                      dockerfilePath: '$(Build.SourcesDirectory)/Dockerfile'
+                                      tag: 'latest'
+
+                                      # Agent VM image name
+                                      vmImageName: 'ubuntu-latest'
+
+                                    stages:
+                                    - stage: Build
+                                      displayName: Build and push stage
+                                      jobs:
+                                      - job: Build
+                                        displayName: Build
+                                        pool:
+                                          vmImage: $(vmImageName)
+                                        steps:
+                                        
+                                        - script: mvn package
+                                        - task: SnykSecurityScan@1
+                                          inputs:
+                                            serviceConnectionEndpoint: 'snyk'
+                                            testType: 'app'
+                                            monitorWhen: 'always'
+                                            failOnIssues: true
+                                        - task: Docker@2
+                                          displayName: Build and push an image to container registry
+                                          inputs:
+                                            command: buildAndPush
+                                            repository: $(imageRepository)
+                                            dockerfile: $(dockerfilePath)
+                                            containerRegistry: $(dockerRegistryServiceConnection)
+                                            tags: |
+                                              $(tag)
+                                        - task: CopyFiles@2
+                                          displayName: 'Copy Files to: $(build.artifactstagingdirectory)'
+                                          inputs:
+                                            Contents: 'azure-aks.yaml'
+                                            TargetFolder: '$(build.artifactstagingdirectory)'      
+                                        - task: PublishBuildArtifacts@1
+                                          displayName: 'Publish Artifact: drop'
+
+
+               
 It is a good practice to adhere to the concept of Infrastructure as Code (IaC) when creating DevOps pipelines. Creating Jenkins jobs with pipeline scripts is a good example of IaC.
 
 You can write link:https://www.jenkins.io/doc/book/pipeline/syntax/[Jenkins pipeline code] in one of the following ways:
