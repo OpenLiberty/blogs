@@ -21,7 +21,7 @@ Continuous integration and continuous deployment (CI/CD) is a process in which d
 
 Azure DevOps service is an SaaS/on-premise offering from microsoft using which we can create the complete DevOps pipeline excluively with Azure based tools. The following diagram shows a simple architecture for a Azure DevOps build and deployment pipeline that builds and deploys a Jakarta EE and MicroProfile application in Azure Kubernetes cluster environment. When a code change is made in the link:https://azure.microsoft.com/en-us/services/devops/repos/[Azure Git repository], Azure Git will trigger link:https://azure.microsoft.com/en-us/services/devops/pipelines/[Azure build pipeline], Scans the application dependencies using link:https://snyk.io[Snyk plugin] and generates a link:https://www.docker.com[Docker] container image of the application with Open Liberty as its runtime, saves the image to a link:https://azure.microsoft.com/en-us/services/container-registry/[Azure container registry], finally, link:https://azure.microsoft.com/en-us/services/devops/pipelines/[Azure release pipeline] will automatically trigger the deployment to link:https://azure.microsoft.com/en-us/services/kubernetes-service/#overview[Azure kubernetes services].
 
-image::/img/blog/aks-deployment-pipeline.png[Azure devops deployment pipeline architecture diagram,width=90%,align="center"]
+image::/img/blog/aks-deployment-pipeline1.png[Azure devops deployment pipeline architecture diagram,width=90%,align="center"]
 
 In this blog post, I will assume that you have a basic understanding of Git, Docker, and Kubernetes.
 
@@ -193,67 +193,6 @@ image::/img/blog/azure-deploy9.png[Azure devops deployment pipeline run stage 2 
 
 image::/img/blog/azure-deploy11.jpeg[AKS connect details page,width=90%,align="center"]  
 
-[source]
-----
-mvn package verify sonar:sonar -Dsonar.projectKey=sampleapp -Dsonar.host.url=http://localhost:9000 -Dsonar.login=<generated-login-key>
-----
-
-== Deploying cloud-native Java applications with Open Liberty to Kubernetes with Jenkins
-
-For simplicity, I will use the command line (CLI) code in a Jenkins pipeline job to deploy a Jakarta EE and MicroProfile application with Open Liberty into Kubernetes. You can also use other tools like Helm, Travis CI, and CircleCI.
-
-In your pipeline code, add these CLI commands in a new stage. The following sample pipeline code connects to IBM Cloud from the CLI and then connects to the Kubernetes cluster running inside that, then it runs all the Kubernetes deployment-related configurations.
-                           
-[source]
-----
-ibmcloud login --apikey $IBM_CLOUD_API_KEY -g $IBM_CLOUD_RSGRP
-ibmcloud ks cluster config --cluster $CLUSTER-ID
-kubectl config current-context
-kubectl create -f deploy/deployment.yaml #( simple k8s deployment command )
-kubectl create -f deploy/service.yaml #( simple k8s service creation command )
-kubectl create -f deploy/route.yaml #( simple k8s route creation command )
-----
-
-Make sure that your Kubernetes configuration files are stored in the same Git repository as your Jenkinsfile in a sub-directory called `deploy`. Also ensure that the Docker image name in the Kubernetes deployment configuration file is updated according to the container image name/tag in the Dockerfile (manually, or programmatically if it needs to change at run time):
-
-[.imageblock.img_border_light]
-image::/img/blog/deploymentyaml.png[Image reference in deployment yaml,width=40%,align="center"]
-
-When Jenkins has checked out the Java application code for the code build, all the Kubernetes configuration files are also downloaded to the Jenkins workspace so that Jenkins can run the IBM Cloud and Kubernetes commands to connect to the Kubernetes cluster and deploy the application.
-
-See the link:https://kubernetes.io/docs/reference/kubectl/cheatsheet/[Kubernetes documentation] for other commands.
-
-== QA testing cloud-native Java applications with Jenkins
-
-Apart from running JUnit test cases along with the code build phase, Jenkins can trigger functional and integration QA test cases automatically after deploying the cloud-native Java application.
-
-Configure the test cases in the Jenkins job and test it manually. Create a remote job identifier authentication token in the "Trigger builds remotely" section under "Build Triggers". Trigger this test case from the Docker "entrypoint" file by using a remote rest API call that uses this authentication token as the identifier.
-
-For example, run the following command in a terminal: 
-
-[source]
-----
-curl -I -u <auth-token> https://<jenkins-host>/job/<job-name>/build?token=<remote-job-identifier-authentication-token>
-----
-
-You can generate an authentication token (auth-token) with link:https://www.postman.com[Postman] using the Jenkins login credentials.
-
-== Kubernetes monitoring tools
-
-You can use the following Kubernetes commands to check the application or cluster logs and the memory and CPU usage: 
-
-[source]
-----
-kubectl logs ..
-cat /sys/fs/cgroup/cpu/cpuacct.usage (after connecting to k8s pod)
-cat /sys/fs/cgroup/memory/memory.usage_in_bytes (after connecting to k8s pod)
-----
-
-You can integrate different applications with Kubernetes to persist logs and usage statistics, such as link:https://prometheus.io[Prometheus] and link:https://grafana.com/oss/loki/[Grafana].
-
-Liberty makes it easy to collect and visualize system and application metrics for observability by using Prometheus and Grafana. You can find guidance and more details in the resources listed link:https://community.ibm.com/community/user/wasdevops/blogs/don-bourne1/2021/06/26/metrics-and-monitoring-guidance-for-open-liberty-a[here].
-
-
 == Conclusion
 
-You can configure your DevOps pipeline in many ways. This blog post is a quick introduction to how you can use Jenkins to set up a simple CI/CD pipeline to build and deploy your cloud-native Java applications on Liberty.
+You can configure your DevOps pipeline in many ways. This blog post is a quick introduction to how you can setup a simple Azure DevOPs pipeline to deploy your cloud-native Java applications on Liberty.
