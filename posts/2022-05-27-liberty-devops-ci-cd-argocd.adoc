@@ -1,15 +1,15 @@
 ---
 layout: post
-title: "Continuous integration and delivery (CI/CD) of cloud-native Java applications using Jenkins"
+title: "Continuous integration, delivery (CI/CD) and monitoring of cloud-native Java applications using Jenkins (CI) and ArgoCD"
 categories: blog
 author_picture: https://avatars3.githubusercontent.com/shamjithantholi
 author_github: https://github.com/shamjithantholi
-seo-title: Continuous integration and delivery (CI/CD) of cloud-native Java applications using Jenkins - OpenLiberty.io
-seo-description: How to build a DevOps pipeline for a cloud-native Java application with Jenkins as the core controller component.
-blog_description: How to build a DevOps pipeline for a cloud-native Java application with Jenkins as the core controller component.
+seo-title: Continuous integration, delivery (CI/CD) and monitoring of cloud-native Java applications using Jenkins and ArgoCD- OpenLiberty.io
+seo-description: How to build a DevOps pipeline for a cloud-native Java application with Jenkins and ArgoCD.
+blog_description: How to build a DevOps pipeline for a cloud-native Java application with Jenkins and ArgoCD.
 open-graph-image: https://openliberty.io/img/blog/liberty-devops-generic-architecture.png
 ---
-= Continuous integration and delivery (CI/CD) of cloud-native Java applications using Jenkins
+= Continuous integration, delivery (CI/CD) and monitoring of cloud-native Java applications using Jenkins and ArgoCD
 Shamjith Antholi <https://github.com/shamjithantholi>
 :imagesdir: /
 :url-prefix:
@@ -17,14 +17,22 @@ Shamjith Antholi <https://github.com/shamjithantholi>
 
 [#Intro]
 
-Continuous integration and continuous deployment (CI/CD) is a process in which developers frequently merge code changes into a source code repository, which then triggers code builds, runs security scans, runs tests, and then deploys the application. Automation of this process, through adopting a DevOps culture, tools, and processes, enables organizations to release on a more frequent basis without compromising on quality. Various tools are available to automate the CI/CD process that can be readily integrated into a DevOps deployment pipeline. In this blog post, we'll discuss how you can use link:https://www.jenkins.io/[Jenkins] to automate the CI/CD process for building, testing, and deploying your cloud-native Java applications that run on link:https://openliberty.io[Open Liberty]. As the CI/CD process is triggered by source changes in Git, this is also known as the GitOps approach to DevOps.
+Continuous integration and continuous deployment (CI/CD) is a process in which developers frequently merge code changes into a source code repository, which then triggers code builds, runs security scans, runs tests, and then deploys the application. Automation of this process, through adopting a DevOps culture, tools, and processes, enables organizations to release on a more frequent basis without compromising on quality. Various tools are available to automate the CI/CD process that can be readily integrated into a DevOps deployment pipeline. In this blog post, we'll discuss how you can use link:https://www.jenkins.io/[Jenkins] to automate the CI process for building, testing, and how to use link:https://argo-cd.readthedocs.io/en/stable/[ArgoCD] for deploying and monitoring your cloud-native Java applications that run on link:https://openliberty.io[Open Liberty] into link:https://kubernetes.io[Kubernetes]. The approach used in this blog is to do the development environment deployment using the jenkins directly and trigger the deployment on test and higer environment using ArgoCD based on the pull request on GitHub. As the CI/CD process is triggered by source changes in Git, this is also known as the GitOps approach to DevOps. ArgoCD will help to fix configuration drift issue between containers and source repository like github. 
 
-Jenkins is a popular open source automation server that has hundreds of plug-ins to help integrate it into your existing DevOps pipeline. The following diagram shows a simple architecture for a Jenkins deployment pipeline that builds and deploys a Jakarta EE and MicroProfile application in a single Kubernetes environment. When a code change is made in the Git repository, GitHub will trigger link:https://www.jenkins.io[Jenkins] to build the code, runs JUnit tests and then link:https://www.sonarqube.org[SonarQube] static code analysis scans against the built code. Jenkins then generates a link:https://www.docker.com[Docker] container image of the application with Open Liberty as its runtime, saves the image to a Docker container repository, and then scans the image with link:https://www.aquasec.com[Trivy]. Jenkins then triggers a deployment by using CLI commands and deploys the Docker container image to link:https://kubernetes.io[Kubernetes].
+Jenkins is a popular open source automation server that has hundreds of plug-ins to help integrate it into your existing DevOps pipeline. The following diagram shows a simple architecture for a Jenkins deployment pipeline that builds and deploys a Jakarta EE and MicroProfile application in a single Kubernetes environment. When a code change is made in the Git repository, GitHub will trigger link:https://www.jenkins.io[Jenkins] to build the code, runs JUnit tests and then link:https://www.sonarqube.org[SonarQube] static code analysis scans against the built code. Jenkins then generates a link:https://www.docker.com[Docker] container image of the application with Open Liberty as its runtime, saves the image to a Docker container repository, and then scans the image with link:https://www.aquasec.com[Trivy]. 
+
+ArgoCD is a GitOps based contineous delivery tool and monitoring tool for kubernetes. ArgoCD does the application deployment as well as moniter  any change in the applications deployed on Kuberntes and verifies if those changes are according to the desired state specified by the defenitions files in the associated GitHub repository, if it identiifies any change in the deployed application, it resets the container back to the desired state by itself.
+
+image::/img/blog/jenkins-argocd-architecture.png[Jenkins with ArgoCD DevOps architecture diagram,width=70%,align="center"]
+
+In this blog post, I will assume that you have a basic understanding of Git, Docker, and Kubernetes. I will also assume that the Jakarta EE and MicroProfile application code is stored in link:https://github.com/[GitHub]. I will use link:https://hub.docker.com/[Docker Hub] to store the Docker container images and I will deploy the containerized application to link:https://cloud.ibm.com/kubernetes/catalog/create[IBM Cloud Kubernetes Service]. 
+
+== Setup development pipeline and associated configurations
+
+Create 3 branches in associated github repository, 'develop', 'test' and 'master' (or 'main'). Development team will work on the code in 'develop' branch, quality testing team will work on 'test' branch and production deployment team will work on 'master' (or 'main') branch. 
 
 
-image::/img/blog/liberty-devops-generic-architecture.png[Liberty DevOps architecture diagram,width=70%,align="center"]
-
-In this blog post, I will assume that you have a basic understanding of Git, Docker, and Kubernetes. I will also assume that the Jakarta EE and MicroProfile application code is stored in link:https://github.com/[GitHub]. I will use link:https://hub.docker.com/[Docker Hub] to store the Docker container images and I will deploy the containerized application to link:https://cloud.ibm.com/kubernetes/catalog/create[IBM Cloud Kubernetes Service].
+You can setup the Jenkins pipeline on development environment using the steps in the blog link:https://openliberty.io/blog/2022/05/27/liberty-devops-ci-cd-jenkins.html[CI/CD with Jenkins]. 
 
 == Installing and configuring Jenkins to set up CI/CD of a cloud-native Java application
 
