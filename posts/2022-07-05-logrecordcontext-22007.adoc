@@ -215,6 +215,108 @@ WLP_LOGGING_STACK_JOIN=true
 
 We’ve spent some time fixing bugs. The following sections describe just some of the issues resolved in this release. If you’re interested, here’s the  link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A22007+label%3A%22release+bug%22[full list of bugs fixed in 22.0.0.7].
 
+* link:https://github.com/OpenLiberty/open-liberty/issues/21441[The openapi-3.1 liberty feature generates wrong property name for annotation @Schema]
++
+The `openapi-3.1` feature is used in Liberty to generate the Open API documents. We found that the `@Schema` annotation doesn't work as expected. 
+For example, when annotating a field as shown below:
++
+[source, java]
+----
+    @Schema(name="asset_id", readOnly = true, required = true)
+    private String assetId;
+----
++
+The generated swagger doc .yaml file will contain the following:
+[source, yaml]
+----
+RelatedAsset:
+  required:
+  - assetId         <<----- name of the property in the "required" section is not correct
+  - ...
+  type: object
+  properties:
+    asset_id:       <<----- name of the property in the "properties" section is correct
+      type: string
+      readOnly: true
+    ...
+----
++
+The property is generated correctly in the properties section however it was not generated correctly in the required section. The expected name should be the name used in the `@Schema` annotation, i.e., `asset_id`. This issue has now been resolved so that the correct property name for the `@Schema` annotation is generated.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/21148[Transactions summary trace is missing]
++
+We discovered that the `TransactionSummary` trace group which is used to provide ultra minimal trace for transaction creation and setRollbackOnly no longer works.
+When setting `TransactionSummary=all` trace, the regular `Transaction=all` trace is emitted. The trace was emitted only for transaction creation and `setRollbackOnly`.
+This trace group is used when identifying what started a transaction or what rolled back a transaction in very high throughput systems where regular trace would be too big. In this Open Liberty release, the transaction summary trace has been reinstated.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/20933[FeatureUtility only checks one Maven repository]
++
+Previously, FeatureUtility only checked one Maven repository. The verbose output shows both repositories are configured, but the utility fails because it only checks Maven Central (the first repo in the properties file).
++
+[source]
+----
+./featureUtility if helloWorld1 --verbose --noCache --featuresBom=test.user.test.osgi:hello-bom:1.0
+[2022-04-26, 20:45:20:780 EDT] Check following assets whether they were installed or not: [helloWorld1]
+[2022-04-26, 20:45:20:835 EDT] Using old resolve API
+[2022-04-26, 20:45:20:854 EDT] checkAssetsNotInstalled() ignore exception: CWWKF1259E: Unable to obtain the following assets: helloWorld1. Ensure that the specified assets are valid. To find the IDs of applicable assets, run the installUtility find command.
+[2022-04-26, 20:45:20:858 EDT] checkAssetsNotInstalled() cause of exception: Top level feature not resolved: resource=helloWorld1
+MissingRequirement [requirementName=helloWorld1, owningResource=null]
+
+[2022-04-26, 20:45:20:866 EDT] Initializing ...
+[2022-04-26, 20:45:20:869 EDT] Environment variables:
+[2022-04-26, 20:45:20:870 EDT] FEATURE_REPO_URL: null
+[2022-04-26, 20:45:20:872 EDT] FEATURE_REPO_USER: null
+[2022-04-26, 20:45:20:873 EDT] FEATURE_UTILITY_MAVEN_REPOSITORIES: []
+[2022-04-26, 20:45:20:874 EDT] FEATURE_REPO_PASSWORD: *********
+[2022-04-26, 20:45:20:875 EDT] FEATURE_LOCAL_REPO: null
+[2022-04-26, 20:45:20:878 EDT] Overriding the environment variables using featureUtility.properties
+[2022-04-26, 20:45:20:879 EDT] envmap before:
+[2022-04-26, 20:45:20:880 EDT] {FEATURE_REPO_URL=null, FEATURE_REPO_USER=null, FEATURE_UTILITY_MAVEN_REPOSITORIES=[], FEATURE_REPO_PASSWORD=null, FEATURE_LOCAL_REPO=null}
+[2022-04-26, 20:45:20:881 EDT] printing envmap after
+[2022-04-26, 20:45:20:882 EDT] {FEATURE_REPO_URL=null, FEATURE_REPO_USER=null, FEATURE_UTILITY_MAVEN_REPOSITORIES=[http://rhel8-install11.fyre.ibm.com:8081/repository/maven-central/, http://localhost:8081/repository/maven-central/], FEATURE_REPO_PASSWORD=null, FEATURE_LOCAL_REPO=null}
+[2022-04-26, 20:45:20:884 EDT] additional jsons: [test.user.test.osgi:features:1.0]
+[2022-04-26, 20:45:20:886 EDT] Features installed from the remote repository will not be cached locally
+[2022-04-26, 20:45:20:887 EDT] JSONs required: [com.ibm.websphere.appserver.features:features:22.0.0.3, io.openliberty.features:features:22.0.0.3, test.user.test.osgi:features:1.0]
+[2022-04-26, 20:45:20:889 EDT] Found the following jsons locally: [/Users/jiwoolim/.m2/repository/com/ibm/websphere/appserver/features/features/22.0.0.3/features-22.0.0.3.json]
+[2022-04-26, 20:45:20:890 EDT] Could not find all json files from local directories, now downloading from Maven..
+[2022-04-26, 20:45:20:894 EDT] Using 8 threads to download artifacts.
+[2022-04-26, 20:45:20:895 EDT] Using temp location: /Users/jiwoolim/Downloads/wlp22003open/tmp/
+[2022-04-26, 20:45:20:896 EDT] Testing connection for repository: http://rhel8-install11.fyre.ibm.com:8081/repository/maven-central/
+[2022-04-26, 20:45:24:883 EDT] Response code: 200
+[2022-04-26, 20:45:24:884 EDT] Connecting to the following repository: http://rhel8-install11.fyre.ibm.com:8081/repository/maven-central/
+[2022-04-26, 20:45:36:170 EDT] Successfully validated MD5 checksum for file: features-22.0.0.3.json
+[2022-04-26, 20:45:36:170 EDT] Using temp location: /Users/jiwoolim/Downloads/wlp22003open/tmp/
+[2022-04-26, 20:45:36:171 EDT] Testing connection for repository: http://rhel8-install11.fyre.ibm.com:8081/repository/maven-central/
+[2022-04-26, 20:45:36:308 EDT] Response code: 200
+[2022-04-26, 20:45:36:308 EDT] Connecting to the following repository: http://rhel8-install11.fyre.ibm.com:8081/repository/maven-central/
+[2022-04-26, 20:45:36:950 EDT] Could not download this json with maven coordinate: test.user.test.osgi:features:1.0
+[2022-04-26, 20:45:36:951 EDT] Downloaded the following json files from remote: [/Users/jiwoolim/Downloads/wlp22003open/tmp/io/openliberty/features/features/22.0.0.3/features-22.0.0.3.json]
+[2022-04-26, 20:45:36:952 EDT] action.exception.stacktrace: null
+[2022-04-26, 20:45:36:952 EDT] CWWKF1409E: Unable to find the following feature JSON files locally or on the configured Maven repository: [test.user.test.osgi:features:1.0].
+com.ibm.ws.install.InstallException: CWWKF1409E: Unable to find the following feature JSON files locally or on the configured Maven repository: [test.user.test.osgi:features:1.0].
+at com.ibm.ws.install.featureUtility.FeatureUtility.getJsonFiles(FeatureUtility.java:672)
+at com.ibm.ws.install.featureUtility.FeatureUtility.(FeatureUtility.java:164)
+at com.ibm.ws.install.featureUtility.FeatureUtility.(FeatureUtility.java:58)
+at com.ibm.ws.install.featureUtility.FeatureUtility$FeatureUtilityBuilder.build(FeatureUtility.java:808)
+at com.ibm.ws.install.featureUtility.cli.InstallFeatureAction.install(InstallFeatureAction.java:240)
+at com.ibm.ws.install.featureUtility.cli.InstallFeatureAction.execute(InstallFeatureAction.java:257)
+at com.ibm.ws.install.featureUtility.cli.InstallFeatureAction.handleTask(InstallFeatureAction.java:78)
+at com.ibm.ws.install.featureUtility.cli.FeatureAction.handleTask(FeatureAction.java:100)
+at com.ibm.ws.install.featureUtility.FeatureUtilityExecutor.main(FeatureUtilityExecutor.java:58)
+at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:62)
+at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+at java.base/java.lang.reflect.Method.invoke(Method.java:566)
+at com.ibm.ws.kernel.boot.cmdline.UtilityMain.internal_main(UtilityMain.java:173)
+at com.ibm.ws.kernel.boot.cmdline.UtilityMain.main(UtilityMain.java:53)
+at com.ibm.ws.kernel.boot.cmdline.Main.main(Main.java:52)
+----
++
+The utility showed it never attempted to download the JSONs from the custom repository. If the order is reversed in the file, then it fails not finding the JSONs for core Liberty features instead of the custom ones. Once all the files are available in the local m2 repo, the utility succeeded. This release ensures that if the user feature is not found on the first repo, it should continue to find it in the next repo listed on `featureUtility.properties`.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/19832[OpenIdConnectClient not working with proxy settings given in jvm.options]
++
+A bug was discovered which meant that `OpenIdConnectClient` would not take proxy settings given in `jvm.options`, which would cause a connection timeout. The issue lied with creating a connection to the `discoveryEndpointUrl`. This issue has now been fixed updating the relevant code to use the `useSystemPropertiesForHttpClientConnections` attribute.
 
 [#guides]
 == New and updated guides since the previous release
