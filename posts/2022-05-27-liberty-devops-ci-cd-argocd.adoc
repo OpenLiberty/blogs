@@ -113,63 +113,22 @@ An attempt will be made by cluster to create a new pod, but argocd immediately a
 [.img_border_light]
 image::/img/blog/pods-before-and-after.png[Kubernetes pod - before and after status,width=60%, align="center" ]
 
+== Higher environment (QA, production) argocd based pipeline
 
-== Deploying cloud-native Java applications with Open Liberty to Kubernetes with Jenkins
+*ArgoCD on multiple environments* It is expected to have the QA (testing) and PROD (production) environments running on different kubernetes clusters or on different kubernetes namespace. +
+In such cases, Install ArgoCD separately on these clusters (or namespaces) and configure the kubernetes cluster details (or namespace) and github branch details on each ArgoCD instances, as shown below
 
-For simplicity, I will use the command line (CLI) code in a Jenkins pipeline job to deploy a Jakarta EE and MicroProfile application with Open Liberty into Kubernetes. You can also use other tools like Helm, Travis CI, and CircleCI.
+[.img_border_light]
+image::/img/blog/argocd-multi-cluster.png[ArgoCD configuration - multi-cluster,width=60%, align="center" ]
 
-In your pipeline code, add these CLI commands in a new stage. The following sample pipeline code connects to IBM Cloud from the CLI and then connects to the Kubernetes cluster running inside that, then it runs all the Kubernetes deployment-related configurations.
-                           
-[source]
-----
-ibmcloud login --apikey $IBM_CLOUD_API_KEY -g $IBM_CLOUD_RSGRP
-ibmcloud ks cluster config --cluster $CLUSTER-ID
-kubectl config current-context
-kubectl create -f deploy/deployment.yaml #( simple k8s deployment command )
-kubectl create -f deploy/service.yaml #( simple k8s service creation command )
-kubectl create -f deploy/route.yaml #( simple k8s route creation command )
-----
+*GitHub setup* As explained earlier, development pipeline will generate the comtainer image and upload the same to docker hub repository +
+Update the new image name and version in the deployment configuration file on development branch in github and create a pull request to merge the same to higher branches. +
 
-Make sure that your Kubernetes configuration files are stored in the same Git repository as your Jenkinsfile in a sub-directory called `deploy`. Also ensure that the Docker image name in the Kubernetes deployment configuration file is updated according to the container image name/tag in the Dockerfile (manually, or programmatically if it needs to change at run time):
+[.img_border_light]
+image::/img/blog/deployment-config.png[Kubernetes deployment config - example,width=60%, align="center" ]
 
-[.imageblock.img_border_light]
-image::/img/blog/deploymentyaml.png[Image reference in deployment yaml,width=40%,align="center"]
-
-When Jenkins has checked out the Java application code for the code build, all the Kubernetes configuration files are also downloaded to the Jenkins workspace so that Jenkins can run the IBM Cloud and Kubernetes commands to connect to the Kubernetes cluster and deploy the application.
-
-See the link:https://kubernetes.io/docs/reference/kubectl/cheatsheet/[Kubernetes documentation] for other commands.
-
-== QA testing cloud-native Java applications with Jenkins
-
-Apart from running JUnit test cases along with the code build phase, Jenkins can trigger functional and integration QA test cases automatically after deploying the cloud-native Java application.
-
-Configure the test cases in the Jenkins job and test it manually. Create a remote job identifier authentication token in the "Trigger builds remotely" section under "Build Triggers". Trigger this test case from the Docker "entrypoint" file by using a remote rest API call that uses this authentication token as the identifier.
-
-For example, run the following command in a terminal: 
-
-[source]
-----
-curl -I -u <auth-token> https://<jenkins-host>/job/<job-name>/build?token=<remote-job-identifier-authentication-token>
-----
-
-You can generate an authentication token (auth-token) with link:https://www.postman.com[Postman] using the Jenkins login credentials.
-
-== Kubernetes monitoring tools
-
-You can use the following Kubernetes commands to check the application or cluster logs and the memory and CPU usage: 
-
-[source]
-----
-kubectl logs ..
-cat /sys/fs/cgroup/cpu/cpuacct.usage (after connecting to k8s pod)
-cat /sys/fs/cgroup/memory/memory.usage_in_bytes (after connecting to k8s pod)
-----
-
-You can integrate different applications with Kubernetes to persist logs and usage statistics, such as link:https://prometheus.io[Prometheus] and link:https://grafana.com/oss/loki/[Grafana].
-
-Liberty makes it easy to collect and visualize system and application metrics for observability by using Prometheus and Grafana. You can find guidance and more details in the resources listed link:https://community.ibm.com/community/user/wasdevops/blogs/don-bourne1/2021/06/26/metrics-and-monitoring-guidance-for-open-liberty-a[here].
-
+When this pull request is completed, application deployment will be triggered on kubernetes QA/PROD environments through ArgoCD
 
 == Conclusion
 
-You can configure your DevOps pipeline in many ways. This blog post is a quick introduction to how you can use Jenkins to set up a simple CI/CD pipeline to build and deploy your cloud-native Java applications on Liberty.
+This is only an opinionated way to setup the Jenkins - ArgoCD pipeline. Instead of doing deployment directly from Jenkins on development environment (which is not advicable in general), you can write the pipeline code to commit the new image name with tag to github development code branch and automate the deployment through ArgoCD. 
