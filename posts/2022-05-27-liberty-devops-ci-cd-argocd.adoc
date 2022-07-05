@@ -92,79 +92,27 @@ image::/img/blog/argocd-app-status1.png[ArgoCD app status1,width=60%, align="cen
 Click on the application and see more details
 
 [.img_border_light]
-image::/img/blog/argocd-app-status1.png[ArgoCD app status2,width=60%, align="center" ]
+image::/img/blog/argocd-app-status2.png[ArgoCD app status2,width=60%, align="center" ]
 
-== Writing Jenkins pipeline scripts
+== Configuration drift testing
 
-It is a good practice to adhere to the concept of Infrastructure as Code (IaC) when creating DevOps pipelines. Creating Jenkins jobs with pipeline scripts is a good example of IaC.
+Configuration drift can happen because of manual changes directly on cluster resources or due to any erroneous automatic changes. In either cases, if the configuration changes in cluster does not match with the desired state in the mapped GitHub repository, ArgoCD will identify the same automatically and will apply the required changes in cluster resources. 
 
-You can write link:https://www.jenkins.io/doc/book/pipeline/syntax/[Jenkins pipeline code] in one of the following ways:
+Below given is an example scenario of configuration drift and the fix
 
-* As pipeline code written directly in the link:https://www.jenkins.io/doc/book/pipeline/getting-started/[Jenkins UI] and stored on the Jenkins controller (host). This is a useful way to get started. You will need to take a backup of the Jenkins instance in this case to save the pipeline code because the code is stored as part of the Jenkins instance.
+Connect to the kubernetes cluster and modify the deployment instance and add another replica to the same
 
-[.img_border_light]
-image::/img/blog/pipeline-code-on-jenkins.png[Pipeline code directly on Jenkins,align="center"]
-
-* As plain text in a Jenkinsfile (a plain text file) in Git and mapping it to Jenkins. This is better for ensuring that your configuration is always under version control. If you have specific build and deployment configurations for separate environments, such as dev, staging, and production, you can create a separate Jenkinsfile for each environment and store it in that environment-specific Git repository branches. You can use either the "Pipeline" or "Multibranch pipeline" type of job in this case.
+        kubectl edit deployment <deployment-name> -n <namespace>
+        eg: kubectl edit deployment argoliberty -n argocd
 
 [.img_border_light]
-image::/img/blog/pipeline-code-on-git.png[Pipeline code stored in a Jenkinsfile on Git,align="center"]
+image::/img/blog/kubernetes-change-deployment.png[Kubernetes pod count change,width=60%, align="center" ]
 
-== Building the cloud-native Java application with Open Liberty on Jenkins
+An attempt will be made by cluster to create a new pod, but argocd immediately act on it and get the new pod terminated. Before and after scenario is depicted in the below given screenshot
 
-The following sample pipeline code builds your Java application code, packages it into a Docker container image, and pushes the container image to a remote container image repository, such as Docker Hub or an equivalent within your enterprise:
+[.img_border_light]
+image::/img/blog/pods-before-and-after.png[Kubernetes pod - before and after status,width=60%, align="center" ]
 
-[source]
-----
- pipeline {
-     agent any
-      stages {
-       stage('Build') {
-                    steps {
-              checkout([$class: 'GitSCM', branches: [[name: '*/main']], extensions: [], userRemoteConfigs: [[credentialsId: ‘<git token>, url: 'https://github.com/liberty/app.git']]])
-                    sh '''
-                         mvn -U package
-                         docker login <remote-docker-image-repository-url> -u "${USERNAME}" -p “${PASSWORD}”
-                         docker build -t liberty-$<code identifier>:$<docker image version> .
-                         #eg: docker build -t liberty-app:v1.0 .
-                         docker tag liberty-$<code identifier>:$<docker image version> <remote-docker-image-repository-url>/<docker-repo-name>/liberty-$<code identifier>:$<docker image version>
-                         #eg: docker tag liberty-app:v1.0 docker.io/someid/liberty-app:v1.0
-                         docker push <remote-docker-image-repository-url>/<docker-repo-name>/liberty-$<code identifier>:$<docker image version>
-                         #eg: docker push docker.io/someid/liberty-app:v1.0  
-                       '''   
-                  }
-               }
-            }
-          }
-----
-
-Where:
-
-* _git-token_ is the personal access token you have generated from your Github account.
-* _remote-docker-image-repository-url_ is the location of the Docker image repository.
-* _username_ is your user name for the Docker image repository.
-* _password_ is your password for the Docker image repository.
-* _docker-image-version_ is the version number of your Docker image, a unique identifier.
-
-Build your container image using a Dockerfile or a Containerfile generated by the link:http://start.openliberty.io[Liberty Starter] or by following the pattern described in link:https://github.com/OpenLiberty/ci.docker[Open Liberty Images]. The link:https://openliberty.io/guides/containerize.html[Containerize guide] is a helpful resource that goes into more details on how to create a container image for applications running on Liberty.
-
-For static code analysis, you can use SonarQube Community edition. The Jenkins client setup details for SonarQube are given at link:https://docs.sonarqube.org/latest/analysis/scan/sonarscanner-for-jenkins/[SonarScanner for Jenkins]. The following sample Maven command packages the code with Maven and runs the SonarQube scan:
-
-[source]
-----
-mvn package verify sonar:sonar -Dsonar.projectKey=sampleapp -Dsonar.host.url=http://localhost:9000 -Dsonar.login=<generated-login-key>
-----
-
-For scanning the container image (for security purpose), you can use link:https://hub.docker.com/r/aquasec/trivy/[Trivy]. This scan provides the vulnerability details of open source JAR files that are used to resolve the dependencies while building the application. The following Docker command runs Trivy against your container image:
-
-[source]
-----
-docker run aquasec/trivy image docker.io/<docker-repo>/liberty-app:v1.0
-----
-
-Where:
-
-* _docker-repo_ is the name of the Docker container repository that contains your image
 
 == Deploying cloud-native Java applications with Open Liberty to Kubernetes with Jenkins
 
