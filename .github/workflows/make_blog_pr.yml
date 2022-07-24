@@ -1,0 +1,31 @@
+on: 
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version of OpenLiberty to generate blog for, e.g. 22.0.0.9, 22.0.0.9-beta'
+        required: true
+        type: string
+env:
+  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+jobs:
+  ListIssues:
+    name: List open issues labeled "release"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          ref: prod
+      - name: Create blog
+        run: |
+          git switch -c ${{ inputs.version }}
+          wget 'https://raw.githubusercontent.com/thallium/summer-project-blogs/master/main.py'
+          python3 main.py ${{ inputs.version }}
+          rm main.py
+          git add --all
+          git commit -m ${{ inputs.version }}
+
+      - name: Create PR
+        run: |
+          gh pr create --title ${{ inputs.version }} --base staging
+
