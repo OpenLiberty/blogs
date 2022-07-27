@@ -1,5 +1,6 @@
 # Writing and publishing blog posts on the OpenLiberty.io blog
 
+
 * [Authors: creating a new blog post](#Authors-creating-a-new-blog-post)
 * [Editors: editing and publishing a post](#Editors-editing-and-publishing-a-post)
 * [Authors and Editors: updating a published post](#Authors-and-Editors-updating-a-published-post)
