@@ -5,6 +5,22 @@ on:
         description: 'Version of OpenLiberty to generate blog for, e.g. 22.0.0.9, 22.0.0.9-beta'
         required: true
         type: string
+      publish-date:
+        description: 'Date of publish of the blog, format: YYYY-MM-DD'
+        required: true
+        default: '2050-01-01'
+        type: string
+      author-name:
+        description: 'Name of the anthor'
+        required: true
+        default: ${{ github.actor }}
+        type: string
+      github-username:
+        description: 'GitHub username of the anthor'
+        required: true
+        default: ${{ github.actor }}
+        type: string
+
 env:
   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 jobs:
@@ -16,16 +32,25 @@ jobs:
         uses: actions/checkout@v3
         with:
           ref: prod
+
       - name: Create blog
         run: |
           # git switch -c ${{ inputs.version }}
           wget 'https://raw.githubusercontent.com/thallium/summer-project-blogs/master/main.py'
-          python3 main.py ${{ inputs.version }}
+          python3 main.py ${{ inputs.version }} ${{ inputs.publish-date }} ${{ inputs.author-name }} ${{ inputs.github-username }}
           rm main.py
+
+      - name: Generate draft URL
+        run:
+          echo "https://draft-blogs-openlibertyio.mybluemix.net/blog/$(echo {{ input.publish-date }} | tr - /)/{{ input.version }}.html"
 
       - name: Create PR
         uses: peter-evans/create-pull-request@v4
         with:
           commit-message: ${{ inputs.version }}
-          branch: staging
+          branch: ${{ input.version }}
+          base: staging
           title: ${{ inputs.version }}
+          assignees: ${{ github.actor }}
+          body: Preview draft: 
+          # TODO put links in the body
