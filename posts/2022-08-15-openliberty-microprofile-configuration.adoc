@@ -52,7 +52,7 @@ image::/img/blog/ol-configuration.png[Open Liberty configuration file flow,width
 
 == Different data injection methods in Kubernetes/OpenShift
 
-There are multiple ways to inject data into application containers. This blog will discuss those methods one by one.
+There are multiple ways to inject data into application containers. This blog will discuss those methods one by one. The commands given in this blogs are OpenShift commands, but you can run the same on Kubernetes by replacing 'oc' by 'kubeclt'
 
 For the purpose of demonstration, i have defined variables in below given files and the values for the same is injected from different container data sources.
 
@@ -120,12 +120,22 @@ image::/img/blog/env-variable-results.png[Environment variable result view,width
 
 A ConfigMap is a configuration store in containerization platform. It store configurations in key-value format. These configmap's can be injected into container pods which will be used by the hosted application on run time. 
 
+In this section i will explain the steps to create configmap and configure the same on container to inject the values into the hosted application.
 
 Create a configmap in Kubernetes/OpenShift
 
-image::/img/blog/configmap-yaml.png[ConfigMap yaml view,width=40%,align="center"]
+            apiVersion: v1
+            kind: ConfigMap
+            metadata:
+              name: config-env-file
+            data:
+              MPConfig: "micro profile  test config"
+              SerEnv: "server env test config"
+              Custom-Config: "Custom config param"
+              Server-Config: "server config"
+              Boot-config: "boot config"
 
-image::/img/blog/configmap-command.png[ConfigMap create command view,width=70%,align="center"]
+            oc create -f configmap.yaml 
 
 ConfigMap is created in Kubernetes/OpenShift
 
@@ -140,6 +150,24 @@ ConfigMap is added as the source of values in environment variables
 
 image::/img/blog/configmap-env-mapping.png[ConfigMap - environment variable mapping view,width=50%,align="center"]
 
+          containers:
+            - resources: {}
+              terminationMessagePath: /dev/termination-log
+              name: libertyapp
+              env:
+                - name: MPConfig
+                  valueFrom:
+                    configMapKeyRef:
+                      name: config-env-file
+                      key: MPConfig
+                - name: SerEnv
+                  valueFrom:
+                    configMapKeyRef:
+                      name: config-env-file
+                      key: SerEnv
+              ports:
+                - containerPort: 9080
+                  protocol: TCP
 === Config as Secrets
 
 OpenShift/Kubernetes secrets can be used to inject dynamic values into hosted applications. +
