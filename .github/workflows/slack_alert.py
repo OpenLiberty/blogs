@@ -101,10 +101,6 @@ if __name__ == "__main__":
         issue_number = issue["number"]
         message["attachments"][0]["blocks"][4]["text"]["text"] += f"\n <{issue_url}| {issue_title}> #{issue_number}"
     
-    print(message)
-
-    requests.post(args.slackhook, headers=headers, data=json.dumps(message))
-
     response = requests.post(args.slackhook, headers=headers, data=json.dumps(message))
 
     if response.status_code != 200:
