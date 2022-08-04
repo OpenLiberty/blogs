@@ -105,64 +105,121 @@ You can find out more about this specific update and the wider technology with t
 [#cdi]
 == CDI 4.0
 CDI allows objects to be bound to lifecycle contexts, to be injected, to be associated with interceptors and decorators, and to interact in a loosely coupled fashion by firing and observing events.
-As part of Jakarta EE 10 Core Profile, CDI 4.0 brings some functional updates and removes some previously deprecated APIs. This update also brings in new Jakarta EE 10 versions of the Jakarta Annotations and Jakarta Interceptors APIs.
-Support has been added for Build Compatibile Extensions, along with a new Metamodel that is less dependent on reflection at runtime.
+Highlights of CDI 4.0 include support for Build Compatibile Extensions and Observable Container State Events. This update also brings in new Jakarta EE 10 versions of the Jakarta Annotations and Jakarta Interceptors APIs.
 
+=== Build Compatible Extensions
+
+Previous versions of CDI allowed users to provider Portable Extensions which allowed customisation of CDI application initialization lifecycle. Build Compatible Extensions are intended to make implementing extensions easier and do make them amenable to build-time processing. To implement a Build Compatible Extension, you need to provide an implementation of the `BuildCompatibleExtension` interface, declared via `META-INF/services`. The implementation may provide methods annotated with one of the extension annotations, each of which corresponds to the extension execution phases;
+
+- `@Discovery`
+- `@Enhancement`
+- `@Registration`
+- `@Synthesis`
+- `@Validation`
+
+For example, as part of the `Enhancement` phase, this implementation adds an additional `MyQualifier` annotation to the `MyService` type.
 [source, java]
 ----
 public class MyExtension implements BuildCompatibleExtension {
-    @Enhancement(type=MyFooService.class)
-    public void foo(ClassConfig clazz) {
+    @Enhancement(type=MyService.class)
+    public void addMyQualifier(ClassConfig clazz) {
         clazz.addAnnotation(MyQualifier.class)
     }
 }
 ----
 
-In previous versions of CDI, an empty `beans.xml` file indicated that an archive should be treated as an Explicit Bean Archive (the equivalent of `bean-discovery-mode="all"`). In CDI 4.0, an empty `beans.xml` will now cause an archive to be treated as an Implicit Bean Archive (the equivalent of `bean-discovery-mode="annotated"`). Should it be needed, a configuration option has been provided to enable compatibility with previous versions.
-
-In previous versions of CDI, a non-empty `beans.xml` file that did not include a version attribute defaulted to mean `bean-discovery-mode="all"`. In CDI 4.0, it defaults to `bean-discovery-mode="annotated"`.
+=== Startup and Shutdown Events
 
 Two new Observable Container State Events are added: Startup and Shutdown. Applications can listen for these events to be notified when the CDI container is starting up and being shut down.
 
-A new Handle API is added to make programatic lookup of Beans and Instances easier.
+[source, java]
+----
+@ApplicationScoped
+public class MyObserver {
+    public void observeStartup(@Observes Startup startupEvent) { {
+        System.out.println("CDI Container is starting");
+    }
 
-In Jakarta Annotations 2.1, the `@priority` annotation can now be applied to any program element. This annotation is used by CDI 4.0 to allow Stereotypes to include a Priority annotation.
+    public void observeShutdown(@Observes Shutdown shutdownEvent) { {
+        System.out.println("CDI Container is stopping");
+    }
+}
+----
 
-The following previously deprecated CDI APIs are removed:  
+The order of multiple observer methods may be controlled using the `@Priority` annotation.
 
-* `@New qualifier`, which is replaced by `@dependent` beans in CDI 1.1 and later.
+=== Empty beans.xml files
 
-* `Bean#isNullable()`, which has not been used by the implementation since CDI 1.1.
+In previous versions of CDI, an empty `beans.xml` file indicated that an archive should be treated as an Explicit Bean Archive (the equivalent of `bean-discovery-mode="all"`). In CDI 4.0, an empty `beans.xml` will now cause an archive to be treated as an Implicit Bean Archive (the equivalent of `bean-discovery-mode="annotated"`). Should it be needed, a configuration option has been provided to enable compatibility with previous versions.
 
-* `BeanManager#fireEvent()`. Use `BeanManager.getEvent()` instead in CDI 2.0 and later. 
+=== Unversioned beans.xml files
 
-* `BeanManager#createInjectionTarget(AnnotatedType)`, which is replaced by `BeanManager#getInjectionTargetFactory(AnnotatedType)` in CDI 1.1 and later.
+In previous versions of CDI, a non-empty `beans.xml` file that did not include a `version` attribute defaulted to mean `bean-discovery-mode="all"`. In CDI 4.0, it defaults to `bean-discovery-mode="annotated"`. It is recommended that all `beans.xml` files should be properly versioned.
 
-* `BeforeBeanDiscovery#addAnnotatedType(AnnotatedType)`, which is replaced by `BeforeBeanDiscovery#addAnnotatedType(AnnotatedType, String)` in CDI 1.1 and later.
+[source, xml]
+----
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns="https://jakarta.ee/xml/ns/jakartaee"
+    xsi:schemaLocation="https://jakarta.ee/xml/ns/jakartaee https://jakarta.ee/xml/ns/jakartaee/beans_4_0.xsd"
+    version="4.0"
+    bean-discovery-mode="annotated">
+</beans>
+----
 
-* The Liberty configuration element has been superseded by a new element that applies to all versions of CDI (1.2 and newer).
+=== Programatic lookup of Beans and Instances
+
+A new Handle API is added to make programatic inspection of Bean metadata easier, avoiding the need to create instances before they are actually required. `Handles` may be obtained via the `Instance` API.
+
+[source, java]
+----
+public interface Handle<T> extends AutoCloseable {
+        T get();
+        Bean<T> getBean();
+        void destroy();
+        void close();
+}
+----
+
+=== Removed APIs
+
+The following previously deprecated CDI APIs have been removed:  
+
+* `@New` qualifier
+  - replaced by `@Dependent` beans
+* `Bean#isNullable()`
+  - has not been used by the implementation since CDI 1.1
+* `BeanManager#fireEvent()`
+  - Use `BeanManager.getEvent()` instead
+* `BeanManager#createInjectionTarget(AnnotatedType)`
+  - replaced by `BeanManager#getInjectionTargetFactory(AnnotatedType)`
+* `BeforeBeanDiscovery#addAnnotatedType(AnnotatedType)`
+  - replaced by `BeforeBeanDiscovery#addAnnotatedType(AnnotatedType, String)`
+
+=== Configuration
+
+The Liberty `<cdi12>` `server.xml` configuration element has been superseded by a new `<cdi>` element which applies to all versions of CDI (1.2 and newer).
 
 [source, xml]
 ----
 <cdi enableImplicitBeanArchives="false" emptyBeansXmlCDI3Compatibility="true"/>
 ----
 
-The `enableImplicitBeanArchives` attribute is the same as it was in previous versions.
-If set to `true`, which is the default, then archives that do not contain a `beans.xml` file are treated as Implicit Bean Archives and scanned for classes that have Bean Defining Annotations.
-If set to `false`, then archives that do not contain a `beans.xml` file are not scanned for annotated classes.
+* The `enableImplicitBeanArchives` attribute is the same as it was in previous versions.
+  - If set to `true`, which is the default, then archives that do not contain a `beans.xml` file are treated as Implicit Bean Archives and scanned for classes that have Bean Defining Annotations.
+  - If set to `false`, then archives that do not contain a `beans.xml` file are not scanned for annotated classes.
 
-The `emptyBeansXmlCDI3Compatibility` attribute applies only to CDI 4.0.
-If set to `true`, then an archive that contains an empty `beans.xml` file is treated as an Explicit Bean Archive, as it was in CDI 3.0 and earlier.
+* The `emptyBeansXmlCDI3Compatibility` attribute applies only to CDI 4.0.
+  - If set to `true`, then an archive that contains an empty `beans.xml` file is treated as an Explicit Bean Archive, as it was in CDI 3.0 and earlier.
+  - If set to `false`, which is the default, then an archive that contains an empty `beans.xml` file is treated as an Implicit Bean Archive. This is equivalent to setting `bean-discovery-mode="annotated"`.
 
-If set to `false`, which is the default, then an archive that contains an empty `beans.xml` file is treated as an Implicit Bean Archive. This is equivalent to setting `bean-discovery-mode="annotated"`.
+To use the CDI 4.0 feature, add `cdi-4.0` to your `server.xml`
 
 [source, xml]
 ----
 <featureManager>
   <feature>cdi-4.0</feature>
 </featureManager>
-
-<cdi enableImplicitBeanArchives="false" emptyBeansXmlCDI3Compatibility="true"/>
 ----
 
 [#expression]
