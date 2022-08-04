@@ -102,13 +102,14 @@ if __name__ == "__main__":
 
     bug_issue_url = f"https://github.com/OpenLiberty/open-liberty/issues?q=+label%3A%22release+bug%22+label%3Arelease%3A{version_no_dots}"    
     if not "beta" in args.version.lower():
-        message["attachments"][0]["blocks"][5] = {
+        message["attachments"][0]["blocks"].append({
             "type": "section",
             "text": {
                 "type": "mrkdwn",
                 "text": f"*<{bug_issue_url}| Corresponding Notable Fixes>*"
                 }
             }
+        )
     
     response = requests.post(args.slackhook, headers=headers, data=json.dumps(message))
 
