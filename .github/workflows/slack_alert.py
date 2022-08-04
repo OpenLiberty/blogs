@@ -61,7 +61,7 @@ message = {
 }
 
 headers = {
-    "Content-type": "application/json"
+    'Content-Type': 'application/json'
 }
 
 if __name__ == "__main__":
@@ -104,3 +104,11 @@ if __name__ == "__main__":
     print(message)
 
     requests.post(args.slackhook, headers=headers, data=json.dumps(message))
+
+    response = requests.post(args.slackhook, headers=headers, data=json.dumps(message))
+
+    if response.status_code != 200:
+        raise ValueError(
+            'Request to slack returned an error %s, the response is:\n%s'
+            % (response.status_code, response.text)
+        )
