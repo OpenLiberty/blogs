@@ -46,6 +46,7 @@ jobs:
           echo "::set-output name=url::https://draft-blogs-openlibertyio.mybluemix.net/blog/$(echo ${{ inputs.publish-date }} | tr - /)/${{ inputs.version }}.html"
 
       - name: Create PR
+        id: create-pr
         uses: peter-evans/create-pull-request@v4
         with:
           commit-message: ${{ inputs.version }}
@@ -55,3 +56,9 @@ jobs:
           assignees: ${{ github.actor }}
           body: "Preview draft at: ${{ steps.gen-url.outputs.url }}"
           # TODO put links in the body
+
+      - name: Send Slack alert
+        run: |
+          python3 .github/workflows/slack_alert.py \
+          ${{ inputs.version }} ${{ inputs.publish-date }} ${{ inputs.author-name }} ${{ inputs.github-username }} \
+          ${{ steps.create-pr.outputs.pull-request-number }} ${{ steps.gen-url.outputs.url }} ${{ secrets.SLACK_HOOK }} 
