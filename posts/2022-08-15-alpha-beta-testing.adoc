@@ -17,33 +17,31 @@ Shamjith Antholi <https://github.com/shamjithantholi>
 
 [#Intro]
 
-=== About A/B testing
+== About A/B testing
 
 A/B testing is a method of running multiple versions of a single application simultaneously to test and compare the performance and user experiance of the application. A/B testing can be executed as a random version testing or using fixed number of hits on either version of application. A/B testing model are executed by either the consent of user or without leaving a choice to the user based on the requirement, for example, sometimes users are given an option to select old version or newer version of an application to do their business. This testing method helps product owner to get clear evidence of user choices. A/B testing need more resources and time to get the desired results compared to other testing models.
 
-=== About kubernetes 
+== About kubernetes 
 
 This focus of this blog is more about technical steps to do the A/B testing using Kubernetes technology. Kubernetes is a open source platform for managing containerized applications workloads and services, that facilitates both declarative configuration and automation. Kubernetes works with Docker runtime engine as well as other wide variety of container engines. Kubernetes cluster can be installed on your own datacenter ( link:https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/[Install kubernetes] ) or directly use a host kubernetes service (eg: link:https://azure.microsoft.com/en-us/services/kubernetes-service/ [Azure kubernetes service] )
 
-=== A/B testing kubernetes architecture
+== A/B testing kubernetes architecture
 
 A/B testing on kubernetes can be designed in multiple ways, i will be discussing 2 such designs on this blog.  
 
 RANDOM ACCESS model: 
 
+Random number of container instances (pods) of the multiple versions of an application will be created in the container cluster and users will be getting services from different versions of the applications randomly. For example, if 8 instances of version 1 and 2 instances of version 2 are deployed in container cluster, there are chances that 100 users may get access to version 1 or all 100 users may get access to version 2 or 50 users may get acces to version 1 and 50 users may get access to version 2. We cannot predict how many users may get access to a particular version of the applciation when requested.  
+
 image::/img/blog/AB-type-1.png[A/B testing on kubernetes - randon access setup architecture diagram,width=70%,align="center"]
 
 TARGETED ACCESS model: 
 
+In this model, multiple versions of an application is deployed in the container cluster and we apply weightages on access to those instances. That means, if 100 users are trying to access version 1 and version 2, we can set the rule that at any point of time, 80 percentage of users will be getting access to version 1 and 20 percentage will get access to version 2
+
 image::/img/blog/AB-type-2-1.png[A/B testing on kubernetes - targeted access setup architecture diagram,width=70%,align="center"]
 
-
-setu p architecture is given below. A sample application is deployed on kubernetes pods and external access is controlled by services. The instances of application pods deployed (eg: 6 green application instance and 2 red application instance as shown in this diagram) and the amount of user traffic routed to deployed application (eg: 80% traffic to green application instance and 20% to red application instances as shown in this diagram) are decided based on the overall A/B testing architectural plan. 
-
-image::/img/blog/A-B-testing-kubernetes.png[A/B testing kubernetes setup architecture diagram,width=70%,align="center"]
-
-
-=== A/B testing terminologies and worthiness check
+== A/B testing terminologies and worthiness check
 
 Various well known A/B testing terminolories are + 
 
@@ -57,13 +55,15 @@ In terms of worthiness check, i am listing out various obstacles to consider +
 *Requirement of huge usage traffic* If a particular feature under test doesn't get enough traffic over a period of time, then the test may take months or years to complete and that won't help in faster feature rollout plans +
 *One-Size-Fits-All approach* Once we decide to select a particular variant after A/B testing, we are neglecting a set of users like who would have been choosing other variants. These neglected users may fall users high value category and the company is risking their annoyance in these kind of scenarious. 
 
-=== Prerequistes for understaing this blog
+== Prerequistes for understaing this blog
 
-In this blog post, I will assume that you have a basic understanding of Kubernetes. 
+In this blog post, to understand the technical details explained further, I will assume that you have a basic understanding of Kubernetes. 
 
 == A/B testing component setup on Kubernetes
 
 There are various ways to impletement A/B testing infrastracture in Kubernetes platform, I will be explaining you the CANARY deployment way of A/B testing and below given kubernetes deployment and service file contents are going to help you for that.  
+
+=== Generic kubernetes deployment details.
 
 For canary depoyment, we are going to create 2 setup of kubernetes deployment instance, one will be returning 'Green' result and the other one will be returning 'red' result. All pods in there 2 deployments will contain common key-value in labels section. These deployment instances will be bind together and exposed to external users with a kubernetes service instance. This service instance will be using comming label in these deployments to create a mix of pods (running stable and non-stable application instances together) or will be using unique labels in these deployments (to run stable and non-stable instances separately) to test unique instances. More details are given below.
 
@@ -137,8 +137,6 @@ Kubernetes service config file
           port: 8080
           targetPort: 8080
 
-== A/B testing execution on Kubernetes and result analysis
-
 Run both deployment yaml files and create 6 pods of green instances and 2 pods of red instance
 
     kubeclt apply -f RED.yaml
@@ -151,9 +149,13 @@ Expose these pods by running the below given command
 
     kubectl apply -f reg-green-srvc.yaml
 
+== Testing the RANDOM access  model
+
+Since we have not implemented any rendering conditions on the application routing logic in the kubernetes cluster, also since we have used the selector "app: ab-test-all-color-instance" in application related kubernetes service, which is a common label on both the application deployment instance, the randomness is already implemented. 
+
 To test the randomness of the result, run the  below given command and verify the results
 
-    $ for i in {1..10}; do curl 172.17.0.100:8080; done
+    $ for i in {1..10}; do curl <application-routeurl>:8080; done
 
     {
     “color”: “RED”,
@@ -186,6 +188,12 @@ To test the randomness of the result, run the  below given command and verify th
     “color”: “GREEN”,
     “date”: “2022-07-25T12:52:12.482Z”
     }{
+
+As you can see in the result, out of 10 requests, the RED instance which consists of only 2 pod instances in the cluster was returned 7 times and the GREEN instance which consists of 6 pods instance was returned only 3 times
+
+== Testing the TARGETED access  model
+
+In this model, apart from the setup explained above, we need to introduce a kuberntes ingress instance in-between users and kubernetes service.
 
 == Conclusion
 
