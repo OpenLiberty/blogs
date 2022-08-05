@@ -26,7 +26,7 @@ Open Liberty 22.0.0.9-beta brings you the hot-off-the-press link:https://jakarta
 ** Jakarta Annotation 2.1: allowing `@Priority` to be used on any program element; adding `@Nullable` and `@NotNull`
 ** Jakarta Interceptors 2.1: picking up the changes from Annotation 2.1
 
-In addition to the Core Profile features, Jakarta EE 10 Expression Language 5.0 is included in this beta and provides new features and specification clarifications.   
+In addition to the Core Profile features, Jakarta EE 10 Expression Language 5.0 is included in this beta and provides new features and specification clarifications.  Likewise, Jakarta Concurrency 3.0 is also included and enhances the set of parallel and reactive programming models available to applications, enabling tasks and completion stage actions to run with the thread context of the submitter.
 
 But it's not only Jakarta EE features that are debuting in this release!  MicroProfile OpenAPI is updated to version 3.1, in which you can specify optional authentication for operations and multiple annotation enhancements.  Last but not least, Password Utilities 1.1 is introduced in this beta, which no longer forcefully federates stand-alone user registries.
 
@@ -38,6 +38,7 @@ The link:{url-about}[Open Liberty] 22.0.0.9-beta includes the following beta fea
 ** <<json, Jakarta JSON Binding and Processing>>
 ** <<cdi, CDI 4.0>>
 * <<expression, Jakarta EE 10 Expression Language 5.0>>
+* <<concurrency, Jakarta EE 10 Concurrency 3.0>>
 * <<microprofile, MicroProfile OpenAPI 3.1>>
 * <<password, Password Utilities 1.1>>
 
@@ -125,7 +126,7 @@ Highlights of CDI 4.0 include support for build compatible extensions and observ
 
 === Build compatible extensions
 
-Previous versions of CDI allowed users to provide Portable Extensions to customize the CDI application initialization lifecycle. These Build Compatible Extensions make implementing extensions amenable to build-time processing. To implement a Build Compatible Extension, provide an implementation of the `BuildCompatibleExtension` interface, declared via `META-INF/services`. The implementation can provide methods annotated with one of the extension annotations, each of which corresponds to the extension execution phases;
+Previous versions of CDI allowed users to provide Portable Extensions to customize the CDI application initialization lifecycle. These Build Compatible Extensions make implementing extensions amenable to build-time processing. To implement a Build Compatible Extension, provide an implementation of the `BuildCompatibleExtension` interface, declared via `META-INF/services`. The implementation can provide methods annotated with one of the extension annotations, each of which corresponds to the extension execution phases:
 
 - `@Discovery`
 - `@Enhancement`
@@ -217,7 +218,7 @@ The Liberty `<cdi12>` `server.xml` configuration element has been superseded by 
 ----
 
 * The `enableImplicitBeanArchives` attribute is the same as it was in previous versions.
-  - If set to `true`, which is the default, then archives that do not contain a `beans.xml` file are treated as Implicit Bean Archives and scanned for classes that have Bean Defining Annotations.
+  - If set to `true`, which is the default, then archives that do not contain a `beans.xml` file are treated as Implicit Bean Archives and scanned for classes that have bean defining annotations.
   - If set to `false`, then archives that do not contain a `beans.xml` file are not scanned for annotated classes.
 
 * The `emptyBeansXmlCDI3Compatibility` attribute applies only to CDI 4.0.
@@ -254,10 +255,111 @@ More information about Expression Language 5.0 can be found in:
 
 * link:{url-prefix}/docs/latest/reference/feature/expressionLanguage.html[Open Liberty Expression Language feature documentation]
 
+[#concurrency]
+== Jakarta EE 10 Concurrency 3.0
+
+The Jakarta Concurrency specification enhances the set of parallel and reactive programming models available to applications, enabling tasks and completion stage actions to run with the thread context of the submitter.
+
+Concurrency 3.0 includes the following enhancements:
+
+* Resource definition annotations that put applications in control of defining the concurrency constraints and thread context types that the application requires
+* Context-aware completion stages that are managed by the container
+* Asynchronous methods that are backed by context-aware completion stages
+* Improvements to Triggers for customizing the scheduling of business logic according to dates and times within one's own time zone
+* Standardized integration for third-party providers of thread context
+
+Enable the concurrent-3.0 feature in server.xml, along with other Jakarta EE 10 beta features that you wish to use in combination with it, for example:
+
+[source, xml]
+----
+<featureManager>
+  <feature>concurrent-3.0</feature>
+  <!-- other features that are used in the examples: -->
+  <feature>cdi-4.0</feature>
+  <feature>jdbc-4.2</feature>
+  <feature>jndi-1.0</feature>
+  <feature>restfulWS-3.1</feature>
+</featureManager>
+----
+
+You can still configure `<managedExecutorService>` and other Concurrency resource types in your `server.xml` file as you did for previous versions of the feature.  However, In Concurrency 3.0 you can define those resources within application components.
+With the CDI feature enabled, methods that return a `CompletionStage` or `CompletableFuture` can be designated to run asynchronously by annotating them with `@Asynchronous`. For example:
+
+[source, java]
+----
+import jakarta.enterprise.concurrent.Asynchronous;
+import jakarta.inject.Singleton;
+
+import java.sql.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+
+import javax.naming.InitialContext;
+import javax.naming.NamingException;
+import javax.sql.DataSource;
+
+@Singleton
+public class AccountsBean {
+
+    @Asynchronous(executor = "java:module/concurrent/MyExecutor")
+    CompletableFuture<List<Account>> findOverdue(int minDaysLate) {
+        List<Account> overdueAccounts = new ArrayList<Account>();
+        try {
+            // Resource reference lookup requires context of the application component,
+            DataSource db = InitialContext.doLookup("java:comp/env/jdbc/account-db-ref");
+            ...
+            return Asynchronous.Result.complete(overdueAccounts);
+        } catch (NamingException | SQLException x) {
+            throw new CompletionException(x);
+        }
+    }
+
+    ...
+----
+
+When the application invokes the asynchronous method, the container intercepts the invocation and hands back a completion stage representing its eventual completion, which is arranged by the `ManagedExecutorService`.  For example:
+
+[source, java]
+----
+    public void doGet(HttpServletRequest req, HttpServletResponse res) {
+        ...
+        accounts.findOverdue(60).thenAccept(this::sendReminder);
+        ...
+    }
+
+    void sendReminder(List<Account> overdue) {
+        try {
+            // Resource reference lookup requires context of the application component,
+            DataSource db = InitialContext.doLookup("java:comp/env/jdbc/customer-db-ref");
+            ...
+        } catch (NamingException | SQLException x) {
+            throw new CompletionException(x);
+        }
+    }
+----
+
+The Maven coordinates for Concurrency 3.0 are as follows:
+
+[source, xml]
+----
+<dependency>
+    <groupId>jakarta.enterprise.concurrent</groupId>
+    <artifactId>jakarta.enterprise.concurrent-api</artifactId>
+    <version>3.0.0</version>
+</dependency>
+----
+
+For more resources regarding Concurrency 3.0, reference the following links:
+
+* link:https://jakarta.ee/specifications/concurrency/3.0/jakarta-concurrency-spec-3.0.html[Concurrency 3.0 specification]
+* link:https://jakarta.ee/specifications/concurrency/3.0/apidocs[Concurrency 3.0 Javadoc]
+* link:https://repo1.maven.org/maven2/jakarta/enterprise/concurrent/jakarta.enterprise.concurrent-api/3.0.0/jakarta.enterprise.concurrent-api-3.0.0.jar[Concurrency 3.0 API jar]
+
+
 [#microprofile]
 == MicroProfile OpenAPI 3.1 
 
-The link:https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.0.md[OpenAPI specification] standardizes a way of documenting REST APIs in a JSON or YAML format. The link:https://microprofile.io/project/eclipse/microprofile-open-api[MicroProfile OpenAPI specification] helps you generate and serve OpenAPI documentation for your REST applications that are built by using JAX-RS or Jakarta restfulWS. This can be useful for developers to test out the API during development, or for people using the API in production.
+The link:https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.0.md[OpenAPI specification] standardizes a way of documenting REST APIs in a JSON or YAML format. The link:https://microprofile.io/project/eclipse/microprofile-open-api[MicroProfile OpenAPI specification] helps you generate and serve OpenAPI documentation for your REST applications that are built by using JAX-RS or Jakarta RESTful Web Services. This can be useful for developers to test out the API during development, or for people using the API in production.
 
 MicroProfile OpenAPI 3.1 is a minor release that includes the following updates:
 
@@ -273,7 +375,7 @@ To use MicroProfile OpenAPI 3.1, add the `mpOpenAPI-3.1` feature to your server.
 </featureManager>
 ----
 
-Next, deploy your rest application and then visit the `/openapi` endpoint to view the OpenAPI documentation, or visit `/openapi/ui` for a user interface where you can browse through it. You can enhance the documentation by using annotations to add things like textual descriptions to each method. The annotations are available as a maven dependency:
+Next, deploy your rest application and then visit the `/openapi` endpoint to view the OpenAPI documentation, or visit `/openapi/ui` for a user interface where you can browse through it. You can enhance the documentation by using annotations to add things like textual descriptions to each method. The annotations are available as a Maven dependency:
 
 [source, xml]
 ----
@@ -310,7 +412,7 @@ For more information about the Password Utilities, check out the link:{url-prefi
 [#run]
 === Try it now 
 
-To try out these features, just update your build tools to pull the Open Liberty All Beta Features package instead of the main release. The beta works with Java SE 18, Java SE 17, Java SE 11, and Java SE 8, however, the Jakarta EE 10 features are only compatible with Java SE 11 and above.
+To try out these features, just update your build tools to pull the Open Liberty All Beta Features package instead of the main release. The beta works with Java SE 18, Java SE 17, Java SE 11, and Java SE 8, however, the Jakarta EE 10 features are only compatible with Java SE 11 and later.
 
 If you're using link:{url-prefix}/guides/maven-intro.html[Maven], here are the coordinates:
 
