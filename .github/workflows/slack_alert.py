@@ -1,3 +1,12 @@
+# Copyright (c) 2022 IBM Corporation and others.
+# All rights reserved. This program and the accompanying materials
+# are made available under the terms of the Eclipse Public License v1.0
+# which accompanies this distribution, and is available at
+# http://www.eclipse.org/legal/epl-v10.html
+#
+# Contributors:
+#     IBM Corporation - initial API and implementation
+
 import requests
 import json
 from argparse import ArgumentParser
@@ -36,10 +45,29 @@ message = {
                 },
                 {
                     "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": "*First Draft PR:* <fakeLink.toEmployeeProfile.com| #pr_number>"
-                    }
+                    "fields": [
+                        {
+                            "type": "mrkdwn",
+                            "text": "*First Draft PR:* <fakeLink.toEmployeeProfile.com| #pr_number>"
+                        },
+                        {
+                            "type": "mrkdwn",
+                            "text": "*<fakeLink.toEmployeeProfile.com| Preview Draft Post>*"
+                        }
+                    ]
+                },
+                {
+                    "type": "section",
+                    "fields": [
+                        {
+                            "type": "mrkdwn",
+                            "text": "*Staging PR:* <fakeLink.toEmployeeProfile.com| #pr_number>"
+                        },
+                        {
+                            "type": "mrkdwn",
+                            "text": "*<fakeLink.toEmployeeProfile.com| Preview Staging Post>*"
+                        }
+                    ]
                 },
                 {
                     "type": "section",
@@ -70,8 +98,10 @@ if __name__ == "__main__":
     parser.add_argument('publish_date', type=str)
     parser.add_argument('author', type=str)
     parser.add_argument('github_username', type=str)
-    parser.add_argument('pr_number', type=str)
+    parser.add_argument('draft_pr_number', type=str)
     parser.add_argument('draft_url', type=str)
+    parser.add_argument('staging_pr_number', type=str)
+    parser.add_argument('staging_url', type=str)
     parser.add_argument('slackhook', type=str)
     args = parser.parse_args()
 
@@ -86,10 +116,15 @@ if __name__ == "__main__":
     message["attachments"][0]["blocks"][1]["fields"][2]["text"] = f"*Author:*\n {args.author}"
     message["attachments"][0]["blocks"][1]["fields"][3]["text"] = f"*Author GitHub:*\n <{github_url}| {args.github_username}>"
 
-    pr_url = f"https://github.com/OpenLiberty/blogs/pull/{args.pr_number}"
-    message["attachments"][0]["blocks"][2]["text"]["text"] = f"*First Draft PR:* <{pr_url}| #{args.pr_number}>"
+    draft_pr_url = f"https://github.com/OpenLiberty/blogs/pull/{args.draft_pr_number}"
+    message["attachments"][0]["blocks"][2]["fields"][0]["text"] = f"*First Draft PR:* <{draft_pr_url}| #{args.draft_pr_number}>"
 
-    message["attachments"][0]["blocks"][3]["text"]["text"] = f"*<{args.draft_url}| Preview Draft Post>*"
+    message["attachments"][0]["blocks"][2]["fields"][1]["text"] = f"*<{args.draft_url}| Preview Draft Post>*"
+
+    staging_pr_url = f"https://github.com/OpenLiberty/blogs/pull/{args.staging_pr_number}"
+    message["attachments"][0]["blocks"][3]["fields"][0]["text"] = f"*Staging PR:* <{staging_pr_url}| #{args.staging_pr_number}>"
+
+    message["attachments"][0]["blocks"][3]["fields"][1]["text"] = f"*<{args.staging_url}| Preview Staging Post>*"
 
     version_no_dots = args.version.replace('.', '')
     ISSUE_URL = f"https://api.github.com/repos/OpenLiberty/open-liberty/issues?labels=blog,target:{version_no_dots}"
