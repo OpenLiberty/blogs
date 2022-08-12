@@ -1,0 +1,201 @@
+---
+layout: post
+title: "Securing your cloud-native Java app from the first commit (DevSecOps)"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://gitlab.com/uploads/-/system/user/avatar/7278326/avatar.png
+author_github: https://gitlab.com/rslangehennig1
+seo-title: Securing your cloud-native Java app from the first commit (DevSecOps) - OpenLiberty.io
+seo-description: DESCRIPTION
+blog_description: "DESCRIPTION"
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+additional_authors: 
+- name: Laura Cowen
+  github: https://github.com/lauracowen
+  image: https://avatars0.githubusercontent.com/lauracowen
+---
+= Securing your cloud-native Java app from the first commit (DevSecOps)
+Randall Langehennig <https://gitlab.com/rslangehennig1>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+// If adding image into the post add :
+// -------------------------
+// [.img_border_light]
+// image::img/blog/FILE_NAME[IMAGE CAPTION ,width=70%,align="center"]
+// -------------------------
+// "[.img_border_light]" = This adds a faint grey border around the image to make its edges sharper. Use it around
+// screenshots but not around diagrams. Then double check how it looks.
+// There is also a "[.img_border_dark]" class which tends to work best with screenshots that are taken on dark backgrounds.
+// Once again make sure to double check how it looks
+// Change "FILE_NAME" to the name of the image file. Also make sure to put the image into the right folder which is: img/blog
+// change the "IMAGE CAPTION" to a couple words of what the image is
+// // // // // // // //
+
+Microservice architectures can increase the compexity of monitoring, detecting, and resolving security issues in your applications. DevSecOps, the process of securing your cloud-native application early and continuously throughout development, ensures that your cloud-native application is secure with each code commit from the start.
+
+We'll demonstrate how you can use the deployment pipelines in GitLab to automatically scan your code for security vulnerabilities when fixing a bug in a cloud-native Java application on Liberty.
+
+== What is DevSecOps?
+DevSecOps, in its broadest definition, means it's the delivery team's responsibility to ensure that the code that is built and deployed is secure. In practice, this means ensuring that the DevOps pipeline in a continuous integration and continuous deployment (CI/CD) process runs scans for security issues at several points: on the committed code and on the built containers; static application security testing (SAST); dynamic application security testing (DAST); checking for license compliance; checking for accidentally committed secrets; and more.
+
+The following diagram illustrates the stages of a DevOps pipeline for an Open Liberty application
+
+[.img_border_light]
+image::/img/blog/devsecops-diagram.png[DevOps pipeline stages for Open Liberty,width=70%,align="center"]
+
+== Automatically security scanning your code
+
+In the following scenario, a tester has reported a bug in the cloud-native Java application which you will fix using the Liberty dev mode and the DevOps deployment pipelines in GitLab. The deployment pipeline will automatically scan your code for security issues and you can see the results of the scans in GitLab.
+
+1. <<fix, Fix the bug in the cloud-native Java application code.>>  Find and fix the bug in your IDE using the Liberty dev mode.
+2. <<commit, Commit the code changes to the feature branch.>> Commit your code to the feature branch and trigger the pipeline to build and test your code.
+3. <<merge, Merge code changes back to the main branch.>> Merge your fixed code to the main branch and trigger another pipeline to build and test your code before deploying the application to Kubernetes.
+
+[#fix]
+=== 1. Fix the bug in the cloud-native Java application code
+
+A tester has opened an issue in GitLab to report that the front-end system of your cloud-native Java application is responding with errors and the "liveness" API is returning a DOWN status:
+
+**(TODO: screenshot of issue details - similar to liberty-blog-issue-details-2.png but without the WebSphere logo and without the highlighting; also try taking it at a lower resolution so that the text is larger and clearer)**
+
+As a developer, you start by clicking **Create merge request** to create a merge request from the issue. A dialog opens. You can see that a reviewer is required because (Randy, can we demonstrate that a reviewer has been assigned because of some rule condition triggered? or does that not make sense here?):
+
+**(TODO: screenshot of create merge request dialog? like liberty-blog-merge-request-confirm.png - crop out the left and top banners so just the form is shown, if that's useful?)**
+
+Click **Create merge request**. GitLab creates a new "feature branch" in Git where you can fix the bug.
+
+In your IDE, make sure that "Open Liberty Tools" is installed. In this scenario, we're using Visual Studio Code and you can install Open Liberty Tools as an extension.
+
+As you start to work in your feature branch in the IDE, the Liberty Dev Dashboard detects your Liberty-based application and gives you the option to start the application in a container:
+
+**(TODO: screenshot of starting dev mode - like liberty-blog-vscode-2.png but crop out the Walkthroughs side of the UI to focus in a bit more on the relevant part)**
+
+Click **Start in container**. This process builds the application code, creates a container, and then starts the container in “dev mode”.
+
+From the same menu, now click **Run tests**. Liberty dev mode runs unit tests against the application code and displays the results in your IDE:
+
+**(TODO: screenshot of IDE unit test results - similar to liberty-vscode-3.png but maybe crop out some of the top of the window and make the text bigger and easier to read)**
+
+Sure enough, the unit test to check the response from the liveness endpoint is failing just as the issue describes. You can even open a local browser and connect to the web application running in the container and see the same failure as well.
+
+To fix the bug, you edit the `SystemLivenessCheck.java` class on line 39:
+
+**(TODO: screenshot of SystemLivenessCheck.java - like liberty-blog-vscode-3.png)**
+
+When you save your code changes, Liberty dev mode automatically recompiles the code and updates the running container. Then you can run the unit tests again to confirm the bug is fixed:
+
+**(TODO: screenshot of tests showing no errors - like liberty-blog-vscode-4.png but cropped to only the bit that's highlighted in your original post)**
+
+Now you're ready to commit the code changes.
+
+[#commit]
+=== 2. Commit the code changes to the feature branch
+
+When you're happy with your bug fix, you commit your code changes to the feature branch.
+
+As soon as you commit your code changes to the feature branch, the GitLab CI/CD pipeline starts to run. The pipeline includes the relevant security scans at each stage: build, container scan, review, test, and so on.
+
+You can see the progress of the running pipeline by clicking **CI/CD > Pipelines** in the sidebar:
+
+**(TODO: screenshot of pipeline stages - something like liberty-blog-2.png)**
+
+The application is being built using GitLab Runner, which is packaged wtih cloud-native build capabilities to support Maven and Gradle. GitLab automatically detects the runner needed for your application. (Randy: what does this mean? that it detects Java code rather than, say, Python?)
+
+After building the application, the pipeline creates a Docker container (see the Build stage in the pipeline) and then stores the container in the GitLab Container Registry. You can see what is stored in the container registry by clicking **Packages & Registries > Container Registry** in the sidebar:
+
+**(TODO: screenshot - like liberty-blog-4a.png)**
+
+The pipeline then runs a container scan (see the Container_scan stage in the pipeline). A container scan is a very important step for new cloud-native applications. Your application’s Docker image might be based on Docker images that contain known vulnerabilities; the scanning feature can help ensure that your containers are secure and can alert you of potential vulnerabilities immediately.
+
+During the Test stage, the pipeline runs the following set of tests, including some security scans (Randy: Is this the case if you don't have GitLab for IBM? Do you need to configure it yourself? Which tests do you have if you have free GitLab?):
+
+* Dependency Scans – this looks for vulnerabilities in the libraries that are used in your project (either open source libraries or shared libraries)
+* License Scans – if you are using open source projects, you can configure the license scans to make sure you do not have any license violations
+* Static Application Security Tests (SAST) Scans – this is white-box testing; for example, the scan can look for items like an “sql scripting injection” in your code
+* Secret Detection – checks to see if you are exposing secrets
+* Coverage-guided Fuzz Testing – a fuzz test sends random inputs to an instrumented version of your application in an effort to cause unexpected behavior
+* API Fuzz Testing – a fuzz test sets operation parameters to unexpected values to try to cause unexpected behavior and errors in the API backend. This helps you discover bugs and potential security issues that other QA processes may miss.
+
+The pipeline can also include other stages to run performance tests; for example, using k6, a free and open source tool for measuring the system performance of applications under load.
+
+Finally, the pipeline can start the application and run Dynamic Application Security Testing (DAST) against the running application. The DAST tests are a form of black-box testing that scan the running application to look for problems.  DAST can analyze the application in two ways:
+
+* Passive Scan Only (DAST default). DAST executs OWASP Zed Attack Proxy (ZAP) Baseline Scan and does not actively attack your application.
+* Passive and Active Scan. DAST can be configured to perform an active scan to attack your application and produce a more extensive security report.
+
+(Certain tests are only available if you have a GitLab or link:https://www.ibm.com/products/gitlab-ultimate[GitLab for IBM license].)
+
+In the merge request, you can view a lot of information, including the results of the code quality scans, license scans, to help you decide whether to merge the code changes back into the main branch:
+
+**(TODO: screenshot of merge request - like liberty-blog-7.png)**
+
+Click **View app** to see a preview of your application with the code changes you made. This enables colleagues to collaborate with you and to verify your changes. You can also validate the changes using the REST API by connecting to the same preview of the application.
+
+Let's look at some of the security scan results by clicking **View full report** in the merge request. The list of potential security vulnerabilities is displayed:
+
+**(TODO: screenshot of report - like liberty-blog-10.png)**
+
+For each potential vulnerability identified, you can use the buttons to the right to view more information, to create a new issue which is populated with the details about the vulnerability, or to dismiss the issue if the team feels it is not a problem.
+
+Traditionally, a security team tests and catches security problems just before the app goes live (which can cause delays in release, be more complicated to fix retrospectively, and it can be unclear who should address the problems). Instead, with DevSecOps with GitLab, you identify any security problems early on, right when the code is committed to the feature branch in Git. The development team collaborates with the security team in GitLab and can become extended members of the security team to help you secure your environment. You can develop “security champions” in the organization who assist the application teams and work alongside the main security team.
+
+The first time that you run security scans in a GitLab pipeline you might find that the GitLab security testing results tend to be “overprotective”. We find that being “overprotective” is better for establishing a good working baseline, especially if your team has previously run no security scans at all.
+
+If you click **Security & Compliance** in the sidebar, you can also review the license compliance, dependency list, and vulnerability details.
+
+The pipeline ends with a manual step to deploy the application into a Quality Acceptance environment.
+
+[#merge]
+=== 3. Merge code changes back to the main branch
+
+When you, as developer, are satisfied with your test results and your updates, you can mark the merge request as being ready: click **Mark as ready** in the merge request.
+
+A software leader might need to review the changes then click **Merge** in the merge request to merge the code changes to the main branch.
+
+Merging the code changes to the main branch triggers another pipeline to run. This pipeline runs against the main branch. You can see the pipeline progress if you click **CI/CD > Pipelines** again:
+
+**(TODO: screenshot of main branch pipeline progress - like liberty-blog-18.png)**
+
+The main difference between the two pipelines that we've run is that the pipeline for the main branch ends with a Deploy stage that deploys the cloud-native Java application on Liberty into a Kubernetes cluster in OpenShift.
+
+Ensure that you've installed the Open Liberty Operator from the OpenShift Container Platform (OCP). The Open Liberty Operator simplifies deployment of containers into an OpenShift cluster. The operator watches Open Liberty resources and compares the current state of resources to the state you expect.   When a discrepancy exists, the operator creates, updates, or deletes Kubernetes resources to return the application to the proper state.
+
+The GitLab pipeline calls (Randy: pick an alternative deployment tool...ArgoCD?) to trigger the deployment of the new container into a Kubernetes cluster in the “INTEGRATION-OpenShift” environment:
+
+**(TODO: screenshot of whatever you decide as alternative to UCD)**
+
+You can check that the application is running by (Randy: straightforward instruction to check that it's running. I don't think we need to go into so much detail about the actual deployment here unless it's security-related.)
+
+**(TODO: screenshot of running app showing Liveness working?)**
+
+== Summary
+DevSecOps ensures that cloud-native Java applications are secure from the first code commit right through the development process. Performing security scans only at the end of the development process can be more complicated and inefficient to correct serious security problems. Incorporating security scans into your DevOps deployment pipelines, DevSecOps, catches potential security vulnerabilities as early as possible so that you can resolve them before they become large and more cumbersome, and expensive, to resolve.
+
+
+
+**NOTES for Randy (to be removed before publishing**
+
+* Need all the screenshots mentioned above
+* Don't mention WebSphere or IBM.
+* Don't use WebSphere Liberty logo or colour branding (it's currently in all your screenshots). Could you put the OL logo/colours on the web app index.html page to make it clearly identifiable in the blog post as being the web app in the screenshot rather than the GitLab UI (just so reader doesn't confuse the two when reading)? Don't need to call out how to do that in the scenario though (just show it in the screenshot).
+* Treat Open Liberty and GitLab as open source projects that anyone can try without needing a licence. Does this cause problems for the scenario? I know some of the security scans require a GitLab licence if you don't have GitLab for IBM. Do you have a link to GitLab for IBM so we can give it as an option maybe? I'll talk to YK about exactly how
+* Don't need to sell the Open Liberty features.
+* Show rather than telling the GitLab features (ie don't do a walkthrough of GitLab features in this version of the post; focus on the simple scenario which happens to demonstrate Liberty and GitLab features along the way.)
+* Don't use software that's not OSS or at least (when not possible) freely available to use.
+* UrbanCode Deploy - can you use a different example? Do you have any suggestions/preference, eg ArgoCD, Jenkins? (I'm not sure what the equivalents are for devops tools :)
+* Don't need to provide so many screenshots. Try to use larger text sizes (lower screen resolution) and crop the screenshot to just the relevant part of the screen (include the wider context only when it's not otherwise clear where to find the relevant bit). Don't include the whole screen every time.
+* Would you be able to create a simple diagram (similar to liberty-gitlab-intro-slide.png but with acronyms spelled out, no IBM/WebSphere branding, no UCD, and with Open Liberty branding)? We can then use that in the intro of the post and also on social media to promote the post. **DONE**
+
+// // // // // // // //
+// LINKS
+//
+// OpenLiberty.io site links:
+// link:/guides/microprofile-rest-client.html[Consuming RESTful Java microservices]
+// 
+// Off-site links:
+// link:https://openapi-generator.tech/docs/installation#jar[Download Instructions]
+//
+// // // // // // // //
