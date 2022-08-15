@@ -73,13 +73,6 @@ message = {
                     "type": "section",
                     "text": {
                         "type": "mrkdwn",
-                        "text": "*<fakeLink.toEmployeeProfile.com| Preview Draft Post>*"
-                    }
-                },
-                {
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
                         "text": "*Corresponding Blog Issues:*"
                     }
                 }
@@ -118,12 +111,10 @@ if __name__ == "__main__":
 
     draft_pr_url = f"https://github.com/OpenLiberty/blogs/pull/{args.draft_pr_number}"
     message["attachments"][0]["blocks"][2]["fields"][0]["text"] = f"*First Draft PR:* <{draft_pr_url}| #{args.draft_pr_number}>"
-
     message["attachments"][0]["blocks"][2]["fields"][1]["text"] = f"*<{args.draft_url}| Preview Draft Post>*"
 
     staging_pr_url = f"https://github.com/OpenLiberty/blogs/pull/{args.staging_pr_number}"
     message["attachments"][0]["blocks"][3]["fields"][0]["text"] = f"*Staging PR:* <{staging_pr_url}| #{args.staging_pr_number}>"
-
     message["attachments"][0]["blocks"][3]["fields"][1]["text"] = f"*<{args.staging_url}| Preview Staging Post>*"
 
     version_no_dots = args.version.replace('.', '')
