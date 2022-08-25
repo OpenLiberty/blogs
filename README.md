@@ -147,6 +147,7 @@ These steps are completed by the editors of the blog. As editor, you might ask q
    b. Merge the PR into `staging`.
    
 4. IBM Cloud will automatically rebuild the [blogs-staging site](https://blogs-staging-openlibertyio.mqj6zf7jocq.us-south.codeengine.appdomain.cloud/blog/) and [staging site](https://staging-openlibertyio.mqj6zf7jocq.us-south.codeengine.appdomain.cloud/blog/). If you have access, you can track the progress in the [Slack channel](https://app.slack.com/client/T15GKHBT4/C01GX9P8YP2).
+
 ~~Request a build of the [staging openliberty.io site from Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io/branches) (type `staging` in the **Branch** field of the dialog).~~
 
 5. When the build has finished, check to make sure the blog with its blog tags render correctly on the [blogs-staging site](https://blogs-staging-openlibertyio.mqj6zf7jocq.us-south.codeengine.appdomain.cloud/blog/) or [staging site](https://staging-openlibertyio.mqj6zf7jocq.us-south.codeengine.appdomain.cloud/blog/). The latter includes the entire site, while the former just has the blog content.  If you need to verify links to other parts of the site (outside of the /blogs/ content) then you'll need to wait for the full [staging site](https://staging-openlibertyio.mqj6zf7jocq.us-south.codeengine.appdomain.cloud/blog/) to build.
