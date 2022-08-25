@@ -9,13 +9,64 @@ seo-description: Methods to manage Open Liberty and MicroProfile configuration f
 blog_description: Methods to manage Open Liberty and MicroProfile configuration files in multiple Kubernetes environments.
 open-graph-image: https://openliberty.io/img/blog/liberty-devops-generic-architecture.png
 ---
-= Open Liberty and MicroProfile configuration file management in multiple Kubernetes environments
+= Managing configuration through the application lifecycle in Kubernetes environments
 Shamjith Antholi <https://github.com/shamjithantholi>
 :imagesdir: /
 :url-prefix:
 :url-about: /
 
-[#Intro]
+During an application's lifecycle, it is deployed repeatedly into different environments, like development, test, and production. Each environment often requires its own connection details for databases, messaging services, and other services. Your application needs to be able to connect to data sources and other services no matter which environment it is in. Moreover, when deployed to Kubernetes clusters as microservices, the microservices must be able to bind to the correct ports to be able to communicate through, for example, HTTP calls. As instances of microservices are created and destroyed to scale the application up and down in Kubernetes, port numbers are likely to change so you need to be able to programmatically assign new port numbers to the microservices and inject the information during startup without changing the code.
+
+This blog post will discuss how to manage the configuration of an Open Liberty application throughout its lifecycle in development, test, and production Kubernetes environments. We will use the MicroProfile Config capabilities to control the configuration and look at how best to reliably and securely store, package, and deploy the configuration in each environment.
+
+== Managing configurations sources through different environments
+
+Applications deployed on multiple environments like development, test and production have environment-specific configuration files. These environment-specific configurations are managed by developers and operators whose access is limited to the specific environment in which they work.
+
+=== Development environment 
+
+In the development environment (DEV), all of the common configuration files and the DEV-specific configuration files should be stored in source control. Ideally, the configuration files are stored on separate branches of a dedicated Git repository. The configuration files are stored in a separate repository from the source code because the source code should not be available to teams outside the DEV environment. The files are stored on separate branches because.....
+
+The build tool, such as Jenkins, should have both a build job and a separate configuration build job. When the source code for the application is updated, both jobs are run. The build job builds, scans, and packages the application, then uploads the Docker image to the image repository, while the configuration job packages and deploys the configuration files xxxx. However, if only the configuration files are updated, the configuration job can run without building and deploying the whole application as well.
+
+**Laura: is this right?** 
+
+The following diagram shows a typical full build and deployment workflow on the DEV environment. Configuration updates can also be made manually by connecting directly to the running container, though configuration changes should always be committed to version control so that they can be tracked.
+
+Use commands similar to below given to copy files to pods from local
+*kubectl cp /tmp/samplefile.txt <container-namespace>/<pod-id>:/tmp/*
+
+image::/img/blog/dev-cluster1.png[Configuration management and deployment on DEV environment ,width=70%,align="center"]
+
+=== Testing environment
+
+In a testing environment (QA), it's not mandatory to do the code build again. For application deployment, the test team can set up the deployment config in the QA container prior and initiate the redeployment of the image from the build tool. In case of a new image deployment, QA team can update the new image details in container deployment config manually or programmatically from the build job  
+
+**Laura: I don't think I understand what the paragraph above is saying**
+
+
+To update any configurations from DEV branch to QA branch, DEV team can initiate a pull request and on approval from QA team, it can be merged to QA branch. QA team can directly update any QA environment specific configurations to the configs on QA branch 
+
+image::/img/blog/qa-cluster1.png[Configuration management and deployment on QA environment ,width=70%,align="center"]
+
+=== Production environment
+
+In the production environment (PROD), the deployment pattern is same as on QA environment. The PROD team can set up the deployment config in the PROD container prior and initiate the redeployment of the image from the build tool or manually. In case of a new image deployment, PROD team can update the new image details in container deployment config manually or programmatically from the build job 
+
+To update any configurations from QA branch to PROD branch, QA team can initiate a pull request and on approval from PROD team, it can be merged to PROD branch. PROD team can directly update any production environment specific configurations to the configs on PROD branch 
+
+image::/img/blog/prod-cluster1.png[Configuration management and deployment on production environment ,width=70%,align="center"]
+
+
+== Choosing where to store configuration on Open Liberty
+
+???
+
+
+
+
+
+******************************
 
 == What is MicroProfile and Open Liberty
 
@@ -203,38 +254,6 @@ In this method of configuration management, you need to create environment varia
 
 Developers need to write the timer based code to read the configuration file copied from external to internal volume and process the same and update the new values to the mapped environment variable. Since the change in environment variable values are set from inside the application itself, there is no need of an application restart to reflect the change across the application 
 
-== Managing configurations sources through different Kubernetes environments
-
-Applications deployed on multiple environments like DEV, QA and PROD will have environment specific configuration files. These environment specific configurations will have to be managed by associates whose access would be limited to specific environments. I will explain a simple way to manage environment specific files storage, packaging and deploying across different environments.
-
-=== 1. DEV enviornment 
-
-On DEV environment, all the common config files and DEV specific config files will be stored on Git on a separate branches (not along with the source code repository, a separate repository can be created for configs - in this way, we can stop exposing the source code to non-DEV team).  
-
-On Build tool (like jenkins),  We should create a build job as well as configuration update job. This seperate configuration update job on build tool would be useful when we need to update only the configurations in the container and no application deployment need to be done. Build job will do the application build, scan and packaging and upload the docker image to the image repository. 
-
-The below given diagram states the full build/deployment flow on DEV environment. Please note that config update on container DEV environment can be done manually as well
-
-Use commands similar to below given to copy files to pods from local
-*kubectl cp /tmp/samplefile.txt <container-namespace>/<pod-id>:/tmp/*
-
-image::/img/blog/dev-cluster1.png[Configuration management and deployment on DEV environment ,width=70%,align="center"]
-
-=== 2. QA environment
-
-On QA environment, it's not mandatory to do the code build again. For application deployment, QA team can setup the deployment config in the QA container prior and initiate the redeployment of the image from the build tool. In case of a new image deployment, QA team can update the new image details in container deployment config manually or programmatically from the build job  
-
-To update any configurations from DEV branch to QA branch, DEV team can initiate a pull request and on approval from QA team, it can be merged to QA branch. QA team can directly update any QA environment specific configurations to the configs on QA branch 
-
-image::/img/blog/qa-cluster1.png[Configuration management and deployment on QA environment ,width=70%,align="center"]
-
-=== 3. PROD environment
-
-on PROD environment, deployment pattern is same as on QA environment, PROD team can setup the deployment config in the PROD container prior and initiate the redeployment of the image from the build tool or manually. In case of a new image deployment, PROD team can update the new image details in container deployment config manually or programmatically from the build job 
-
-To update any configurations from QA branch to PROD branch, QA team can initiate a pull request and on approval from PROD team, it can be merged to PROD branch. PROD team can directly update any production environment specific configurations to the configs on PROD branch 
-
-image::/img/blog/prod-cluster1.png[Configuration management and deployment on production environment ,width=70%,align="center"]
 
 == Conclusion
 
