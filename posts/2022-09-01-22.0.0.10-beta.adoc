@@ -3,15 +3,15 @@ layout: post
 title: "TITLE"
 # Do NOT change the categories section
 categories: blog
-author_picture: https://avatars3.githubusercontent.com/mbroz2
-author_github: https://github.com/mbroz2
+author_picture: https://avatars3.githubusercontent.com/reecenana
+author_github: https://github.com/reecenana
 seo-title: TITLE - makes sure it ends with - OpenLiberty.io
 seo-description: DESCRIPTION
 blog_description: DESCRIPTION
 open-graph-image: https://openliberty.io/img/twitter_card.jpg
 ---
 = TITLE
-Michal Broz <https://github.com/mbroz2>
+Reece Nana <https://github.com/reecenana>
 :imagesdir: /
 :url-prefix:
 :url-about: /
@@ -57,11 +57,11 @@ BETA_RELEASE_SUMMARY
 
 The link:{url-about}[Open Liberty] 22.0.0.10-beta includes the following beta features (along with link:{url-prefix}/docs/latest/reference/feature/feature-overview.html[all GA features]):
 
-* <<SUB_TAG_0, Java 19 Support>>
-* <<SUB_TAG_1, XML Binding 4.0>>
-* <<SUB_TAG_2, BELL SPI Visibility and BELL Properties>>
-* <<SUB_TAG_3, MicroProfile Telemetry 1.0>>
-* <<SUB_TAG_4, Distributed Security Caches>>
+* <<java, Java 19 Support>>
+* <<xml, XML Binding 4.0>>
+* <<bell, BELL SPI Visibility and BELL Properties>>
+* <<microprofile, MicroProfile Telemetry 1.0>>
+* <<security, Distributed Security Caches>>
 
 // // // // // // // //
 // In the preceding section:
@@ -73,49 +73,221 @@ The link:{url-about}[Open Liberty] 22.0.0.10-beta includes the following beta fe
 // // // // // // // //
 
 // https://github.com/OpenLiberty/open-liberty/issues/22166
-[#SUB_TAG_0]
+[#java]
 == Java 19 Support
-Could not locate the summary.
+Java 19 is coming soon, and with it the following features and changes:
+
+* 405: Record Patterns (Preview)
+* 422: Linux/RISC-V Port
+* 424: Foreign Functions & Memory API (Preview)
+* 425: Virtual Threads (Preview)
+* 426: Vector API (Fourth Incubator)
+* 427: Pattern Matching for switch (Third Preview)
+* 428: Structured Concurrency (Incubator)
+
+By taking advantage of trying out the new changes in Java 19 now, you will get more time to review your applications, microservices and runtime environments which means you will be a step ahead when it becomes generally available.
+
+To give this a try, link:https://jdk.java.net/19/[download the early access release of Java 19], download and install the link:https://openliberty.io/downloads/#runtime_betas[22.0.0.10-beta] version of Open Liberty, edit your Liberty server's link:https://openliberty.io/docs/22.0.0.10/reference/config/server-configuration-overview.html#server-env[server.env] file to point JAVA_HOME to your Java 19 installation and start testing!
+
+For more information on Java 19, visit the Java 19 link:https://jdk.java.net/19/release-notes[release notes page], link:https://download.java.net/java/early_access/jdk19/docs/api/[API Javadoc page] or link:https://openliberty.io/docs[download page].
+For more information on Open Liberty, please visit our documentation page.
+
+As work is made towards full Java 19 support, there may functionality that might not be 100% ready yet but is in progress to be complete soon!
+
 // https://github.com/OpenLiberty/open-liberty/issues/22092
-[#SUB_TAG_1]
+[#xml]
 == XML Binding 4.0
-Could not locate the summary.
+Jakarta XML Binding 4.0 is an API for automating the mapping between XML documents and Java objects. Support provides the updated XML Binding 4.0 API, it's Reference Implementation, and introduces the xmlBinding-4.0 feature to Open Liberty.
+
+The xmlBinding-4.0 feature provides the Jakarata XML Binding 4.0 tools for marshalling and unmarshing XML to Java: xjc and schemagen. Both command line tools preform identically to the Jakarata EE 9 tooling.
+
+To enable the new Jakarta XML Binding 4.0 feature, add the xmlBinding-4.0 feature to your `server.xml`. Here's an example of what the feature configuration looks like:
+
+[source,xml]
+----
+    <featureManager>
+          <feature>xmlBinding-4.0</feature>
+    </featureManager>  
+----
+
+For more information see the link:https://jakarta.ee/specifications/xml-binding/[Jakarta XML Binding Specification]
+
 // https://github.com/OpenLiberty/open-liberty/issues/21974
-[#SUB_TAG_2]
+[#bell]
 == BELL SPI Visibility and BELL Properties
-Could not locate the summary.
+The link:https://openliberty.io/docs/latest/reference/feature/bells-1.0.html[Basic Extensions using Liberty Libraries (BELL) 1.0] feature enables shared libraries to provide implementations of Liberty API interfaces using Java link:https://docs.oracle.com/javase/9/docs/api/java/util/ServiceLoader.html[ServiceLoader] configuration files.
+
+22.0.0.10-beta introduces two capabilities for BELL services: SPI visibility and properties configuration and Injection.
+Previously these capabilities were available only to user feature extensions. User features offer more capabilities than BELL services, but come with a more complex development model. These capabilities afford extension developers greater opportunity to leverage the simplicity of BELL services.
+
+BELL SPI visibility makes feature SPI packages visible only to shared libraries referenced in BELL configurations. The introduction of BELL SPI visibility enables developers to provide implementations of SPI interfaces as BELL services rather than user features, which typically require more time to develop.
+
+BELL properties configuration and injection enables BELL services to receive properties configured in the server.xml file. The introduction of BELL properties allows users to exploit the benefits of the Liberty configuration and obviates the need to configure BELL services with environment variables or JVM system properties.
+
+To enable SPI visibility declare Boolean attribute `spiVisibility=“true”` in your BELL configuration. SPI visibility is disabled by default.
+
+To specify properties add a `<properties/>` element within your BELL configuration and declare one or more `name="value"` attributes. Properties are type `String` and apply to all services provided by the referenced library.
+
+The configuration below enables SPI visibility for services provided by shared library `ServletExtLib` and declares two properties, `servletName` and `servletMapping`.
+
+[source, xml]
+----
+        <library id=”ServletExtLib">
+            <fileset dir="${server.output.dir}/sharedLib" includes="ServletExtLib.jar" />
+        </library>
+
+        <bell libraryRef=”ServletExtLib”
+              service="javax.servlet.ServletContainerInitializer"
+              spiVisibility=”true">
+           <properties servletName=“RestSciServlet” servletMapping="/rest/*" />
+        </bell>
+----
+
+In order to receive properties at runtime, modify your service implementation classes by defining either a public constructor or a public method named `updateBell`, each having a single parameter of type `java.util.Map<String,String>`. The `updateBell` method is intended to support non-destructive updates and must tolerate multiple calls on the same service instance.
+
+The example below defines method `updateBell` within service implementation class `RestSci`.
+
+[source, java]
+----
+        package my.servlet.extensions;
+        ...    
+        public class RestSci implements javax.servlet.ServletContainerInitializer {
+           public RestfSci() {}
+           public void updateBell(java.util.Map<String, String> properties) { 
+              // Collect properties 
+           }
+           ...
+        }
+----
+At runtime the server will make SPI packages visible only to a specialized classloader for library `ServletExtLib`. Applications can declare `commonLibRef="ServletExtLib"` in their `<classloader/>` configuration, but they will not see SPI packages. Regarding `<properties/>` the server will inject an unmodifiable map with `key=value` pairs `"servletName"="RestSciServlet"` and `"servletMapping"="/rest/*"` into all services when created during startup and after BELL configuration updates.
+
+The following steps describe how to bring up a BELL service that implements the REST Handler SPI interface `com.ibm.wsspi.rest.handler.RESTHandler`, which was impossible until now.
+
+
+=== Create the service resource and implementation class files
+
+The resource file is named for the SPI interface and declares the fully-qualified name of the implementation class. The minimal resource file content is shown below. Notice the file also declares an OSGi property required by the RESTHandler interface -- the entry starting with `#` -- that enables the REST Handler framework to register the service as a listener for a specified URL sub-root. In this example the URL sub-root is `/bellEP`.
+
+[source, java]
+----
+    #com.ibm.wsspi.rest.handler.root=/bellEP
+    your.org.rest.example.BellEndpoint
+----
+
+And here's a skeletal implementation of SPI interface `com.ibm.wsspi.rest.handler.RESTHandler`. The implementation defines method `updateBell` to receive BELL properties. The `updateBell` method is intended for non-destructive updates and must tolerate multiple calls on the same service instance.
+
+[source, java]
+----
+    package your.org.rest.example;
+    import com.ibm.wsspi.rest.handler.*;
+    ...
+    public class BellEndpoint implements com.ibm.wsspi.rest.handler.RESTHandler {
+        public BellEndpoint() {}
+        public void updateBell(java.util.Map<String, String> properties) {...}
+        @Override
+        public void handleRequest(RESTRequest request, RESTResponse response) {...}
+    }
+----
+
+Package the files into a JAR file, say `RestEpLib.jar`:
+
+[source, java]
+----
+    META-INF/services/com.ibm.wsspi.rest.handler.RESTHandler
+    your/org/rest/example/BellEndpoint.class
+----
+
+=== Configure the server
+
+Add the following features to the `server.xml` file. The `restConnector-2.0` feature enables the REST Handler framework and exports the REST Handler SPI package required by the BELL service. Access to REST endpoints requires secure transport (`transportSecurity-1.0`) and that a user is mapped to the administrator role. 
+
+[source, xml]
+----
+     <featureManager>
+         <feature>bells-1.0</feature>
+         <feature>restConnector-2.0</feature>
+         <feature>transportSecurity-1.0</feature>
+     </featureManager>
+----
+
+Now add the shared library and BELL. The following configuration enables SPI visibility for the `RestEpLib` library and declares one property, `hello="WORLD"`. Enable SPI visibility whenever a BELL service implementation requires SPI packages exported by a configured feature(s). Remember to copy file `RestEpLib.jar` to the directory specified in the library's `<fileset/>`.
+
+[source, xml]
+----
+    <library id=”RestEpLib">
+        <fileset dir="${server.output.dir}/sharedLib" includes="RestEpLib.jar" />
+    </library>
+
+    <bell libraryRef=”RestEpLib”
+            service="com.ibm.wsspi.rest.handler.RESTHandler"
+            spiVisibility=”true">
+        <properties hello=“WORLD” />
+    </bell>
+----
+
+Add the keystore for transport security and map a user to the administrator role:
+
+[source, xml]
+----
+     <keyStore id="defaultKeyStore" password="keystorePassword" />
+     <basicRegistry>
+         <user name="you" password="yourPassword" />
+         <group name="yourGroup" />
+     </basicRegistry>
+     <administrator-role>
+         <user>you</user>
+         <group>yourGroup</group>
+     </administrator-role>
+----
+
+=== Save your changes and start the server
+
+Look for messages CWWKL0059I and CWWKL0050I in server logs indicating the server enabled BELL SPI visiblity and registered the BELL service. The server makes REST Handler SPI packages visible to a unique classloader for library `RestEpLib`. Applications may declare a common library reference to `RestEpLib` (`commonLibRef="RestEpLib"`) in their `<classloader/>` configuration, but they will not see SPI packages.
+
+[source, xml]
+----
+[...] 00000001 com.ibm.ws.classloading.bells.internal.Bell                  I BETA: BELL SPI Visibility and BELL Properties has been invoked by class com.ibm.ws.classloading.bells.internal.Bell for the first time.
+[...] 00000001 com.ibm.ws.classloading.bells.internal.Bell                  I CWWKL0059I: BELL SPI visibility is enabled for the RestEpLib library. The BELL references the RestEpLib library through a unique class loader that can see SPI packages.
+[...] 00000001 com.ibm.ws.classloading.bells.internal.Bell                  I CWWKL0050I: The RestEpLib library registered the service that is declared in the wsjar:file:/<your_wlp>/usr/servers/bell_ep_server/sharedLib/RestEpLib!/META-INF/services/com.ibm.wsspi.rest.handler.RESTHandler file, using your.org.rest.example.BellEndpoint implementation class.
+----
+
+When the server registers the BELL service with the OSGi framework it triggers the REST Handler framework to register the service as a listener for URL sub-root `/bellEP`. The /bellEP endpoint is now accessible.
+
+You can now make calls to `https://<host>:8020/ibm/api/bellEP`.
+
+The REST handler framework references the BELL service to serve the `/bellEP` endpoint. During the first reference the server creates an instance of class BellEndpoint and injects an unmodifiable map with key/value pair `"hello"/"WORLD"`. The server injects BELL properties at service creation and after BELL configuration updates.
+
+You can find out more about this specific update from the following links:
+
+* link:https://openliberty.io/docs/latest/reference/feature/bells-1.0.html[Open Liberty BELL 1.0 Feature Doc]
+* link:https://docs.oracle.com/javase/9/docs/api/java/util/ServiceLoader.html[Java ServiceLoader]
+* link:https://openliberty.io/docs/latest/reference/config/bell.html[Open Liberty BELL Server Configuration Doc]
+
 // https://github.com/OpenLiberty/open-liberty/issues/21847
-[#SUB_TAG_3]
+[#microprofile]
 == MicroProfile Telemetry 1.0
 
-   
-   - A sentence or two that introduces the update to someone new to the general technology/concept.
-[OpenTelemetry](https://opentelemetry.io/) is a set of APIs, SDKs, tooling and integrations that are designed for the creation and management of telemetry data such as traces, metrics, and logs.
+link:https://opentelemetry.io/[[OpenTelemetry] is a set of APIs, SDKs, tooling and integrations that are designed for the creation and management of telemetry data such as traces, metrics, and logs.
 
 This feature adopts OpenTelemetry from CNCF to allow MicroProfile Applications to benefit from OpenTelemetry and enable automatic tracing of Jakarta RESTful Web Services if configured.
 
-   - What was the problem before and how does your update make their life better? (Why should they care?)
-   
-   - Briefly explain how to make your update work. Include screenshots, diagrams, and/or code snippets, and provide a `server.xml` snippet.
-
-```xml
+[source, xml]
+----
 <featureManager>
   <feature>mpTelemetry-1.0</feature>
 </featureManager>
-```
+----
 
-You can view the telemetry data from your application in Jaeger(https://www.jaegertracing.io/docs/1.37/monitoring/#traces)  and Zipkin (https://zipkin.io/pages/quickstart.html). To export your traces to one of these exporters, configure the exporter with system properties, e.g. `-Dotel.traces.exporter=jaeger` or environment variables, e.g. `OTEL_TRACES_EXPORTER=jaeger`.  You can also configure the exporter endpoints using `OTEL_EXPORTER_JAEGER_ENDPOINT` and `OTEL_EXPORTER_ZIPKIN_ENDPOINT`.  To specify the name of the service, use `OTEL_SERVICE_NAME`.
+You can view the telemetry data from your application in link:https://www.jaegertracing.io/docs/1.37/monitoring/#traces[Jaeger] and  link:https://zipkin.io/pages/quickstart.htmlp[Zipkin]. To export your traces to one of these exporters, configure the exporter with system properties, e.g. `-Dotel.traces.exporter=jaeger` or environment variables, e.g. `OTEL_TRACES_EXPORTER=jaeger`.  You can also configure the exporter endpoints using `OTEL_EXPORTER_JAEGER_ENDPOINT` and `OTEL_EXPORTER_ZIPKIN_ENDPOINT`.  To specify the name of the service, use `OTEL_SERVICE_NAME`.
    
-   - Where can they find out more about this specific update (eg Open Liberty docs, Javadoc) and/or the wider technology?
-
 For more information about MicroProfile Telemetry, see the following links:
 
-https://github.com/eclipse/microprofile-telemetry
-https://github.com/open-telemetry/opentelemetry-specification/blob/v1.11.0/specification/trace/api.md
-https://opentelemetry.io
+* link:https://github.com/eclipse/microprofile-telemetry[microprofile-telemetry]
+* link:https://github.com/open-telemetry/opentelemetry-specification/blob/v1.11.0/specification/trace/api.md[opentelemetry-specification]
+* link:https://opentelemetry.io[opentelemetry.io]
 
 // https://github.com/OpenLiberty/open-liberty/issues/20209
-[#SUB_TAG_4]
+[#security]
 == Distributed Security Caches
 
    
