@@ -1,15 +1,15 @@
 ---
 layout: post
-title: "Open Liberty and MicroProfile configuration file management in multiple Kubernetes environments"
+title: "Managing Open Liberty and MicroProfile configuration files deployment into multiple Kubernetes environments"
 categories: blog
 author_picture: https://avatars3.githubusercontent.com/shamjithantholi
 author_github: https://github.com/shamjithantholi
-seo-title: Open Liberty and MicroProfile configuration file management in multiple Kubernetes environments
+seo-title: Managing Open Liberty and MicroProfile configuration files deployment into multiple Kubernetes environments
 seo-description: Methods to manage Open Liberty and MicroProfile configuration files in multiple Kubernetes environments.
 blog_description: Methods to manage Open Liberty and MicroProfile configuration files in multiple Kubernetes environments.
 open-graph-image: https://openliberty.io/img/blog/liberty-devops-generic-architecture.png
 ---
-= Open Liberty and MicroProfile configuration file management in multiple Kubernetes environments
+= Managing Open Liberty and MicroProfile configuration files deployment into multiple Kubernetes environments
 Shamjith Antholi <https://github.com/shamjithantholi>
 :imagesdir: /
 :url-prefix:
@@ -17,191 +17,21 @@ Shamjith Antholi <https://github.com/shamjithantholi>
 
 [#Intro]
 
-== What is MicroProfile and Open Liberty
+== MicroProfile, Open Liberty configuration files and Kubernetes
+
+link:https://microprofile.io[MicroProfile] and link:https://openliberty.io/[Open Liberty] applications uses the following configuration files, externalization of these files are a common coding practice.
+
+            server.xml
+            Environment variables
+            microprofile-config.properties
+            CustomConfig properties (implemented using org.eclipse.microprofile.config.spi.ConfigSource)
+
+link:https://kubernetes.io[Kubernetes] is a popular container orchastration tool. Kubernetes basic operation unit called Pod works on isolation concept (every pod act as an independent VM unit), In this blog we will discuss about the next level of kubernetes isolation, which is the isolation of deployment environments (DEV,QA,PROD etc) on kubernetes cluster and how we can manage the deployment of MicroProfile and OpenLiberty configuration files on those environments. 
+
 
 The link:https://microprofile.io[MicroProfile] specification consists of a collection of Enterprise Java APIs and technologies that together form a core baseline for microservices that aims to deliver application portability across multiple runtimes.
 
 link:https://openliberty.io/[Open Liberty] is a lightweight open source Java™ runtime that is built by using modular features. 
-
-== About MicroProfile config and containerization
-
-Externalizing configuration into different file formats like JSON, XML and Java Properties files are a common coding practice to separate application code from the configuration variables. Variables in the source code are initialized from these configuration files at runtime. In this blog, we will be discussing how Open Liberty and MicroProfile manage such configuration requirements.   
-
-MicroProfile and Open Liberty have standardized the use of these configuration sources, please visit link:https://openliberty.io/guides/microprofile-config.html[Configuring microservices], to learn more about configurations in OpenLiberty. Some commonly used configuration sources are; 
-
-             server.xml
-             Environment variables
-             microprofile-config.properties
-             CustomConfig properties (implemented using org.eclipse.microprofile.config.spi.ConfigSource)
-
-These config sources may contain a special ordinal value to control the order of precedence at runtime.
-
-In many cases, applications need to be hosted in multiple environments like development, test and production. Some of the configuration may need to set differently depending on the environment and platform, whereas some may remain the same. In a containerized environment, there are number of different configuration methods, such as;
-
-            Configuring through environment variables
-            Configuring through ConfigMap
-            Configuring through Secrets
-            Configuring through configuration file in a volume
-
-When values of variables configured on environment variable, configmap and secrets are changed, application pod will be restarted to complete the injection, but that's not the case with configuration through volume. 
-
-Architecture diagram of Open Liberty config files flow from GitHub through a build tool to Kubernetes is as given below
-
-image::/img/blog/ol-configuration1.png[Open Liberty configuration file flow,width=100%,align="left"]
-
-== Discussing data injection in Kubernetes/OpenShift
-
-There are multiple ways to inject data into application containers. This blog will discuss those methods one by one. The commands given in this blogs are OpenShift commands, but you can run the same on Kubernetes by replacing 'oc' by 'kubeclt'
-
-For the purpose of demonstration, i have defined variables in below given files and the values for the same is injected from different container data sources.
-
-server.xml&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;microprofile-config.properties
-
-[cols=">a,<a", frame=none, grid=none]
-|===
-| image::/img/blog/server-xml.png[server.xml file variable view,width=70%,align="left"]
-| image::/img/blog/microprofile.png[MicroProfile config file variable view,width=70%,align="right"]
-|===
-
-server.env&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;CustomConfigSource.json
-
-[cols=">a,<a", frame=none, grid=none]
-|===
-| image::/img/blog/server-env.png[server.env file variable view,width=70%,align="right"]
-| image::/img/blog/customconfigsource.png[Custom config source file variable view,width=70%,align="left"]
-|===
-
-=== 1. Configuration injection through environment variables
-
-Container pods can define environment variables in deployment configuration. Users can configure these environment variables to use it in the application on run time. 
-
-In this section, i will demonstrate how to configure the environment variables in container environment, from UI as well as from deployment configuration yaml code. Users can change these environment variables either manually or automated to feed the new variable values into the container (when environment variable is changed, associated pod will be restarted).
-
-image::/img/blog/OpenShift-deployment.png[OpenShift environment variable view,width=70%,align="center"]
-
-        containers:
-          - resources: {}
-            terminationMessagePath: /dev/termination-log
-            name: libertyapp
-            env:
-              - name: MPConfig
-                value: micro profile  test config
-              - name: SerEnv
-                value: server env test config
-              - name: Custom-Config
-                value: Custom config param
-              - name: Server-Config
-                value: server config
-              - name: Boot-config
-                value: boot config
-            ports:
-              - containerPort: 9080
-
-When the container is restarted, the values from this environment variables are injected into application in the container, a sample result is show below
-
-image::/img/blog/env-variable-results.png[Environment variable result view,width=100%,align="center"]
-
-=== 2. Configuration injection through Config Map
-
-A ConfigMap is a configuration store in containerization platform. It store configurations in key-value format. These configmap's can be injected into container pods which will be used by the hosted application on run time. 
-
-In this section i will explain the steps to create configmap and configure the same on container to inject the values into the hosted application.
-
-Create a configmap in Kubernetes/OpenShift
-
-            apiVersion: v1
-            kind: ConfigMap
-            metadata:
-              name: config-env-file
-            data:
-              MPConfig: "micro profile  test config"
-              SerEnv: "server env test config"
-              Custom-Config: "Custom config param"
-              Server-Config: "server config"
-              Boot-config: "boot config"
-
-            oc create -f configmap.yaml 
-
-ConfigMap is created in Kubernetes/OpenShift
-
-[cols=">a,<a", frame=none, grid=none]
-|===
-| image::/img/blog/configmap-in-oc1.png[ConfigMap openshift view1,width=70%,align="center"]
-| image::/img/blog/configmap-in-oc2.png[ConfigMap openshift view2,width=70%,align="center"]
-|===
-
-Now map the configmap to the container pod for injecting into the associated application 
-
-From UI:
-
-image::/img/blog/configmap-env-mapping.png[ConfigMap - environment variable mapping view,width=70%,align="center"]
-
-
-YAML defenition
-
-          containers:
-            - resources: {}
-              terminationMessagePath: /dev/termination-log
-              name: libertyapp
-              env:
-                - name: MPConfig
-                  valueFrom:
-                    configMapKeyRef:
-                      name: config-env-file
-                      key: MPConfig
-                - name: SerEnv
-                  valueFrom:
-                    configMapKeyRef:
-                      name: config-env-file
-                      key: SerEnv
-                .
-                .
-                .      
-              ports:
-                - containerPort: 9080
-                  protocol: TCP
-
-Successful configuration injection would give results like given below
-
-image::/img/blog/env-variable-results.png[Environment variable result view,width=100%,align="center"]
-
-
-=== 3. Configuration injection through Secrets
-
-OpenShift/Kubernetes secrets stores/displays the configurations in encrypted format. Sensitive data's can be stored as secrets in Kubernetes/OpenShift and map the same to environment variable in POD to inject the same to the associated application. 
-
-In this section, i will explain the steps to create secrets in OpenShift/Kubernetes and map the same to a pod. 
-
-Create an OpenShift/Kubernetes secret following the steps in link:https://docs.openshift.com/container-platform/3.11/dev_guide/secrets.html[create secret]
-
-Eg: oc create secret docker-registry regcred --docker-server="https://index.docker.io/v1/" --docker-username=“” --docker-password=“” --docker-email=*
-
-Secret is created on OpenShift
-
-image::/img/blog/oc-config.png[OpenShift secret view, width=50%, height=50%, align="center"]
-
-Now map the secret to environment variable as the data source and access the variable from the application.
-
-image::/img/blog/secrets-as-config.png[OpenShift secret as config view,width=50%, height=50% ,align="left"]
-
-Successful configuration injection would give results like given below
-
-image::/img/blog/env-variable-results.png[Environment variable result view,width=100%,align="center"]
-
-
-=== 4. Configuration injection through Kubernetes/OpenShift volumes
-
-Volumes are the persistent storage facility on containerization platforms like Kubernetes/OpenShift. Application pods can be configured to map this volume to the  containers hence any files copied to volumes from external to container will be available inside the container. In kubernetes, volumes can be created by following the steps in link:https://kubernetes.io/docs/concepts/storage/persistent-volumes/[Kubernetes Persistent Volume], creating volume is very straightforward in OpenShift. An example code which shows how a volume can be mapped to the pod and mount to the container is given in the below screenshot
-
-image::/img/blog/config-in-volume-mount.png[ConfigMap in volume - yaml view ,width=70%,align="center"]
-
-In this method of configuration management, you need to create environment variables in OpenShift/Kubernetes manually or with automated steps as explained in the above sections. 
-
-Developers need to write the timer based code to read the configuration file copied from external to internal volume and process the same and update the new values to the mapped environment variable. Since the change in environment variable values are set from inside the application itself, there is no need of an application restart to reflect the change across the application 
 
 == Managing configurations sources through different Kubernetes environments
 
