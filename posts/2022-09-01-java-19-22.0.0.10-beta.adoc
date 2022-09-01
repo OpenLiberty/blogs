@@ -148,18 +148,18 @@ At runtime the server will make SPI packages visible only to a specialized class
 
 The following steps describe how to bring up a BELL service that implements the REST Handler SPI interface `com.ibm.wsspi.rest.handler.RESTHandler`, which was impossible until now.
 
-1. Create the service resource and implementation class files
-
-    The resource file is named for the SPI interface and declares the fully-qualified name of the implementation class. The minimal resource file content is shown below. Notice the file also declares an OSGi property required by the RESTHandler interface -- the entry starting with `#` -- that enables the REST Handler framework to register the service as a listener for a specified URL sub-root. In this example the URL sub-root is `/bellEP`.
-
+. Create the service resource and implementation class files
++
+The resource file is named for the SPI interface and declares the fully-qualified name of the implementation class. The minimal resource file content is shown below. Notice the file also declares an OSGi property required by the RESTHandler interface -- the entry starting with `#` -- that enables the REST Handler framework to register the service as a listener for a specified URL sub-root. In this example the URL sub-root is `/bellEP`.
++
 [source, java]
 ----
 #com.ibm.wsspi.rest.handler.root=/bellEP
 your.org.rest.example.BellEndpoint
 ----
-
-    A skeletal implementation of SPI interface `com.ibm.wsspi.rest.handler.RESTHandler`. The implementation defines method `updateBell` to receive BELL properties. The `updateBell` method is intended for non-destructive updates and must tolerate multiple calls on the same service instance. Below is the skeletal implementation:
-
++
+A skeletal implementation of SPI interface `com.ibm.wsspi.rest.handler.RESTHandler`. The implementation defines method `updateBell` to receive BELL properties. The `updateBell` method is intended for non-destructive updates and must tolerate multiple calls on the same service instance. Below is the skeletal implementation:
++
 [source, java]
 ----
 package your.org.rest.example;
@@ -172,19 +172,19 @@ public class BellEndpoint implements com.ibm.wsspi.rest.handler.RESTHandler {
     public void handleRequest(RESTRequest request, RESTResponse response) {...}
 }
 ----
-
-    Package the files into a JAR file, say `RestEpLib.jar`:
-
++
+Package the files into a JAR file, say `RestEpLib.jar`:
++
 [source, java]
 ----
 META-INF/services/com.ibm.wsspi.rest.handler.RESTHandler
 your/org/rest/example/BellEndpoint.class
 ----
 
-2.Configure the server
-
-    The restConnector-2.0 feature enables the REST Handler framework and exports the REST Handler SPI package required by the BELL service. Access to REST endpoints requires secure transport (`transportSecurity-1.0`) and that a user is mapped to the administrator role. Add the following features to the `server.xml`:
-
+. Configure the server
++
+The restConnector-2.0 feature enables the REST Handler framework and exports the REST Handler SPI package required by the BELL service. Access to REST endpoints requires secure transport (`transportSecurity-1.0`) and that a user is mapped to the administrator role. Add the following features to the `server.xml`:
++
 [source, xml]
 ----
 <featureManager>
@@ -193,9 +193,9 @@ your/org/rest/example/BellEndpoint.class
     <feature>transportSecurity-1.0</feature>
 </featureManager>
 ----
-
-    Now add the shared library and BELL. The following configuration enables SPI visibility for the `RestEpLib` library and declares one property, `hello="WORLD"`. Enable SPI visibility whenever a BELL service implementation requires SPI packages exported by a configured feature(s). Remember to copy file `RestEpLib.jar` to the directory specified in the library's `<fileset/>`. The stated configuration below:
-
++
+Now add the shared library and BELL. The following configuration enables SPI visibility for the `RestEpLib` library and declares one property, `hello="WORLD"`. Enable SPI visibility whenever a BELL service implementation requires SPI packages exported by a configured feature(s). Remember to copy file `RestEpLib.jar` to the directory specified in the library's `<fileset/>`. The stated configuration below:
++
 [source, xml]
 ----
 <library id=”RestEpLib">
@@ -208,9 +208,9 @@ your/org/rest/example/BellEndpoint.class
     <properties hello=“WORLD” />
 </bell>
 ----
-
-    Add the keystore for transport security and map a user to the administrator role:
-
++
+Add the keystore for transport security and map a user to the administrator role:
++
 [source, xml]
 ----
 <keyStore id="defaultKeyStore" password="keystorePassword" />
@@ -224,22 +224,22 @@ your/org/rest/example/BellEndpoint.class
 </administrator-role>
 ----
 
-3.Save your changes and start the server
-
-    Look for messages CWWKL0059I and CWWKL0050I in server logs indicating the server enabled BELL SPI visiblity and registered the BELL service. The server makes REST Handler SPI packages visible to a unique classloader for library `RestEpLib`. Applications may declare a common library reference to `RestEpLib` (`commonLibRef="RestEpLib"`) in their `<classloader/>` configuration, but they will not see SPI packages.
-
+. Save your changes and start the server
++
+Look for messages CWWKL0059I and CWWKL0050I in server logs indicating the server enabled BELL SPI visiblity and registered the BELL service. The server makes REST Handler SPI packages visible to a unique classloader for library `RestEpLib`. Applications may declare a common library reference to `RestEpLib` (`commonLibRef="RestEpLib"`) in their `<classloader/>` configuration, but they will not see SPI packages.
++
 [source, xml]
 ----
 [...] 00000001 com.ibm.ws.classloading.bells.internal.Bell                  I BETA: BELL SPI Visibility and BELL Properties has been invoked by class com.ibm.ws.classloading.bells.internal.Bell for the first time.
 [...] 00000001 com.ibm.ws.classloading.bells.internal.Bell                  I CWWKL0059I: BELL SPI visibility is enabled for the RestEpLib library. The BELL references the RestEpLib library through a unique class loader that can see SPI packages.
 [...] 00000001 com.ibm.ws.classloading.bells.internal.Bell                  I CWWKL0050I: The RestEpLib library registered the service that is declared in the wsjar:file:/<your_wlp>/usr/servers/bell_ep_server/sharedLib/RestEpLib!/META-INF/services/com.ibm.wsspi.rest.handler.RESTHandler file, using your.org.rest.example.BellEndpoint implementation class.
 ----
-
-    When the server registers the BELL service with the OSGi framework it triggers the REST Handler framework to register the service as a listener for URL sub-root `/bellEP`. The /bellEP endpoint is now accessible.
-
-    You can now make calls to `https://<host>:8020/ibm/api/bellEP`.
-
-    The REST handler framework references the BELL service to serve the `/bellEP` endpoint. During the first reference the server creates an instance of class BellEndpoint and injects an unmodifiable map with key/value pair `"hello"/"WORLD"`. The server injects BELL properties at service creation and after BELL configuration updates.
++
+When the server registers the BELL service with the OSGi framework it triggers the REST Handler framework to register the service as a listener for URL sub-root `/bellEP`. The /bellEP endpoint is now accessible.
++
+You can now make calls to `https://<host>:8020/ibm/api/bellEP`.
++
+The REST handler framework references the BELL service to serve the `/bellEP` endpoint. During the first reference the server creates an instance of class BellEndpoint and injects an unmodifiable map with key/value pair `"hello"/"WORLD"`. The server injects BELL properties at service creation and after BELL configuration updates.
 
 To find out more about this specific update see:
 
