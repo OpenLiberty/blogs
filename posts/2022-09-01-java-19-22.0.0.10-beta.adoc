@@ -19,13 +19,13 @@ Reece Nana <https://github.com/reecenana>
 
 Java SE 19 and MicroProfile Telemetry 1.0 are released this month so we bring you previews of both in this Open Liberty 22.0.0.10-beta. Java 19 provides several new and changed features, including record patterns and virtual threads. MicroProfile Telemetry provides a standards-based set of APIs, SDKs, tooling and integrations that are designed for the creation and management of telemetry data such as traces, metrics, and logs.
 
-Also in this beta, the Jakarta XML Binding tools, `xjc` and `schemagen` have been repackaged for Jakarta XML Binding 4.0, and you can now expose SPI interfaces as BELL services and inject properties into BELL services. In a previous beta, we introduced distributed security caches which has now been updated so that you no longer need to include the `distributedSecurityCache-1.0` feature in your `server.xml`.
+Also in this beta, you can now programmatically choose an alternative XML Binding implementation when using Jakarta XML Binding 4.0, the tools, `xjc` and `schemagen` have been repackaged for Jakarta XML Binding 4.0, and the deprecated `jakarta.xml.bind.Validator` API has been removed. You can now also expose SPI interfaces as BELL services and inject properties into BELL services, which is simpler to use than writing a user feature. In a previous beta, we introduced distributed security caches which has now been updated so that you no longer need to include the `distributedSecurityCache-1.0` feature in your `server.xml`.
 
 The link:{url-about}[Open Liberty] 22.0.0.10-beta includes the following beta features (along with link:{url-prefix}/docs/latest/reference/feature/feature-overview.html[all GA features]):
 
 * <<java, Java SE 19 support>>
 * <<microprofile, Create and manage traces, metrics, and logs using OpenTelemetry open standards (MicroProfile Telemetry 1.0)>>
-* <<xml, Repackaging of tools for XML binding (Jakarta XML Binding 4.0)>>
+* <<xml, Programmatically choose an alternative XML binding implementation (Jakarta XML Binding 4.0)>>
 * <<bell, Expose SPI interfaces as BELL services and inject properties into BELL services>>
 * <<security, Distributed security caches>>
 
@@ -80,9 +80,49 @@ For more information about MicroProfile Telemetry, see:
 
 // https://github.com/OpenLiberty/open-liberty/issues/22092
 [#xml]
-== Repackaging of tools for XML binding (Jakarta XML Binding 4.0)
+== Programmatically choose an alternative XML binding implementation (Jakarta XML Binding 4.0)
 
-Jakarta XML Binding 4.0 is an API for automating the mapping between XML documents and Java objects when writing XML documents in Java. By and large, the xmlBinding-4.0 feature is identical to xmlBinding-3.0, with a couple of exceptions. The 4.0 spec has removed the deprecated `jakarta.xml.bind.Validator API`. This means, if your application is using Validator to validate your JAX-B data types, you'll need to update to use the more common schema validation method. Here's an example of how to move from the Validator to schema validation: 
+Jakarta XML Binding 4.0 is an API for automating the mapping between XML documents and Java objects when writing XML documents in Java. By and large, the `xmlBinding-4.0` feature is identical to `xmlBinding-3.0`, with a couple of exceptions. The 4.0 spec has removed the deprecated `jakarta.xml.bind.Validator` API. This means, if your application is using Validator to validate your JAX-B data types, you'll need to update to use the more common schema validation method. Here's an example of how to move from the Validator to schema validation:
+
+[source,java]
+----
+  // With Validator: 
+  SomeJAXBDataOjbect dataObject = new SomeJAXBDataObject();
+
+  JAXBContext context = JAXBContext.newInstance(new Class<>{]{ClassToBeBound.class, ClassToBeBound2.class, …});
+  JAXBSource source = new JAXBSource(context, dataObject);
+
+  Validator validator = schema.newValidator();
+  validator.setErrorHandler(c);
+  validator.validate(source);
+
+  // With Schema Validation - Suggested alternative since 2.0. 
+
+  JAXBContext context = JAXBContext.newInstance(new Class<>{]{ClassToBeBound.class, ClassToBeBound2.class, …});
+  
+  Unmarshaller junmarshaller = jaxbContext.createUnmarshaller();
+   
+  SchemaFactory schemaFactory = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI);
+  Schema dataObjectSchema = schemaFactory.newSchema(new File("dataObjectSchema.xml"));
+  jaxbUnmarshaller.setSchema(dataObjectSchema);
+   
+  SomeJAXBDataObject dataObject = (SomeJAXBDataObject dataObject) umarshaller.unmarshal(new       File("dataObjectSchema.xml"));
+----
+
+In 4.0, you can now programmatically choose an alternative XML Binding implementation. Provided you package the implementation with the application, then you simply need to set the name of the implementation in a property map, and pass the map along when instantiating a JAXBContext object. Here's an example doing just that with Eclipe's Moxy implementation:
+
+[source,java]
+----
+   String JAXB_CONTEXT_FACTORY = "jakarta.xml.bind.JAXBContextFactory";
+   String MOXY_JAXB_CONTEXT_FACTORY = "org.eclipse.persistence.jaxb.XMLBindingContextFactory";
+
+   ClassLoader classLoader = some.package.with.jaxb.data.objects.ObjectFactory.class.getClassLoader();
+   Map<String, String> properties = new HashMap<String, String>();
+   properties.put(JAXB_CONTEXT_FACTORY, MOXY_JAXB_CONTEXT_FACTORY);
+   JAXBContext context = JAXBContext.newInstance("some.package.with.jaxb.data.objects",
+                                   classLoader, properties);
+----
+
 
 To enable the Jakarta XML Binding 4.0 feature, add the `xmlBinding-4.0` feature to your `server.xml`:
 
