@@ -1,0 +1,104 @@
+---
+layout: post
+title: "Liberty is the premier application server for running Java EE8 workloads"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/vijaysun-omr
+author_github: https://github.com/vijaysun-omr
+seo-title: Liberty is the premier application server for running Java EE8 workloads - OpenLiberty.io
+seo-description: Performance comparison of Liberty with other application servers using the DayTrader8 application.
+blog_description: "Performance comparison of Liberty with other application servers using the DayTrader8 application."
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+---
+= Liberty is the premier application server for running Java EE8 workloads
+Vijay Sundaresan <https://github.com/vijaysun-omr>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+// // // // // // // //
+// In the preceding section:
+// Do not insert any blank lines between any of the lines.
+//
+// "open-graph-image" is set to OL logo. Whenever possible update this to a more appriopriate/specific image (For example if present a image that is being used in the post). However, it
+// can be left empty which will set it to the default
+//
+// Replace TITLE with the blog post title.
+// Replace AUTHOR_NAME with your name as first author.
+// Replace GITHUB_USERNAME with your GitHub username eg: lauracowen
+// Replace DESCRIPTION with a short summary (~60 words) of the release (a more succinct version of the first paragraph of the post).
+//
+// Replace AUTHOR_NAME with your name as you'd like it to be displayed, eg: Laura Cowen
+//
+// Example post: 2020-04-02-generate-microprofile-rest-client-code.adoc
+//
+// If adding image into the post add :
+// -------------------------
+// [.img_border_light]
+// image::img/blog/FILE_NAME[IMAGE CAPTION ,width=70%,align="center"]
+// -------------------------
+// "[.img_border_light]" = This adds a faint grey border around the image to make its edges sharper. Use it around screenshots but not           
+// around diagrams. Then double check how it looks.
+// There is also a "[.img_border_dark]" class which tends to work best with screenshots that are taken on dark backgrounds.
+// Change "FILE_NAME" to the name of the image file. Also make sure to put the image into the right folder which is: img/blog
+// change the "IMAGE CAPTION" to a couple words of what the image is
+// // // // // // // //
+
+In this blog post, I will be discussing a performance comparison that demonstrates Liberty’s capabilities as the premier runtime for Java/Jakarta EE applications. The metrics used to perform this comparison, when running the sample Java EE8 application DayTrader8 are:  
+•	First response - time from issuing the 'server start' command to the first response received by client 
+•	Memory footprint - Java process size (RSS) after first response is processed 
+•	Throughput - rate at which requests are processed 
+•	Scalability - throughput as the number of clients increases 
+The remainder of this blog post provides more detail about how the evaluation was conducted on four application servers that implement the Java EE8 specification and the results seen for each metric.
+
+The DayTrader8 application simulates an online stock trading system, allowing users to perform several actions to manipulate their portfolio. DayTrader8 is written in a manner that exercises several different features in the Java EE8 specification, making it a good representative benchmark application for evaluating different implementations. In the competitive comparison, we used the container images that each application server product had released, thus ensuring that we used the out-of-the-box settings for each application server. Note that the container images used JDK 11 for all the application servers, and HotSpot-based Open JDK was used for all the frameworks except Liberty for which the OpenJ9-based IBM Semeru JDK was used since this is used as the base JDK image for building the Liberty image. For Liberty, we used the steps outlined in the documentation to build the application container image, and we used Liberty’s powerful “composability” feature to configure only the required features used by the application. All the runs were done on a Linux SLES 12.4 system, running on a Intel(R) Xeon(R) Platinum 8180 CPU @ 2.50GHz machine, with containers limited to 4 CPUs and 4GB of RAM. 
+
+The first metric we compared was the time to receive the first response back at the client (sometimes equated with startup time). Liberty was almost 80% better than the nearest competitor (JBoss EAP) and this was a testament not just to the EE8 application server technology in Liberty but also to the optimized containers that include a shared classes cache population step as part of the container build procedure.    
+
+-------------------------
+[.img_border_light]
+image::img/blog/dt8pic1.png[First Response Times ,width=70%,align="center"]
+-------------------------
+
+The next metric compared was the memory footprint just after the first response was sent back to the client. This shows the memory consumed by the server framework itself, separate from the memory that will be used by the application as workload increases. Liberty takes less than half the memory as the nearest competitor, while still consistently outperforming on the other performance metrics.  
+ 
+-------------------------
+[.img_border_light]
+image::img/blog/dt8pic2.png[Memory Footprint ,width=70%,align="center"]
+-------------------------
+
+Throughput is usually the metric many customers associate with “performance” since it measures the number of requests that the application server was able to handle in a fixed unit of time. As the below comparison shows, Liberty has a very well tuned Java EE8 implementation designed for both optimal peak throughput performance and judicious resource use. 
+  
+-------------------------
+[.img_border_light]
+image::img/blog/dt8pic3.png[Throughput ,width=70%,align="center"]
+-------------------------
+
+Finally, the last metric that we evaluated was the scalability (sometime also referred to as “scaling up”, since there is only a single server instance). In this evaluation we varied the number of simultaneous client requests (we were using JMeter to drive the load) so that we could get a view into the application server’s behavior at different load levels to assess if the above throughput differences were unique to a particular configuration. The scalability experiments used 2 CPUs overall and so it was relatively easy to saturate the CPU with a moderate number of client requests as can be seen by the throughput curves flattening out in the below comparison. Once again Liberty stands out for the superior throughput at many different load levels showing that it can scale up consistently as load increases (harder to judge at the lower load levels since it is likely that CPU was not saturated).
+
+-------------------------
+[.img_border_light]
+image::img/blog/dt8pic4.png[Throughput ,width=70%,align="center"]
+-------------------------
+
+To get a view into physical memory use (RSS) during load, we also plotted the ratio between throughput and memory at the different load levels to provide a view into how much “throughput per byte of memory” is being delivered by the different application servers. The fact that this last graph shows an even larger advantage for Liberty means that it was able to deliver higher throughput while simultaneously taking lesser memory during load. 
+ 
+-------------------------
+[.img_border_light]
+image::img/blog/dt8pic5.png[Throughput/Memory ,width=70%,align="center"]
+-------------------------
+
+In conclusion, we evaluated the performance of different application servers running a Java EE8 workload in containers, and the Liberty application server came out on top across the board in all metrics, showing how it is the most performant and cost-effective option that can help users save money when running Java/Jakarta EE workloads. We encourage you to try out Liberty for your application to experience these performance benefits, and we would love to hear any feedback that you might have as well! 
+
+
+// // // // // // // //
+// LINKS
+//
+// OpenLiberty.io site links:
+// link:/guides/microprofile-rest-client.html[Consuming RESTful Java microservices]
+// 
+// Off-site links:
+// link:https://openapi-generator.tech/docs/installation#jar[Download Instructions]
+//
+// // // // // // // //
