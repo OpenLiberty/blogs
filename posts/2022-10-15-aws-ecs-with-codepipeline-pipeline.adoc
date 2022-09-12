@@ -39,7 +39,7 @@ Edit the "DNS resolution" of this new VPC and enable it
 
 image::/img/blog/edit-dns-resolutions.png[Edit DNS resolutions,width=80%,align="left"]
 
-== Subnets and Internet Gateway
+=== Subnets and Internet Gateway
 
 We need to create a private subnet within the VPC to define the hosted applications access to internal (private). Internet gateways are created and configured to route the traffic to load balancer 
 
@@ -67,7 +67,7 @@ Select this new internet gateway and attached it to above created VPC
 
 image::/img/blog/attach-igw-to-vpc.png[Attach internet gateway to VPC,width=80%,align="left"]
 
-== Configure Route tables
+=== Configure Route tables
 
 Login to link:http://aws.amazon.com[AWS] and Go to the route table created earlier and then go to "Subnet associations tab" and then click on "Edit subnet association"
 
@@ -85,7 +85,7 @@ Click on "Edit route" and then on "Add route" and select earlier created interne
 
 image::/img/blog/route-table-config-4.png[Route table configuration,width=80%,align="left"]
 
-== Endpoints
+=== Endpoints
 
 Create ECR DKR endpoint
 
@@ -111,29 +111,98 @@ image::/img/blog/openliberty-ep-logs-1.png[ECR S3 endpoint,width=80%,align="left
 
 image::/img/blog/openliberty-ep-logs-2.png[ECR S3 endpoint,width=80%,align="left"]
 
+== Create load balancer and target group
 
+Login to link:http://aws.amazon.com[AWS] and search and for 'load balancer' 
 
-VPC
-private subnet
-nat gateway
-route table - nat
-ecs endpoints
-load balancer
-target group
-open liberty image
-ECS - with no public IP
-ECS with LB
+Select 'Application Load Balancer' from load balancer types
 
+image::/img/blog/loadbalancer-1.png[Creating load balancer,width=80%,align="left"]
 
-== What is MicroProfile and Open Liberty
+Select the VPC created earlier and select the 2 availability zones in which out earlier created private subnet's are hosted
 
+image::/img/blog/loadbalancer-2.png[Creating load balancer,width=80%,align="left"]
 
-link:https://openliberty.io/[Open Liberty] is a lightweight open source Java™ runtime that is built by using modular features. 
+Create a new target group
 
-== About MicroProfile config and containerization
+image::/img/blog/loadbalancer-3.png[Creating load balancer,width=80%,align="left"]
 
-image::/img/blog/ol-configuration1.png[Open Liberty configuration file flow,width=100%,align="left"]
+Choose the target type as 'IP Address' and select the above created VPC, keep the other default options 
 
-Use commands similar to below given to copy files to pods from local
-*kubectl cp /tmp/samplefile.txt <container-namespace>/<pod-id>:/tmp/*
+image::/img/blog/loadbalancer-4.png[Creating target group,width=80%,align="left"]
 
+Submit the form and wait for the load balancer status to be 'Active'
+
+== ECS cluster and associated components 
+
+=== ECS cluster
+Login to link:http://aws.amazon.com[AWS] and search and for 'ECS' and select 'Elastic Container Service' 
+
+Click on 'Create CLuster', and you will land in this page
+
+image::/img/blog/create-ecs-cluster1.png[Creating ECS cluster,width=80%,align="left"]
+
+Select "Network only" and 'Next step'
+
+Provide a suitable name and click on 'Create', an ECS cluster will be created
+
+image::/img/blog/create-ecs-cluster2.png[Creating ECS cluster,width=80%,align="left"]
+
+=== Task Defenition
+
+Login to link:http://aws.amazon.com[AWS] and search and for 'ECS' and select 'Elastic Container Service' 
+
+Click on 'Task Defenitions' from the right column and 'Create new Task Defenition'
+
+image::/img/blog/create-ecs-taskdefenition1.png[Creating ECS task defenition,width=80%,align="left"]
+
+Select 'Fargate' and go to 'Next step'
+
+image::/img/blog/create-ecs-taskdefenition2.png[Creating ECS task defenition,width=80%,align="left"]
+
+image::/img/blog/create-ecs-taskdefenition3.png[Creating ECS task defenition,width=80%,align="left"]
+
+image::/img/blog/create-ecs-taskdefenition4.png[Creating ECS task defenition,width=80%,align="left"]
+
+Select the required memory and CPU and click on 'Add container'
+
+Copy the image URL from ECR and copy the same to 'Image' box, provide the port in which deployed application would be accessible and click on 'Add'
+
+image::/img/blog/create-ecs-taskdefenition5.png[Creating ECS task defenition,width=80%,align="left"]
+
+After verifying everything, click on 'Create' to create an 'Active' task defenition
+
+=== Create Service and Tasks
+
+Login to link:http://aws.amazon.com[AWS] and search and for 'ECS' and select 'Elastic Container Service' 
+
+Go to the cluster created above and go to 'Services' tab and click on 'Create'
+
+image::/img/blog/create-ecs-service-1.png[Creating ECS service,width=80%,align="left"]
+
+Enter the details as in this screenshot and go to 'Next step'
+
+image::/img/blog/create-ecs-service-2.png[Creating ECS service,width=80%,align="left"]
+
+image::/img/blog/create-ecs-service-3.png[Creating ECS service,width=80%,align="left"]
+
+Select the above created VPC and the 2 private subnet's in the respective input boxes. Select 'Auto-assign public IP' to 'DISABLED'
+
+image::/img/blog/create-ecs-service-4.png[Creating ECS service,width=80%,align="left"]
+
+Note the default security group selected in this page, go to the 'Security Groups' page and create the InBound rule as given below
+
+image::/img/blog/create-ecs-service-7.png[Creating ECS service,width=80%,align="left"]
+
+Select 'Application Load balancer' from the 'Load balancing' section, select the appropriate load balancer from the 'Load balancer name' dropdown + 
+
+image::/img/blog/create-ecs-service-5.png[Creating InBound rules,width=80%,align="left"]
+
+Select the appropriate container from 'Container name : port' drop down and click on 'Add to load balancer' + 
+Select '80:http' from 'Production listener port*' drop down and select target group created earlier and go to next step and click on 'Create Service'
+
+image::/img/blog/create-ecs-service-6.png[Creating ECS service,width=80%,align="left"]
+
+A new service and the associated task (In 'Tasks' tab) will be created
+
+Access this application from the Load balancer DNS name.
