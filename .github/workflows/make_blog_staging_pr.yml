@@ -1,24 +1,10 @@
+name: Create the PR to `staging` branch for release blog post
 on: 
   workflow_dispatch:
     inputs:
       version:
         description: 'Version of OpenLiberty to generate blog for, e.g. 22.0.0.9, 22.0.0.9-beta'
         required: true
-        type: string
-      publish-date:
-        description: 'Date of publish of the blog, format: YYYY-MM-DD'
-        required: true
-        default: '2050-01-01'
-        type: string
-      author-name:
-        description: 'Name of the author, put the name in quotes if the name contains space'
-        required: true
-        # default: ${{ github.actor }}
-        type: string
-      github-username:
-        description: 'GitHub username of the author'
-        required: true
-        # default: ${{ github.actor }}
         type: string
       slack-notification:
         description: 'Send Slack notification'
@@ -42,11 +28,6 @@ jobs:
         with:
           ref: prod
 
-      - name: Create blog
-        id: gen-blog
-        run: |
-          python3 .github/workflows/gen_blog.py ${{ inputs.version }} ${{ inputs.publish-date }} ${{ inputs.author-name }} ${{ inputs.github-username }}
-
       - name: Generate draft and staging URLs
         id: gen-url
         run: |
@@ -58,15 +39,12 @@ jobs:
         uses: peter-evans/create-pull-request@v4
         with:
           commit-message: ${{ inputs.version }}
-          branch: ${{ inputs.version }}-staging
+          branch: ${{ inputs.version }}-post
           base: staging
           title: ${{ inputs.version }} staging
           assignees: ${{ github.actor }}
           body: "Preview at draft site: ${{ steps.gen-url.outputs.draft-url }}\nAfter this PR is merged, preview at staging site: ${{ steps.gen-url.outputs.staging-url }}"
           reviewers: ${{ steps.gen-blog.outputs.reviewers }}
-
-      - name: Checkout repository code
-        uses: actions/checkout@v3
 
       - name: Send Slack alert
         run: |
