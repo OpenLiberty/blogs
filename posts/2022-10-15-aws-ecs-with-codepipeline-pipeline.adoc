@@ -206,3 +206,59 @@ image::/img/blog/create-ecs-service-6.png[Creating ECS service,width=80%,align="
 A new service and the associated task (In 'Tasks' tab) will be created
 
 Access this application from the Load balancer DNS name.
+
+== Setting up DevOps pipeline to deploy to ECS
+
+=== AWS source code repository
+
+Login to link:http://aws.amazon.com[AWS] and search for 'CodeCommit' and click on 'Create repository'. +
+Create a repository and check-in the openliberty code to this repository +
+The only environment related file you need to create in this repository is 'buildspec.yml' (or any custom name). A sample buildspec file is give below
+
+            version: 0.2
+
+            phases:
+                pre_build:
+                    commands:
+                        - aws ecr get-login-password --region <aws-availabilty-zone> | docker login --username AWS --password-stdin <aws-acc-id>.dkr.ecr.<aws-availability-zone>.amazonaws.com # this is for authenticating the access to Amazon Elastic Container Registry (ECR)
+                build:
+                commands:
+                    - mvn package
+                post_build:
+                commands:
+                    - docker build -t <container-image>:<image-version> .  
+                    - docker tag <container-image>:<image-version> <aws-acc-id>.dkr.ecr.<aws-availabilty-zone>.amazonaws.com/<container-image>:<image-version>
+                    - docker push <aes-acc-id>.dkr.ecr.<aws-availabilty-zone>.amazonaws.com/<container-image>:<image-version>
+                    - printf '[{"name":"<ECS-container-name>","imageUri":"<aws-acc-id>.dkr.ecr.<aws-availabity-zone>.amazonaws.com/<container-image>:<image-version>"}]' > imagedefenitions.json # This is required for the ECS to pull the container from ECR instead of default S3 location 
+            artifacts:
+                files:
+                - imagedefenitions.json 
+
+Docker container details mentioned in the above given code should be similar to the one created in ECS task defenition (sample location picture is pasted below)
+
+image::/img/blog/ecs-pipeline-5.png[ECS task defenition image reference,width=80%,align="left"]
+
+=== Create AWS code build project
+
+image::/img/blog/ecs-pipeline-codebuild-1.png[ECS code build creation,width=80%,align="left"]
+
+image::/img/blog/ecs-pipeline-codebuild-2.png[ECS code build creation,width=80%,align="left"]
+
+
+=== Create AWS codepipeline project
+
+image::/img/blog/ecs-pipeline-1.png[ECS code pipeline creation,width=80%,align="left"]
+
+image::/img/blog/ecs-pipeline-2.png[ECS code pipeline creation - source code,width=80%,align="left"]
+
+image::/img/blog/ecs-pipeline-3.png[ECS code pipeline creation - build stage,width=80%,align="left"]
+
+image::/img/blog/ecs-pipeline-4.png[ECS code pipeline creation - deploy stage,width=80%,align="left"]
+
+Setting requirement permissions to the ecs service role created in the code pipeline creation process
+
+image::/img/blog/ecs-pipeline-iam-1.png[IAM permission settings for ECS pipeline,width=80%,align="left"]
+
+image::/img/blog/ecs-pipeline-iam-2.png[IAM permission settings for ECS pipeline,width=80%,align="left"]
+
+image::/img/blog/ecs-pipeline-iam-3.png[IAM permission settings for ECS pipeline,width=80%,align="left"]
