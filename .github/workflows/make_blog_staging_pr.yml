@@ -20,40 +20,23 @@ on:
         required: true
         # default: ${{ github.actor }}
         type: string
+      slack-notification:
+        description: 'Send Slack notification'
+        required: true
+        default: 'release channel'
+        type: choice
+        options:
+        - 'release channel'
+        - 'test channel'
+        - off
 
 env:
   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 jobs:
   create_blog_and_pr:
-    name: Automate release and beta blog PR creation
+    name: Automate release and beta blog PR creation for `staging` branch
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-        with:
-          ref: prod
-
-      - name: Create blog
-        run: |
-          python3 .github/workflows/gen_blog.py ${{ inputs.version }} ${{ inputs.publish-date }} ${{ inputs.author-name }} ${{ inputs.github-username }}
-
-      - name: Generate draft URL
-        id: gen-url
-        run: |
-          echo "::set-output name=draft-url::https://draft-blogs-openlibertyio.mybluemix.net/blog/$(echo ${{ inputs.publish-date }} | tr - /)/${{ inputs.version }}.html"
-          echo "::set-output name=staging-url::https://staging-blogs-openlibertyio.mybluemix.net/blog/$(echo ${{ inputs.publish-date }} | tr - /)/${{ inputs.version }}.html"
-
-      - name: Create PR to draft
-        id: create-pr-draft
-        uses: peter-evans/create-pull-request@v4
-        with:
-          commit-message: ${{ inputs.version }}
-          branch: ${{ inputs.version }}-draft
-          base: draft
-          title: ${{ inputs.version }} draft
-          assignees: ${{ github.actor }}
-          body: "Preview at draft site: ${{ steps.gen-url.outputs.draft-url }}"
-
       - name: Checkout
         uses: actions/checkout@v3
         with:
@@ -64,6 +47,12 @@ jobs:
         run: |
           python3 .github/workflows/gen_blog.py ${{ inputs.version }} ${{ inputs.publish-date }} ${{ inputs.author-name }} ${{ inputs.github-username }}
 
+      - name: Generate draft and staging URLs
+        id: gen-url
+        run: |
+          echo "::set-output name=draft-url::https://blogs-draft-openlibertyio.mqj6zf7jocq.us-south.codeengine.appdomain.cloud/blog/$(echo ${{ inputs.publish-date }} | tr - /)/${{ inputs.version }}.html"
+          echo "::set-output name=staging-url::https://staging-openlibertyio.mqj6zf7jocq.us-south.codeengine.appdomain.cloud/blog/$(echo ${{ inputs.publish-date }} | tr - /)/${{ inputs.version }}.html"
+      
       - name: Create PR to staging
         id: create-pr-staging
         uses: peter-evans/create-pull-request@v4
@@ -73,9 +62,8 @@ jobs:
           base: staging
           title: ${{ inputs.version }} staging
           assignees: ${{ github.actor }}
-          body: "Preview at draft site: ${{ steps.gen-url.outputs.draft-url }}\nPreview at staging site: ${{ steps.gen-url.outputs.staging-url }}"
+          body: "Preview at draft site: ${{ steps.gen-url.outputs.draft-url }}\nAfter this PR is merged, preview at staging site: ${{ steps.gen-url.outputs.staging-url }}"
           reviewers: ${{ steps.gen-blog.outputs.reviewers }}
-          draft: true
 
       - name: Checkout repository code
         uses: actions/checkout@v3
@@ -83,6 +71,6 @@ jobs:
       - name: Send Slack alert
         run: |
           python3 .github/workflows/slack_alert.py \
-          ${{ inputs.version }} ${{ inputs.publish-date }} ${{ inputs.author-name }} ${{ inputs.github-username }} \
-          ${{ steps.create-pr-draft.outputs.pull-request-number }} ${{ steps.gen-url.outputs.draft-url }} \
-          ${{ steps.create-pr-staging.outputs.pull-request-number }} ${{ steps.gen-url.outputs.staging-url }} ${{ secrets.SLACK_HOOK }} 
+          ${{ inputs.version }} ${{ inputs.publish-date }} ${{ inputs.author-name }} ${{ inputs.github-username }} ${{ inputs.slack-notification }} \
+          ${{ secrets.SLACK_HOOK }} ${{ secrets.SLACK_HOOK_TEST }} \
+          ${{ steps.create-pr-staging.outputs.pull-request-number }} staging ${{ steps.gen-url.outputs.staging-url }}

@@ -48,24 +48,11 @@ message = {
                     "fields": [
                         {
                             "type": "mrkdwn",
-                            "text": "*First Draft PR:* <fakeLink.toEmployeeProfile.com| #pr_number>"
+                            "text": "*PR:* <fakeLink.toEmployeeProfile.com| #pr_number>"
                         },
                         {
                             "type": "mrkdwn",
                             "text": "*<fakeLink.toEmployeeProfile.com| Preview Draft Post>*"
-                        }
-                    ]
-                },
-                {
-                    "type": "section",
-                    "fields": [
-                        {
-                            "type": "mrkdwn",
-                            "text": "*Staging PR:* <fakeLink.toEmployeeProfile.com| #pr_number>"
-                        },
-                        {
-                            "type": "mrkdwn",
-                            "text": "*<fakeLink.toEmployeeProfile.com| Preview Staging Post>*"
                         }
                     ]
                 },
@@ -91,12 +78,16 @@ if __name__ == "__main__":
     parser.add_argument('publish_date', type=str)
     parser.add_argument('author', type=str)
     parser.add_argument('github_username', type=str)
-    parser.add_argument('draft_pr_number', type=str)
-    parser.add_argument('draft_url', type=str)
-    parser.add_argument('staging_pr_number', type=str)
-    parser.add_argument('staging_url', type=str)
+    parser.add_argument('slack_notification', type=str)
     parser.add_argument('slackhook', type=str)
+    parser.add_argument('slackhook_test', type=str)
+    parser.add_argument('pr_number', type=str)
+    parser.add_argument('pr_branch', type=str)
+    parser.add_argument('url', type=str)
     args = parser.parse_args()
+
+    if "off" == args.slack_notification.lower():
+        quit()
 
     if "beta" in args.version.lower():
         message["attachments"][0]["blocks"][0]["text"]["text"] = "Beta Release Blog Post"
@@ -109,13 +100,9 @@ if __name__ == "__main__":
     message["attachments"][0]["blocks"][1]["fields"][2]["text"] = f"*Author:*\n {args.author}"
     message["attachments"][0]["blocks"][1]["fields"][3]["text"] = f"*Author GitHub:*\n <{github_url}| {args.github_username}>"
 
-    draft_pr_url = f"https://github.com/OpenLiberty/blogs/pull/{args.draft_pr_number}"
-    message["attachments"][0]["blocks"][2]["fields"][0]["text"] = f"*First Draft PR:* <{draft_pr_url}| #{args.draft_pr_number}>"
-    message["attachments"][0]["blocks"][2]["fields"][1]["text"] = f"*<{args.draft_url}| Preview Draft Post>*"
-
-    staging_pr_url = f"https://github.com/OpenLiberty/blogs/pull/{args.staging_pr_number}"
-    message["attachments"][0]["blocks"][3]["fields"][0]["text"] = f"*Staging PR:* <{staging_pr_url}| #{args.staging_pr_number}>"
-    message["attachments"][0]["blocks"][3]["fields"][1]["text"] = f"*<{args.staging_url}| Preview Staging Post>*"
+    draft_pr_url = f"https://github.com/OpenLiberty/blogs/pull/{args.pr_number}"
+    message["attachments"][0]["blocks"][2]["fields"][0]["text"] = f"*{args.pr_branch} PR:* <{draft_pr_url}| #{args.pr_number}>"
+    message["attachments"][0]["blocks"][2]["fields"][1]["text"] = f"*<{args.url}| Preview {args.pr_branch} Post>*"
 
     version_no_dots = args.version.replace('.', '')
     ISSUE_URL = f"https://api.github.com/repos/OpenLiberty/open-liberty/issues?labels=blog,target:{version_no_dots}"
@@ -124,7 +111,7 @@ if __name__ == "__main__":
         issue_url = issue["html_url"]
         issue_title = issue["title"]
         issue_number = issue["number"]
-        message["attachments"][0]["blocks"][4]["text"]["text"] += f"\n <{issue_url}| {issue_title}> #{issue_number}"
+        message["attachments"][0]["blocks"][3]["text"]["text"] += f"\n <{issue_url}| {issue_title}> #{issue_number}"
 
     bug_issue_url = f"https://github.com/OpenLiberty/open-liberty/issues?q=+label%3A%22release+bug%22+label%3Arelease%3A{version_no_dots}"    
     if not "beta" in args.version.lower():
@@ -137,7 +124,11 @@ if __name__ == "__main__":
             }
         )
     
-    response = requests.post(args.slackhook, headers=headers, data=json.dumps(message))
+    slackhook = args.slackhook
+    if "test channel" == args.slack_notification.lower():
+        slackhook = args.slackhook_test
+    
+    response = requests.post(slackhook, headers=headers, data=json.dumps(message))
 
     if response.status_code != 200:
         raise ValueError(
