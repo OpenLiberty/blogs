@@ -3,7 +3,7 @@ name: Open Liberty GA and beta release blog posts
 about: Checklist that must be completed to create and publish Open Liberty release notes.
 title: Open Liberty release blog post for VERSION_NUMBER
 labels: release
-assignees: ryan-storey
+assignees: ReeceNana
 
 ---
 
