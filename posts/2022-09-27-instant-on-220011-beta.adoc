@@ -1,0 +1,1122 @@
+---
+layout: post
+title: Liberty Instant On for cloud native Java applications
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/tjwatson
+author_github: https://github.com/tjwatson
+seo-title: Liberty Instant On for cloud native Java applications - OpenLiberty.io
+seo-description: The Open Liberty 22.0.0.11-beta brings you an exciting new feature called InstantOn that provides incredibly fast startup times for Jakarta EE and MicroProfile applications.
+blog_description: "The Open Liberty 22.0.0.11-beta brings you an exciting new feature called InstantOn that provides incredibly fast startup times for Jakarta EE and MicroProfile applications."
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+additional_authors: 
+- name: Joshua Dettinger
+  github: https://github.com/dettmoney
+  image: https://avatars0.githubusercontent.com/dettmoney
+---
+= Liberty Instant On for cloud native Java applications
+Thomas Watson <https://github.com/tjwatson>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+// // // // // // // //
+// In the preceding section:
+// Do not insert any blank lines between any of the lines.
+//
+// "open-graph-image" is set to OL logo. Whenever possible update this to a more appriopriate/specific image (for example if present an image that is being used in the post). 
+// However, it can be left empty which will set it to the default
+//
+// Replace TITLE with the blog post title
+//
+// Replace SECOND_AUTHOR_NAME with the name of the second author.
+// Replace SECOND_GITHUB_USERNAME with the GitHub user name of the second author.
+// Replace THIRD_AUTHOR_NAME with the name of the third author. And so on for fourth, fifth, etc authors.
+// Replace THIRD_GITHUB_USERNAME with the GitHub user name of the third author. And so on for fourth, fifth, etc authors.
+//
+// Replace AUTHOR_NAME with your name as first author.
+// Replace GITHUB_USERNAME with your GitHub username eg: lauracowen
+// Replace DESCRIPTION with a short summary (~60 words) of the release (a more succinct version of the first paragraph of the post).
+//
+// Replace AUTHOR_NAME with your name as you'd like it to be displayed, eg: Laura Cowen
+//
+// Example post: 2020-02-12-faster-startup-Java-applications-criu.adoc
+//
+// If adding image into the post add :
+// -------------------------
+// [.img_border_light]
+// image::img/blog/FILE_NAME[IMAGE CAPTION ,width=70%,align="center"]
+// -------------------------
+// "[.img_border_light]" = This adds a faint grey border around the image to make its edges sharper. Use it around
+// screenshots but not around diagrams. Then double check how it looks.
+// There is also a "[.img_border_dark]" class which tends to work best with screenshots that are taken on dark backgrounds.
+// Once again make sure to double check how it looks
+// Change "FILE_NAME" to the name of the image file. Also make sure to put the image into the right folder which is: img/blog
+// change the "IMAGE CAPTION" to a couple words of what the image is
+// // // // // // // //
+
+Do you want cloud-native Java applications that can startup in milliseconds, without compromising on throughput, memory, development-production parity or Java language features?  The Open Liberty 22.0.0.11-beta brings you an exciting new feature that provides incredibly fast startup times for Jakarta EE and MicroProfile applications.  In serverless environments it is important to have applications that can startup very quickly.  Instant on applications enable the application instances to scale to zero when the application is not in use.  When activity picks up for the application then new instances can startup quickly without introducing high latency for the end user.  Scale to zero can help reduce the overall cloud costs for deployed applications by reducing the overall number an application instances when it has no ongoing requests.
+
+To enable instant on behavior, Open Liberty provides support for taking a checkpoint of the application process as it is being started. In order to take a checkpoint of the application process Open Liberty uses new features of the link:https://www.eclipse.org/openj9/[OpenJ9] JVM and a Linux technology called called Checkpoint and Restore link:https://criu.org/[CRIU]. The checkpoint is a record of the running application process which can be persisted and then very quickly restored to bring back the application process into the exact state it was when the checkpoint was taken.  This enables the Liberty instance, along with any configured applications to be restored multiple times into distinct instances of your application.
+
+The Open Liberty InstantOn feature provides a new `checkpoint` action which can be executed against your existing Open Liberty server configuration. With the `checkpoint` action you specify a phase at which you want the Liberty startup process to be stopped and a checkpoint of the process saved.  When Liberty is launched it will detect that there is a saved checkpoint process and it will resume the process from the state the process was saved during the `checkpoint` action.
+
+== Setup the example application project
+
+Before getting into the details of how the `checkpoint` action works lets setup a working example. For that we will have a look at the link:/guides/rest-intro.html[RESTful web service] guide.  If you would like to follow along then start by cloning the link:https://github.com/openliberty/guide-rest-intro.git[Git repository] and use the projects that are provided inside:
+[source]
+----
+
+git clone https://github.com/openliberty/guide-rest-intro.git
+cd guide-rest-intro
+----
+We will work within the `finish/` directory for this demonstration. First go to the finish directory and update the `pom.xml` to use the latest Open Liberty beta. To do that add the following configuration to the `liberty-maven-plugin` build plugin:
+[source]
+.Configure liberty-maven-plugin to use the beta
+----
+    <configuration>
+        <runtimeArtifact>
+            <groupId>io.openliberty.beta</groupId>
+            <artifactId>openliberty-runtime</artifactId>
+            <version>LATEST</version>
+            <type>zip</type>
+        </runtimeArtifact>
+    </configuration>
+----
+
+To try out the application, run the following Maven goal to build the application and deploy it to Open Liberty:
+[source]
+----
+cd finish
+mvn liberty:run
+----
+After you see the following message, your application server is ready:
+[source]
+----
+The defaultServer server is ready to run a smarter planet.
+----
+Check out the service at the (http://localhost:9080/LibertyProject/system/properties) URL.
+
+After you are finished checking out the application, stop the Open Liberty server by pressing CTRL+C in the command-line session where you ran the server.
+
+To build the WAR for the application run the following :
+[source]
+----
+mvn package
+----
+After this you will have a `target/guide-rest-intro.war` archive built.  We can now include this WAR into a container image
+
+== Open Liberty checkpoint phases
+
+For Open Liberty there are three defined places (phases) during the startup process where a checkpoint can occur.
+
+1. `features` - This is the earliest phase during startup where a checkpoint can happen.  The checkpoint will occur after all of the configured Open Liberty features have been started.  This is before any processing occurs for the installed applications.
+2. `deployment` - The checkpoint will happen after processing the configured applications meta-data.  If the application has any components that get run as part of the application starting then the checkpoint will be taken before executing any code from the application.
+3. `applications` - This is the last phase where a checkpoint can happen, implying that this phase has the potential for providing the fastest startup time when restoring the application instance.  The checkpoint will happen after all configured applications have been reported as started.  This phase happens before opening any ports for listening to incoming requests for the applications.
+
+The `applications` phase typically provides the quickest startup time for an application, but it also may cause some application code to run before the server process checkpoint happens.  This may lead to undesired behavior when restoring the checkpoint process if the application holds on to some state that should not be restored into more than one concurrent instance of the application.  For example, connecting to an outside resource such as a database.  It will not be possible to restore many instances of such a process that tries to restore the same connection multiple times.
+
+== Containerizing the application
+To use Open Liberty Instant On support an application must first be containerized.  For more details on how to containerize your application with Open Liberty first see the link:/guides/containerize.html[Containerizing microservices] guide or the link:/guides/containerize-podman.html[Containerizing microservices with Podman] guide. If you are unfamiliar with Podman then it is recommended to follow the Podman guide first because the Open Liberty Instant On support currently requires the use of Podman.  Support for Docker should come later once a Docker release is made that supports the necessary capabilities that checkpoint and restore require.
+
+=== Prerequisites to checkpoint and restore in container
+List kernel, runc, podman versions here.  Optionally list `criu` versions here if doing checkpoint and restore on host (probably not going to show that here).
+...
+
+=== Using the Open Liberty Beta InstantOn Image
+The Liberty InstantOn beta image contains the prerequisites for building an application container image with a checkpoint server process.  Applications can use the Liberty InstantOn beta image as a base to build their own application container images and from that create their own application container image with a checkpoint process. This involves the following steps:
+
+* <<containerfile, Create the Containerfile for the application>>
+* <<app-image, Building the application container image>>
+* <<checkpoint-app, Checkpoint an application in-container>>
+* <<checkpoint-image, Create the application checkpoint image>>
+
+[#containerfile]
+=== Create the Containerfile for the application
+
+For the link:/guides/rest-intro.html[RESTful web service] example the first step is to create a `ContainerFile` which provide the instructions to create a containerized version of the application.
+
+For this example, we will be using an official image from the IBM Container Registry (ICR), `icr.io/appcafe/open-liberty:beta-instanton-java17-openj9-ubi`, as the parent image. This image is tagged with the word `beta`, meaning it includes all the Liberty beta features as well as all the Liberty features from the `full` image.  The image is tagged with the word `instanton`, meaning it includes all the prerequisites for producing a checkpoint process image, for example, the necessary `criu` binaries.
+
+The `Containerfile` for the rest-intro application will look identical to other examples of containerizing an Open Liberty application except it will specify the `icr.io/appcafe/open-liberty:beta-instanton-java17-openj9-ubi` as the parent image using the `FROM` instruction.  Place the following content into the the file `final/Containerfile`.
+[source]
+.Containerfile
+----
+FROM icr.io/appcafe/open-liberty:full-java11-openj9-ubi
+
+ARG VERSION=1.0
+ARG REVISION=SNAPSHOT
+
+LABEL \
+  org.opencontainers.image.authors="Your Name" \
+  org.opencontainers.image.vendor="Open Liberty" \
+  org.opencontainers.image.url="local" \
+  org.opencontainers.image.source="https://github.com/openliberty/guide-rest-intro" \
+  org.opencontainers.image.version="$VERSION" \
+  org.opencontainers.image.revision="$REVISION" \
+  vendor="Open Liberty" \
+  name="rest-intro" \
+  version="$VERSION-$REVISION" \
+  summary="The rest-intro application from Creating RESTful web service guide" \
+  description="This image contains the rest-intro application running with the Open Liberty runtime."
+
+COPY --chown=1001:0 src/main/liberty/config /config/
+COPY --chown=1001:0 target/guide-rest-intro.war /config/apps
+RUN configure.sh
+----
+
+[#app-image]
+=== Building the application container image
+Before building the image, an understanding of what is required to perform a checkpoint and restore is necessary. For `criu` to be able to do its job of taking a checkpoint of a process and restoring a process, the `criu` binary must be granted additional link:https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux_atomic_host/7/html/container_security_guide/linux_capabilities_and_seccomp[Linux capabilities]. In particular, for Open Liberty, it needs to be granted `cap_checkpoint_restore`, `cap_net_admin` and `cap_sys_ptrace`. The Open Liberty InstantOn beta image includes the `criu` binary with the necessary capabilities granted to the `criu` binary file. In order for the `criu` binary to be given access its assigned capabilities, the container which is running `criu` must also be granted the necessary capabilities when it is launched. This can be done in one of two ways:
+
+. Use a privileged container using the `--privileged` option
+. Assign specific capabilities using `--cap-add` options
+
+When using a Docker daemon, the daemon typically has root authority.  This allow it to grant any requested capabilities to a container when it is launching the container. For Podman, there is no daemon running. This means the user launching the container has to have the authority to grant the necessary Linux capabilities to the running container. This can be done by running as root or by using `sudo` to run the `podman` commands. For the purposes of this example it will be assumed you are running the `podman` commands as the root user.
+
+With that understanding, we can now the container image using the `podman build` command. Run the following command to download or update to the latest Open Liberty container image:
+[source]
+----
+podman pull icr.io/appcafe/open-liberty:full-java11-openj9-ubi
+----
+
+From the `final/` directory run the following command to build the container image for the application:
+[source]
+.Build the application container image
+----
+podman build -t rest-intro-application .
+----
+
+This created the rest-intro-application container image.  This container image will not contain any checkpoint process for InstantOn startup. You can run this application container image with the following command:
+[source]
+.Run the application container
+----
+podman run --name rest-intro -p 9081:9081 rest-intro-application
+----
+
+Check out the service running in the container at the (http://localhost:9080/LibertyProject/system/properties) URL. After you are finished checking out the application, stop the running container by pressing CTRL+C in the command-line session where executed the `podman run` command.
+
+[#checkpoint-app]
+=== Checkpoint an application in-container
+
+Once an application container image has been built it can be used to checkpoint the application process at one of the specified checkpoint phases described in the previous section (`features`, `deployment`, `applications`). This is done by using the `--env` option to `podman run` to set the value for `WLP_CHECKPOINT` to one of the available checkpoint phases. For this example, use the `applications` phase by runing the following `podman` command:
+[source]
+.Perform a checkpoint in container
+----
+podman run \
+  --name rest-intro-checkpoint-container \
+  --privileged \
+  --env WLP_CHECKPOINT=applications \
+  rest-intro-application
+----
+
+This will start the container with the application running with Open Liberty.  Once Open Liberty starts it will perform the checkpoint at the phase specified by the `WLP_CHECKPOINT` environment variable. Note that the `--privileged` option is required to perform the `criu` checkpoint in-container. This is only necessary to produce the checkpoint process data which gets persisted into the container. After the container process data has been persisted the container will stop, leaving you with a stopped container that contains the checkpoint process data. The output will look something like this:
+
+[source]
+.Process checkpoint output
+----
+Performing checkpoint --at=applications
+
+Launching defaultServer (Open Liberty 22.0.0.11-beta/wlp-1.0.69.cl221020220909-0301) on Eclipse OpenJ9 VM, version 11.0.17-ea+2 (en_US)
+CWWKE0953W: This version of Open Liberty is an unsupported early release version.
+[AUDIT   ] CWWKE0001I: The server defaultServer has been launched.
+[AUDIT   ] CWWKG0093A: Processing configuration drop-ins resource: /opt/ol/wlp/usr/servers/defaultServer/configDropins/defaults/checkpoint.xml
+[AUDIT   ] CWWKG0093A: Processing configuration drop-ins resource: /opt/ol/wlp/usr/servers/defaultServer/configDropins/defaults/keystore.xml
+[AUDIT   ] CWWKG0093A: Processing configuration drop-ins resource: /opt/ol/wlp/usr/servers/defaultServer/configDropins/defaults/open-default-port.xml
+[AUDIT   ] CWWKZ0058I: Monitoring dropins for applications.
+[AUDIT   ] CWWKT0016I: Web application available (default_host): http://222d03a0ffe4:9080/LibertyProject/
+[AUDIT   ] CWWKZ0001I: Application guide-rest-intro started in 0.515 seconds.
+[AUDIT   ] CWWKC0451I: A server checkpoint was requested. When the checkpoint completes, the server stops.
+
+----
+
+This process currently cannot be done as part of a `podman build` step because Podman (and Docker) do not provide a way to grant the container image build the necessary Linux capabilities for `criu` to perform the process checkpoint.
+
+[#checkpoint-image]
+=== Create the application checkpoint image
+
+So far we have created the checkpoint process data for the rest-intro application and stored it in a stopped container named `rest-intro-checkpoint-container`. The final step is to create a new container image containing the checkpoint process data. When this container image is started it will resume the application process right from the point the checkpoint was created resulting in an Instant On application. This is done by running the following `podman commit` operation:
+[source]
+.Commit the checkpoint to an image
+----
+podman commit rest-intro-checkpoint-container rest-intro-instanton
+----
+
+Now we have two application images named `rest-intro` and `rest-intro-instanton`. Starting a container with the `rest-intro-instanton` container image will show a much faster startup time than the original `rest-intro` image.
+
+== Running the instanton application image
+Typically an application container can be started from an application container image with a command like the following:
+[source]
+----
+podman run -it -p 9080:9080 rest-intro-instanton
+----
+This will fail because `criu` needs some elevated privileges in order to be able to restore the process in-container. The following command can be used to grant the container the necessary privileges without running a fully `--privileged` container:
+[source]
+.podman run with unconfined --security-opt options
+----
+podman run \
+  --cap-add=CHECKPOINT_RESTORE \
+  --cap-add=NET_ADMIN \
+  --cap-add=SYS_PTRACE \
+  --security-opt seccomp=unconfined \
+  --security-opt systempaths=unconfined \
+  --security-opt apparmor=unconfined \
+  -p 9080:9080 \
+  rest-intro-instanton
+----
+
+Additional work can be done to reduce the need for the `--security-opt` options that use `unconfined`.  First, an additional configuration file is needed which grants all the required system calls that `criu` needs to the container. Second, the host `ns_last_pid` need to be mounted. This can be done with the following:
+[source]
+.podman run with limited --security-opt
+----
+podman run \
+  --cap-add=CHECKPOINT_RESTORE \
+  --cap-add=NET_ADMIN \
+  --cap-add=SYS_PTRACE \
+  --security-opt seccomp=criuRequiredSysCalls.json \ <1>
+  -v /proc/sys/kernel/ns_last_pid:/proc/sys/kernel/ns_last_pid \ <2>
+  -p 9080:9080
+  rest-intro-instanton
+----
+<1> The `--security-opt seccomp=` option refers to a file called `criuRequiredSysCalls.json`. This file specifies the system calls required by `criu`.
+<2> Mounts the host `ns_last_pid` for access by the container.
+
+[source,json]
+.criuRequiredSysCalls.json
+----
+{
+	"defaultAction": "SCMP_ACT_ERRNO",
+	"defaultErrnoRet": 1,
+	"archMap": [
+		{
+			"architecture": "SCMP_ARCH_X86_64",
+			"subArchitectures": [
+				"SCMP_ARCH_X86",
+				"SCMP_ARCH_X32"
+			]
+		},
+		{
+			"architecture": "SCMP_ARCH_AARCH64",
+			"subArchitectures": [
+				"SCMP_ARCH_ARM"
+			]
+		},
+		{
+			"architecture": "SCMP_ARCH_MIPS64",
+			"subArchitectures": [
+				"SCMP_ARCH_MIPS",
+				"SCMP_ARCH_MIPS64N32"
+			]
+		},
+		{
+			"architecture": "SCMP_ARCH_MIPS64N32",
+			"subArchitectures": [
+				"SCMP_ARCH_MIPS",
+				"SCMP_ARCH_MIPS64"
+			]
+		},
+		{
+			"architecture": "SCMP_ARCH_MIPSEL64",
+			"subArchitectures": [
+				"SCMP_ARCH_MIPSEL",
+				"SCMP_ARCH_MIPSEL64N32"
+			]
+		},
+		{
+			"architecture": "SCMP_ARCH_MIPSEL64N32",
+			"subArchitectures": [
+				"SCMP_ARCH_MIPSEL",
+				"SCMP_ARCH_MIPSEL64"
+			]
+		},
+		{
+			"architecture": "SCMP_ARCH_S390X",
+			"subArchitectures": [
+				"SCMP_ARCH_S390"
+			]
+		},
+		{
+			"architecture": "SCMP_ARCH_RISCV64",
+			"subArchitectures": null
+		}
+	],
+	"syscalls": [
+		{
+			"names": [
+				"accept",
+				"accept4",
+				"access",
+				"adjtimex",
+				"alarm",
+				"bind",
+				"brk",
+				"capget",
+				"capset",
+				"chdir",
+				"chmod",
+				"chown",
+				"chown32",
+				"clock_adjtime",
+				"clock_adjtime64",
+				"clock_getres",
+				"clock_getres_time64",
+				"clock_gettime",
+				"clock_gettime64",
+				"clock_nanosleep",
+				"clock_nanosleep_time64",
+				"close",
+				"close_range",
+				"connect",
+				"copy_file_range",
+				"creat",
+				"dup",
+				"dup2",
+				"dup3",
+				"epoll_create",
+				"epoll_create1",
+				"epoll_ctl",
+				"epoll_ctl_old",
+				"epoll_pwait",
+				"epoll_pwait2",
+				"epoll_wait",
+				"epoll_wait_old",
+				"eventfd",
+				"eventfd2",
+				"execve",
+				"execveat",
+				"exit",
+				"exit_group",
+				"faccessat",
+				"faccessat2",
+				"fadvise64",
+				"fadvise64_64",
+				"fallocate",
+				"fanotify_mark",
+				"fchdir",
+				"fchmod",
+				"fchmodat",
+				"fchown",
+				"fchown32",
+				"fchownat",
+				"fcntl",
+				"fcntl64",
+				"fdatasync",
+				"fgetxattr",
+				"flistxattr",
+				"flock",
+				"fork",
+				"fremovexattr",
+				"fsetxattr",
+				"fstat",
+				"fstat64",
+				"fstatat64",
+				"fstatfs",
+				"fstatfs64",
+				"fsync",
+				"ftruncate",
+				"ftruncate64",
+				"futex",
+				"futex_time64",
+				"futex_waitv",
+				"futimesat",
+				"getcpu",
+				"getcwd",
+				"getdents",
+				"getdents64",
+				"getegid",
+				"getegid32",
+				"geteuid",
+				"geteuid32",
+				"getgid",
+				"getgid32",
+				"getgroups",
+				"getgroups32",
+				"getitimer",
+				"getpeername",
+				"getpgid",
+				"getpgrp",
+				"getpid",
+				"getppid",
+				"getpriority",
+				"getrandom",
+				"getresgid",
+				"getresgid32",
+				"getresuid",
+				"getresuid32",
+				"getrlimit",
+				"get_robust_list",
+				"getrusage",
+				"getsid",
+				"getsockname",
+				"getsockopt",
+				"get_thread_area",
+				"gettid",
+				"gettimeofday",
+				"getuid",
+				"getuid32",
+				"getxattr",
+				"inotify_add_watch",
+				"inotify_init",
+				"inotify_init1",
+				"inotify_rm_watch",
+				"io_cancel",
+				"ioctl",
+				"io_destroy",
+				"io_getevents",
+				"io_pgetevents",
+				"io_pgetevents_time64",
+				"ioprio_get",
+				"ioprio_set",
+				"io_setup",
+				"io_submit",
+				"io_uring_enter",
+				"io_uring_register",
+				"io_uring_setup",
+				"ipc",
+				"kill",
+				"landlock_add_rule",
+				"landlock_create_ruleset",
+				"landlock_restrict_self",
+				"lchown",
+				"lchown32",
+				"lgetxattr",
+				"link",
+				"linkat",
+				"listen",
+				"listxattr",
+				"llistxattr",
+				"_llseek",
+				"lremovexattr",
+				"lseek",
+				"lsetxattr",
+				"lstat",
+				"lstat64",
+				"madvise",
+				"membarrier",
+				"memfd_create",
+				"memfd_secret",
+				"mincore",
+				"mkdir",
+				"mkdirat",
+				"mknod",
+				"mknodat",
+				"mlock",
+				"mlock2",
+				"mlockall",
+				"mmap",
+				"mmap2",
+				"mprotect",
+				"mq_getsetattr",
+				"mq_notify",
+				"mq_open",
+				"mq_timedreceive",
+				"mq_timedreceive_time64",
+				"mq_timedsend",
+				"mq_timedsend_time64",
+				"mq_unlink",
+				"mremap",
+				"msgctl",
+				"msgget",
+				"msgrcv",
+				"msgsnd",
+				"msync",
+				"munlock",
+				"munlockall",
+				"munmap",
+				"nanosleep",
+				"newfstatat",
+				"_newselect",
+				"open",
+				"openat",
+				"openat2",
+				"pause",
+				"pidfd_open",
+				"pidfd_send_signal",
+				"pipe",
+				"pipe2",
+				"poll",
+				"ppoll",
+				"ppoll_time64",
+				"prctl",
+				"pread64",
+				"preadv",
+				"preadv2",
+				"prlimit64",
+				"process_mrelease",
+				"pselect6",
+				"pselect6_time64",
+				"pwrite64",
+				"pwritev",
+				"pwritev2",
+				"read",
+				"readahead",
+				"readlink",
+				"readlinkat",
+				"readv",
+				"recv",
+				"recvfrom",
+				"recvmmsg",
+				"recvmmsg_time64",
+				"recvmsg",
+				"remap_file_pages",
+				"removexattr",
+				"rename",
+				"renameat",
+				"renameat2",
+				"restart_syscall",
+				"rmdir",
+				"rseq",
+				"rt_sigaction",
+				"rt_sigpending",
+				"rt_sigprocmask",
+				"rt_sigqueueinfo",
+				"rt_sigreturn",
+				"rt_sigsuspend",
+				"rt_sigtimedwait",
+				"rt_sigtimedwait_time64",
+				"rt_tgsigqueueinfo",
+				"sched_getaffinity",
+				"sched_getattr",
+				"sched_getparam",
+				"sched_get_priority_max",
+				"sched_get_priority_min",
+				"sched_getscheduler",
+				"sched_rr_get_interval",
+				"sched_rr_get_interval_time64",
+				"sched_setaffinity",
+				"sched_setattr",
+				"sched_setparam",
+				"sched_setscheduler",
+				"sched_yield",
+				"seccomp",
+				"select",
+				"semctl",
+				"semget",
+				"semop",
+				"semtimedop",
+				"semtimedop_time64",
+				"send",
+				"sendfile",
+				"sendfile64",
+				"sendmmsg",
+				"sendmsg",
+				"sendto",
+				"setfsgid",
+				"setfsgid32",
+				"setfsuid",
+				"setfsuid32",
+				"setgid",
+				"setgid32",
+				"setgroups",
+				"setgroups32",
+				"setitimer",
+				"setpgid",
+				"setpriority",
+				"setregid",
+				"setregid32",
+				"setresgid",
+				"setresgid32",
+				"setresuid",
+				"setresuid32",
+				"setreuid",
+				"setreuid32",
+				"setrlimit",
+				"set_robust_list",
+				"setsid",
+				"setsockopt",
+				"set_thread_area",
+				"set_tid_address",
+				"setuid",
+				"setuid32",
+				"setxattr",
+				"shmat",
+				"shmctl",
+				"shmdt",
+				"shmget",
+				"shutdown",
+				"sigaltstack",
+				"signalfd",
+				"signalfd4",
+				"sigprocmask",
+				"sigreturn",
+				"socket",
+				"socketcall",
+				"socketpair",
+				"splice",
+				"stat",
+				"stat64",
+				"statfs",
+				"statfs64",
+				"statx",
+				"symlink",
+				"symlinkat",
+				"sync",
+				"sync_file_range",
+				"syncfs",
+				"sysinfo",
+				"tee",
+				"tgkill",
+				"time",
+				"timer_create",
+				"timer_delete",
+				"timer_getoverrun",
+				"timer_gettime",
+				"timer_gettime64",
+				"timer_settime",
+				"timer_settime64",
+				"timerfd_create",
+				"timerfd_gettime",
+				"timerfd_gettime64",
+				"timerfd_settime",
+				"timerfd_settime64",
+				"times",
+				"tkill",
+				"truncate",
+				"truncate64",
+				"ugetrlimit",
+				"umask",
+				"uname",
+				"unlink",
+				"unlinkat",
+				"utime",
+				"utimensat",
+				"utimensat_time64",
+				"utimes",
+				"vfork",
+				"vmsplice",
+				"wait4",
+				"waitid",
+				"waitpid",
+				"write",
+				"writev",
+				"arch_prctl",
+				"chroot",
+				"clone",
+				"clone3",
+				"fallocate",
+				"fanotify_init",
+				"fsconfig",
+				"fsmount",
+				"fsopen",
+				"guarded_storage",
+				"kcmp",
+				"lseek",
+				"mmap",
+				"mount",
+				"open",
+				"open_by_handle_at",
+				"openat",
+				"pivot_root",
+				"preadv",
+				"process_vm_readv",
+				"ptrace",
+				"readdir",
+				"s390_runtime_instr",
+				"setns",
+				"sigaction",
+				"signal",
+				"syscall",
+				"umount",
+				"umount2",
+				"unshare",
+				"userfaultfd",
+				"wait"
+			],
+			"action": "SCMP_ACT_ALLOW"
+		},
+		{
+			"names": [
+				"process_vm_readv",
+				"process_vm_writev",
+				"ptrace"
+			],
+			"action": "SCMP_ACT_ALLOW",
+			"includes": {
+				"minKernel": "4.8"
+			}
+		},
+		{
+			"names": [
+				"personality"
+			],
+			"action": "SCMP_ACT_ALLOW",
+			"args": [
+				{
+					"index": 0,
+					"value": 0,
+					"op": "SCMP_CMP_EQ"
+				}
+			]
+		},
+		{
+			"names": [
+				"personality"
+			],
+			"action": "SCMP_ACT_ALLOW",
+			"args": [
+				{
+					"index": 0,
+					"value": 8,
+					"op": "SCMP_CMP_EQ"
+				}
+			]
+		},
+		{
+			"names": [
+				"personality"
+			],
+			"action": "SCMP_ACT_ALLOW",
+			"args": [
+				{
+					"index": 0,
+					"value": 131072,
+					"op": "SCMP_CMP_EQ"
+				}
+			]
+		},
+		{
+			"names": [
+				"personality"
+			],
+			"action": "SCMP_ACT_ALLOW",
+			"args": [
+				{
+					"index": 0,
+					"value": 131080,
+					"op": "SCMP_CMP_EQ"
+				}
+			]
+		},
+		{
+			"names": [
+				"personality"
+			],
+			"action": "SCMP_ACT_ALLOW",
+			"args": [
+				{
+					"index": 0,
+					"value": 4294967295,
+					"op": "SCMP_CMP_EQ"
+				}
+			]
+		},
+		{
+			"names": [
+				"sync_file_range2",
+				"swapcontext"
+			],
+			"action": "SCMP_ACT_ALLOW",
+			"includes": {
+				"arches": [
+					"ppc64le"
+				]
+			}
+		},
+		{
+			"names": [
+				"arm_fadvise64_64",
+				"arm_sync_file_range",
+				"sync_file_range2",
+				"breakpoint",
+				"cacheflush",
+				"set_tls"
+			],
+			"action": "SCMP_ACT_ALLOW",
+			"includes": {
+				"arches": [
+					"arm",
+					"arm64"
+				]
+			}
+		},
+		{
+			"names": [
+				"arch_prctl"
+			],
+			"action": "SCMP_ACT_ALLOW",
+			"includes": {
+				"arches": [
+					"amd64",
+					"x32"
+				]
+			}
+		},
+		{
+			"names": [
+				"modify_ldt"
+			],
+			"action": "SCMP_ACT_ALLOW",
+			"includes": {
+				"arches": [
+					"amd64",
+					"x32",
+					"x86"
+				]
+			}
+		},
+		{
+			"names": [
+				"s390_pci_mmio_read",
+				"s390_pci_mmio_write",
+				"s390_runtime_instr"
+			],
+			"action": "SCMP_ACT_ALLOW",
+			"includes": {
+				"arches": [
+					"s390",
+					"s390x"
+				]
+			}
+		},
+		{
+			"names": [
+				"riscv_flush_icache"
+			],
+			"action": "SCMP_ACT_ALLOW",
+			"includes": {
+				"arches": [
+					"riscv64"
+				]
+			}
+		},
+		{
+			"names": [
+				"open_by_handle_at"
+			],
+			"action": "SCMP_ACT_ALLOW",
+			"includes": {
+				"caps": [
+					"CAP_DAC_READ_SEARCH"
+				]
+			}
+		},
+		{
+			"names": [
+				"bpf",
+				"clone",
+				"clone3",
+				"fanotify_init",
+				"fsconfig",
+				"fsmount",
+				"fsopen",
+				"fspick",
+				"lookup_dcookie",
+				"mount",
+				"mount_setattr",
+				"move_mount",
+				"name_to_handle_at",
+				"open_tree",
+				"perf_event_open",
+				"quotactl",
+				"quotactl_fd",
+				"setdomainname",
+				"sethostname",
+				"setns",
+				"syslog",
+				"umount",
+				"umount2",
+				"unshare"
+			],
+			"action": "SCMP_ACT_ALLOW",
+			"includes": {
+				"caps": [
+					"CAP_SYS_ADMIN"
+				]
+			}
+		},
+		{
+			"names": [
+				"clone"
+			],
+			"action": "SCMP_ACT_ALLOW",
+			"args": [
+				{
+					"index": 0,
+					"value": 2114060288,
+					"op": "SCMP_CMP_MASKED_EQ"
+				}
+			],
+			"excludes": {
+				"caps": [
+					"CAP_SYS_ADMIN"
+				],
+				"arches": [
+					"s390",
+					"s390x"
+				]
+			}
+		},
+		{
+			"names": [
+				"clone"
+			],
+			"action": "SCMP_ACT_ALLOW",
+			"args": [
+				{
+					"index": 1,
+					"value": 2114060288,
+					"op": "SCMP_CMP_MASKED_EQ"
+				}
+			],
+			"comment": "s390 parameter ordering for clone is different",
+			"includes": {
+				"arches": [
+					"s390",
+					"s390x"
+				]
+			},
+			"excludes": {
+				"caps": [
+					"CAP_SYS_ADMIN"
+				]
+			}
+		},
+		{
+			"names": [
+				"clone3"
+			],
+			"action": "SCMP_ACT_ERRNO",
+			"errnoRet": 38,
+			"excludes": {
+				"caps": [
+					"CAP_SYS_ADMIN"
+				]
+			}
+		},
+		{
+			"names": [
+				"reboot"
+			],
+			"action": "SCMP_ACT_ALLOW",
+			"includes": {
+				"caps": [
+					"CAP_SYS_BOOT"
+				]
+			}
+		},
+		{
+			"names": [
+				"chroot"
+			],
+			"action": "SCMP_ACT_ALLOW",
+			"includes": {
+				"caps": [
+					"CAP_SYS_CHROOT"
+				]
+			}
+		},
+		{
+			"names": [
+				"delete_module",
+				"init_module",
+				"finit_module"
+			],
+			"action": "SCMP_ACT_ALLOW",
+			"includes": {
+				"caps": [
+					"CAP_SYS_MODULE"
+				]
+			}
+		},
+		{
+			"names": [
+				"acct"
+			],
+			"action": "SCMP_ACT_ALLOW",
+			"includes": {
+				"caps": [
+					"CAP_SYS_PACCT"
+				]
+			}
+		},
+		{
+			"names": [
+				"kcmp",
+				"pidfd_getfd",
+				"process_madvise",
+				"process_vm_readv",
+				"process_vm_writev",
+				"ptrace"
+			],
+			"action": "SCMP_ACT_ALLOW",
+			"includes": {
+				"caps": [
+					"CAP_SYS_PTRACE"
+				]
+			}
+		},
+		{
+			"names": [
+				"iopl",
+				"ioperm"
+			],
+			"action": "SCMP_ACT_ALLOW",
+			"includes": {
+				"caps": [
+					"CAP_SYS_RAWIO"
+				]
+			}
+		},
+		{
+			"names": [
+				"settimeofday",
+				"stime",
+				"clock_settime"
+			],
+			"action": "SCMP_ACT_ALLOW",
+			"includes": {
+				"caps": [
+					"CAP_SYS_TIME"
+				]
+			}
+		},
+		{
+			"names": [
+				"vhangup"
+			],
+			"action": "SCMP_ACT_ALLOW",
+			"includes": {
+				"caps": [
+					"CAP_SYS_TTY_CONFIG"
+				]
+			}
+		},
+		{
+			"names": [
+				"get_mempolicy",
+				"mbind",
+				"set_mempolicy"
+			],
+			"action": "SCMP_ACT_ALLOW",
+			"includes": {
+				"caps": [
+					"CAP_SYS_NICE"
+				]
+			}
+		},
+		{
+			"names": [
+				"syslog"
+			],
+			"action": "SCMP_ACT_ALLOW",
+			"includes": {
+				"caps": [
+					"CAP_SYSLOG"
+				]
+			}
+		}
+	]
+}
+----
+
+// // // // // // // //
+// LINKS
+//
+// OpenLiberty.io site links:
+// link:/guides/microprofile-rest-client.html[Consuming RESTful Java microservices]
+// 
+// Off-site links:
+// link:https://openapi-generator.tech/docs/installation#jar[Download Instructions]
+//
+// // // // // // // //
