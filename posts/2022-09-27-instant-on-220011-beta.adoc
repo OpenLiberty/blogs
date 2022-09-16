@@ -58,7 +58,7 @@ Thomas Watson <https://github.com/tjwatson>
 
 Do you want cloud-native Java applications that can startup in milliseconds, without compromising on throughput, memory, development-production parity or Java language features?  The Open Liberty 22.0.0.11-beta brings you an exciting new feature that provides incredibly fast startup times for Jakarta EE and MicroProfile applications.  In serverless environments it is important to have applications that can startup very quickly.  Instant on applications enable the application instances to scale to zero when the application is not in use.  When activity picks up for the application then new instances can startup quickly without introducing high latency for the end user.  Scale to zero can help reduce the overall cloud costs for deployed applications by reducing the overall number an application instances when it has no ongoing requests.
 
-To enable instant on behavior, Open Liberty provides support for taking a checkpoint of the application process as it is being started. In order to take a checkpoint of the application process Open Liberty uses new features of the link:https://www.eclipse.org/openj9/[OpenJ9] JVM and a Linux technology called called Checkpoint and Restore link:https://criu.org/[CRIU]. The checkpoint is a record of the running application process which can be persisted and then very quickly restored to bring back the application process into the exact state it was when the checkpoint was taken.  This enables the Liberty instance, along with any configured applications to be restored multiple times into distinct instances of your application.
+To enable instant on behavior, Open Liberty provides support for taking a checkpoint of the application process as it is being started. In order to take a checkpoint of the application process Open Liberty uses new features of the link:https://www.eclipse.org/openj9/[OpenJ9] JVM and a Linux technology called called Checkpoint and Restore link:https://criu.org/[CRIU]. The checkpoint is a record of the running application process which can be persisted and then very quickly restored to bring back the application process into the exact state it was when the checkpoint was taken.  This enables the Liberty instance, along with any configured applications to be restored multiple times into distinct instances of your application. To see just how fast skip to the "<<benchmark, How fast is it?>>" section.
 
 The Open Liberty InstantOn feature provides a new `checkpoint` action which can be executed against your existing Open Liberty server configuration. With the `checkpoint` action you specify a phase at which you want the Liberty startup process to be stopped and a checkpoint of the process saved.  When Liberty is launched it will detect that there is a saved checkpoint process and it will resume the process from the state the process was saved during the `checkpoint` action.
 
@@ -72,8 +72,9 @@ git clone https://github.com/openliberty/guide-rest-intro.git
 cd guide-rest-intro
 ----
 We will work within the `finish/` directory for this demonstration. First go to the finish directory and update the `pom.xml` to use the latest Open Liberty beta. To do that add the following configuration to the `liberty-maven-plugin` build plugin:
-[source]
+
 .Configure liberty-maven-plugin to use the beta
+[source,xml]
 ----
     <configuration>
         <runtimeArtifact>
@@ -140,8 +141,9 @@ For the link:/guides/rest-intro.html[RESTful web service] example the first step
 For this example, we will be using an official image from the IBM Container Registry (ICR), `icr.io/appcafe/open-liberty:beta-instanton-java17-openj9-ubi`, as the parent image. This image is tagged with the word `beta`, meaning it includes all the Liberty beta features as well as all the Liberty features from the `full` image.  The image is tagged with the word `instanton`, meaning it includes all the prerequisites for producing a checkpoint process image, for example, the necessary `criu` binaries.
 
 The `Containerfile` for the rest-intro application will look identical to other examples of containerizing an Open Liberty application except it will specify the `icr.io/appcafe/open-liberty:beta-instanton-java17-openj9-ubi` as the parent image using the `FROM` instruction.  Place the following content into the the file `final/Containerfile`.
-[source]
+
 .Containerfile
+[source]
 ----
 FROM icr.io/appcafe/open-liberty:full-java11-openj9-ubi
 
@@ -201,8 +203,9 @@ Check out the service running in the container at the (http://localhost:9080/Lib
 === Checkpoint an application in-container
 
 Once an application container image has been built it can be used to checkpoint the application process at one of the specified checkpoint phases described in the previous section (`features`, `deployment`, `applications`). This is done by using the `--env` option to `podman run` to set the value for `WLP_CHECKPOINT` to one of the available checkpoint phases. For this example, use the `applications` phase by runing the following `podman` command:
-[source]
+
 .Perform a checkpoint in container
+[source]
 ----
 podman run \
   --name rest-intro-checkpoint-container \
@@ -213,8 +216,8 @@ podman run \
 
 This will start the container with the application running with Open Liberty.  Once Open Liberty starts it will perform the checkpoint at the phase specified by the `WLP_CHECKPOINT` environment variable. Note that the `--privileged` option is required to perform the `criu` checkpoint in-container. This is only necessary to produce the checkpoint process data which gets persisted into the container. After the container process data has been persisted the container will stop, leaving you with a stopped container that contains the checkpoint process data. The output will look something like this:
 
-[source]
 .Process checkpoint output
+[source]
 ----
 Performing checkpoint --at=applications
 
@@ -237,8 +240,9 @@ This process currently cannot be done as part of a `podman build` step because P
 === Create the application checkpoint image
 
 So far we have created the checkpoint process data for the rest-intro application and stored it in a stopped container named `rest-intro-checkpoint-container`. The final step is to create a new container image containing the checkpoint process data. When this container image is started it will resume the application process right from the point the checkpoint was created resulting in an Instant On application. This is done by running the following `podman commit` operation:
-[source]
+
 .Commit the checkpoint to an image
+[source]
 ----
 podman commit rest-intro-checkpoint-container rest-intro-instanton
 ----
@@ -252,8 +256,9 @@ Typically an application container can be started from an application container 
 podman run -it -p 9080:9080 rest-intro-instanton
 ----
 This will fail because `criu` needs some elevated privileges in order to be able to restore the process in-container. The following command can be used to grant the container the necessary privileges without running a fully `--privileged` container:
-[source]
+
 .podman run with unconfined --security-opt options
+[source]
 ----
 podman run \
   --cap-add=CHECKPOINT_RESTORE \
@@ -267,8 +272,9 @@ podman run \
 ----
 
 Additional work can be done to reduce the need for the `--security-opt` options that use `unconfined`.  First, an additional configuration file is needed which grants all the required system calls that `criu` needs to the container. Second, the host `ns_last_pid` need to be mounted. This can be done with the following:
-[source]
+
 .podman run with limited --security-opt
+[source]
 ----
 podman run \
   --cap-add=CHECKPOINT_RESTORE \
@@ -1109,6 +1115,10 @@ podman run \
 	]
 }
 ----
+
+[#benchmark]
+== How fast is it?
+Add benchmark section here.
 
 // // // // // // // //
 // LINKS
