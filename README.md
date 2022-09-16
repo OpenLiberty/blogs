@@ -1,11 +1,12 @@
 # Writing and publishing blog posts on the OpenLiberty.io blog
 
-* [Blog sites](#Blog-sites)
-* [Authors: creating a new blog post](#Authors-creating-a-new-blog-post)
-* [Editors: editing and publishing a post](#Editors-editing-and-publishing-a-post)
-* [Authors and Editors: updating a published post](#Authors-and-Editors-updating-a-published-post)
-* [Troubleshooting Asciidoc](#Troubleshooting-Asciidoc)
-* [Troubleshooting GitHub workflow](#troubleshooting-github-workflow)
+- [Writing and publishing blog posts on the OpenLiberty.io blog](#writing-and-publishing-blog-posts-on-the-openlibertyio-blog)
+  - [Blog sites](#blog-sites)
+  - [Authors: creating a new blog post](#authors-creating-a-new-blog-post)
+  - [Editors: editing and publishing a post](#editors-editing-and-publishing-a-post)
+  - [Authors and Editors: updating a published post](#authors-and-editors-updating-a-published-post)
+  - [Troubleshooting Asciidoc](#troubleshooting-asciidoc)
+  - [Troubleshooting GitHub workflow](#troubleshooting-github-workflow)
 
 ## Blog sites
 
@@ -148,8 +149,6 @@ These steps are completed by the editors of the blog. As editor, you might ask q
    
 4. IBM Cloud will automatically rebuild the [blogs-staging site](https://blogs-staging-openlibertyio.mqj6zf7jocq.us-south.codeengine.appdomain.cloud/blog/) and [staging site](https://staging-openlibertyio.mqj6zf7jocq.us-south.codeengine.appdomain.cloud/blog/). If you have access, you can track the progress in the [Slack channel](https://app.slack.com/client/T15GKHBT4/C01GX9P8YP2).
 
-~~Request a build of the [staging openliberty.io site from Travis CI](https://travis-ci.com/github/OpenLiberty/openliberty.io/branches) (type `staging` in the **Branch** field of the dialog).~~
-
 5. When the build has finished, check to make sure the blog with its blog tags render correctly on the [blogs-staging site](https://blogs-staging-openlibertyio.mqj6zf7jocq.us-south.codeengine.appdomain.cloud/blog/) or [staging site](https://staging-openlibertyio.mqj6zf7jocq.us-south.codeengine.appdomain.cloud/blog/). The latter includes the entire site, while the former just has the blog content.  If you need to verify links to other parts of the site (outside of the /blogs/ content) then you'll need to wait for the full [staging site](https://staging-openlibertyio.mqj6zf7jocq.us-south.codeengine.appdomain.cloud/blog/) to build.
 
    This is the final check before the post is published live on the [production site](https://openliberty.io/blog/).
@@ -162,13 +161,13 @@ These steps are completed by the editors of the blog. As editor, you might ask q
 
 7. When the PR is approved, merge it into `prod`.
 
-12. Rebuild the [production site from the IBM Cloud console](https://cloud.ibm.com/devops/pipelines/063d397c-febc-4f73-8340-61da6bc775f5?env_id=ibm:yp:us-south).
+8.  Rebuild the [production site from the IBM Cloud console](https://cloud.ibm.com/devops/pipelines/063d397c-febc-4f73-8340-61da6bc775f5?env_id=ibm:yp:us-south).
 
     When the build has finished, check that the post looks as expected on [openliberty.io/blog](https://openliberty.io/blog/).
 
     If the post's file name uses a future date, the post will not exist on the production site until at least that date and the production site has been rebuilt.
 
-13. When the post is published, and any changes you made are in all three branches (`draft`, `staging`, and `prod`), delete the author's branch.
+9.  When the post is published, and any changes you made are in all three branches (`draft`, `staging`, and `prod`), delete the author's branch.
 
 You've published a post!
 
