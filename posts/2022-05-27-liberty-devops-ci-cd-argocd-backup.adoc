@@ -1,0 +1,133 @@
+---
+layout: post
+title: "Continuous integration, delivery (CI/CD) and monitoring of cloud-native Java applications using Jenkins (CI) and ArgoCD"
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/shamjithantholi
+author_github: https://github.com/shamjithantholi
+seo-title: Continuous integration, delivery (CI/CD) and monitoring of cloud-native Java applications using Jenkins and ArgoCD- OpenLiberty.io
+seo-description: How to build a DevOps pipeline for a cloud-native Java application with Jenkins and ArgoCD.
+blog_description: How to build a DevOps pipeline for a cloud-native Java application with Jenkins and ArgoCD.
+open-graph-image: https://openliberty.io/img/blog/liberty-devops-generic-architecture.png
+---
+= Continuous integration, delivery (CI/CD) and monitoring of cloud-native Java applications using Jenkins and ArgoCD
+Shamjith Antholi <https://github.com/shamjithantholi>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+
+[#Intro]
+
+Continuous integration and continuous deployment (CI/CD) is a process in which developers frequently merge code changes into a source code repository, which then triggers code builds, runs security scans, runs tests, and then deploys the application. Automation of this process, through adopting a DevOps culture, tools, and processes, enables organizations to release on a more frequent basis without compromising on quality. Various tools are available to automate the CI/CD process that can be readily integrated into a DevOps deployment pipeline. In this blog post, we'll discuss how you can use link:https://www.jenkins.io/[Jenkins] to automate the CI process for building, testing, and how to use link:https://argo-cd.readthedocs.io/en/stable/[ArgoCD] for deploying and monitoring your cloud-native Java applications that run on link:https://openliberty.io[Open Liberty] into link:https://kubernetes.io[Kubernetes]. The approach used in this blog is to do the development environment deployment using the jenkins directly and trigger the deployment on test and higer environment using ArgoCD based on the pull request on GitHub. As the CI/CD process is triggered by source changes in Git, this is also known as the GitOps approach to DevOps. ArgoCD will help to fix configuration drift issue between containers and source repository like github. 
+
+Jenkins is a popular open source automation server that has hundreds of plug-ins to help integrate it into your existing DevOps pipeline. The following diagram shows a simple architecture for a Jenkins deployment pipeline that builds and deploys a Jakarta EE and MicroProfile application in a single Kubernetes environment. When a code change is made in the Git repository, GitHub will trigger link:https://www.jenkins.io[Jenkins] to build the code, runs JUnit tests and then link:https://www.sonarqube.org[SonarQube] static code analysis scans against the built code. Jenkins then generates a link:https://www.docker.com[Docker] container image of the application with Open Liberty as its runtime, saves the image to a Docker container repository, and then scans the image with link:https://www.aquasec.com[Trivy]. 
+
+ArgoCD is a GitOps based contineous delivery tool and monitoring tool for kubernetes. ArgoCD does the application deployment as well as moniter  any change in the applications deployed on Kuberntes and verifies if those changes are according to the desired state specified by the defenitions files in the associated GitHub repository, if it identiifies any change in the deployed application, it resets the container back to the desired state by itself.
+
+image::/img/blog/jenkins-argocd-architecture.png[Jenkins with ArgoCD DevOps architecture diagram,width=90%,align="center"]
+
+In this blog post, I will assume that you have a basic understanding of Git, Docker, and Kubernetes and OpenShift. I will also assume that the Jakarta EE and MicroProfile application code is stored in link:https://github.com/[GitHub]. I will use link:https://hub.docker.com/[Docker Hub] to store the Docker container images and I will deploy the containerized application to link:https://www.ibm.com/ca-en/cloud/kubernetes-service[IBM Cloud Kubernetes Service] and link:https://www.ibm.com/ca-en/cloud/openshift[OpenShift on IBM Cloud]. 
+
+== Setup development pipeline and associated configurations
+
+Create 3 branches in associated github repository, 'develop', 'test' and 'master' (or 'main'). Development team will work on the code in 'develop' branch, quality testing team will work on 'test' branch and production deployment team will work on 'master' (or 'main') branch. 
+
+You can setup the Jenkins pipeline on development environment using the steps in the blog link:https://openliberty.io/blog/2022/05/27/liberty-devops-ci-cd-jenkins.html[CI/CD with Jenkins], the steps explained in this blog will serve as the code build and container image generation step required for this jenkins and argocd pipeline. 
+
+*The container image used for deployment on all the lower and higher environments are generated only once on development environment (as part of the development code build and docker image generation jenkins job) and uploaded the same to docker hub repository which is referred in deployment configurations used on all environments.*   
+
+The open source jar files scan and static code analysis are done as part of the development code build jenkins job.
+
+== Installing and configuring ARGOCD in kubernetes cluster
+
+Login to kubernetes cluster/OpenShift cluster from the CLI
+
+   curl -fsSL https://clis.cloud.ibm.com/install/linux | sh # install IBM cloud CLI
+   ibmcloud plugin install container-service # kubernetes plugin install
+   ibmcloud login --apikey $IBM_CLOUD_API_KEY -g $IBM_CLOUD_RSGRP # for connecting to IBM Cloud 
+   ibmcloud ks cluster config --cluster $CLUSTER-ID # for connecting to kubernetes cluster in IBM cloud
+   # to connect to openshift, run this command
+   oc login --token=$OC_TOKEN --server=$OC_SERVER #to get this complete command, login to openshift and go to "https://<OC-URL>/command-line-tools" and click on "Copy Login Command", then click on "Display Token"
+   kubectl config current-context
+
+Run the following commands to install ArgoCD (Replace 'oc' with 'kubectl' if you are installing ArgoCD on OpenShift)
+
+   kubectl create namespace argocd # for installing all argocd related containers on 'argocd' namespace
+   kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+   kubectl patch svc argocd-server -n argocd -p '{"spec": {"type": "LoadBalancer"}}' # change the service type to 'LoadBalancer'
+   kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d; echo # Get the ArgoCD admin password
+ 	 kubectl port-forward svc/argocd-server -n argocd 8080:443 & # To access the ArgoCD from browser on '8080' (or anything of your choice)
+
+Login to ArgoCD using 'admin' as username and the administrator password generated earlier
+
+First step is to configure the GitHub repository in the ArgoCD
+
+[.img_border_light]
+image::/img/blog/argocd-settings.png[ArgoCD home page,width=50%, align="center" ]
+
+Go to 'Repositories' page from the 'Settings' page, click on '+ CONNECT REPO USING HTTPS'
+
+Enter the required details, select 'type' as 'git' and 'Project' as 'default' 
+
+[.img_border_light]
+image::/img/blog/argocd-connect-to-git.png[ArgoCD connect to git,width=40%, align="center" ]
+
+Go back to home page and click on '+ NEW APP'
+
+[.img_border_light]
+image::/img/blog/argocd-home-page.png[ArgoCD home page,width=40%, align="center" ]
+
+Enter the following details and create the app
+
+[.img_border_light]
+image::/img/blog/argocd-create-app1.png[ArgoCD create app1,width=60%, align="center" ]
+[.img_border_light]
+image::/img/blog/argocd-create-app2.png[ArgoCD create app 2,width=60%, align="center" ]
+
+If the created argocd app is working good, i.e. connecting to git repository, able to deploy the application on kubernetes cluster etc, the status of the app will be 'healthy, synced' as shown below 
+
+[.img_border_light]
+image::/img/blog/argocd-app-status1.png[ArgoCD app status1,width=60%, align="center" ]
+
+Click on the application and see more details
+
+[.img_border_light]
+image::/img/blog/argocd-app-status2.png[ArgoCD app status2,width=60%, align="center" ]
+
+== Configuration drift testing
+
+Configuration drift can happen because of manual changes directly on cluster resources or due to any erroneous automatic changes. In either cases, if the configuration changes in cluster does not match with the desired state in the mapped GitHub repository, ArgoCD will identify the same automatically and will apply the required changes in cluster resources. 
+
+Below given is an example scenario of configuration drift and the fix
+
+Connect to the kubernetes cluster and modify the deployment instance and add another replica to the same
+
+        kubectl edit deployment <deployment-name> -n <namespace>
+        eg: kubectl edit deployment argoliberty -n argocd
+
+[.img_border_light]
+image::/img/blog/kubernetes-change-deployment.png[Kubernetes pod count change,width=60%, align="center" ]
+
+An attempt will be made by cluster to create a new pod, but argocd immediately act on it and get the new pod terminated. Before and after scenario is depicted in the below given screenshot
+
+[.img_border_light]
+image::/img/blog/pods-before-and-after.png[Kubernetes pod - before and after status,width=60%, align="center" ]
+
+== Higher environment (QA, production) argocd based pipeline
+
+*ArgoCD on multiple environments* It is expected to have the QA (testing) and PROD (production) environments running on different kubernetes clusters or on different kubernetes namespace. +
+In such cases, Install ArgoCD separately on these clusters (or namespaces) and configure the kubernetes cluster details (or namespace) and github branch details on each ArgoCD instances, as shown below
+
+[.img_border_light]
+image::/img/blog/argocd-multi-cluster.png[ArgoCD configuration - multi-cluster,width=60%, align="center" ]
+
+*GitHub setup* As explained earlier, development pipeline will generate the comtainer image and upload the same to docker hub repository +
+Update the new image name and version in the deployment configuration file on development branch in github and create a pull request to merge the same to higher branches. +
+
+[.img_border_light]
+image::/img/blog/deployment-config.png[Kubernetes deployment config - example,width=60%, align="center" ]
+
+When this pull request is completed, application deployment will be triggered on kubernetes QA/PROD environments through ArgoCD
+
+== Conclusion
+
+This is only an opinionated way to setup the Jenkins - ArgoCD pipeline. Instead of doing deployment directly from Jenkins on development environment (which is not advicable in general), you can write the pipeline code to commit the new image name with tag to github development code branch and automate the deployment through ArgoCD. 
