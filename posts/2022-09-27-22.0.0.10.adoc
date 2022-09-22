@@ -73,11 +73,11 @@ image::img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="cent
 [#oidc]
 == Use issuer claim for selecting which configuration to use for a JWT inbound propagation request (OpenID Connect Client 1.0)
 
-Starting in 22.0.0.10, the OpenID Connect Client 1.0 feature supports using the issuer claim from the JWT or JWS access token for selecting which `openidConnectClient` configuration to use for a JWT inbound propagation request.  Prior to this functionality, complicated authentication filters were required if more than one issuer was used for the same resource. Instead, the OpenID Connect Client 1.0 feature can now be configured with simpler `openidConnectClient` elements for each required issuer.
+Starting in 22.0.0.10, the link:{url-prefix}/docs/latest/reference/feature/openidConnectClient-1.0.html[OpenID Connect Client 1.0] feature supports using the issuer claim from the JWT or JWS access token for selecting which `openidConnectClient` configuration to use for a JWT inbound propagation request.  Prior to this release, complicated authentication filters were required if more than one issuer was used for the same resource. Instead, the OpenID Connect Client 1.0 feature can now be configured with simpler `openidConnectClient` elements for each required issuer.
 
 A Liberty OpenID Connect Relying Party will automatically use the issuer claim from a JWT or JWS access token to select the `openidConnectClient` configuration with a matching `issuer` attribute. 
 
-For example, for an issuer claim value of `"https://hostname/op1"` and a `server.xml` file configured as follows:
+The following `server.xml` file example shows two Open ID connect client configurations, with an link:{url-prefix}/docs/latest/authentication-filters.html[authentication filter] configured to route requests to the `RP2` configuration. If a request with an issuer claim value of `https://hostname/op1` is presented, the `RP1` configuration is selected unless the `rp2filter` applies to the request.
 [source, xml]
 ----
 <server>
@@ -94,14 +94,14 @@ For example, for an issuer claim value of `"https://hostname/op1"` and a `server
 </server>
 ----
 
-The `"RP1"` configuration is selected as long as the `"rp2filter"` does not apply to the request. Therefore, an attempt to find which `openidConnectClient` configuration applies to the request will be done using the following algorithm:
+Open Liberty selects the `openidConnectClient` configuration to use for a JWT request according to the following algorithm:
 
-1. If the auth filter for a `openidConnectClient` matches the request, choose that configuration.
-2. Check the issuer from the JWT against the issuers of all config elements. If the issuer from the JWT matches a single `openidConnectClient` configuration element, choose that configuration.
-3. If the issuer from the JWT matches the issuer of multiple `openidConnectClient` configuration elements, choose the first configuration matched.
-4. If the issuer does not match the issuer of any configuration elements, choose between all of the config elements in a non-deterministic manner.
+1. If the authentication filter for a `openidConnectClient` configuration matches the request, choose that configuration.
+2. Check the issuer claim from the JWT against the `issuer` attributes from of all `openidConnectClient` elements. If the issuer claim from the JWT matches the `issuer` attribute in only one `openidConnectClient` configuration element, choose that configuration.
+3. If the issuer claim from the JWT matches the `issuer` attribute in multiple `openidConnectClient` configuration elements, choose the first configuration that matches.
+4. If the issuer claim from the JWT does not match the `issuer` attribute of any `openidConnectClient` configuration elements, choose one of the configuration elements in a nondeterministic manner.
 
-For more information about OpenID Connect Client refer to the link:https://openid.net/specs/openid-connect-core-1_0.html[OpenID Connect Client specification].
+For more information about OpenID Connect Client, refer to the link:https://openid.net/specs/openid-connect-core-1_0.html[OpenID Connect Client specification].
 
 [#CVEs]
 == Security vulnerability (CVE) fixes in this release
@@ -127,9 +127,9 @@ We’ve spent some time fixing bugs. The following sections describe just some o
 
 * link:https://github.com/OpenLiberty/open-liberty/issues/20599[JDBC connection not validated when numConnectionsPerThreadLocal is used]
 +
-When a JDBC datasource is configured with `validationTimeout` the connection pool should validate a connection before it is passed back to the application. If the connection is invalid (e.g. after a database failover event), other connections in the pool should be purged according to the `purgePolicy` configuration. The application should therefore rarely receive an invalid database connection.
+When a JDBC datasource is configured with `validationTimeout`, the connection pool should validate a connection before it is passed back to the application. If the connection is invalid (e.g. after a database failover event), other connections in the pool should be purged according to the `purgePolicy` configuration. The application should therefore rarely receive an invalid database connection.
 +
-However, if the connection manager is configured with `numConnectionsPerThreadLocal=1`, once a connection is stashed as a `ThreadLocal`, it isn't validated before being used by the application resulting in a `SQLException`. Also, if the application calls `isValid` on the connection and the connection is determined to be invalid, the connection manager does not apply the `purgePolicy` logic to other connections in the pool, so clients may see multiple errors until each of the worker threads is used. 
+However, if the connection manager is configured with `numConnectionsPerThreadLocal=1`, once a connection is stashed as a `ThreadLocal`, it isn't validated before being used by the application, which results in a `SQLException`. Also, if the application calls `isValid` on the connection and the connection is determined to be invalid, the connection manager does not apply the `purgePolicy` logic to other connections in the pool, so clients may see multiple errors until each of the worker threads is used. 
 +
 ```
     <dataSource id="fhirDatasourcePglocalDefault" jndiName="jdbc/fhir_ibmfhirpg_default" type="javax.sql.XADataSource" statementCacheSize="200" syncQueryTimeoutWithTransactionTimeout="true" validationTimeout="30s">
