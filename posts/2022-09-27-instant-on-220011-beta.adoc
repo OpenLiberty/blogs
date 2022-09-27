@@ -316,6 +316,20 @@ Depending on your Linux distribution, Podman may use `runc` or `crun` by default
 
 Depending on how up to date your RHEL 8.6 or RHEL 9.0 installation is, you may find that the `--security-opt` for specifying the `criuRequiredSysCalls.json` is unnecessary. At the time of writing, the latest up to date versions of RHEL 8.6 and RHEL 9.0 include a Podman that grants the required system calls to the containers it launches by default. This makes specifying the `--security-opt seccomp=criuRequiredSysCalls.json` unnecessary.
 
+[#benchmark]
+== How fast is it?
+We have tested multiple applications to show how startup time is reduced with InstantOn. link:https://github.com/HotswapProjects/pingperf-quarkus/[Pingperf] is a very simple ping-type application involve a single REST endpoint. link:https://github.com/johnaohara/quarkusRestCrudDemo/[Rest crud] is a bit more complicated, involving JPA and a remote database. link:https://github.com/blueperf/acmeair-mainservice-java#acme-air-main-service---javaliberty/[AcmeAir Microservice Main] makes use of the microprofile features. These experiments were run on a 24 core system. I used taskset -c to allocate 4 CPUs to the Liberty process running in container. The InstantOn times were taken using the `applications` checkpoint phase. Startup time is measured from the time the Liberty server startup is initiated to the time the server is ready to accept requests, as denoted by the message "The <server name> server is ready to run a smarter planet." in the messages.log. The time it takes to start the container itself up has been filtered out. InstantOn versus normal startup times for these applications are shown here in relative terms, with the baseline times normalized to 100 for each application. Lower is better:
+
+image::img/blog/instantonperf.png[Startup Performance,width=70%,align="center"]
+
+InstantOn offers a large startup savings of up to 90% depending on the application. All applications are not the same, so you may see different results.
+
+== What is next?
+This post described the details of using Open Liberty InstantOn beta to produce an application container image with InstantOn startup times. This support currently only allows for Open Liberty features that are included as part of Liberty features webProfile-8.0, webProfile-9.1, microProfile-4.1 and microProfile-5.0. We hope to expand that to include future versions of webProfile and microProfile as well as expand support to the Jakarta full profile features (e.g. jakarta-8.0, jakarta-9.1, jakarta-10.0).
+
+With InstantOn, you can build very fast startup application containers that can be deployed with scale to zero as an option. We look forward to a future blog post that describes how to deploy Open Liberty InstantOn in cloud environments such as Red Hat OpenShift Container Platform (OCP) and Kubernetes (k8s) with technologies, such as Knative, that can auto-scale applications to zero.
+
+== System calls file
 [#sys-calls-json]
 [source,json]
 .criuRequiredSysCalls.json
@@ -1144,19 +1158,6 @@ Depending on how up to date your RHEL 8.6 or RHEL 9.0 installation is, you may f
 	]
 }
 ----
-
-[#benchmark]
-== How fast is it?
-We have tested multiple applications to show how startup time is reduced with InstantOn. link:https://github.com/HotswapProjects/pingperf-quarkus/[Pingperf] is a very simple ping-type application involve a single REST endpoint. link:https://github.com/johnaohara/quarkusRestCrudDemo/[Rest crud] is a bit more complicated, involving JPA and a remote database. link:https://github.com/blueperf/acmeair-mainservice-java#acme-air-main-service---javaliberty/[AcmeAir Microservice Main] makes use of the microprofile features. These experiments were run on a 24 core system. I used taskset -c to allocate 4 CPUs to the Liberty process running in container. The InstantOn times were taken using the `applications` checkpoint phase. Startup time is measured from the time the Liberty server startup is initiated to the time the server is ready to accept requests, as denoted by the message "The <server name> server is ready to run a smarter planet." in the messages.log. The time it takes to start the container itself up has been filtered out. InstantOn versus normal startup times for these applications are shown here. All times are in milliseconds:
-
-image::img/blog/instantonperf.png[Startup Performance,width=70%,align="center"]
-
-InstantOn offers a large startup savings of up to 90% depending on the application. All applications are not the same, so you may see different results.
-
-== What is next?
-This post described the details of using Open Liberty InstantOn beta to produce an application container image with InstantOn startup times. This support currently only allows for Open Liberty features that are included as part of Liberty features webProfile-8.0, webProfile-9.1, microProfile-4.1 and microProfile-5.0. We hope to expand that to include future versions of webProfile and microProfile as well as expand support to the Jakarta full profile features (e.g. jakarta-8.0, jakarta-9.1, jakarta-10.0).
-
-With InstantOn, you can build very fast startup application containers that can be deployed with scale to zero as an option. We look forward to a future blog post that describes how to deploy Open Liberty InstantOn in cloud environments such as Red Hat OpenShift Container Platform (OCP) and Kubernetes (k8s) with technologies, such as Knative, that can auto-scale applications to zero.
 
 // // // // // // // //
 // LINKS
