@@ -19,44 +19,8 @@ Thomas Watson <https://github.com/tjwatson>
 :imagesdir: /
 :url-prefix:
 :url-about: /
-//Blank line here is necessary before starting the body of the post.
 
-// // // // // // // //
-// In the preceding section:
-// Do not insert any blank lines between any of the lines.
-//
-// "open-graph-image" is set to OL logo. Whenever possible update this to a more appriopriate/specific image (for example if present an image that is being used in the post). 
-// However, it can be left empty which will set it to the default
-//
-// Replace TITLE with the blog post title
-//
-// Replace SECOND_AUTHOR_NAME with the name of the second author.
-// Replace SECOND_GITHUB_USERNAME with the GitHub user name of the second author.
-// Replace THIRD_AUTHOR_NAME with the name of the third author. And so on for fourth, fifth, etc authors.
-// Replace THIRD_GITHUB_USERNAME with the GitHub user name of the third author. And so on for fourth, fifth, etc authors.
-//
-// Replace AUTHOR_NAME with your name as first author.
-// Replace GITHUB_USERNAME with your GitHub username eg: lauracowen
-// Replace DESCRIPTION with a short summary (~60 words) of the release (a more succinct version of the first paragraph of the post).
-//
-// Replace AUTHOR_NAME with your name as you'd like it to be displayed, eg: Laura Cowen
-//
-// Example post: 2020-02-12-faster-startup-Java-applications-criu.adoc
-//
-// If adding image into the post add :
-// -------------------------
-// [.img_border_light]
-// image::img/blog/FILE_NAME[IMAGE CAPTION ,width=70%,align="center"]
-// -------------------------
-// "[.img_border_light]" = This adds a faint grey border around the image to make its edges sharper. Use it around
-// screenshots but not around diagrams. Then double check how it looks.
-// There is also a "[.img_border_dark]" class which tends to work best with screenshots that are taken on dark backgrounds.
-// Once again make sure to double check how it looks
-// Change "FILE_NAME" to the name of the image file. Also make sure to put the image into the right folder which is: img/blog
-// change the "IMAGE CAPTION" to a couple words of what the image is
-// // // // // // // //
-
-Do you want cloud-native Java applications that can start up in milliseconds, without compromising on throughput, memory, development-production parity, or Java language features? The Open Liberty 22.0.0.11-beta brings you InstantOn, an exciting new feature that provides incredibly fast startup times for Jakarta EE and MicroProfile applications. 
+Do you want cloud-native Java applications that can start up in milliseconds, without compromising on throughput, memory, development-production parity, or Java language features? The Open Liberty 22.0.0.11-beta brings you InstantOn, an exciting new feature that provides incredibly fast startup times for MicroProfile and Jakarta EE applications. 
 
 In serverless environments, application startup times are important. InstantOn application instances can scale to zero when the application is not in use. Scaling to zero can help reduce the overall cloud costs for deployed applications by reducing the overall number of application instances when there are no ongoing requests. When activity picks up for the application, new instances can start up quickly, without introducing high latency for the user.
 
@@ -98,9 +62,9 @@ mvn package
 This command builds a `target/guide-getting-started.war` archive. We can now include this WAR in a container image that uses the InstantOn feature.
 
 == Containerizing the application
-For an application to use Open Liberty InstantOn support, it must first be containerized. For more details on how to containerize your application with Open Liberty, see the link:/guides/containerize.html[Containerizing microservices] guide or the link:/guides/containerize-podman.html[Containerizing microservices with Podman] guide. If you are unfamiliar with Podman, follow the Podman guide first because the Open Liberty InstantOn support currently requires the use of Podman. Support for Docker should come later, once Docker supports the capabilities that CRIU requires.
+For an application to use Open Liberty InstantOn support, it must first be containerized using the Open Liberty beta InstantOn image. For general information about how to containerize applications with Open Liberty, see the link:/guides/containerize.html[Containerizing microservices] guide or the link:/guides/containerize-podman.html[Containerizing microservices with Podman] guide. If you are unfamiliar with Podman, follow the Podman guide first because the Open Liberty InstantOn support currently requires the use of Podman. Support for Docker should come later, once Docker supports the capabilities that CRIU requires.
 
-=== Using the Open Liberty Beta InstantOn Image
+=== Containerize an application using the Open Liberty Beta InstantOn image 
 The Liberty InstantOn beta image contains the prerequisites for building an application container image with a checkpoint server process.  Applications can use the Liberty InstantOn beta image as a base to build their own application container images and from that create their own application container image with a checkpoint process. This involves the following steps:
 
 1. <<dockerfile, Create the Dockerfile for the application>>
@@ -319,25 +283,6 @@ Depending on your Linux distribution, Podman might use `runc` or `crun` by defau
 
 Depending on how up to date your RHEL 8.6 or RHEL 9.0 installation is, you might find that the `--security-opt` for specifying the `criuRequiredSysCalls.json` is unnecessary. At the time of writing, the most up-to-date versions of RHEL 8.6 and RHEL 9.0 include a Podman that grants the required system calls to the containers it launches by default. This default makes specifying the `--security-opt seccomp=criuRequiredSysCalls.json` unnecessary.
 
-[#benchmark]
-== How fast is it?
-We tested multiple applications to show how startup time is reduced with InstantOn. 
-* link:https://github.com/HotswapProjects/pingperf-quarkus/[Pingperf] is a very simple ping-type application involve a single REST endpoint. 
-* link:https://github.com/johnaohara/quarkusRestCrudDemo/[Rest crud] is a bit more complicated, and involves JPA and a remote database. 
-* link:https://github.com/blueperf/acmeair-mainservice-java#acme-air-main-service---javaliberty/[AcmeAir Microservice Main] makes use of the MicroProfile features. 
-
-These experiments were run on a 24 core system. I used `taskset -c` to allocate 4 CPUs to the Liberty process running in container. The InstantOn times were taken using the `applications` checkpoint phase. Startup time is measured from the time the Liberty server startup is initiated to the time the server is ready to accept requests, as denoted by the message **"The <server name> server is ready to run a smarter planet."** in the messages.log. The time it takes to start the container itself up has been filtered out. InstantOn versus normal startup times for these applications are shown here in relative terms, with the baseline times normalized to 100 for each application. Lower is better:
-
-image::img/blog/instantonperf.png[Startup Performance,width=70%,align="center"]
-
-InstantOn offers a large startup savings of up to 90% depending on the application. All applications are not the same, so you might see different results.
-
-== What is next?
-This post described the details of using Open Liberty InstantOn beta to produce an application container image with InstantOn startup times. This support currently allows for only Open Liberty features that are included as part of the Liberty webProfile-8.0, webProfile-9.1, microProfile-4.1 and microProfile-5.0 umbrella features. We hope to expand that to include future versions of webProfile and microProfile, as well as to expand support to the Jakarta full profile features (e.g. jakarta-8.0, jakarta-9.1, jakarta-10.0).
-
-With InstantOn, you can build very fast startup application containers that can be deployed with scale-to-zero as an option. We look forward to a future blog post that describes how to deploy Open Liberty InstantOn in cloud environments such as Red Hat OpenShift Container Platform (OCP) and Kubernetes (k8s) with technologies that can auto-scale applications to zero, such as Knative.
-
-== System calls file
 [#sys-calls-json]
 [source,json]
 .criuRequiredSysCalls.json
@@ -1166,6 +1111,24 @@ With InstantOn, you can build very fast startup application containers that can 
 	]
 }
 ----
+
+[#benchmark]
+== How fast is it?
+We tested multiple applications to show how startup time is reduced with InstantOn. 
+* link:https://github.com/HotswapProjects/pingperf-quarkus/[Pingperf] is a very simple ping-type application involve a single REST endpoint. 
+* link:https://github.com/johnaohara/quarkusRestCrudDemo/[Rest crud] is a bit more complicated, and involves JPA and a remote database. 
+* link:https://github.com/blueperf/acmeair-mainservice-java#acme-air-main-service---javaliberty/[AcmeAir Microservice Main] makes use of the MicroProfile features. 
+
+These experiments were run on a 24 core system. I used `taskset -c` to allocate 4 CPUs to the Liberty process running in container. The InstantOn times were taken using the `applications` checkpoint phase. Startup time is measured from the time the Liberty server startup is initiated to the time the server is ready to accept requests, as denoted by the message **"The <server name> server is ready to run a smarter planet."** in the messages.log. The time it takes to start the container itself up has been filtered out. InstantOn versus normal startup times for these applications are shown here in relative terms, with the baseline times normalized to 100 for each application. Lower is better:
+
+image::img/blog/instantonperf.png[Startup Performance,width=70%,align="center"]
+
+InstantOn offers a large startup savings of up to 90% depending on the application. All applications are not the same, so you might see different results.
+
+== What is next?
+This post described the details of using Open Liberty InstantOn beta to produce an application container image with InstantOn startup times. This support currently allows for only Open Liberty features that are included as part of the Liberty webProfile-8.0, webProfile-9.1, microProfile-4.1 and microProfile-5.0 umbrella features. We hope to expand that to include future versions of webProfile and microProfile, as well as to expand support to the Jakarta full profile features (e.g. jakarta-8.0, jakarta-9.1, jakarta-10.0).
+
+With InstantOn, you can build very fast startup application containers that can be deployed with scale-to-zero as an option. We look forward to a future blog post that describes how to deploy Open Liberty InstantOn in cloud environments such as Red Hat OpenShift Container Platform (OCP) and Kubernetes (k8s) with technologies that can auto-scale applications to zero, such as Knative.
 
 // // // // // // // //
 // LINKS
