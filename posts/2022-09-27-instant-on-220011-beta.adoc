@@ -1,20 +1,20 @@
 ---
 layout: post
-title: Liberty Instant On for cloud native Java applications
+title: Liberty InstantOn startup for cloud native Java applications
 # Do NOT change the categories section
 categories: blog
 author_picture: https://avatars3.githubusercontent.com/tjwatson
 author_github: https://github.com/tjwatson
-seo-title: Liberty Instant On for cloud native Java applications - OpenLiberty.io
+seo-title: Liberty InstantOn startup for cloud native Java applications - OpenLiberty.io
 seo-description: The Open Liberty 22.0.0.11-beta brings you an exciting new feature called InstantOn that provides incredibly fast startup times for Jakarta EE and MicroProfile applications.
 blog_description: "The Open Liberty 22.0.0.11-beta brings you an exciting new feature called InstantOn that provides incredibly fast startup times for Jakarta EE and MicroProfile applications."
-open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image: https://openliberty.io/img/blog/instantonperf.png
 additional_authors: 
 - name: Joshua Dettinger
   github: https://github.com/dettmoney
   image: https://avatars0.githubusercontent.com/dettmoney
 ---
-= Liberty Instant On for cloud native Java applications
+= Liberty InstantOn startup for cloud native Java applications
 Thomas Watson <https://github.com/tjwatson>
 :imagesdir: /
 :url-prefix:
@@ -56,15 +56,19 @@ Thomas Watson <https://github.com/tjwatson>
 // change the "IMAGE CAPTION" to a couple words of what the image is
 // // // // // // // //
 
-Do you want cloud-native Java applications that can start up in milliseconds, without compromising on throughput, memory, development-production parity or Java language features?  The Open Liberty 22.0.0.11-beta brings you an exciting new feature that provides incredibly fast startup times for Jakarta EE and MicroProfile applications.  In serverless environments it is important to have applications that can start up very quickly.  Instant on applications enable the application instances to scale to zero when the application is not in use.  When activity picks up for the application then new instances can start up quickly without introducing high latency for the end user.  Scale to zero can help reduce the overall cloud costs for deployed applications by reducing the overall number an application instances when it has no ongoing requests.
+Do you want cloud-native Java applications that can start up in milliseconds, without compromising on throughput, memory, development-production parity, or Java language features? The Open Liberty 22.0.0.11-beta brings you InstantOn, an exciting new feature that provides incredibly fast startup times for Jakarta EE and MicroProfile applications. 
 
-To enable instant on behavior, Open Liberty provides support for taking a checkpoint of the application process as it is being started. In order to take a checkpoint of the application process Open Liberty uses new features of the link:https://www.eclipse.org/openj9/[OpenJ9] JVM and a Linux technology called Checkpoint and Restore link:https://criu.org/[CRIU]. The checkpoint is a snapshot of the running application process which can be persisted and then very quickly restored to bring back the application process into the exact state it was when the checkpoint was taken.  This enables the Liberty instance, along with any configured applications to be restored multiple times into distinct instances of your application. To see just how fast skip to the "<<benchmark, How fast is it?>>" section. For more details on the advantages of this approach see the link:https://blog.openj9.org/2022/09/26/fast-jvm-startup-with-openj9-criu-support/[Fast JVM startup with OpenJ9 CRIU Support] blog. Also, see an earlier Open Liberty link:/blog/2020/02/12/faster-startup-Java-applications-criu.html[blog] where we first discussed the potential of CRIU for faster startup of Java applications.
+In serverless environments, application startup times are important. InstantOn application instances can scale to zero when the application is not in use. Scaling to zero can help reduce the overall cloud costs for deployed applications by reducing the overall number of application instances when there are no ongoing requests. When activity picks up for the application, new instances can start up quickly, without introducing high latency for the user.
 
-The Open Liberty InstantOn feature makes it really easy for you to try it out by providing a new `checkpoint` action. The `checkpoint` action can be executed against your existing Open Liberty server configurations. With the `checkpoint` action you specify a phase at which you want the Liberty startup process to be stopped and a checkpoint of the process saved.  When Liberty is launched it will detect that there is a saved checkpoint process and it will resume the process from the state the process was saved during the `checkpoint` action.
+To enable InstantOn, Open Liberty uses new features of the link:https://www.eclipse.org/openj9/[OpenJ9] JVM and a Linux technology called Checkpoint and Restore link:https://criu.org/[CRIU] to take a checkpoint of the application process as it starts. This checkpoint is a snapshot of the running application process that can be persisted and then quickly restored to bring the application process back into the state it was in when the checkpoint was taken. This process enables the Liberty instance, along with any configured applications, to be restored multiple times into distinct instances of your application. 
 
-== Setup the example application project
+To see just how fast InstantOn startup is, skip to the "<<benchmark, How fast is it?>>" section. For more details on the advantages of this approach, see the link:https://blog.openj9.org/2022/09/26/fast-jvm-startup-with-openj9-criu-support/[Fast JVM startup with OpenJ9 CRIU Support] blog post and this earlier link:/blog/2020/02/12/faster-startup-Java-applications-criu.html[Open Liberty blog post] where we first discussed the potential of CRIU for faster startup of Java applications.
 
-Before getting into the details of how the `checkpoint` action works lets setup a working example. For that we will have a look at the link:/guides/getting-started.html[Getting started with Open Liberty] guide.  If you would like to follow along then start by cloning the link:https://github.com/openliberty/guide-getting-started.git[Git repository] and use the projects that are provided inside:
+The Open Liberty InstantOn feature makes it easy for you to try it out by providing a new `checkpoint` action, which can be executed against your existing Open Liberty server configurations. With the `checkpoint` action, you specify a phase at which you want the Liberty startup process to stop and save a checkpoint.  When Liberty is launched, it will detect the saved checkpoint process and resume the process from the state that it was saved in during the `checkpoint` action.
+
+== Set up the example application project
+
+Before we get into the details of how the `checkpoint` action works, let's set up a working example. For this example, we will have a look at the link:/guides/getting-started.html[Getting started with Open Liberty] guide. If you want to follow along, start by cloning the link:https://github.com/openliberty/guide-getting-started.git[Git repository] for this guide and use the projects that are provided inside:
 [source]
 ----
 
@@ -84,43 +88,43 @@ The defaultServer server is ready to run a smarter planet.
 ----
 Check out the service at the http://localhost:9080/dev/system/properties URL.
 
-After you are finished checking out the application, stop the Open Liberty server by pressing CTRL+C in the command-line session where you ran the server.
+After you finish checking out the application, stop the Open Liberty server by pressing CTRL+C in the command-line session where you ran the server.
 
 To build the WAR for the application run the following :
 [source]
 ----
 mvn package
 ----
-After this you will have a `target/guide-getting-started.war` archive built.  We can now include this WAR into a container image
+This command builds a `target/guide-getting-started.war` archive. We can now include this WAR in a container image that uses the InstantOn feature.
 
 == Containerizing the application
-To use Open Liberty InstantOn support an application must first be containerized.  For more details on how to containerize your application with Open Liberty first see the link:/guides/containerize.html[Containerizing microservices] guide or the link:/guides/containerize-podman.html[Containerizing microservices with Podman] guide. If you are unfamiliar with Podman then it is recommended to follow the Podman guide first because the Open Liberty Instant On support currently requires the use of Podman.  Support for Docker should come later once a Docker release is made that supports the necessary capabilities that checkpoint and restore require.
+For an application to use Open Liberty InstantOn support, it must first be containerized. For more details on how to containerize your application with Open Liberty, see the link:/guides/containerize.html[Containerizing microservices] guide or the link:/guides/containerize-podman.html[Containerizing microservices with Podman] guide. If you are unfamiliar with Podman, follow the Podman guide first because the Open Liberty InstantOn support currently requires the use of Podman. Support for Docker should come later, once Docker supports the capabilities that CRIU requires.
 
 === Using the Open Liberty Beta InstantOn Image
 The Liberty InstantOn beta image contains the prerequisites for building an application container image with a checkpoint server process.  Applications can use the Liberty InstantOn beta image as a base to build their own application container images and from that create their own application container image with a checkpoint process. This involves the following steps:
 
-* <<dockerfile, Create the Dockerfile for the application>>
-* <<app-image, Building the application container image>>
-* <<checkpoint-app, Checkpoint an application in-container>>
-* <<checkpoint-image, Create the application checkpoint image>>
+1. <<dockerfile, Create the Dockerfile for the application>>
+2. <<app-image, Build the application container image>>
+3. <<checkpoint-app, Checkpoint an application in-container>>
+4. <<checkpoint-image, Create the application checkpoint image>>
 
-==== Prerequisites to checkpoint and restore in container
+==== Prerequisites to checkpoint and restore a containerized application
 
-To build and run container images which use `criu`, the host Operating System will need a few prerequisites installed. All testing has been done on RHEL 8.6 and RHEL 9.0.  Other Linux distributions and versions may be possible if they have the necessary prerequisites.  The following is required:
+To build and run container images that use `criu`, the host Operating System needs a few prerequisites installed. All our testing was done on RHEL 8.6 and RHEL 9.0. Other Linux distributions and versions might be possible if they have the necessary prerequisites. The following conditions are required:
 
-1. The kernel must support the Linux link:https://man7.org/linux/man-pages/man7/capabilities.7.html[capability] `CAP_CHECKPOINT_RESTORE`.  This capability was introduced in kernel version 5.9, but has been backported to RHEL kernel versions used in RHEL 8.6.
-2. The latest available version of Podman for the Linux distribution.
-3. Podman configured to use the `crun` or `runc` container runtime.
-4. If using `runc` container runtime then version 1.1.3 or higher is required to have the recent link:https://github.com/opencontainers/runc/pull/3451[fix] to `runc`.  This allows for the successful mount of `/proc/sys/kernel/ns_last_pid` in the container.
+* The kernel must support the Linux link:https://man7.org/linux/man-pages/man7/capabilities.7.html[CAP_CHECKPOINT_RESTORE] capability. This capability was introduced in kernel version 5.9, but was backported to RHEL kernel versions used in RHEL 8.6.
+* The latest available version of Podman for the Linux distribution must be installed.
+* Podman must be configured to use the `crun` or `runc` container runtime.
+* If you use the `runc` container runtime, then version 1.1.3 or higher is required so that you have the recent link:https://github.com/opencontainers/runc/pull/3451[fix] to `runc`. This fix enables the successful mount of `/proc/sys/kernel/ns_last_pid` in the container.
 
 [#dockerfile]
 === Create the Dockerfile for the application
 
-For the link:/guides/getting-started.html[Getting started with Open Liberty] example the first step is to create a `Dockerfile` which provide the instructions to create a containerized version of the application. Note that `podman` also supports the files using the `Containerfile` format for building container images.
+For the link:/guides/getting-started.html[Getting started with Open Liberty] example, the first step is to create a `Dockerfile` that provides the instructions to create a containerized version of the application. Note that `podman` also supports using the `Containerfile` format for building container images.
 
-For this example, we will be using an official image from the IBM Container Registry (ICR), `icr.io/appcafe/open-liberty:beta-instanton-java17-openj9-ubi`, as the parent image. This image is tagged with the word `beta`, meaning it includes all the Liberty beta features as well as all the Liberty features from the `full` image.  The image is tagged with the word `instanton`, meaning it includes all the prerequisites for producing a checkpoint process image, for example, the necessary `criu` binaries.
+For this example, we will use an official image from the IBM Container Registry (ICR), `icr.io/appcafe/open-liberty:beta-instanton-java17-openj9-ubi`, as the parent image. This image is tagged with the word `beta`, meaning it includes all the Liberty beta features as well as all the Liberty features from the `full` image. The image is tagged with `instanton`, meaning it includes all the prerequisites for producing a checkpoint process image, such as the necessary `criu` binary files.
 
-The `Dockerfile` for the getting-started application already exists at `finish/Dockerfile`. Edit the existing `finish/Dockerfile` and change the `FROM` instruction to use the parent image `icr.io/appcafe/open-liberty:beta-instanton-java17-openj9-ubi`. After saving the `Dockerfile` it should look something like this:
+The `Dockerfile` for the getting-started application already exists at `finish/Dockerfile`. Edit the existing `finish/Dockerfile` and change the `FROM` instruction to use the `icr.io/appcafe/open-liberty:beta-instanton-java17-openj9-ubi` parent image. After you save the `Dockerfile`, it should look something like this:
 
 .Dockerfile
 [source]
@@ -152,42 +156,41 @@ RUN configure.sh
 
 [#app-image]
 === Building the application container image
-Before building the image, an understanding of what is required to perform a checkpoint and restore is necessary. For `criu` to be able to do its job of taking a checkpoint of a process and restoring a process, the `criu` binary must be granted additional link:https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux_atomic_host/7/html/container_security_guide/linux_capabilities_and_seccomp[Linux capabilities]. In particular, for Open Liberty, it needs to be granted `cap_checkpoint_restore`, `cap_net_admin` and `cap_sys_ptrace`. The Open Liberty InstantOn beta image includes the `criu` binary with the necessary capabilities granted to the `criu` binary file. In order for the `criu` binary to be given access its assigned capabilities at runtime, the container which is running `criu` must also be granted the necessary capabilities when it is launched. This can be done in one of two ways:
+For `criu` to be able to take a checkpoint of and restore a process, the `criu` binary must be granted additional link:https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux_atomic_host/7/html/container_security_guide/linux_capabilities_and_seccomp[Linux capabilities]. In particular, for Open Liberty, it needs to be granted `cap_checkpoint_restore`, `cap_net_admin` and `cap_sys_ptrace`. The Open Liberty InstantOn beta image includes the `criu` binary with the necessary capabilities already granted to the `criu` binary file. For the `criu` binary to be given access to its assigned capabilities at run time, the container that is running `criu` must also be granted the necessary capabilities when it is launched. You can grant these capabilities to the container in one of two ways:
 
 . Use a privileged container using the `--privileged` option
 . Assign specific capabilities using `--cap-add` options
 
-When using a Docker daemon, the daemon typically has root authority.  This allow it to grant any requested capabilities to a container when it is launching the container. For Podman, there is no daemon running. This means the user launching the container has to have the authority to grant the necessary Linux capabilities to the running container. This can be done by running as root or by using `sudo` to run the `podman` commands. For the purposes of this example it will be assumed you are running the `podman` commands as the root user.
+When you use Docker, the daemon typically has root authority. This authority allows it to grant any requested capabilities when it launches a container. With Podman, there is no daemon, so the user who launches the container must have the authority to grant it the necessary Linux capabilities. You have this authority when you run as root or use `sudo` to run the `podman` commands. For the purposes of this example, we assume you are running the `podman` commands as the root user.
 
-With that understanding, we can now build the container image using the `podman build` command. From the `finish/` directory run the following command to build the container image for the application:
+With that understanding, we can now build the container image by using the `podman build` command. From the `finish/` directory, run the following command to build the container image for the application:
 [source]
 .Build the application container image
 ----
 podman build -t getting-started .
 ----
 
-This created the `getting-started` container image.  This container image will not contain any checkpoint image files that can be used for InstantOn startup. You can run this application container image with the following command:
+This command creates the `getting-started` container image.  However, this container image does not contain any checkpoint image files that can be used for InstantOn startup. You can run this application container image with the following command:
 [source]
 .Run the application container
 ----
 podman run --name getting-started --rm -p 9080:9080 getting-started
 ----
 
-Note the amount of time it took for Liberty to report it has been started and check out the service running in the container at the http://localhost:9080/dev/system/properties URL. After you are finished checking out the application, stop the running container by pressing CTRL+C in the command-line session where executed the `podman run` command.
+Note the amount of time Liberty takes to report it has been started and check out the service running in the container at the http://localhost:9080/dev/system/properties URL. After you finish checking out the application, stop the running container by pressing CTRL+C in the command-line session where you ran the `podman run` command.
 
 [#checkpoint-app]
 === Checkpoint an application in-container
 
-Open Liberty has three defined places (phases) during the startup process where a checkpoint can occur:
+Open Liberty has three phases during the startup process where a checkpoint can occur:
 
-1. `features` - This is the earliest phase during startup where a checkpoint can happen.  The checkpoint will occur after all of the configured Open Liberty features have been started.  This is before any processing occurs for the installed applications.
-2. `deployment` - The checkpoint will happen after processing the configured applications meta-data.  If the application has any components that get run as part of the application starting then the checkpoint will be taken before executing any code from the application.
-3. `applications` - This is the last phase where a checkpoint can happen, implying that this phase has the potential for providing the fastest startup time when restoring the application instance.  The checkpoint will happen after all configured applications have been reported as started.  This phase happens before opening any ports for listening to incoming requests for the applications.
+1. `features` - This is the earliest phase where a checkpoint can happen.  The checkpoint occurs after all of the configured Open Liberty features are started, but before any processing occurs for the installed applications.
+2. `deployment` - The checkpoint happens after processing the configured application metadata.  If the application has any components that get run as part of the application starting, the checkpoint is taken before executing any code from the application.
+3. `applications` - This is the last phase where a checkpoint can happen, so it has the potential to provide the fastest startup time when restoring the application instance. The checkpoint happens after all configured applications are reported as started.  This phase happens before opening any ports for listening to incoming requests for the applications.
 
-The `applications` phase typically provides the quickest startup time for an application, but it also may cause some application code to run before the server process checkpoint happens.  This may lead to undesired behavior when restoring the checkpoint process if the application holds on to some state that should not be restored into more than one concurrent instance of the application.  For example, connecting to an outside resource such as a database before the checkpoint is taken will result in a failure to restore many instances of such a process since this would try to restore the same connection multiple times. If your application initialization does not perform such operations, e.g. 
-open database connections, it may be possible to use the applications checkpoint in that case.
+The `applications` phase typically provides the quickest startup time for an application, but it also might cause some application code to run before the server process checkpoint happens.  This might lead to undesired behavior when restoring the checkpoint process if the application holds on to some state that should not be restored into more than one concurrent instance of the application.  For example, connecting to an outside resource such as a database before the checkpoint is taken results in a failure to restore many instances of such a process since this would try to restore the same connection multiple times. However, If your application initialization does not perform operations such as opening database connections, you might be able to use the `applications` phase for the checkpoint.
 
-Once an application container image has been built it can be used to checkpoint the application process at one of the specified checkpoint phases described above (`features`, `deployment`, `applications`). This is done by using the `--env` option to `podman run` to set the value for `WLP_CHECKPOINT` to one of the available checkpoint phases. For this example, use the `applications` phase by running the following `podman` command:
+After an application container image is built, it can be used to checkpoint the application process at one of the previously described checkpoint phases (`features`, `deployment`, `applications`). You can specify a phase for your checkpoint by using the `--env` option to `podman run` to set the value for `WLP_CHECKPOINT` to one of the available checkpoint phases. For this example, use the `applications` phase by running the following `podman` command:
 
 .Perform a checkpoint in container
 [source]
@@ -201,7 +204,7 @@ podman run \
 - The `--privileged` option is required to perform the `criu` checkpoint in-container.
 - The `WLP_CHECKPOINT` environment variable is used to specify the checkpoint phase. For the getting-started example the `applications` checkpoint phase will provide the fastest restore time.
 
-This will start the container with the application running with Open Liberty.  Once Open Liberty starts it will perform the checkpoint at the phase specified by the `WLP_CHECKPOINT` environment variable. After the container process data has been persisted the container will stop, leaving you with a stopped container that contains the checkpoint process data. The output will look something like this:
+This will start the container with the application running on Open Liberty.  After Open Liberty starts, it performs the checkpoint at the phase specified by the `WLP_CHECKPOINT` environment variable. After the container process data has been persisted, the container will stop, leaving you with a stopped container that contains the checkpoint process data. The output will look something like this:
 
 .Process checkpoint output
 [source]
@@ -230,7 +233,7 @@ This process currently cannot be done as part of a `podman build` step because P
 [#checkpoint-image]
 === Create the application checkpoint image
 
-So far we have created the checkpoint process data for the getting-started application and stored it in a stopped container named `getting-started-checkpoint-container`. The final step is to create a new container image containing the checkpoint process data. When this container image is started it will resume the application process right from the point the checkpoint was created resulting in an Instant On application. This is done by running the following `podman commit` operation:
+So far, we have created the checkpoint process data for the getting-started application and stored it in a stopped container named `getting-started-checkpoint-container`. The final step is to create a new container image that contains the checkpoint process data. When this container image is started, it will resume the application process right from the point that the checkpoint was created, resulting in an InstantOn application. You can create the new image by running the following `podman commit` operation:
 
 .Commit the checkpoint to an image
 [source]
@@ -241,12 +244,12 @@ podman commit getting-started-checkpoint-container getting-started-instanton
 Now we have two application images named `getting-started` and `getting-started-instanton`. Starting a container with the `getting-started-instanton` container image will show a much faster startup time than the original `getting-started` image.
 
 == Running the instanton application image
-Typically an application container can be started from an application container image with a command like the following:
+Typically, an application container can be started from an application container image with a command like the following:
 [source]
 ----
 podman run --rm -p 9080:9080 getting-started-instanton
 ----
-This will fail because `criu` needs some elevated privileges in order to be able to restore the process in-container. When Liberty fails to restore checkpoint process it will recover by launching without the checkpoint image and log the following message:
+However, this command will fail because `criu` needs some elevated privileges in order to be able to restore the process in-container. When Liberty fails to restore the checkpoint process, it will recover by launching without the checkpoint image and log the following message:
 
 [source]
 ----
@@ -274,7 +277,7 @@ If successful, you will see output like the following:
 
 === Running with an unprivileged container
 
-Running fully privileged containers is not recommended.  Best practice would be to reduce the elevated privileges down to only what is required to run the container. The following command can be used to grant the container the necessary privileges without running a fully `--privileged` container:
+Running fully privileged containers is not recommended.  The best practice is to instead reduce the elevated privileges down to only what is required to run the container. You can use the following command to grant the container the necessary privileges without running a fully `--privileged` container:
 
 .podman run with unconfined --security-opt options
 [source]
@@ -294,7 +297,7 @@ The `--cap-add` options grant the container the three Linux capabilities that `c
 
 === Running with an unprivileged container with confined security
 
-Additional work can be done to reduce the need for the `--security-opt` options that use `unconfined`. By default `podman` does not grant access to all the system calls that `criu` needs (defaults specified in the file `/usr/share/containers/seccomp.json`).  First, an additional configuration file is needed which grants all the required system calls that `criu` needs to the container. Second, the host `/proc/sys/kernel/ns_last_pid` needs to be mounted. This can be done with the following command:
+You further simplify the checkpoint process by reducing the need for the `--security-opt` options that use `unconfined`. By default, `podman` does not grant access to all the system calls that `criu` needs (defaults specified in the file `/usr/share/containers/seccomp.json`).  First, you need an additional configuration file that grants all the required system calls that `criu` needs to the container. Second, the host `/proc/sys/kernel/ns_last_pid` needs to be mounted. You can do both these steps with the following command:
 
 .podman run with limited --security-opt
 [source]
@@ -312,9 +315,9 @@ podman run \
 The `--security-opt seccomp=` option refers to a file called <<sys-calls-json,`criuRequiredSysCalls.json`>>. This file specifies the system calls required by `criu`.
 The `-v` option mounts the host `/proc/sys/kernel/ns_last_pid` for access by the container.
 
-Depending on your Linux distribution, Podman may use `runc` or `crun` by default. To check what container runtime is configured for your Podman installation run the command `podman info` and have a look at the `ociRuntime` section. If `runc` is used then make sure version 1.1.3 or higher is being used. For this method to work you must have a version of `runc` that is 1.1.3 or greater.
+Depending on your Linux distribution, Podman might use `runc` or `crun` by default. To check what container runtime is configured for your Podman installation, run the command `podman info` and look at the `ociRuntime` section. If `runc` is used, make sure you are using version 1.1.3 or higher. For this method to work, you must have a version of `runc` that is 1.1.3 or greater.
 
-Depending on how up to date your RHEL 8.6 or RHEL 9.0 installation is, you may find that the `--security-opt` for specifying the `criuRequiredSysCalls.json` is unnecessary. At the time of writing, the latest up to date versions of RHEL 8.6 and RHEL 9.0 include a Podman that grants the required system calls to the containers it launches by default. This makes specifying the `--security-opt seccomp=criuRequiredSysCalls.json` unnecessary.
+Depending on how up to date your RHEL 8.6 or RHEL 9.0 installation is, you might find that the `--security-opt` for specifying the `criuRequiredSysCalls.json` is unnecessary. At the time of writing, the most up-to-date versions of RHEL 8.6 and RHEL 9.0 include a Podman that grants the required system calls to the containers it launches by default. This default makes specifying the `--security-opt seccomp=criuRequiredSysCalls.json` unnecessary.
 
 [#benchmark]
 == How fast is it?
@@ -322,12 +325,12 @@ We have tested multiple applications to show how startup time is reduced with In
 
 image::img/blog/instantonperf.png[Startup Performance,width=70%,align="center"]
 
-InstantOn offers a large startup savings of up to 90% depending on the application. All applications are not the same, so you may see different results.
+InstantOn offers a large startup savings of up to 90% depending on the application. All applications are not the same, so you might see different results.
 
 == What is next?
-This post described the details of using Open Liberty InstantOn beta to produce an application container image with InstantOn startup times. This support currently only allows for Open Liberty features that are included as part of Liberty features webProfile-8.0, webProfile-9.1, microProfile-4.1 and microProfile-5.0. We hope to expand that to include future versions of webProfile and microProfile as well as expand support to the Jakarta full profile features (e.g. jakarta-8.0, jakarta-9.1, jakarta-10.0).
+This post described the details of using Open Liberty InstantOn beta to produce an application container image with InstantOn startup times. This support currently allows for only Open Liberty features that are included as part of the Liberty webProfile-8.0, webProfile-9.1, microProfile-4.1 and microProfile-5.0 umbrella features. We hope to expand that to include future versions of webProfile and microProfile, as well as to expand support to the Jakarta full profile features (e.g. jakarta-8.0, jakarta-9.1, jakarta-10.0).
 
-With InstantOn, you can build very fast startup application containers that can be deployed with scale to zero as an option. We look forward to a future blog post that describes how to deploy Open Liberty InstantOn in cloud environments such as Red Hat OpenShift Container Platform (OCP) and Kubernetes (k8s) with technologies, such as Knative, that can auto-scale applications to zero.
+With InstantOn, you can build very fast startup application containers that can be deployed with scale-to-zero as an option. We look forward to a future blog post that describes how to deploy Open Liberty InstantOn in cloud environments such as Red Hat OpenShift Container Platform (OCP) and Kubernetes (k8s) with technologies that can auto-scale applications to zero, such as Knative.
 
 == System calls file
 [#sys-calls-json]
