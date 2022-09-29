@@ -24,7 +24,8 @@ Do you want cloud-native Java applications that can start up in milliseconds, wi
 
 In serverless environments, application startup times are important. InstantOn application instances can scale to zero when the application is not in use. Scaling to zero can help reduce the overall cloud costs for deployed applications by reducing the overall number of application instances when there are no ongoing requests. When activity picks up for the application, new instances can start up quickly, without introducing high latency for the user.
 
-To enable InstantOn, Open Liberty uses new features of the link:https://www.eclipse.org/openj9/[OpenJ9] JVM and a Linux technology called Checkpoint and Restore link:https://criu.org/[CRIU] to take a checkpoint of the application process as it starts. This checkpoint is a snapshot of the running application process that can be persisted and then quickly restored to bring the application process back into the state it was in when the checkpoint was taken. This process enables the Liberty instance, along with any configured applications, to be restored multiple times into distinct instances of your application. 
+== How Open Liberty enables InstantOn startup
+To enable InstantOn, Open Liberty uses new features of the link:https://www.eclipse.org/openj9/[OpenJ9] JVM and a Linux technology called Checkpoint/Restore In Userspace link:https://criu.org/[CRIU] to take a checkpoint of the application process as it starts. This checkpoint is a snapshot of the running application process that can be persisted and then quickly restored to bring the application process back into the state it was in when the checkpoint was taken. This process enables the Liberty instance, along with any configured applications, to be restored multiple times into distinct instances of your application. 
 
 To see just how fast InstantOn startup is, skip to the "<<benchmark, How fast is it?>>" section. For more details on the advantages of this approach, see the link:https://blog.openj9.org/2022/09/26/fast-jvm-startup-with-openj9-criu-support/[Fast JVM startup with OpenJ9 CRIU Support] blog post and this earlier link:/blog/2020/02/12/faster-startup-Java-applications-criu.html[Open Liberty blog post] where we first discussed the potential of CRIU for faster startup of Java applications.
 
@@ -72,9 +73,9 @@ The Liberty InstantOn beta image contains the prerequisites for building an appl
 3. <<checkpoint-app, Checkpoint an application in-container>>
 4. <<checkpoint-image, Create the application checkpoint image>>
 
-==== Prerequisites to checkpoint and restore a containerized application
+==== Prerequisites to checkpoint/restore a containerized application
 
-To build and run container images that use `criu`, the host Operating System needs a few prerequisites installed. All our testing was done on RHEL 8.6 and RHEL 9.0. Other Linux distributions and versions might be possible if they have the necessary prerequisites. The following conditions are required:
+Currently, the beta of Open Liberty InstantOn only supports running on x86-64/amd64 architectures. To build and run container images that use `criu`, the host Operating System needs a few prerequisites installed. All our testing was done on RHEL 8.6 and RHEL 9.0. Other Linux distributions and versions might be possible if they have the necessary prerequisites. The following conditions are required:
 
 * The kernel must support the Linux link:https://man7.org/linux/man-pages/man7/capabilities.7.html[CAP_CHECKPOINT_RESTORE] capability. This capability was introduced in kernel version 5.9, but was backported to RHEL kernel versions used in RHEL 8.6.
 * The latest available version of Podman for the Linux distribution must be installed.
@@ -86,14 +87,14 @@ To build and run container images that use `criu`, the host Operating System nee
 
 For the link:/guides/getting-started.html[Getting started with Open Liberty] example, the first step is to create a `Dockerfile` that provides the instructions to create a containerized version of the application. Note that `podman` also supports using the `Containerfile` format for building container images.
 
-For this example, we will use an official image from the IBM Container Registry (ICR), `icr.io/appcafe/open-liberty:beta-instanton-java17-openj9-ubi`, as the parent image. This image is tagged with the word `beta`, meaning it includes all the Liberty beta features as well as all the Liberty features from the `full` image. The image is tagged with `instanton`, meaning it includes all the prerequisites for producing a checkpoint process image, such as the necessary `criu` binary files.
+For this example, we will use an official image from the IBM Container Registry (ICR), `icr.io/appcafe/open-liberty:beta-instanton`, as the parent image. This image is tagged with the word `beta`, meaning it includes all the Liberty beta features as well as all the Liberty features from the `full` image. The image is tagged with `instanton`, meaning it includes all the prerequisites for producing a checkpoint process image, such as the necessary `criu` binary files.
 
-The `Dockerfile` for the getting-started application already exists at `finish/Dockerfile`. Edit the existing `finish/Dockerfile` and change the `FROM` instruction to use the `icr.io/appcafe/open-liberty:beta-instanton-java17-openj9-ubi` parent image. After you save the `Dockerfile`, it should look something like this:
+The `Dockerfile` for the getting-started application already exists at `finish/Dockerfile`. Edit the existing `finish/Dockerfile` and change the `FROM` instruction to use the `icr.io/appcafe/open-liberty:beta-instanton` parent image. After you save the `Dockerfile`, it should look something like this:
 
 .Dockerfile
 [source]
 ----
-FROM icr.io/appcafe/open-liberty:beta-instanton-java17-openj9-ubi
+FROM icr.io/appcafe/open-liberty:beta-instanton
 
 ARG VERSION=1.0
 ARG REVISION=SNAPSHOT
