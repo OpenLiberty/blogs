@@ -1,0 +1,296 @@
+---
+layout: post
+title: "MicroProfile applications running as a serverless function via CloudEvent in IBM Cloud Code Engine"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/abutch3r
+author_github: https://github.com/abutch3r
+seo-title: MicroProfile applications running as a serverless function via CloudEvent in IBM Cloud Code Engine - OpenLiberty.io
+seo-description: Running MicroProfile applications in the IBM Cloud Code Engine serverless environments using CloudEvents
+blog_description: "Running MicroProfile applications in the IBM Cloud Code Engine serverless environments using CloudEvents"
+---
+= MicroProfile applications running as a serverless function via CloudEvent in IBM Cloud Code Engine
+Emily Jiang <https://github.com/Emily-Jiang>
+Alex Butcher <https://github.com/abutch3r
+:imagesdir: /
+:url-prefix:
+:url-about: /
+
+Serverless is certainly a hot topic in 2022. MicroProfile has been adopted widely by cloud native applications. An often question being asked is:
+
+Can MicroProfile Applications run as a serverless?
+
+This blog explains the basic concept of Serverless, CloudEvent and IBM Cloud Code Engine and then demonstrate how to get MicroProfile running on Open Liberty running as a serverless function in IBM Cloud Code Engine via CloudEvent.
+
+Let's first explain what is Serverless?
+
+== Serverless
+Serverless is a short name for Serverless Computing, which is an execution model in which the cloud provider allocates resources on demand. Serverless enables developers to concentrate on their own applications without the need of managing servers. It does not mean there is no server running in the background. On a contrary, normally Serverless architecture contains servers.
+
+Serverless normally executes code in the form of a function, so Serverless sometimes referred to “Functions as a ServICCE” (FaaS). There are a few FaaS from major cloud providers:
+
+*	IBM Cloud Code Engine: IBM Cloud Function
+*	AWS: AWS Lambda
+*	Microsoft Azure: Azure Functions
+*	Google Cloud: Google Cloud Functions
+
+Serverless is a model. https://knative.dev/docs/concepts/[Knative] provides a platform-agnostic solution for running serverless deployment. CloudEvent is also a common event model to be used in Serverless architecture. This blog will focus on CloudEvent instead.
+
+== CloudEvents
+https://cloudevents.io/[CloudEvents] is a specification of describing event data in a common and language agnostic way. CloudEvents is to simplify event declaration and delivery across the servICCEs and platforms. This specification is under Cloud Native Computing Foundation (CNCF). CloudEvents are supported by many Serverless frameworks including IBM Cloud Code Engine.
+
+== IBM Cloud Code Engine
+https://www.ibm.com/cloud/code-engine[IBM Cloud Code Engine](ICCE) is a fully managed, serverless platform designed to run container images, batch jobs, or source code. Code Engine allows you to build event driven workloads that react to CloudEvents. Code Engine is truly serverless. It automatically scales your workloads up and down, and even down to zero when there are no requests. You only pay for the resources you consume. The common cloud native applications normal use MicroProfile specifications for configuring, securing, and observing applications.
+
+== MicroProfile Applications
+MicroProfile Applications are popular cloud native applications. They are designed for containers and clouds. Since we are entering into Serverless era, it will be very important to get MicroProfile Applications running in a serverless environment. Luckily with CloudEvent, it is very straightforward to get these kinds of applications running as functions in an environment that supports CloudEvents such as IBM Cloud Code Engine. In the next section, we will demonstrate how to get MicroProfile application deployed to Open Liberty running as a function in IBM Cloud Code Engine via CloudEvent.
+
+== MicroProfile applications running as a serverless in Code Engine
+RESTful MicroProfile Applications can run seamlessly as a serverless in Code Engine via CloudEvent. This section will explain in a step-by-step manner.
+
+=== Pre-requisites
+Before you start you will need the following
+
+* IBM Cloud Account
+* Docker
+* Docker Registry that is externally accessible which can host your images (IBM Cloud Container Registry is available as part of your cloud account)
+
+=== Creating your MicroProfile Application
+If you don't have a suitable RESTful application to host as a set of functions you can use https://openliberty.io/guides/getting-started.html[OpenLiberty and Microprofile Getting Started] to get a simple application well suited to a Serverless environment such as IBM Cloud Code Engine
+
+It is recommended that if using the Getting Started code and you have experience with OpenLiberty and Microprofile that you use the `finish` folder as your starting point and go to the next step. If you do not, follow the guide up to the Running the application in a Docker container step.
+
+The step that needs to be completed before progressing is https://openliberty.io/guides/getting-started.html#running-the-application-in-a-docker-container[Running the application in a Docker Container].
+
+At this step it is recommended that your test the application at this stage to ensure that it is running and accessible.
+
+To run your container locally on its `http` port:
+```
+docker run -p 9080:9080 openliberty-getting-started:1.0-SNAPSHOT
+```
+
+To invoke the application you can either use your browser, curl or an API testing tool. For example you can use the following curl command:
+```
+curl http://localhost:9080/dev/system/properties
+```
+This invokes the `getProperties()` method in the SystemResource class
+
+=== Deploying your application to a container registry ready for IBM Cloud Code Engine
+Having sucessfully built and tested your image local, it now needs to be put somewhere that IBM Cloud Code Engine can get to it.
+
+ICCE supports two primary methods to get your code into a runnable format
+
+* https://cloud.ibm.com/docs/codeengine?topic=codeengine-app-source-code[From source code respository] e.g. Github
+* From a externally accessible Docker Registry:
+** https://cloud.ibm.com/docs/codeengine?topic=codeengine-deploy-app[Public Registry] e.g. DockerHub
+** https://cloud.ibm.com/docs/codeengine?topic=codeengine-deploy-app-crimage[IBM Cloud Container Registry] - available as part of your IBM Cloud account
+** https://cloud.ibm.com/docs/codeengine?topic=codeengine-deploy-app-private[Private Registry]
+
+Given to follow this blog, you will have an IBM Cloud Account, IBM Cloud Container Registry (ICCR) provides the quickest route to getting your image up and running.
+
+=== Creating your IBM Cloud Code Engine Application
+With your image uploaded, you now need to create and configure you IBM Cloud Code Engine Application to make your function available.
+
+If you used ICCR follow these https://cloud.ibm.com/docs/codeengine?topic=codeengine-deploy-app-crimage[steps to create your application using ICCR]. If your used one of the other types of registry follow the matching Application creating instructions.
+
+When creating your application there are some considerations to make:
+
+* Image reference, while the name of your image will stay the same, you will be updating it later so you should consider whether to use the image hash that is has within the registry or if you want use the tag you uploaded with, just be aware that an update to the image may not be reflected when a new image with is pushed with the old tag.
+* Resource allocation. As part of the application definition, you can tell ICCE how much CPU and Memory to allocate to any running instances. While the application is small, it is still a Java application that needs a period of startup before it can start serving requests. The Getting Started image will eventually start on the minimum values, but giving it slightly more will significantly improve startup and response time.
+
+Having created your application ensure that the application is not showing any errors such as `Missing Pull credentials` indicating that the image cannot be pulled to run. If you have any of these errors follow the steps in the ICCE documentation to resolve. Some errors may only occur when the application is invoked for the first time
+
+=== Invoking your function
+Having created the application, you can now invoke it within IBM Cloud Code Engine.
+
+As part of creating your app you will have been able to obtain the URL from the test application or the CLI. if you did not obtain it via these means you can follow https://cloud.ibm.com/docs/codeengine?topic=codeengine-access-servICCE[accessing your app].
+
+If you make a request to `https://{ICCE_Application_URL}/` you should see the `Welcome to Open Liberty` page
+
+To call the function we use the path used to validate the docker image locally
+```
+curl https://${ICCE_Application_URL}/dev/system/properties
+```
+
+After a short time you should see a response with a JSON payload containing all the system properties.
+
+Note: All ICCE connections are HTTPS. so while we used `http` locally, our image is configured to support HTTPS all the way.
+
+Congratulations you have now called your function on IBM Cloud Code Engine.
+
+While you are making the requests if you have the IBM Cloud Code Engine UI open on your applications Overview tab you will be able to see the active instances. you will need to be on the page when you start making the requests it creating the instance and then scaling down to zero when it stops receiving work
+
+image:/img/blog/ibm-code-engine-active-instances.png[IBM Cloud Code Engine Active Instances,width=70%,align="center"]
+
+=== Updating the application to use CloudEvents
+One key aspect of IBM Cloud Code Engine is how it receives events from sources such as https://cloud.ibm.com/docs/codeengine?topic=codeengine-working-kafkaevent-producer#setup-kafka-receiverapp[Kafka] or https://cloud.ibm.com/docs/codeengine?topic=codeengine-eventing-cosevent-producer#obstorage_ev_app[Object Storage]. These events are sent to a subscribed application as HTTP POST requests containing a CloudEvent. As such a RESTful application can receive these events without the complexities of including an additional libraries and configuration to receive such events.
+
+To include the CloudEvents Java RESTful library within your application
+
+Add the following https://openliberty.io/guides/maven-intro.html[Maven] dependency to your `pom.xml`
+```
+<dependency>
+    <groupId>io.cloudevents</groupId>
+    <artifactId>cloudevents-http-restful-ws-jakarta</artifactId>
+    <version>2.5.0</version>
+</dependency>
+```
+
+Or if you use https://openliberty.io/guides/gradle-intro.html[Gradle]:
+```
+dependencies {
+	implementation group: 'io.cloudevents', name: 'cloudevents-http-restful-ws', version: '2.5.0'}
+
+```
+
+There are two restful-ws pakcages produced under CloudEvents
+
+* `restful-ws` supports Jakarta EE 8 and the `javax.*` namespace
+* `restful-ws-jakarta` supporting Jakarta EE 9+ and the `jakarta.*` namespace*
+
+*Currently there is no 2.5.0 release available, as we are awaiting its release. It will be the first release of `restful-ws-jakarta` package. If you want to use the new package prior to its release. You can build the package locally and store in a suitable Maven repository for later use. If you build from source, the version will need to be updated to `2.5.0-SNAPSHOT`. THe source can be found at https://github.com/cloudevents/sdk-java/tree/master/http/restful-ws-jakarta.
+
+When run within the context of Open Liberty, the `CloudEventsProvider class is automatically mapped configured for marshalling and unmarshalling of CloudEvents.
+
+==== Returning a CloudEvent
+Having added the necessary library, how do we firstly return a CloudEvent.
+
+If the Getting Started guide was used, the SystemResource class is a good candidate to convert the response Type from `Responce` to `CloudEvent`
+
+For the Method Declaration replace `Response` with `CloudEvent`
+```
+public CloudEvent getProperties() {
+```
+
+Having changed the output type we now need to construct a CloudEvent to return. However we need to do some work on the system properties to be able to include them as the data within the event.
+
+CloudEvents requires the data to be in a binary format when it is provided during its building process as it itself cannot do the conversion from Object to byte[]. As such we can take the properties from `System.getProperties()` and make them into a JSON string with use of Jsonb.
+```
+/* java.util.properties does not have a direct way to obtain a byte[] so store in an intermediary Map first*/
+    Map properties = System.getProperties();
+    Jsonb jsonb = JsonbBuilder.create();
+/* convert properties map into a JSON string which can then be converted into a byte[]*/
+    String jsonString = jsonb.toJson(properties);
+
+```
+
+With our Data in String format, we can now get the byte[] representation of the data.
+
+The `CloudEventBuilder` class provides the necessary components to build our CloudEvent and for this, it is recommended you use `v1()` as that is the most recent specification version.
+```
+    return CloudEventBuilder.v1()
+        .withData(jsonString.getBytes())
+        .withDataContentType("application/json")
+        .withId("properties")
+        .withType("java.properties")
+        .withSource(URI.create("http://system.poperties"))
+        .build();
+```
+Aside from `withData()`, the reset of the methods set the values that will be returned as headers in the response.
+Once all required properties are set you can build the CloudEvent Object.
+
+If you are missing any required properties, when your application attempts to build the CloudEvent an exception will be thrown informing of a missing property. To see which properties are required you can review the https://github.com/cloudevents/spec/blob/v1.0/spec.md[specification]
+
+As CloudEvents can be from a wide variety of sources can that differ even within a single provider the majority of fields are fairly free-form.
+
+==== Receiving a CloudEvent
+Having returned a CloudEvent, how can one be handled within the application.
+
+For this we are going to enhance the `SystemResource` class to add a query method where we can send a POST request where the body contains the system properties that we want returned.
+
+The body we are going to send will be a JSON array with each property we want as an a member of the array
+```
+["java.vendor.url","awt.toolkit"]
+```
+
+In the class add the following Method declaration.
+```
+    @POST
+    @Produces(MediaType.APPLICATION_JSON)
+    @Timed(name = "queryPropertiesTime",
+            description = "Time needed to query the JVM system properties")
+    @Counted(absolute = true, description
+            = "Number of times the JVM system properties are queried")
+    public CloudEvent queryProperties(CloudEvent query){
+
+
+}
+```
+In this case we will be returning a CloudEvent, but you can return any type that you want that confirms the request was received such as `Response.ok().build();`
+
+Inside the method, we need to perform some similar actions as we did within `getProperties()`, but also handle the CloudEvent input.
+
+As some initial structure add this block to the top of the method
+```
+Map properties = System.getProperties();
+HashMap<String,String> props = new HashMap<>((Map<String,String>)properties);
+HashMap<String,String> qProps = new HashMap<String,String>();
+Jsonb jsonb = JsonbBuilder.create();
+```
+This gives us the Map of the properties, but in a form that is more useful later as we need to do more processing then we did within `getProperties()`
+
+To retrieve the data from the CloudEvent we use `.withData();` to extra and Object of type CloudEventData, the data portion is in binary format, so needs to be converted to make it usable.
+```
+/* Pull data from the data portion of the CloudEvent - this is in binary format so convert it into a standard String*/
+CloudEventData data = query.getData();
+String jsonString = new String(data.toBytes(), StandardCharsets.UTF_8);
+```
+The conversion to a String is the quickest way if you know the input will be in format of JSON, you can check what the sender claims it has sent you can validate via inspect the Data Content Type from `getDataContentType()`
+
+With the data now in a more usable format we can start to process it and make use of its contents.
+
+As we have a JSON array, we can use jsonb to convert the json to an ArrayList of the keys requested from the properties HashMap.
+```
+/* Take the Json Array data and use that to pull out the request properties */
+ArrayList<String> tProps = jsonb.fromJson(jsonString, ArrayList.class);
+for(String key: tProps){
+    qProps.put(key, props.get(key));
+}
+```
+We use the other hashmap created at the start to store the properties we queried for.
+
+Having built our map of queried properties, it can be returned to the user in the same way we returend
+```
+return CloudEventBuilder.v1()
+    .withData(jsonb.toJson(qProps).getBytes())
+    .withDataContentType("application/json")
+    .withId("properties")
+    .withType("java.properties")
+    .withSource(URI.create("http://system.poperties"))
+    .build();
+```
+
+With that the new method is ready to be tested.
+
+To invoke the new method, we make a POST request against `/dev/system/properties` with the HTTP request being a CloudEvent. This can be done locally, or against a rebuild Docker image.
+
+To invoke this method use the following curl command:
+```
+curl -X POST http://${url}/dev/system/properties \
+-H "Ce-Specversion: 1.0" \
+-H "Ce-Type: properties" \
+-H "Ce-Source: io.cloudevents.examples/properties" \
+-H "Ce-Id: 536808d3-88be-4077-9d7a-a3f162705f78" \
+-H "Content-Type: application/json" \
+-H "Ce-Subject: resources" \
+-d "[\"java.vendor.url\",\"awt.toolkit\"]"
+```
+
+In the same way when we returned a CloudEvent, when we make the request, we need to provide the required set of headers so that the application can correctly convert the request into a CloudEvent.
+
+=== Updating your IBM Cloud Code Engine application
+With the application now capable of returning and receiving CloudEvents we can upade our application in ICCE
+To update your application
+
+* Rebuild your Liberty application with the CloudEvent changes
+* Rebuild your docker container and publish to ICCR either updating the version or leave as is if you are using the image hash
+* https://cloud.ibm.com/docs/codeengine?topic=codeengine-update-app#update-app-crimage-console[Update your ICCE application] to use the new version
+
+With your application updated you can validate your changes in ICCE by invoking using the previous curl commands.
+
+== Additional Resources
+
+* https://cloud.ibm.com/docs/codeengine
+* https://cloudevents.io
+* https://github.com/cloudevents/spec/blob/v1.0/spec.md
+* https://github.com/cloudevents/sdk-java
