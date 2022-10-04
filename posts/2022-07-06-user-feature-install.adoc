@@ -1,0 +1,376 @@
+---
+layout: post
+title: "Build and install a Liberty user feature by using Maven plug-ins"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/jjiwooLim
+author_github: https://github.com/jjiwooLim
+seo-title: Build and install a Open Liberty user feature by using Maven plug-ins.
+seo-description: You can extend the capability of Open Liberty by writing your own features and installing them onto the runtime.
+blog_description: "You can extend the capability of Open Liberty by writing your own features and installing them onto the runtime."
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+---
+= Build and install an Open Liberty user feature by using Maven plug-ins
+Jiwoo Lim <https://github.com/jjiwooLim>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+:source-highlighter: highlight.js
+
+You can extend the capability of Open Liberty by writing your own features, known as _user features_, and installing them onto the Open Liberty runtime. For example, you can develop a user feature to configure a custom authentication provider or incorporate custom functions that aren't shipped with Open Liberty.
+
+== What is an Open Liberty user feature?
+An Open Liberty user feature is a customized Open Liberty feature that consists of a definition file, or feature manifest, and a collection of link:https://www.ibm.com/docs/en/wasdtfe?topic=overview-osgi-bundles[OSGi bundles]. The OSGi bundles provide classes and services that correspond to providing a particular capability in the Open Liberty runtime environment.
+
+To develop the Open Liberty user feature, you need to create your own feature definition file and add your OSGi bundle(s). In this post, we’ll walk through the use of several Maven plug-ins to build and install a custom Open Liberty feature.
+
+== Creating an Open Liberty user feature
+
+In this post, we will use the Eclipse IDE with an Open Liberty link:https://start.openliberty.io[starter application] to create a Maven project for the user feature.
+
+We will walk through the following steps of developing a user feature:
+
+- Create an OSGi bundle containing your Java classes by using the link:https://felix.apache.org/documentation/subprojects/apache-felix-maven-bundle-plugin-bnd.html#_using_the_plugin[Apache Felix Maven Bundle Plugin (BND)].
+- Package your OSGi bundle to an Enterprise Subsystem Archive (ESA) file with the link:https://aries.apache.org/documentation/modules/esamavenpluginproject.html[ESA Maven Plugin]. ESA is the required file format to install the user feature to an Open Liberty runtime environment.
+- Create a Bill of Materials (BOM) for your ESA file that will be consumed by the Liberty Maven Plugin when you prepare and install the Open Liberty user feature.
+- Install your Open Liberty user feature on to the Open Liberty runtime by using the link:https://github.com/OpenLiberty/ci.maven[Liberty Maven Plugin].
+
+'''
+=== Developing an OSGi bundle with simple activation
+
+The OSGi bundle is the unit of deployment for an application that has an independent lifecycle. You can create the OSGi bundle with any of your java classes, but in this example we will create a Java class that implements the `BundleActivator` interface to control the lifecycle of the OSGi bundle. When you start and stop the Open Liberty runtime, the start and stop methods of the `BundleActivator` interface are called.
+
+[start=1]
+. Create a Maven project to build the OSGi bundle:
++
+[source, txt]
+----
+Group Id : test.user.test.osgi
+Artifact Id : SimpleActivator
+----
+
+. Add the `org.osgi.core` dependency to import `org.osgi.framework` package:
++
+[source, xml]
+----
+<dependency>
+    <groupId>org.osgi</groupId>
+    <artifactId>org.osgi.core</artifactId>
+    <version>6.0.0</version>
+</dependency>
+----
+
+. Create an implementation for the OSGi `BundleActivator` class in the project:
++
+[source, java]
+----
+package com.example.bundle;
+
+import org.osgi.framework.BundleActivator;
+import org.osgi.framework.BundleContext;
+
+public class Activator implements BundleActivator {
+	public void start(BundleContext context) throws Exception {
+		System.out.println("Sample bundle starting");
+		// Insert bundle activation logic here
+	}
+
+	public void stop(BundleContext context) throws Exception {
+		System.out.println("Sample bundle stopping");
+		// Insert bundle deactivation logic here
+	}
+}
+----
+
+. Build the bundle:
++
+Build the OSGi bundle using the Apache Felix Maven Bundle Plugin (BND). Explicitly specify `packaging` as `bundle` in the `pom.xml` file.
++
+[source, xml]
+----
+<packaging>bundle</packaging>
+----
++
+We also need to specify the configuration. The `Bundle-SymbolicName` is the only required header but you might need other OSGi headers, depending on your bundle implementation. To learn more about OSGi headers, check link:https://www.ibm.com/docs/en/SSHR6W/com.ibm.websphere.wdt.doc/topics/cbundles.html#osgibundlemanifestfile[OSGi bundle manifest file].
++
+In the previous step, we created the Java class that implements the OSGi `BundleActivator` class. Now, we need to identify the bundle activator class to the OSGi framework by adding the `Bundle-Activator` header. Other headers are optional, but including the `Bundle-Name` and `Bundle-version` headers is a good practice.
++
+[source, xml]
+----
+<plugin>
+    <groupId>org.apache.felix</groupId>
+    <artifactId>maven-bundle-plugin</artifactId>
+    <version>3.3.0</version>
+    <extensions>true</extensions>
+    <configuration>
+        <instructions>
+            <Bundle-SymbolicName>
+              com.example.bundle.Activator
+            </Bundle-SymbolicName>
+            <Bundle-Name>SimpleActivator</Bundle-Name>
+            <Bundle-Version>1.0.0</Bundle-Version>
+            <Bundle-Activator>com.example.bundle.Activator</Bundle-Activator>
+        </instructions>
+    </configuration>
+</plugin>
+----
++
+Putting everything together, here is the entire `pom.xml` file:
++
+[source, xml]
+.pom.xml
+----
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+<modelVersion>4.0.0</modelVersion>
+<groupId>test.user.test.osgi</groupId>
+<artifactId>SimpleActivator</artifactId>
+<version>0.0.1-SNAPSHOT</version>
+<packaging>bundle</packaging>
+
+	<dependencies>
+		<dependency>
+	    <groupId>org.osgi</groupId>
+	    <artifactId>org.osgi.core</artifactId>
+	    <version>6.0.0</version>
+	    <scope>provided</scope>
+		</dependency>
+	</dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.8.1</version>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.felix</groupId>
+                <artifactId>maven-bundle-plugin</artifactId>
+                <version>3.3.0</version>
+                <extensions>true</extensions>
+                <configuration>
+                    <instructions>
+                        <Bundle-SymbolicName>
+                          com.example.bundle.Activator
+                        </Bundle-SymbolicName>
+                        <Bundle-Name>SimpleActivator</Bundle-Name>
+                        <Bundle-Version>1.0.0</Bundle-Version>
+                        <Bundle-Activator>com.example.bundle.Activator</Bundle-Activator>
+                    </instructions>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+----
+Run `mvn clean install` to build the bundle. Inside the bundle JAR file, you will find the MANIFEST.MF file with the metadata of the bundle.
++
+.MANIFEST.MF
+[source,txt]
+----
+Manifest-Version: 1.0
+Bnd-LastModified: 1644446481175
+Build-Jdk: 11.0.10
+Built-By: jiwoolim
+Bundle-Activator: com.example.bundle.Activator
+Bundle-ManifestVersion: 2
+Bundle-Name: SimpleActivator
+Bundle-SymbolicName: com.example.bundle.Activator
+Bundle-Version: 1.0.0
+Created-By: Apache Maven Bundle Plugin
+Export-Package: com.example.bundle;uses:="org.osgi.framework";version
+ ="1.0.0"
+Import-Package: org.osgi.framework;version="[1.8,2)"
+Require-Capability: osgi.ee;filter:="(&(osgi.ee=JavaSE)(version=1.6))"
+Tool: Bnd-3.3.0.201609221906
+----
+
+'''
+=== Building an Enterprise Subsystem Archive
+The Enterprise Subsystem Archive (ESA) is an archive file (i.e. zip) containing the SUBSYSTEM.MF manifest file. The contents of this manifest file provide information on how to install, resolve, and start the bundle.
+
+We will use the link:https://aries.apache.org/documentation/modules/esamavenpluginproject.html[esa-maven-plugin] to package our bundle and to generate the Open Liberty feature manifest file (SUBSYSTEM.MF). Create a new Maven project, set the `packaging` type to *esa*, add the OSGi bundle dependency from earlier, and add appropriate headers for the manifest file.
+
+The SUBSYTEM.MF file must include the following headers:
+
+- *Subsystem-SymbolicName* : Specifies the identity and visibility of the feature
+- *Subsystem-Content* : Comma-separated list of bundles and subsystems that are required to run this feature
+- *IBM-Feature-Version* : Identifies which version of feature support is required by the runtime environment; Must be set to 2
+- *Subsystem-Type* : All Open Liberty features are currently of the same subsystem type `osgi.subsystem.feature`
+
+For details about the format of a feature manifest file, see link:https://www.ibm.com/docs/en/was-liberty/base?topic=manually-liberty-feature-manifest-files[Liberty feature manifest files].
+
+.pom.xml
+[source, xml]
+----
+<project>
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>test.user.test.osgi</groupId>
+  <artifactId>SimpleActivatorESA-</artifactId>
+  <version>1.0.0-SNAPSHOT</version>
+
+  <packaging>esa</packaging> <!-- set packaging type to esa -->
+
+  <dependencies>
+    <!-- Add OSGi bundle -->
+    <dependency>
+		<groupId>test.user.test.osgi</groupId>
+    	<artifactId>SimpleActivator</artifactId>
+    	<version>0.0.1-SNAPSHOT</version>
+	</dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.aries</groupId>
+        <artifactId>esa-maven-plugin</artifactId>
+        <version>1.0.0</version>
+        <extensions>true</extensions>
+        <configuration>
+          <generateManifest>true</generateManifest>
+          <archiveContent>all</archiveContent>
+          <instructions>
+            <Subsystem-Vendor>IBM</Subsystem-Vendor>
+            <IBM-Feature-Version>2</IBM-Feature-Version>
+            <IBM-ShortName>SimpleActivator</IBM-ShortName>
+            <Subsystem-Type>osgi.subsystem.feature</Subsystem-Type>
+            <Subsystem-SymbolicName>
+                com.example.bundle.Activator;visibility:=public
+            </Subsystem-SymbolicName>
+            <Subsystem-Version>1.0.0</Subsystem-Version>
+          </instructions>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+</project>
+----
+By default, it will not generate the manifest file, so we have to set the `generateManifest` header to *true*. To install the feature on to the Open Liberty runtime, we need to set the *visibility* directive to "public". We can do so by setting the `Subsystem-SymbolicName` header to "_Bundle-SymbolicName;visibility:=public_". If the *visibility* is set to `protected|private`, the Liberty Maven Plugin can't resolve the feature. Also, the plugin automatically creates the mandatory `Subsystem-Content` header. `IBM-ShortName` is an optional header alias to `Subsystem-SymbolicName`.
+
+Run `mvn clean install` to create an ESA file. Inside the ESA file, you will find your bundle JAR and SUBSYSTEM.MF files.
+
+.SUBSYSTEM.MF
+[source, txt]
+----
+Subsystem-ManifestVersion: 1
+Subsystem-SymbolicName: com.example.bundle.Activator;visibility:=public
+Subsystem-Version: 1.0.0
+Subsystem-Name: SimpleActivatorESA
+Subsystem-Content: com.example.bundle.Activator;version="[1.0.0,1.0.0]"
+IBM-Feature-Version: 2
+IBM-ShortName: SimpleActivator
+Subsystem-Type: osgi.subsystem.feature
+Subsystem-Vendor: IBM
+----
+'''
+=== Creating Bill of Materials (BOM)
+Create a Bill of Materials (BOM) for the user feature ESA file. The BOM is a pom file that manages the dependencies of the project. The Liberty Maven Plugin `prepare-feature` and `install-feature` goals require a BOM file to install an Open Liberty user feature onto the Open Liberty runtime.
+[source, xml]
+.pom.xml
+----
+<project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>test.user.test.osgi</groupId>
+  <artifactId>features-bom</artifactId>
+  <version>0.0.1-SNAPSHOT</version>
+  <packaging>pom</packaging>
+  <name>user features bill of materials</name>
+  <description>user features bill of materials</description>
+  <url>https://openliberty.io/</url>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>test.user.test.osgi</groupId>
+        <artifactId>SimpleActivatorESA-</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+        <scope>runtime</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+</project>
+----
+Run `mvn clean install` to create `features-bom.pom` BOM file.
+
+'''
+=== Installing an Open Liberty user feature by using the Liberty Maven Plugin
+
+[start=1]
+. Create a link:https://start.openliberty.io[starter application] from Open Liberty website. Then, add the following configuration to create a server.
++
+----
+<plugin>
+   <groupId>io.openliberty.tools</groupId>
+   <artifactId>liberty-maven-plugin</artifactId>
+   <!-- Specify configuration, executions for liberty-maven-plugin -->
+   <configuration>
+      <serverName>test</serverName>
+   </configuration>
+</plugin>
+----
+
+. Run `mvn liberty:create` to create an Open Liberty instance named `test`
+
+. Specify the feature to install for the `test` server.
++
+Open the `${project.build.testOutputDirectory}/wlp/server.xml` file and add the user feature. The `usr` extension indicates that the feature will be installed to the `${project.build.testOutputDirectory}/wlp/usr` or `$WLP_USER_DIR` directory. It also tells Liberty where to find the user feature when it starts.
++
+[source, xml]
+.server.xml
+----
+<featureManager>
+  <acceptLicense>true</acceptLicense>
+  <feature>usr:SimpleActivator</feature>
+</featureManager>
+----
+
+. Import the BOM file we created earlier by adding the following to the pom.xml.
++
+[source, xml]
+----
+<dependencyManagement>
+   <dependencies>
+     <dependency>
+       <groupId>test.user.test.osgi</groupId>
+       <artifactId>features-bom</artifactId>
+       <version>0.0.1-SNAPSHOT</version>
+       <type>pom</type>
+     </dependency>
+   </dependencies>
+ </dependencyManagement>
+----
+
+. Run `mvn liberty:prepare-feature` to generate a `features.json` file. The `features.json` file is a JSON file that contains the information found within a feature's ESA manifest file. This JSON file is required to install any Open Liberty features(s) from a Maven repository.
+
+. Run `mvn liberty:install-feature liberty:start` to install the user feature and start the server. In the server `messages.log`, you will see `"Sample bundle starting"` when the server starts and `"Sample bundle stopping"` when the server stops, which is the logic we implemented in our `BundleActivator` class.
++
+[source, txt]
+.messages.log
+----
+A CWWKE0001I: The server test has been
+I CWWKE0002I: The kernel started after 0.571
+I CWWKF0007I: Feature update
+O Sample bundle starting
+A CWWKF0012I: The server installed the following features:
+I CWWKF0008I: Feature update completed in 0.091
+A CWWKF0011I: The test server is ready to run a smarter planet. The test server started in 0.663
+A CWWKE0055I: Server shutdown requested on Monday, February 14, 2022 at 6:03 p.m.. The server test is shutting
+A CWWKE1100I: Waiting for up to 30 seconds for the server to
+I CWWKE1101I: Server quiesce
+O Sample bundle stopping
+A CWWKE0036I: The server test stopped after 21 minutes, 4.4
+----
+
+You have successfully created a custom user feature for Liberty and installed it!
+
+== Learn more
+
+- To learn more about product extension and features, see link:https://www.ibm.com/docs/en/was-liberty/base?topic=overview-product-extension[Product extension]
+- To learn more about OSGi applications, see link:https://www.ibm.com/docs/en/wasdtfe?topic=developing-osgi-applications[Developing OSGi applications]
+- For more information on Liberty Maven plug-ins, see link:https://github.com/OpenLiberty/ci.maven[ci.maven]
+- To develop user features to secure Liberty, see link:https://www.ibm.com/docs/en/was-liberty/base?topic=auil-configuring-java-authentication-spi-containers-jaspic-user-feature[Configuring a Java Authentication SPI for Containers (JASPIC) User Feature]

@@ -2,7 +2,7 @@
 layout: post
 title: "Database connections with TLS"
 categories: blog
-author_picture: https://avatars3.githubusercontent.com/Kyle_Aure
+author_picture: https://avatars.githubusercontent.com/u/33664635
 author_github: https://github.com/KyleAure
 seo-title: Database connections with TLS - OpenLiberty.io
 seo-description: How to setup common database jdbc drivers (Db2, Oracle, Postgres, SQLServer) to use SSL / TLS for secure connections.
@@ -82,7 +82,7 @@ The following `server.xml` example configures three Db2 data sources, each of wh
       sslConnection="true"/>
   </dataSource>
 
-    <!-- Option 2: Trust using driver configured truststore -->
+  <!-- Option 2: Trust using driver configured truststore -->
   <dataSource jndiName="jdbc/db2-tls-native-trust" jdbcDriverRef="jdbcLib" containerAuthDataRef="dbData">
     <properties.db2.jcc
       databaseName="${DB2_DBNAME}" serverName="${DB2_HOSTNAME}" portNumber="${DB2_PORT_SECURE}"
@@ -111,9 +111,9 @@ To provide a trusted certificate, configure one of the following options:
 
 For more information, see https://www.ibm.com/docs/en/db2-for-zos/11?topic=dsdjsss-configuring-connections-under-data-server-driver-jdbc-sqlj-use-ssl[Configuring connections under the IBM Data Server Driver for JDBC and SQLJ to use SSL].
 
-=== Postgres SQL
+=== PostgreSQL
 
-The following `server.xml` example configures two Postgres SQL data sources, each of which establishes trust in a different way:
+The following `server.xml` example configures two PostgreSQL data sources, each of which establishes trust in a different way:
 [source,xml]
 ----
 <server>
@@ -142,18 +142,18 @@ The following `server.xml` example configures two Postgres SQL data sources, eac
 </server>
 ----
 
-To enable TLS connections on the Postgre SQL driver, add the `ssl="true"` attribute to the dataSource properties element.
+To enable TLS connections on the PostgreSQL driver, add the `ssl="true"` attribute to the dataSource properties element.
 
 The `sslMode` attribute is optional, but can be used to fine-tune the amount of verification done by the driver.
 By default, the `sslMode` attribute is set to `prefer`, which means the driver prefers to use encryption, but still creates a connection even if it cannot.
 The recommended setting is at least `veryify-ca`, which requires encryption, and verifies the server certificate.
 
 
-To establish trust, the Postgre SQL driver must compare the certificate that is sent by the database with a trusted certificate.
+To establish trust, the PostgreSQL driver must compare the certificate that is sent by the database with a trusted certificate.
 To provide a trusted certificate, configure one of the following options:
 
 - Option 1: Configure a `keyStore` element that contains the trusted certificate.
-  - To tell the Postgre SQL Driver to use the java SSLFactory, set `sslfactory="org.postgresql.ssl.DefaultJavaSSLFactory"`
+  - To tell the PostgreSQL Driver to use the java SSLFactory, set `sslfactory="org.postgresql.ssl.DefaultJavaSSLFactory"`
   - Option 2: Configure `sslKey` and `sslPassword` attributes on the `dataSource` `properties` element that has the trusted certificate.
 
 For more information, see https://jdbc.postgresql.org/documentation/head/connect.html[Postgre SQL JDBC Driver: Initializing the driver]
@@ -165,29 +165,37 @@ The following `server.xml` example configures two Oracle data sources, each of w
 [source,xml]
 ----
 <server>
-    <featureManager>
-      <feature>jdbc-4.2</feature>
-    </featureManager>
+  <featureManager>
+    <feature>jdbc-4.2</feature>
+  </featureManager>
 
-    <!-- General TLS connection properties -->
- 	<variable name="oracle.tls.props" value="oracle.net.ssl_version=1.2;oracle.net.ssl_server_dn_match=false;oracle.net.authentication_services=TCPS;"/>
+  <!-- General TLS connection properties -->
+  <variable name="oracle.tls.props" value="oracle.net.ssl_version=1.2;oracle.net.ssl_server_dn_match=false;oracle.net.authentication_services=TCPS;"/>
 
-    <!-- Option 1: Oracle wallet config properties -->
-    <variable name="oracle.wallet" value="oracle.net.wallet_location=security/;" />
-    <variable name="oracle.conn.props.wallet" value="${oracle.tls.props}${oracle.wallet}" />
+  <!-- Option 1: Oracle wallet using SSO Keystore -->
+  <variable name="oracle.wallet.sso" value="oracle.net.wallet_location=security/;" />
+  <variable name="oracle.conn.props.wallet.sso" value="${oracle.tls.props}${oracle.wallet.sso}" />
 
-    <dataSource jndiName="jdbc/oracle-tls-wallet" jdbcDriverRef="jdbcLib">
-    	<properties.oracle URL="${env.SSL_URL}" connectionProperties="${oracle.conn.props.wallet}"/>
-    </dataSource>
+  <dataSource jndiName="jdbc/oracleWalletSSO" jdbcDriverRef="jdbcLib">
+    <properties.oracle URL="${env.SSL_URL}" connectionProperties="${oracle.conn.props.wallet.sso}"/>
+  </dataSource>
 
-    <!-- Option 2: Oracle keystore/truststore config properties-->
-    <variable name="oracle.keystore" value="javax.net.ssl.keystore=security/keystore.p12;javax.net.ssl.trustStoreType=PCKS12;javax.net.ssl.keyStorePassword=${KEYSTORE_PASSWORD};"/>
-    <variable name="oracle.truststore" value="javax.net.ssl.trustStore=security/truststore.p12;javax.net.ssl.trustStoreType=PCKS12;javax.net.ssl.trustStorePassword=${TRUSTSTORE_PASS};"/>
-    <variable name="oracle.conn.props.store" value="${oracle.tls.props}${oracle.truststore}${oracle.keystore}" />
+  <!-- Option 2: Oracle wallet using PKCS Keystore -->
+  <variable name="oracle.wallet.p12" value="oracle.net.wallet_location=security/;oracle.net.wallet_password=${env.WALLET_PASS};" />
+  <variable name="oracle.conn.props.wallet.p12" value="${oracle.tls.props}${oracle.wallet.p12}" />
 
-    <dataSource jndiName="jdbc/oracle-tls-truststore" jdbcDriverRef="jdbcLib">
-    	<properties.oracle URL="${env.SSL_URL}" connectionProperties="${oracle.conn.props.store}" />
-    </dataSource>
+  <dataSource jndiName="jdbc/oracleWalletP12" jdbcDriverRef="jdbcLib">
+    <properties.oracle URL="${env.SSL_URL}" connectionProperties="${oracle.conn.props.wallet.p12}"/>
+  </dataSource>
+
+  <!-- Option 3: Oracle wallet using Java Keystore/Truststore config properties -->
+  <variable name="oracle.keystore" value="javax.net.ssl.keyStore=security/keystore.jks;javax.net.ssl.keyStoreType=JKS;javax.net.ssl.keyStorePassword=${KEYSTORE_PASSWORD};"/>
+  <variable name="oracle.truststore" value="javax.net.ssl.trustStore=security/truststore.jks;javax.net.ssl.trustStoreType=JKS;javax.net.ssl.trustStorePassword=${TRUSTSTORE_PASS};"/>
+  <variable name="oracle.conn.props.store" value="${oracle.tls.props}${oracle.truststore}${oracle.keystore}" />
+
+  <dataSource jndiName="jdbc/oracleWalletJKS" jdbcDriverRef="jdbcLib">
+    <properties.oracle URL="${env.SSL_URL}" connectionProperties="${oracle.conn.props.store}" />
+  </dataSource>
 
 </server>
 ----
@@ -203,12 +211,16 @@ The following Oracle properties can also be set for TLS configuration:
 - `oracle.net.authentication_services`: Setting TCPS tells the driver to expect the database to authenticate the connection to the database via the TLS handshake.  That is, if the TLS handshake succeeds, no other authentication is needed to access the database.  This property requires extra setup on the database.  Notice  that in this example, neither datasource has an `containerAuthDataRef` attribute. The container authorization is not needed because the `oracle.net.authentication_services=TCPS` property indicates that the TLS handshake is the only authorization that is required.
 
 The Oracle database has a feature called Oracle Wallets.
-When this feature is set up correctly on the database side, the Database Administrator can provide two Wallet files, `cwallet.sso` and `ewallet.p12`, to the client.
+When this feature is set up correctly on the database side, the Database Administrator can provide two Wallet files, `cwallet.sso` and `ewallet.p12`, to the client  by using the `oraclepki` tool provided with the Oracle database installation.
+The `oraclepki` tool can also be used to convert the Oracle wallet into a Java keystore/truststore if that format is preferred.
 
 To establish trust, configure one of the following options:
 
-- Option 1: To establish trust by using Oracle Wallets, point the driver to the directory that contains your wallet files: `connectionProperties="oracle.net.wallet_location=security/;"`
-- Option 2: To establish trust by using traditional keystore and truststore files, use the `javax.net.ssl.*` connection properties.
+- Option 1: To establish trust by using Oracle Wallets and the SSO keystore, point the driver to the directory that contains your `cwallet.sso` file: `connectionProperties="oracle.net.wallet_location=security/;"`
+- Option 2: To establish trust by using Oracle Wallets and the PKCS keystore, point the driver to the directory that contains your `ewallet.p12` file and provide the keystore password for that file: `oracle.net.wallet_location=security/;oracle.net.wallet_password=${env.WALLET_PASS};`
+- Option 3: To establish trust by using Oracle Wallets and Java keystore and truststore files, use the `javax.net.ssl.*` connection properties.
+
+> NOTE: the `ewallet.p12` file contains additional encrypted data that the Oracle driver needs to establish the TLS connection to the database.  As such, the default Security Providers shipped with the Java JRE will fail to read this file. If using the `ewallet.p12` keystore users will need to add the Oracle PKI driver to their JVM native liberty path, and add the `oracle.security.pki.OraclePKIProvider.OraclePKIProvider` class to position 1 of their security provides.
 
 For more information, see  https://www.oracle.com/technetwork/topics/wp-oracle-jdbc-thin-ssl-130128.pdf[SSL With Oracle JDBC Thin Driver].
 
@@ -238,7 +250,7 @@ The following `server.xml` example configures three SQLServer data sources, each
   <keyStore id="defaultKeyStore" location="security/keystore.p12" password="${KEYSTORE_PASS}" />
 
   <dataSource jndiName="jdbc/ss-tls-secure-jdk" jdbcDriverRef="jdbcLib" containerAuthDataRef="dbData">
-    <properties.postgresql
+    <properties.microsoft.sqlserver
                 databaseName="${SS_DB}" serverName="${SS_HOST}" portNumber="${SS_TLS_PORT}}"
                 encrypt="true" hostNameInCertificate="${SS_HOST}" />
   </dataSource>
