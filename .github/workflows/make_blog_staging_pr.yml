@@ -34,6 +34,10 @@ jobs:
           echo "::set-output name=draft-url::https://blogs-draft-openlibertyio.mqj6zf7jocq.us-south.codeengine.appdomain.cloud/blog/$(echo ${{ inputs.publish-date }} | tr - /)/${{ inputs.version }}.html"
           echo "::set-output name=staging-url::https://blogs-staging-openlibertyio.mqj6zf7jocq.us-south.codeengine.appdomain.cloud/blog/$(echo ${{ inputs.publish-date }} | tr - /)/${{ inputs.version }}.html"
           echo "::set-output name=pr-branch::Staging"
+
+      - name: Get list of reviewers
+        id: get-reviewers
+        run: python3 .github/workflows/get_reviewers.py ${{ inputs.version }}
       
       - name: Create PR
         id: create-pr
@@ -45,12 +49,13 @@ jobs:
           title: ${{ inputs.version }} staging
           assignees: ${{ github.actor }}
           body: "Preview at draft site: ${{ steps.gen-url.outputs.draft-url }}\nAfter this PR is merged, preview at staging site: ${{ steps.gen-url.outputs.staging-url }}"
-          reviewers: ${{ steps.gen-blog.outputs.reviewers }}
+          reviewers: ${{ steps.get-reviewers.outputs.reviewers }}
 
       - name: Update PR to staging branch
         run: gh pr edit ${{ steps.create-pr.outputs.pull-request-number }} --base staging
 
       - name: Send Slack alert
+        if: false
         run: |
           python3 .github/workflows/slack_alert.py \
           ${{ inputs.version }} ${{ inputs.publish-date }} "${{ inputs.author-name }}" ${{ inputs.github-username }} "${{ inputs.slack-notification }}" \
