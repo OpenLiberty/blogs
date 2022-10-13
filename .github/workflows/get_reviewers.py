@@ -36,6 +36,7 @@ def main():
                         reviewers.update(line.partition(REVIEWERS_COMMENT_START)[2].strip().split(","))
             break
 
+    print('::set-output name=publish-date::' + filename.partition('-' + version + '.adoc')[0])
     print('::set-output name=reviewers::' + ','.join(sorted(list(reviewers))))
                 
 if __name__ == "__main__":

@@ -28,20 +28,20 @@ jobs:
         with:
           ref: prod
 
+      - name: Get list of reviewers and publish date
+        id: get-reviewers
+        run: python3 .github/workflows/get_reviewers.py ${{ inputs.version }}
+     
       - name: Generate draft and staging URLs
         id: gen-url
         run: |
-          echo "::set-output name=draft-url::https://blogs-draft-openlibertyio.mqj6zf7jocq.us-south.codeengine.appdomain.cloud/blog/$(echo ${{ inputs.publish-date }} | tr - /)/${{ inputs.version }}.html"
-          echo "::set-output name=staging-url::https://blogs-staging-openlibertyio.mqj6zf7jocq.us-south.codeengine.appdomain.cloud/blog/$(echo ${{ inputs.publish-date }} | tr - /)/${{ inputs.version }}.html"
+          echo "::set-output name=draft-url::https://blogs-draft-openlibertyio.mqj6zf7jocq.us-south.codeengine.appdomain.cloud/blog/$(echo ${{ steps.get-reviewers.outputs.publish-date }} | tr - /)/${{ inputs.version }}.html"
+          echo "::set-output name=staging-url::https://blogs-staging-openlibertyio.mqj6zf7jocq.us-south.codeengine.appdomain.cloud/blog/$(echo ${{ steps.get-reviewers.outputs.publish-date }} | tr - /)/${{ inputs.version }}.html"
           echo "::set-output name=pr-branch::Staging"
-
-      - name: Get list of reviewers
-        id: get-reviewers
-        run: python3 .github/workflows/get_reviewers.py ${{ inputs.version }}
       
       - name: Create PR
         id: create-pr
-        run: gh pr create --base staging --head ${{ inputs.version }}-post --title "${{ inputs.version }} staging" --assignee ${{ github.actor }} --reviewer ${{ steps.get-reviewers.outputs.reviewers }} --body "Preview at draft site:&nbsp;${{ steps.gen-url.outputs.draft-url }}\nAfter this PR is merged, preview at staging site:&nbsp;${{ steps.gen-url.outputs.staging-url }}"
+        run: gh pr create --base staging --head ${{ inputs.version }}-post --title "${{ inputs.version }} staging" --assignee ${{ github.actor }} --body "Preview at draft site:&nbsp;${{ steps.gen-url.outputs.draft-url }}\nAfter this PR is merged, preview at staging site:&nbsp;${{ steps.gen-url.outputs.staging-url }}" --reviewer ${{ steps.get-reviewers.outputs.reviewers }}
       
       - name: Create PR Old
         if: false
@@ -60,6 +60,6 @@ jobs:
         if: false
         run: |
           python3 .github/workflows/slack_alert.py \
-          ${{ inputs.version }} ${{ inputs.publish-date }} "${{ inputs.author-name }}" ${{ inputs.github-username }} "${{ inputs.slack-notification }}" \
+          ${{ inputs.version }} ${{ steps.get-reviewers.outputs.publish-date }} "${{ inputs.author-name }}" ${{ inputs.github-username }} "${{ inputs.slack-notification }}" \
           ${{ secrets.SLACK_HOOK }} ${{ secrets.SLACK_HOOK_TEST }} \
           ${{ steps.create-pr.outputs.pull-request-number }} ${{ steps.gen-url.outputs.pr-branch }} ${{ steps.gen-url.outputs.staging-url }}
