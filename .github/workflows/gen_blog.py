@@ -115,7 +115,7 @@ def make_blog(issues, is_beta):
             else:
                 print('Could not find any corresponding beta issue to scan previous posts for when processing the GA issue: ' + issue["html_url"])
                             
-        title = issue["title"].replace(prefix, "")
+        title = issue["title"].replace(prefix, "").strip()
         
         # Get the issue body.  First look for tags, then for linked issues, and finally the issue itself
         body = ""
@@ -125,10 +125,17 @@ def make_blog(issues, is_beta):
         else:
             body = linked_issue['body'] if (linked_issue != None and linked_issue['body']) else issue['body']
             # find the content of blog for old template formats
-            body = body.partition("Please provide the following information the week before the GA/beta date (to allow for review and publishing):")[2]
-            body = body.partition("## What happens next?")[0] if is_beta else body.partition("If you have previously provided this information for an Open Liberty beta blog post and nothing has changed since the beta, just provide a link to the published beta blog post and we'll take the information from there.")[0]
+            if ("Please provide the following information the week before the GA/beta date (to allow for review and publishing):" in body):
+                body = body.partition("Please provide the following information the week before the GA/beta date (to allow for review and publishing):")[2]
+            elif ("Please provide the following information the week before the GA date (to allow for review and publishing):" in body):
+                body = body.partition("Please provide the following information the week before the GA date (to allow for review and publishing):")[2]
+
+            if "If you have previously provided this information for an Open Liberty beta blog post and nothing has changed since the beta, just provide a link to the published beta blog post and we'll take the information from there." in body:
+                body = body.partition("If you have previously provided this information for an Open Liberty beta blog post and nothing has changed since the beta, just provide a link to the published beta blog post and we'll take the information from there.")[0]
+            else: 
+                body = body.partition("## What happens next?")[0]
             if body == "":
-                body = "Could not locate the summary from issue"
+                body = issue['body']
 
         titles.append(f'* <<SUB_TAG_{i}, {title}>>') # TODO: get/make meaningful tags
         blogSection = BLOG_ISSUE_SECTION_START.replace(BLOG_ISSUE_URL_PLACEHOLDER, issue["html_url"]).replace(BLOG_CONTACT_PLACEHOLDER, reviewers_string)
