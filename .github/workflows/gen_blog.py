@@ -125,14 +125,9 @@ def make_blog(issues, is_beta):
         else:
             body = linked_issue['body'] if (linked_issue != None and linked_issue['body']) else issue['body']
             # find the content of blog for old template formats
-            splitted = body.split(r'Write a paragraph to summarise the update, including the following points:')
-            # There's a typo in old templates so we have to try both
-            if len(splitted) < 2:
-                splitted = body.split(r'Write a paragraph to summarises the update, including the following points:')
-
-            if len(splitted) >= 2:
-                body = splitted[1].split("## What happens next?")[0].replace('- A sentence or two that introduces the update to someone new to the general technology/concept.\r\n\r\n   - What was the problem before and how does your update make their life better? (Why should they care?)\r\n   \r\n   - Briefly explain how to make your update work. Include screenshots, diagrams, and/or code snippets, and provide a `server.xml` snippet.\r\n   \r\n   - Where can they find out more about this specific update (eg Open Liberty docs, Javadoc) and/or the wider technology?\r\n', '');
-            else:
+            body = body.partition("Please provide the following information the week before the GA/beta date (to allow for review and publishing):")[2]
+            body = body.partition("## What happens next?")[0] if is_beta else body.partition("If you have previously provided this information for an Open Liberty beta blog post and nothing has changed since the beta, just provide a link to the published beta blog post and we'll take the information from there.")[0]
+            if body == "":
                 body = "Could not locate the summary from issue"
 
         titles.append(f'* <<SUB_TAG_{i}, {title}>>') # TODO: get/make meaningful tags
