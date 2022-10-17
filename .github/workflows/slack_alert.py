@@ -9,6 +9,7 @@
 
 import requests
 import json
+import os
 from argparse import ArgumentParser
 
 message = {
@@ -88,6 +89,30 @@ if __name__ == "__main__":
 
     if "off" == args.slack_notification.lower():
         quit()
+
+    # If publish_date, author, and github_username are missing, retrieve them from draft blog
+    if args.version != "" and args.publish_date == "" and args.author == "" and args.github_username == "":
+        args.publish_date = "Not Found"
+        args.author = "Not Found"
+        args.github_username = "Not Found"
+        posts = ""
+        dir = 'posts'
+        for filename in os.listdir(dir):
+            file = os.path.join(dir, filename)
+            if filename.endswith('-' + args.version + '.adoc') and os.path.isfile(file):
+                print("Found file: " + filename)
+                args.publish_date = filename.partition('-' + args.version + '.adoc')[0]
+                print("Publish date: " + args.publish_date)
+                with open(file, 'r') as file:
+                    lines = file.readlines()
+                    for line in lines:
+                        if line.find("author_github: https://github.com/") != -1:
+                            args.github_username = line.partition("author_github: https://github.com/")[2].strip()
+                            print("GH Username: " + args.github_username)
+                        if line.endswith(" <https://github.com/" + args.github_username + ">\n"):
+                            args.author = line.partition(" <https://github.com/" + args.github_username + ">\n")[0]
+                            print("Author: " + args.author)
+                break
 
     if "beta" in args.version.lower():
         message["attachments"][0]["blocks"][0]["text"]["text"] = "Beta Release Blog Post"
