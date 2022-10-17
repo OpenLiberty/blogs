@@ -11,6 +11,7 @@ import sys
 import requests
 import json
 import re
+import os
 
 BETA_TEMPLATE_URL = 'https://raw.githubusercontent.com/OpenLiberty/blogs/prod/templates/beta-release-post.adoc'
 GA_TEMPLATE_URL = 'https://raw.githubusercontent.com/OpenLiberty/blogs/prod/templates/ga-release-post.adoc'
@@ -41,13 +42,46 @@ BETA_CONTENT_SECTION = '''[#SUB_TAG_1]
 // // // // // // // //
 ----'''
 
+BLOG_ISSUE_URL_PLACEHOLDER = "BLOG_ISSUE_URL_PLACEHOLDER"
+BLOG_CONTACT_PLACEHOLDER = "BLOG_CONTACT_PLACEHOLDER"
+BLOG_ISSUE_SECTION_START = f"// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // \n// Blog issue: {BLOG_ISSUE_URL_PLACEHOLDER}\n// Contact/Reviewer: {BLOG_CONTACT_PLACEHOLDER}\n// // // // // // // //"
+BLOG_ISSUE_SECTION_END = '// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> '
+
 people = set()
 
 def get_linked_issue(body):
     result = re.search(r'See (?:the )?Beta blog issue.+?(\d+)', body, re.IGNORECASE)
     if result:
-        return json.loads(requests.get(f'https://api.github.com/repos/OpenLiberty/open-liberty/issues/{result.group(1)}').text)['body']
+        response = json.loads(requests.get(f'https://api.github.com/repos/OpenLiberty/open-liberty/issues/{result.group(1)}').text)
+        print("Found linked beta issue: " + response["html_url"])
+        return response
     return None
+
+def find_previous_posts(issue_url):
+    # Iterate through beta posts looking for the same blog issue
+    print("Scanning beta blog posts for issue: " + issue_url)
+    posts = ""
+    dir = 'posts'
+    
+    thingToFind = BLOG_ISSUE_SECTION_START.partition("// Contact/Reviewer: ")[0].replace(BLOG_ISSUE_URL_PLACEHOLDER, issue_url)
+
+    for filename in os.listdir(dir):
+        file = os.path.join(dir, filename)
+        if filename.endswith('-beta.adoc') and os.path.isfile(file):
+            with open(file, 'r') as file:
+                post = file.read()
+                start = post.find(thingToFind)
+                if start != -1:
+                    start += len(thingToFind)
+                    end = post.find(BLOG_ISSUE_SECTION_END, start)
+                    excerpt = ""
+                    if end != -1:
+                        excerpt = post[start:end]
+                        print('Found excerpt in beta blog ' + filename)
+                    else:
+                        excerpt = f"// The issue {issue_url} was found in {file}, however, no closing tag was found.  You must manually pull in the content."
+                    posts += f'// The following excerpt for issue {issue_url} was found in {filename}.\n// ------ <Excerpt From Previous Post: Start> ------\n{excerpt}\n// ------ <Excerpt From Previous Post: End> ------ \n'
+    return posts
 
 def make_blog(issues, is_beta):
     titles = []
@@ -55,26 +89,58 @@ def make_blog(issues, is_beta):
     prefix = "BETA BLOG - " if is_beta else "GA BLOG - "
 
     for i, issue in enumerate(issues):
+        print("\nProcessing Issue: " + issue["html_url"])
         people.add(issue['user']['login'])
         people.update([assignee['login'] for assignee in issue['assignees']])
-        title = issue["title"].replace(prefix, "")
-        body = get_linked_issue(issue['body']) or issue['body']
-        closed_issue_warning = ' - WARNING: CLOSED ISSUE! VERIFY IF IT SHOULD BE INCLUDED IN BLOG!' if issue['state'] == 'closed' else ''
+        reviewers = set()
+        reviewers.add(issue['user']['login'])
+        reviewers.update([assignee['login'] for assignee in issue['assignees']])
+        reviewers_string = ','.join(reviewers)
+        print("Reviewers for " + issue["html_url"] + ": " + reviewers_string)
+        
+        closed_issue_warning = '\n// WARNING: THIS ISSUE IS CLOSED! VERIFY IF IT SHOULD BE INCLUDED IN BLOG!' if issue['state'] == 'closed' else ''
 
-        # TODO: add markers in templates so it's easier to locate and less easier to break when template gets updated
-        # find the content of blog
-        splitted = body.split(r'Write a paragraph to summarise the update, including the following points:')
-        # There's a typo in old templates so we have to try both
-        if len(splitted) < 2:
-            splitted = body.split(r'Write a paragraph to summarises the update, including the following points:')
+        previous_posts = ""
+        linked_issue = get_linked_issue(issue['body'])
+        # Try to find corresponding beta issue.  First use the new GHA tags, otherwise try and find embedded link.
+        if not is_beta:
+            beta_issue_link = issue['body'].partition("<GHA-BLOG-BETA-LINK>")[2].partition("</GHA-BLOG-BETA-LINK>")[0]
+            print("Beta issue URL from TAG: " + beta_issue_link)
+            
+            if beta_issue_link == "" and linked_issue != None:
+                beta_issue_link = linked_issue["html_url"]
 
-        if len(splitted) >= 2:
-            body = splitted[1].split("## What happens next?")[0].replace('- A sentence or two that introduces the update to someone new to the general technology/concept.\r\n\r\n   - What was the problem before and how does your update make their life better? (Why should they care?)\r\n   \r\n   - Briefly explain how to make your update work. Include screenshots, diagrams, and/or code snippets, and provide a `server.xml` snippet.\r\n   \r\n   - Where can they find out more about this specific update (eg Open Liberty docs, Javadoc) and/or the wider technology?\r\n', '');
+            if beta_issue_link != "":
+                previous_posts = find_previous_posts(beta_issue_link)
+            else:
+                print('Could not find any corresponding beta issue to scan previous posts for when processing the GA issue: ' + issue["html_url"])
+                            
+        title = issue["title"].replace(prefix, "").strip()
+        
+        # Get the issue body.  First look for tags, then for linked issues, and finally the issue itself
+        body = ""
+        # For now, just be greedy and grab everything between "<GHA-BLOG-RELATED-FEATURES>" and "</GHA-BLOG-SUMMARY>"
+        if "<GHA-BLOG-RELATED-FEATURES>" in issue['body'] and "</GHA-BLOG-SUMMARY>" in issue['body'] :
+            body = body.partition("<GHA-BLOG-RELATED-FEATURES>")[2].partition("</GHA-BLOG-SUMMARY>")[0]
         else:
-            body = "Could not locate the summary."
+            body = linked_issue['body'] if (linked_issue != None and linked_issue['body']) else issue['body']
+            # find the content of blog for old template formats
+            if ("Please provide the following information the week before the GA/beta date (to allow for review and publishing):" in body):
+                body = body.partition("Please provide the following information the week before the GA/beta date (to allow for review and publishing):")[2]
+            elif ("Please provide the following information the week before the GA date (to allow for review and publishing):" in body):
+                body = body.partition("Please provide the following information the week before the GA date (to allow for review and publishing):")[2]
+
+            if "If you have previously provided this information for an Open Liberty beta blog post and nothing has changed since the beta, just provide a link to the published beta blog post and we'll take the information from there." in body:
+                body = body.partition("If you have previously provided this information for an Open Liberty beta blog post and nothing has changed since the beta, just provide a link to the published beta blog post and we'll take the information from there.")[0]
+            else: 
+                body = body.partition("## What happens next?")[0]
+            if body == "":
+                body = issue['body']
 
         titles.append(f'* <<SUB_TAG_{i}, {title}>>') # TODO: get/make meaningful tags
-        contents.append(f'// {issue["html_url"]}{closed_issue_warning}\n[#SUB_TAG_{i}]\n== {title}\n{body}')
+        blogSection = BLOG_ISSUE_SECTION_START.replace(BLOG_ISSUE_URL_PLACEHOLDER, issue["html_url"]).replace(BLOG_CONTACT_PLACEHOLDER, reviewers_string)
+        contents.append(f'{blogSection} {closed_issue_warning}\n[#SUB_TAG_{i}]\n== {title}\n{previous_posts}{body}\n{BLOG_ISSUE_SECTION_END}\n')
+        # contents.append(f'{BLOG_ISSUE_SECTION_START} {issue["html_url"]}{closed_issue_warning}\n[#SUB_TAG_{i}]\n== {title}\n{previous_posts}{body}\n{BLOG_ISSUE_SECTION_END}\n')
 
     return '\n'.join(titles), '\n'.join(contents)
 
@@ -94,7 +160,6 @@ def main():
     BLOG_ISSUE_URL = f"https://api.github.com/repos/OpenLiberty/open-liberty/issues?labels=blog,target:{version_no_dots};state=all"
 
     issues = json.loads(requests.get(BLOG_ISSUE_URL).text)
-    # print(issues)
     toc, content = make_blog(issues, is_beta)
 
     template = requests.get(BETA_TEMPLATE_URL if is_beta else GA_TEMPLATE_URL).text;

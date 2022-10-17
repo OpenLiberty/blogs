@@ -54,8 +54,8 @@ jobs:
           echo "::set-output name=staging-url::https://blogs-staging-openlibertyio.mqj6zf7jocq.us-south.codeengine.appdomain.cloud/blog/$(echo ${{ inputs.publish-date }} | tr - /)/${{ inputs.version }}.html"
           echo "::set-output name=pr-branch::Draft"
 
-      - name: Create PR to draft branch
-        id: create-pr-draft
+      - name: Create PR
+        id: create-pr
         uses: peter-evans/create-pull-request@v4
         with:
           commit-message: ${{ inputs.version }}
@@ -64,10 +64,14 @@ jobs:
           title: ${{ inputs.version }} draft
           assignees: ${{ github.actor }}
           body: "After this PR is merged, preview at draft site: ${{ steps.gen-url.outputs.draft-url }}"
+        
+      - name: Update PR to draft branch
+        run: gh pr edit ${{ steps.create-pr.outputs.pull-request-number }} --base draft
+          
 
       - name: Send Slack alert
         run: |
           python3 .github/workflows/slack_alert.py \
           ${{ inputs.version }} ${{ inputs.publish-date }} "${{ inputs.author-name }}" ${{ inputs.github-username }} "${{ inputs.slack-notification }}" \
           ${{ secrets.SLACK_HOOK }} ${{ secrets.SLACK_HOOK_TEST }} \
-          ${{ steps.create-pr-draft.outputs.pull-request-number }} ${{ steps.gen-url.outputs.pr-branch }} ${{ steps.gen-url.outputs.draft-url }}
+          ${{ steps.create-pr.outputs.pull-request-number }} ${{ steps.gen-url.outputs.pr-branch }} ${{ steps.gen-url.outputs.draft-url }}
