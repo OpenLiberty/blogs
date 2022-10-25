@@ -107,7 +107,7 @@ NOTE: To try out preview features in Open Liberty, make sure to add `--enable-pr
 Distributed security cache support has been introduced so that multiple Liberty servers can share caches via a JCache provider. Prior to this feature, the authentication (subject) and logged out cookie caches were restricted to be local and in-memory. Multiple servers were unable to benefit from their peers' caches and each server started with a cold cache. As part of this feature, both caches can be stored in a distributed JCache provider. This can improve performance and failure recovery, reduce the load on backend user registries, reduce redundant redirects to the IDP and improve the security posture of the server.
 
 
-*Configuring a Distributed Authentication Cache*
+=== Configuring a Distributed Authentication Cache
 
 Because the creation of a subject might affect performance, Liberty provides an authentication cache to store a subject after an authentication of a user is successful. The authentication cache now can be distributed using a 3rd party JCache provider. The `jCacheLibraryRef` references the library that contains the JCache caching provider implementation.  To configure the distributed authentication cache, use the following server.xml configuration:
 
@@ -201,7 +201,7 @@ To match the behavior of the local authentication cache, set a least recently us
 * If your `JCache` provider supports it, configure a client-side cache to reduce transactions to the distributed cache. If the client-side cache supports storing the entries as deserialized objects, this can further improve performance.
 * Subjects in the distributed cache should be treated as you would treat other security-sensitive information, such as usernames and passwords. Configure your `JCache` provider to secure the data while it is in motion and at rest. This should include encryption and access control.
 
-*Configuring a Distributed Logged-Out Cookie Cache*
+=== Configuring a Distributed Logged-Out Cookie Cache
 
 The logged-out cookie cache stores `LTPA` and `JWT` cookies that have been logged-out. The logged-out cookie cache can now be distributed using a 3rd party `JCache` provider ensuring that logged out cookies are enforced across multiple servers. To configure the distributed logged-out cookie cache, use the following `server.xml` configuration:
 
@@ -241,7 +241,7 @@ A few points to consider when configuring a JCache cache for use with the logged
 * To match the behavior of the local logged-out cookie cache, configure the cache with a maximum entry count of 10000 and an entry TTL of unlimited. Note that with distributed caches, partitioning of the cache can lead to an actual capacity below the configured value. The cache capacity should be large enough that no cookies that have not expired will be evicted due to new logged out cookies being inserted into the cache.
 * If your JCache provider supports it, configure a client-side cache to reduce transactions to the distributed cache. If the client-side cache supports storing the entries as deserialized objects, this can further improve performance.
 
-*Configuring a Session Cache with the new Distributed Cache Configuration*
+=== Configuring a Session Cache with the new Distributed Cache Configuration
 
 The `sessionCache-1.0` feature has been updated to allow use of the new distributed cache configuration elements to allow common configuration across all features that use `JCache`. This eliminates the need to configure `JCache` separately for the session cache.
 
@@ -273,7 +273,7 @@ The `sessionCache-1.0` feature has been updated to allow use of the new distribu
     <httpSessionCache cacheManagerRef="CacheManager" ... />
 ----
 
-*Configuring Multiple Caches*
+=== Configuring Multiple Caches
 
 When configuring multiple distributed caches, instead of nesting the `cacheManager` configuration element within the cache element, the cache element needs to refer to the cache manager via the `cacheRef` attribute.
 
@@ -396,53 +396,43 @@ For a list of past security vulnerability fixes, reference the link:{url-prefix}
 [#bugs]
 == Notable bugs fixed in this release
 
-
 We’ve spent some time fixing bugs. The following sections describe just some of the issues resolved in this release. If you’re interested, here’s the  link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A220011+label%3A%22release+bug%22[full list of bugs fixed in 22.0.0.11].
 
-* link:https://github.com/OpenLiberty/open-liberty/issues/22721[Update nekohtml version used in openid-2.0]
+* link:https://github.com/OpenLiberty/open-liberty/issues/22688[HTTP Access logging need to log multiple X-Forwarded-For headers]
 +
-
-* link:https://github.com/OpenLiberty/open-liberty/issues/22584[com.ibm.websphere.appserver.api.kernel.service_1.1-javadoc.zip is missing in the Liberty images]
+Prior to the fix, the link:{url-prefix}/docs/latest/access-logging.html[HTTP Access logging] would only log one X-Forwarded-For header per request instead of all of them.
 +
-When using a Liberty image, the com.ibm.websphere.appserver.api.kernel.service_1.1-javadoc.zip file is not in the dev/api/ibm/javadoc directory
+This issue is now resolved and all the X-Forwarded-For headers get properly logged.
 
 * link:https://github.com/OpenLiberty/open-liberty/issues/22397[MYFACES-4450: tabindex not rendered for outputLabel]
 +
-The h:outputLabel fails to render the tabindex attribute in a JSF page. For example:
+The `h:outputLabel` fails to render the tabindex attribute in a JSF page. For example, `<h:outputLabel tabindex="2" value="test"/>` renders as `<label>test</label>` instead of `<label tabindex="2">test</label>`.
 +
-`<h:outputLabel tabindex="2" value="test"/> `
- renders
-`<label>test</label>`
+The issue has now been resolved and the correct output gets rendered.
 
 * link:https://github.com/OpenLiberty/open-liberty/issues/22361[Cannot start Jenkins 2.346.3 with Java 17 when using AD authentication]
 +
 
-When using AD authentication on Jenkins with OpenLiberty 22.0.0.9 running on Java 17 I see the following message:
+When using OpenLiberty 22.0.0.9 running on Java SE 17 the following FFDC can occur:
 +
+[source]
+----
 0000002f com.ibm.ws.logging.internal.impl.IncidentImpl                I FFDC1015I: An FFDC Incident has been created: "java.lang.IllegalAccessException: class com.ibm.ws.jndi.internal.WASInitialContextFactoryBuilder cannot access class com.sun.jndi.dns.DnsContextFactory (in module jdk.naming.dns) because module jdk.naming.dns does not export com.sun.jndi.dns to unnamed module @3ce42ee7 com.ibm.ws.jndi.internal.WASInitialContextFactoryBuilder 58" at ffdc_22.08.31_18.04.56.0.log
+----
 +
-FFDC attached:
-[ffdc_22.08.31_18.04.56.0.log](https://github.com/OpenLiberty/open-liberty/files/9468336/ffdc_22.08.31_18.04.56.0.log)
-+
-This doesn't happen with Java 11
-
-
-* link:https://github.com/OpenLiberty/open-liberty/issues/22303[On z/OS running Java 11 a FFDC with caused by AttachNotSupportedException occurs when feature localConnector-1.0  is specified.]
-+
+The issue has been resolved by exporting the `jdk.naming.dns` module.
 
 * link:https://github.com/OpenLiberty/open-liberty/issues/22227[Yoko marshals null fields incorrectly when the field is declared as a non-serializable class]
 +
+When Yoko is marshalling a Java value object with a null field that is declared as a non-serializable class, it is marshalled incorrectly.  This does not cause any problems when two Liberty processes are communicating over IIOP, but it can cause problems when interoperating with other Java processes.
++
+The objects are now marshalled correctly, resolving the issue.
 
-
-// // // // // // // //
-// In the preceding section:
-// For this section ask either Michal Broz or Tom Evans or the #openliberty-release-blog channel for Notable bug fixes in this release.
-// Present them as a list in the order as provided, linking to the issue and providing a short description of the bug and the resolution.
-// If the issue on Github is missing any information, leave a comment in the issue along the lines of:
-// "@[issue_owner(s)] please update the description of this `relesae bug` using the [bug report template](https://github.com/OpenLiberty/open-liberty/issues/new?assignees=&labels=release+bug&template=bug_report.md&title=)" 
-// Feel free to message the owner(s) directly as well, especially if no action has been taken by them.
-// For inspiration about how to write this section look at previous blogs e.g- 20.0.0.10 or 21.0.0.12 (https://openliberty.io/blog/2021/11/26/jakarta-ee-9.1.html#bugs)
-// // // // // // // //
+* link:https://github.com/OpenLiberty/open-liberty/issues/22584[com.ibm.websphere.appserver.api.kernel.service_1.1-javadoc.zip is missing in the Liberty images]
++
+When using a Liberty image, the `com.ibm.websphere.appserver.api.kernel.service_1.1-javadoc.zip` file does not exist in the `dev/api/ibm/javadoc` directory.
++
+The issue has been resolved and the javadoc zip is now correctly included in the `dev/api/ibm/javadoc` directory.
 
 
 == Get Open Liberty 22.0.0.11 now
