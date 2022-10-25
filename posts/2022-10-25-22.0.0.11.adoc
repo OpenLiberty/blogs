@@ -19,17 +19,17 @@ Broz <https://github.com/mbroz2>
 //Blank line here is necessary before starting the body of the post.
 
 
-Open Liberty 22.0.0.11 provides support for Java SE 19 and distributed security cache.  Java SE 19 includes many new exciting features and changes such as record patterns and virtual threads.  Distributed security cache support allows multiple Liberty servers to share caches via a JCache provider.  
+Open Liberty 22.0.0.11 provides support for Java SE 19 and distributed security caches.  Java SE 19 includes many new exciting features and changes such as record patterns and virtual threads.  Distributed security cache support allows multiple Liberty servers to share caches by using a JCache provider.  
 
-As part of 22.0.0.11, you can now also expose SPI interfaces as BELL services and inject properties into BELL services, which is simpler to use than writing a user feature. This release also includes an important security vulnerability (CVE) fix, as well as many notable bug fixes.
+As part of 22.0.0.11, you can now also implement SPI interfaces with BELL services and enable BELL services to receive configuration properties. These BELL feature enhancements provide a simpler alternative to writing a user feature. This release also includes an important security vulnerability (CVE) fix and many notable bug fixes.
 
 
 In link:{url-about}[Open Liberty] 22.0.0.11:
 
 * <<java19, Java SE 19 Support>>
 * <<security_caches, Distributed security caches>>
-* <<bell, Expose SPI interfaces as BELL services and inject properties into BELL services>>
-* <<CVEs, Security Vulnerability (CVE) Fixes>>
+* <<bell, Implement SPI interfaces with BELL services and enable BELL services to receive configuration properties>>
+* <<CVEs, Security vulnerability (CVE) fixes>>
 * <<bugs, Notable bug fixes>>
 
 
@@ -77,7 +77,7 @@ image::img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="cent
 
 
 [#java19]
-== Java SE 19 Support
+== Java SE 19 support
 
 Java SE 19 has been released and with it the following features:
 
@@ -89,12 +89,12 @@ Java SE 19 has been released and with it the following features:
 * link:https://openjdk.org/jeps/427[Pattern Matching for switch] (Third Preview)
 * link:https://openjdk.org/jeps/428[Structured Concurrency] (Incubator)
 
-Although Java SE 19 was not supported in 22.0.0.10 at the time of that version's release, it has been retroactively back-ported.  Therefore, Java SE 19 is officially supported with Open Liberty 22.0.0.10 and newer.  To give this a try today, link:https://adoptium.net/temurin/releases/?version=19[download Java SE 19], download and install at least the link:{url-prefix}/start/#runtime_releases[22.0.0.10] version of Open Liberty, edit your Liberty server's link:{url-prefix}/docs/latest/reference/config/server-configuration-overview.html#server-env[server.env file] to point JAVA_HOME to your Java SE 19 installation and start testing!
+Although Java SE 19 was not supported in 22.0.0.10 at the time of that version's release, it has been retroactively backported.  Therefore, Java SE 19 is officially supported with Open Liberty 22.0.0.10 and newer.  To give this a try today, link:https://adoptium.net/temurin/releases/?version=19[download Java SE 19], download and install at least the link:{url-prefix}/start/#runtime_releases[22.0.0.10] version of Open Liberty, edit your Liberty server's link:{url-prefix}/docs/latest/reference/config/server-configuration-overview.html#server-env[server.env file] to point `JAVA_HOME` to your Java SE 19 installation and start testing!
 
 For more information on Java SE 19, please visit the Java SE 19 link:https://jdk.java.net/19/release-notes[release notes page] or link:https://docs.oracle.com/en/java/javase/19/docs/api/index.html[API Javadoc page].
-For more information, refer to the link:{url-prefix}/docs/latest/java-se.html[Java SE support].
+For more information, refer to the link:{url-prefix}/docs/latest/java-se.html[Java SE support] page.
 
-NOTE: To try out preview features in Open Liberty, make sure to add `--enable-preview` to your `jvm.options` file.
+NOTE: To try out Java SE 19 preview features in Open Liberty, make sure to add `--enable-preview` to your `jvm.options` file.
 
 
 // // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
@@ -102,12 +102,12 @@ NOTE: To try out preview features in Open Liberty, make sure to add `--enable-pr
 // Contact/Reviewer: jvanhill,ReeceNana
 // // // // // // // // 
 [#security_caches]
-== Distributed Security Caches
+== Distributed security caches
 
-Distributed security cache support has been introduced so that multiple Liberty servers can share caches via a JCache provider. Prior to this feature, the authentication (subject) and logged out cookie caches were restricted to be local and in-memory. Multiple servers were unable to benefit from their peers' caches and each server started with a cold cache. As part of this feature, both caches can be stored in a distributed JCache provider. This can improve performance and failure recovery, reduce the load on backend user registries, reduce redundant redirects to the IDP and improve the security posture of the server.
+Distributed security cache support is introduced so that multiple Liberty servers can share caches by using a JCache provider. Before this release, the authentication (subject) cache and logged-out cookie cache were both restricted to be local and in-memory. Multiple servers were unable to benefit from their peers' caches and each server started with a cold cache. As part of this update, both caches can be stored in a distributed JCache provider. This update can improve performance and failure recovery, reduce the load on backend user registries, reduce redundant redirects to the IDP, and improve the security posture of the server.
 
 
-=== Configuring a Distributed Authentication Cache
+=== Configuring a distributed authentication cache
 
 Because the creation of a subject might affect performance, Liberty provides an authentication cache to store a subject after an authentication of a user is successful. The authentication cache now can be distributed using a 3rd party JCache provider. The `jCacheLibraryRef` references the library that contains the JCache caching provider implementation.  To configure the distributed authentication cache, use the following server.xml configuration:
 
@@ -141,7 +141,7 @@ Because the creation of a subject might affect performance, Liberty provides an 
     <authCache cacheRef="AuthCache" />
 ----
 
-If your Liberty environment injects custom principals or credentials into your subject, such as in a custom `LoginModule` or Trust Association Interceptor (`TAI`), they must be `Serializable` in order to store them in the distributed authentication cache. Additionally, the shared library that contains those classes must be available to the caching provider and any other configurations that need access to those classes. If the same shared library is not used for each, `ClassCastExceptions` might be encountered when working with the classes retrieved from the distributed cache. The `commonLibraryRef` is optional and can reference libraries that contain any custom classes that may be serialized and stored in the cache (define multiple libraries by separating them by a comma).
+If your Liberty environment injects custom principals or credentials into your subject, such as in a custom `LoginModule` or Trust Association Interceptor (`TAI`), they must be `Serializable` in order to store them in the distributed authentication cache. Additionally, the shared library that contains those classes must be available to the caching provider and any other configurations that need access to those classes. If the same shared library is not used for each, `ClassCastExceptions` might be encountered when working with the classes retrieved from the distributed cache. The `commonLibraryRef` is optional and can reference libraries that contain any custom classes that may be serialized and stored in the cache. You can define multiple libraries by separating them by a comma.
 
 [source, xml]
 ----
@@ -198,12 +198,13 @@ A few points to consider when configuring a JCache for use with the authenticati
 
 * The distributed authentication cache is comprised of keys and values of type `Object`.
 To match the behavior of the local authentication cache, set a least recently used eviction (`LRU`) policy with a maximum entry count of 25000 and an entry TTL of 600 seconds. Note that with distributed caches, partitioning of the cache can lead to an actual capacity below the configured value.
-* If your `JCache` provider supports it, configure a client-side cache to reduce transactions to the distributed cache. If the client-side cache supports storing the entries as deserialized objects, this can further improve performance.
-* Subjects in the distributed cache should be treated as you would treat other security-sensitive information, such as usernames and passwords. Configure your `JCache` provider to secure the data while it is in motion and at rest. This should include encryption and access control.
+* If your JCache provider supports it, configure a client-side cache to reduce transactions to the distributed cache. If the client-side cache supports storing the entries as deserialized objects, this can further improve performance.
+* Subjects in the distributed cache should be treated as you would treat other security-sensitive information, such as usernames and passwords. Configure your JCache provider to secure the data while it is in motion and at rest. These precautions include encryption and access control.
 
-=== Configuring a Distributed Logged-Out Cookie Cache
+For more information, check out link:{url-prefix}/docs/latest/distributed-caching-jcache.html[Distributed caching with JCache].
+=== Configuring a distributed logged-out cookie cache
 
-The logged-out cookie cache stores `LTPA` and `JWT` cookies that have been logged-out. The logged-out cookie cache can now be distributed using a 3rd party `JCache` provider ensuring that logged out cookies are enforced across multiple servers. To configure the distributed logged-out cookie cache, use the following `server.xml` configuration:
+The logged-out cookie cache stores `LTPA` and `JWT` cookies that have been logged-out. The logged-out cookie cache can now be distributed using a 3rd party JCache provider, which ensures that logged-out cookies are enforced across multiple servers. To configure the distributed logged-out cookie cache, use the following `server.xml` configuration:
 
 [source, xml]
 ----
@@ -241,9 +242,10 @@ A few points to consider when configuring a JCache cache for use with the logged
 * To match the behavior of the local logged-out cookie cache, configure the cache with a maximum entry count of 10000 and an entry TTL of unlimited. Note that with distributed caches, partitioning of the cache can lead to an actual capacity below the configured value. The cache capacity should be large enough that no cookies that have not expired will be evicted due to new logged out cookies being inserted into the cache.
 * If your JCache provider supports it, configure a client-side cache to reduce transactions to the distributed cache. If the client-side cache supports storing the entries as deserialized objects, this can further improve performance.
 
-=== Configuring a Session Cache with the new Distributed Cache Configuration
+For more information, check out link:{url-prefix}/docs/latest/track-loggedout-sso.html[Track logged-out SSO cookies].
+=== Configuring a distributed session cache 
 
-The `sessionCache-1.0` feature has been updated to allow use of the new distributed cache configuration elements to allow common configuration across all features that use `JCache`. This eliminates the need to configure `JCache` separately for the session cache.
+The `sessionCache-1.0` feature has been updated to allow use of the new distributed cache configuration elements to allow common configuration across all features that use JCache. This eliminates the need to configure JCache separately for the session cache.
 
 [source, xml]
 ----
@@ -273,7 +275,7 @@ The `sessionCache-1.0` feature has been updated to allow use of the new distribu
     <httpSessionCache cacheManagerRef="CacheManager" ... />
 ----
 
-=== Configuring Multiple Caches
+=== Configuring multiple caches
 
 When configuring multiple distributed caches, instead of nesting the `cacheManager` configuration element within the cache element, the cache element needs to refer to the cache manager via the `cacheRef` attribute.
 
@@ -318,14 +320,14 @@ To find out more, check out the link:https://openliberty.io/docs/latest/referenc
 
 
 [#bell]
-== Expose SPI interfaces as BELL services and inject properties into BELL services
+== Implement SPI interfaces with BELL services and enable BELL services to receive configuration properties
 The link:{url-prefix}/docs/latest/reference/feature/bells-1.0.html[Basic extensions using Liberty libraries (BELL) 1.0] feature enables shared libraries to provide implementations of Liberty API interfaces using Java link:https://docs.oracle.com/javase/9/docs/api/java/util/ServiceLoader.html[ServiceLoader] configuration files.
 
-22.0.0.11 introduces two capabilities for BELL services: SPI visibility, and properties configuration and injection. Previously these capabilities were available only to user feature extensions. User features offer more capabilities than BELL services, but come with a more complex development model. These capabilities allow extension developers greater opportunity to leverage the simplicity of BELL services.
+22.0.0.11 introduces two capabilities for BELL services: SPI visibility, and properties configuration and injection. Previously, these capabilities were available only to user feature extensions. User features offer more capabilities than BELL services, but come with a more complex development model. These capabilities allow extension developers greater opportunity to leverage the simplicity of BELL services.
 
 BELL SPI visibility makes feature SPI packages visible only to shared libraries referenced in BELL configurations. The introduction of BELL SPI visibility enables developers to provide implementations of SPI interfaces as BELL services rather than user features, which typically require more time to develop.
 
-BELL properties configuration and injection enables BELL services to receive properties configured in the server.xml file. The introduction of BELL properties allows users to exploit the benefits of the Liberty configuration and obviates the need to configure BELL services with environment variables or JVM system properties.
+BELL properties configuration and injection enables BELL services to receive properties configured in the `server.xml` file. The introduction of BELL properties allows users to exploit the benefits of the Liberty configuration and obviates the need to configure BELL services with environment variables or JVM system properties.
 
 === SPI visibility for shared libraries
 Shared libraries do not support access for SPI packages. The introduction of BELL SPI visibility enables libraries to provide implementations of Liberty SPI interfaces by making SPI packages accessible to shared libraries referenced in a `bell` configuration.
@@ -341,12 +343,12 @@ Use the new `spiVisibility` configuration attribute to indicate whether SPI pack
     <bell libraryRef="servicesLib" spiVisibility="true"/>
 </server>
 ----
-For the example above, the BELL feature loads the service implementation classes discovered in library `serviceLib`` using a specialized classloader that can see SPI packages in addition to the library binaries and API types.
+For the previous example, the BELL feature loads the service implementation classes discovered in library `serviceLib` by using a specialized classloader that can see SPI packages in addition to the library binaries and API types.
 
 === Properties configuration and injection
 The introduction of BELL properties enables service implementations to receive properties declared in the `bell` configuration. The new capability obviates the use of environment variables and JVM system properties to configure BELL services.
 
-Use the new `properties` element to configure one or more properties in a `bell` configuration. Declare each property as a `name="value"` attribute within the element. Properties are type `String` and inject into all service implementations that are enabled to receive them. The following example declares to properties, `hello` and `serverHome`:
+Use the new `properties` element to configure one or more properties in a `bell` configuration. Declare each property as a `name="value"` attribute within the element. Properties are type `String` and inject into all service implementations that are enabled to receive them. The following example declares two properties, `hello` and `serverHome`:
 [source, xml]
 ----
 <server>
@@ -367,7 +369,7 @@ public YourServiceImpl(java.util.Map<String,String> bellProperties) {...}
 // OR
 public void updateBell(java.util.Map<String,String> bellProperties) {...}
 ----
-At service creation the BELL feature discovers the method(s) and invokes it to inject an unmodifiable map containing a key/value pair for each property. For the example above, the map contains the pairs "hello"/"WORLD" and "serverHome"/"<resolved value of ${server.out.dir}>".
+At service creation, the BELL feature discovers the method and invokes it to inject an unmodifiable map containing a key/value pair for each property. For the previous example, the map contains the pairs "hello"/"WORLD" and "serverHome"/"<resolved value of ${server.out.dir}>".
 
 
 To find out more, see:
