@@ -1,0 +1,207 @@
+---
+layout: post
+title: "Open Liberty 22.0.0.10 では、発行者クレームを使用して、より簡単にOpenID Connect クライアント構成ができるようになりました"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/mbroz2
+author_github: https://github.com/mbroz2
+seo-title: Open Liberty 22.0.0.10 では、発行者のクレームを使用して、より簡単にOpenID Connect クライアント構成ができるようになりました - OpenLiberty.io
+seo-description: Open Liberty 22.0.0.10 は、OpenID Connect Client 1.0 フィーチャーを拡張して、JWT または JWS アクセス・トークンからの発行者クレームを使用して、JWT インバウンド・リクエストの openidConnectClient 構成を選択できるようになりました
+blog_description: Open Liberty 22.0.0.10 は、OpenID Connect Client 1.0 フィーチャーを拡張して、JWT または JWS アクセス・トークンからの発行者クレームを使用して、JWT インバウンド・リクエストの openidConnectClient 構成を選択できるようになりました
+open-graph-image: https://openliberty.io/img/blog/GraphQL-client-guide.png
+---
+= Open Liberty 22.0.0.10 では、発行者クレームを使用して、より簡単にOpenID Connect クライアント構成ができるようになりました
+Michal Broz <https://github.com/mbroz2>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+Open Liberty 22.0.0.10 は、OpenID Connect Client 1.0 フィーチャーを拡張して、JWT または JWS アクセス・トークンからの発行者クレームに応じて、`openidConnectClient` 構成を選択できるようになりました。
+このリリースには、重要なセキュリティ脆弱性 (CVE) の修正と、多くの重要なバグ修正も含まれています。
+
+In link:{url-about}[Open Liberty] 22.0.0.10:
+
+* <<oidc, 受信リクエストのJWTトークン内の発行者クレームの値に応じて、OICDクライアント構成を選択する (OpenID Connect Client 1.0)>>
+* <<CVEs, セキュリティ脆弱性 (CVE) の修正>>
+* <<bugs, 主なバグ修正>>
+
+
+ランタイムに追加された新しい機能と機能に加えて、 <<guides, ガイドも更新されました。>>
+
+修正されたバグのリストはこちらを参照してください。 link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A220010+label%3A%22release+bug%22[22.0.0.10].
+
+[#run]
+== 22.0.0.10 を使用してアプリを実行する
+
+link:{url-prefix}/guides/maven-intro.html[Maven]を使う時には下記の設定を使ってください。
+
+[source,xml]
+----
+<dependency>
+    <groupId>io.openliberty</groupId>
+    <artifactId>openliberty-runtime</artifactId>
+    <version>22.0.0.10</version>
+    <type>zip</type>
+</dependency>
+----
+
+link:{url-prefix}/guides/gradle-intro.html[Gradle]の場合は、下記の設定です。
+
+[source,gradle]
+----
+dependencies {
+    libertyRuntime group: 'io.openliberty', name: 'openliberty-runtime', version: '[22.0.0.10,)'
+}
+----
+
+Dockerを使っているときは、下記のイメージを使ってください。
+
+[source]
+----
+FROM open-liberty
+----
+
+または、Open Libertyのlink:{url-prefix}/downloads/[ダウンロード・ページ].
+
+[link=https://stackoverflow.com/tags/open-liberty]
+image::img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="center"]
+
+// https://github.com/OpenLiberty/open-liberty/issues/21783
+[#oidc]
+== 受信リクエストのJWTトークン内の発行者クレームの値に応じて、OICDクライアント構成を選択する (OpenID Connect Client 1.0)
+
+22.0.0.10 以降、link:{url-prefix}/docs/latest/reference/feature/openidConnectClient-1.0.html[OpenID Connect Client 1.0] 機能は、JWT または JWS アクセス トークンの中の発行者クレームに応じて、複数の `openidConnectClient` 構成のうち、どの構成を使うか指定できるようになりました。以前のリリースでは、同じリソースに複数の発行者が使われている場合、複雑な認証フィルターを構成する必要がありました。このリリースから、OpenID Connect Client 1.0 機能は、必要な発行者ごとに、より単純な  `openidConnectClient` 要素で構成できるようになりました。
+
+A Liberty OpenID Connect Relying Party will automatically use the issuer claim from a JWT or JWS access token to select the `openidConnectClient` configuration with a matching `issuer` attribute. 
+
+Liberty OpenID Connect Relying Party は、JWT または JWS アクセス トークンからの発行者クレームを自動的に使用して、一致する `issuer` 属性を持つ `openidConnectClient` 構成を選択します。
+
+The following `server.xml` file example shows two Open ID connect client configurations, with an link:{url-prefix}/docs/latest/authentication-filters.html[authentication filter] configured to route requests to the `RP2` configuration. If a request with an issuer claim value of `https://hostname/op1` is presented, the `RP1` configuration is selected unless the `rp2filter` applies to the request.
+
+次の `server.xml` ファイルの例は、リクエストを `RP2` 構成にルーティングするように構成されたlink:{url-prefix}/docs/latest/authentication-filters.html[authentication filter] を含む 2 つの Open ID Connect クライアント構成を示しています。 . `https://hostname/op1` の発行者クレーム値を持つリクエストが提示された場合、`rp2filter` がリクエストに適用されない限り、`RP1` 構成が選択されます。
+
+[source, xml]
+----
+<server>
+    <featureManager>
+        <feature>openidConnectClient-1.0</feature>
+    </featureManager>
+    ...
+    <openidConnectClient id="RP1" issuer="https://hostname/op1"  ... />
+    <openidConnectClient id="RP2" issuer="https://hostname/op2" authFilterRef="rp2filter" .../>
+    <authFilter id="rp2filter">
+    ...
+    </authFilter>
+    ...
+</server>
+----
+
+Open Liberty は、以下のアルゴリズムに従って、JWT 要求に使用する `openidConnectClient` 構成を選択します。
+
+1. `openidConnectClient` 構成の認証フィルターが、リクエストと一致する場合は、フィルターの構成を優先します。
+2. すべての `openidConnectClient` 要素の `issuer` 属性に対して、JWT からの発行者クレーム(Issuer Claim)を確認します。 JWT からの発行者クレームが 1 つの`openidConnectClient` 構成要素のみの `issuer` 属性と一致する場合は、その構成を選択します。
+3. JWT からの発行者クレームが複数の `openidConnectClient` 構成要素の `issuer` 属性と一致する場合は、一致する最初の構成を選択します
+4. JWT からの issuer クレームがどの `openidConnectClient` 構成要素の `issuer` 属性とも一致しない場合は、構成要素の 1 つを非決定的な方法で選択します。
+
+OpenID Connect クライアントの詳細については、link:https://openid.net/specs/openid-connect-core-1_0.html[OpenID Connect クライアント仕様] を参照してください。
+
+[#CVEs]
+== セキュリティ脆弱性 (CVE) の修正
+[cols="6*"]
+|===
+| CVE | CVSSスコア | 脆弱性評価 | 影響を受けるバージョン | 修正済みバージョン | ノート 
+| http://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2022-34165[CVE-2022-34165]
+| 5.4
+|HTTP header injection
+|17.0.0.3 - 22.0.0.9
+|22.0.0.10 
+|link:https://github.com/OpenLiberty/open-liberty/issues/22425[See issue #2245]
+|===
+
+For a list of past security vulnerability fixes, reference the link:{url-prefix}/docs/latest/security-vulnerabilities.html[Security vulnerability (CVE) list].
+
+過去のセキュリティ脆弱性の修正のリストについては、次のリンクを参照してください: {url-prefix}/docs/latest/security-vulnerabilities.html[セキュリティ脆弱性 (CVE) リスト]。
+
+
+[#bugs]
+== 主なバグ修正
+
+以下のセクションでは、このリリースで修正したバグの一部について説明します。興味がある場合は、link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A220010+label%3A%22release+bug%22[22.0.0.10で修正されたバグのリスト]を参照してください。
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/20599[JDBC connection not validated when numConnectionsPerThreadLocal is used]
++
+JDBC データソースが `validationTimeout` で構成されている場合、コネクションプールは、接続がアプリケーションに戻される前に、接続を検証する必要があります。接続が無効な場合 (データベース フェイルオーバー の後など)、プール内の他の接続は `purgePolicy` 構成に従ってパージする必要があります。したがって、アプリケーションが無効なデータベース接続を受け取ることはめったにありません。
++
+ただし、接続マネージャーが `numConnectionsPerThreadLocal=1` で構成されている場合、接続が `ThreadLocal` として保管されてしまうと、この接続は、アプリケーションによって使用される前に検証されず、`SQLException` が発生します。また、アプリケーションがこの接続に対して `isValid` を呼び出し、その接続が無効であるという結果が返ってきた場合、接続マネージャーは `purgePolicy` ロジックを、コネクションプールの他の接続に適用しなくなります。そのため、クライアントは各ワーカー・スレッドが処理されるまで複数のエラーを表示することがあります。
++
+```
+    <dataSource id="fhirDatasourcePglocalDefault" jndiName="jdbc/fhir_ibmfhirpg_default" type="javax.sql.XADataSource" statementCacheSize="200" syncQueryTimeoutWithTransactionTimeout="true" validationTimeout="30s">
+        <jdbcDriver javax.sql.XADataSource="org.postgresql.xa.PGXADataSource" libraryRef="sharedLibPostgres"/>
+        <properties.postgresql
+             serverName="localhost"
+             portNumber="5432"
+             databaseName="a-database-name"
+             user="a-database-user"
+             password="a-database-password"
+             currentSchema="a-database-schema"
+         />
+        <connectionManager
+            minPoolSize="40"
+            maxPoolSize="80"
+            agedTimeout="-1"
+            numConnectionsPerThreadLocal="1"
+            connectionTimeout="60s"
+            maxIdleTime="2m"
+            purgePolicy="EntirePool"
+        />
+    </dataSource>
+```
+
+修正後、`validationTimeout`が構成されていると、接続は使用前に検証され、`purgePolicy`に従って接続プールから不良な接続が削除されます。
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/21914[JobOperator.getRunningExecutions の出力には、実行されていないジョブの実行が含まれていました]
++
+Liberty Java バッチ `JobOperator.getRunningExecutions()` API は、バグにより、実行中のジョブ実行 ID だけでなく、実行中のジョブ インスタンスに関連付けられたすべてのジョブ実行 ID が返されていました。
++
+修正後、そのジョブ名に対して JobOperator.getRunningExecutions() が呼び出されると、元の (停止された) 実行 ID と新しい (再開された) 実行 ID の両方が返されます。
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/21805[hideMessageのloggingをからメッセージIDを削除したとき、サーバーが動的に更新されるようになりました]
++
+`hideMessage` のlogging属性からのメッセージ IDを削除しても、実行中のサーバーに反映されませんでした。
++ 
+この問題は解決され、実行中のサーバーの構成が適切に更新され、属性から削除されたメッセージは表示されるようになりました。
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/22189[`AllowAuthenticationFailOverToAuthMethod` オプションの翻訳がありませんでした]
++
+`AllowAuthenticationFailOverToAuthMethod` オプションの説明には、翻訳されていない NLS 定数が含まれていました。これは、メタタイプの NLS ファイルから定数が欠落していたことが原因でした。
++
+この修正により、すべての `AllowAuthenticationFailOverToAuthMethod` オプションの説明が適切に翻訳されるようになりました。
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/22221[サーバーのシャットダウン中のセッション タイミングの問題]
++
+サーバーのシャットダウン中のセッション キャッシュ サービスのタイミングの問題により、キャッシュ サービスの終了中に、セッションを無効化するスレッドがキャッシュにアクセスする可能性がありました。これは、無効なリスナーの処理時にキャッシュ インスタンスがチェックされていないために発生する可能性があります。
++
+この問題は、このリリースで解決されました。
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/22347[22.0.0.4 以降で FFDCIgnore が適用されない]
++
+22.0.0.4 以降、1.0 仕様のデプロイメント記述子を持つリソース アダプタがインストールされた場合、`@FFDCIgnore` アノテーションが無視され、FFDC が誤って発行されました。
++
+修正後、FFDC は作成されなくなりました。
+
+
+[#guides]
+== 新規および更新されたガイド
+
+Open Liberty の特徴と機能が成長し続けるにつれて、link:https://openliberty.io/guides/?search=new&key=tag[openliberty.io の新しいガイド]にトピックを追加し続けます。既存のガイドは、報告されたバグ/問題に対処し、コンテンツを最新の状態に保ち、トピックの対象範囲を拡大するために、更新することもあります。
+
+* link:{url-prefix}/guides/graphql-client.html[GraphQL クライアントを使用して GraphQL クエリとミューテーションを実行する]
+** SmallRyeのGraphQLクライアントのタイプセーフなインターフェースを使用して、複数のマイクロサービスからデータを照会および変更する方法を学びます
+
+[.img_border_light]
+image::img/blog/GraphQL-client-guide.png["GraphQL クライアント ガイド" ,width=50%,align="center"]
+
+== Open Liberty 22.0.0.10 を今すぐ入手
+
+下記のリンクから入手可能です。 <<run,Maven, Gradle, Docker, and as a downloadable archive>>.
