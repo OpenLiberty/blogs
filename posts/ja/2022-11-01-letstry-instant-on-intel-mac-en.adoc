@@ -1,13 +1,13 @@
 ---
 layout: post
-title: Let's try Open Liberty InstantOn on Intel Mac
+title: Let's try Liberty InstantOn on Intel Mac
 # Do NOT change the categories section
 categories: blog
 author_picture: https://avatars3.githubusercontent.com/takakiyo
 author_github: https://github.com/takakiyo
-seo-title: Let's try Open Liberty InstantOn on Intel Mac - OpenLiberty.io
-seo-description: Let's try Open Liberty InstantOn on Intel Mac
-blog_description: "Let's try Open Liberty InstantOn on Intel Mac"
+seo-title: Let's try Liberty InstantOn on Intel Mac - OpenLiberty.io
+seo-description: Try Liberty InstantOn on Intel Mac
+blog_description: "Let's try Liberty InstantOn on Intel Mac"
 //open-graph-image: https://openliberty.io/img/blog/instantonperf.png
 //blog-available-in-languages: ['ja']
 additional_authors: 
@@ -23,25 +23,25 @@ Takakiyo Tanaka <https://github.com/takakiyo>
 
 == What is Liberty InstantOn ? 
 
-Liberty InstantOn was announced on September 29, 2022. It is a technology that launches a full-featured Java EE application server in hundreds of milliseconds.
+Liberty InstantOn was announced on September 29, 2022. It is a technology that provides a full-featured cloud-native Java runtime supporting MicroProfile and Jakarta WebProfile APIs that enables applications to start in hundreds of milliseconds.
 
 When using Serverless technology in a container environment, the startup time is important. The response time includes the time it takes for the container process to start.  So the startup time directly affects the quality of service.
 
-Many efforts have been made to reduce the startup time for Java applications. For example, one of the efforts is to use the capabilities of GraalVM to transform the application into a native executable. However, GraalVM does not allow all Java features to be used, so it is not possible to convert widely used Java EE applications into executables.
+Many efforts have been made to reduce the startup time for Java applications. For example, one of the efforts is to use the capabilities of GraalVM to transform the application into a native executable. However, GraalVM does not allow all Java features to be used, so it is not possible to convert widely used Java EE or Jakarta EE applications into executables.
 
 Liberty InstantOn takes a totally different approach to reduce the startup time. It takes advantage of the Linux CRIU (Checkpoint/Restore In Userspace) technology. CRIU is a set of functions for recording (Checkpoint) the information of the running process in a file and restoring (Restore) the process from the file. 
 
-Open Liberty/WebSphere Liberty with an OpenJ9 VM incorporates CRUI technology to get a Checkpoint when the application finishes initializing. By committing the container in this state and resuming it from there, it can be started in a lightning fast time.
+Open Liberty with an Eclipse OpenJ9 VM incorporates CRIU technology to get a checkpoint when the application finishes initializing. By committing the container in this state and resuming it from there, it can be started in a lightning fast time.
 
 == Let's try InstantOn on Intel Mac
 
-The InstantOn steps in the blog article link:https://openliberty.io/blog/2022/09/29/instant-on-beta.html[Liberty InstantOn startup for cloud native Java applications] are  based on the Red Hat Enterprise Linux. The same experience can be achieved on an Intel Mac with macOS Monterey (version 12.x). This article shares the steps to experience the exciting technology on Mac. 
+The InstantOn steps in the blog article link:https://openliberty.io/blog/2022/09/29/instant-on-beta.html[Liberty InstantOn startup for cloud native Java applications] are based on the Red Hat Enterprise Linux. The same experience can be achieved on an Intel Mac with macOS Monterey (version 12.x). This article shares the steps to experience the exciting technology on Mac. Currently, InstantOn feature is not available on M1 aarch64 architecture. 
 
-The InstantOn sample environment is published as a container image from IBM Cloud Registry. As the container execution environment, we can use podman introduced by Homebrew. On Mac, we needed to tweak the steps a little bit to see the InstantOn in action. 
+The InstantOn sample environment is published as a container image from IBM Cloud Registry. As the container execution environment, we can use podman, which one can install via Homebrew by `brew install podman`. On Mac, we needed to tweak the steps a little bit to see the InstantOn in action.
 
 === Preparing the Podman
 
-Since InstantOn uses the CAP_CHECKPOINT_RESTORE function of the Linux kernel, the InstantOn feature does not work properly if podman is started in rootless mode, Also, once the virtual environment (podman machine) has been started in rootless mode, it will fail even if it is run in rootful mode. The solution is to create a new dedicated virtual machine.
+Since InstantOn uses the CAP_CHECKPOINT_RESTORE function of the Linux kernel, the InstantOn feature does not work properly if podman is started in rootless mode, Also, once the virtual environment (podman machine) has been started in rootless mode, it will fail even if it is run in rootful mode. The solution is to create a new dedicated virtual machine. It may be necessary to remove existing VM by `podman machine list` and `podman machine rm` commands. 
 
 The followng steps create a podman virtual environment and start it in rootful mode. We will configure it to connect to a virtual machine by default.
 
@@ -67,23 +67,22 @@ Machine "rootful" started successfully
 $ podman system connection default rootful-root
 ----
 
-Following the version of the podman used for this article. 
+The following is version of podman used for this article. 
 
 [source]
 ----
 $ podman version
 Client:       Podman Engine
-Version:      4.2.1
-API Version:  4.2.1
-Go Version:   go1.18.6
-Built:        Wed Sep  7 04:16:02 2022
+Version:      4.3.0
+API Version:  4.3.0
+Go Version:   go1.18.7
+Built:        Tue Oct 18 13:55:57 2022
 OS/Arch:      darwin/amd64
-
 Server:       Podman Engine
-Version:      4.2.1
-API Version:  4.2.1
-Go Version:   go1.18.5
-Built:        Thu Sep  8 04:58:19 2022
+Version:      4.3.0
+API Version:  4.3.0
+Go Version:   go1.18.7
+Built:        Fri Oct 21 04:16:35 2022
 OS/Arch:      linux/amd64
 ----
 
@@ -201,7 +200,8 @@ If you press Ctrl+C in the window that started the container, the container in w
 [AUDIT   ] CWWKE0036I: The server defaultServer stopped after 2 minutes, 32.806 seconds.  
 ----
 
-==== Getting the Checkpoint
+
+==== Checkpoint the application
 
 Now let's get a checkpoint. Since various privileges are required, we will run with the `--privileged` option. By specifying `applications` for the environment variable `WLP_CHECKPOINT`, Open Liberty can save the checkpoint when the application initialization was completed. 
 
@@ -228,7 +228,7 @@ CWWKE0953W: This version of Open Liberty is an unsupported early release version
 /opt/ol/wlp/bin/server: line 946:   130 Killed                  "${JAVA_CMD}" "$@" >> "${CHECKPOINT_CONSOLE_LOG}" 2>&1 < /dev/null 
 ----
 
-Since the container was started without `--rm`` this time, the container environment after execution remains as it is. In this environment, files that record process information with checkpoint are saved.
+This starts the application container and proceeds to start the application. After the application has started the runtime will perform a checkpoint of the process. When the process state has been saved the container exits. Since the container was started without `--rm` this time, the stopped container remains available for inspection. This stopped container, named `getting-started-checkpoint-container`, contains the checkpoint process state information.
 
 [source]
 ----
@@ -237,7 +237,7 @@ CONTAINER ID  IMAGE                             COMMAND               CREATED   
 940fd476eccc  localhost/getting-started:latest  /opt/ol/wlp/bin/s...  4 minutes ago  Exited (0) 4 minutes ago              getting-started-checkpoint-container
 ----
 
-The following command commits and register it as a new image.
+The following command commits the container into a new image. This new image, named `getting-started-instanton`, will contain the checkpoint process state for the application. This process state is then used to quickly start the application when the `getting-started-instanton` image is run as a container.
 
 [source]
 ----
@@ -265,6 +265,68 @@ Now it's time to execute InstantOn. When you start Liberty using this image, the
 ----
 
 Liberty started in 0.1-0.2 seconds in my environment. If you access it with the curl command or browser, you can see that the application is running successfully. Stop Liberty with Ctrl+C. This image can be used as many times as you want. 
+
+== Starting Open Liberty using the InstantOn feature without `--privileged`
+
+Running fully privileged containers is not recommended. The best practice is to instead reduce the elevated privileges down to only what is required to run the container. 
+
+It is possible to run podman with unconfined --security-opt options below also worked on the Mac OS mentioned below. For more details of the parameters and the input file, refer to link:https://openliberty.io/blog/2022/09/29/instant-on-beta.html[the original InstantOn blog] .
+
+podman command with unconfined `--security-opt` options
+```
+$ podman run \
+  --rm \
+  --cap-add=CHECKPOINT_RESTORE \
+  --cap-add=NET_ADMIN \
+  --cap-add=SYS_PTRACE \
+  --security-opt seccomp=unconfined \
+  --security-opt systempaths=unconfined \
+  --security-opt apparmor=unconfined \
+  -p 9080:9080 \
+  getting-started-instanton
+
+[AUDIT   ] CWWKZ0001I: Application guide-getting-started started in 0.101 seconds.
+[AUDIT   ] CWWKC0452I: The Liberty server process resumed operation from a checkpoint in 0.229 seconds.
+[AUDIT   ] CWWKF0012I: The server installed the following features: [cdi-3.0, checkpoint-1.0, concurrent-2.0, ... transportSecurity-1.0].
+[AUDIT   ] CWWKF0011I: The defaultServer server is ready to run a smarter planet. The defaultServer server started in 0.283 seconds
+```
+
+podman command with seccomp to only required system calls. 
+```
+$ podman run \
+  --rm \
+  --cap-add=CHECKPOINT_RESTORE \
+  --cap-add=NET_ADMIN \
+  --cap-add=SYS_PTRACE \
+  --security-opt seccomp=/Users/htakamiy@us.ibm.com/InstantOn/guide-getting-started/finish/criuRequiredSysCalls.json \
+  -v /proc/sys/kernel/ns_last_pid:/proc/sys/kernel/ns_last_pid \
+  -p 9080:9080 \
+  getting-started-instanton
+
+[AUDIT   ] CWWKZ0001I: Application guide-getting-started started in 0.101 seconds.
+[AUDIT   ] CWWKC0452I: The Liberty server process resumed operation from a checkpoint in 0.220 seconds.
+[AUDIT   ] CWWKF0012I: The server installed the following features: [cdi-3.0, checkpoint-1.0, concurrent-2.0, distributedMap-1.0, jndi-1.0, json-1.0, jsonb-2.0, jsonp-2.0, monitor-1.0, mpConfig-3.0, mpHealth-4.0, mpMetrics-4.0, restfulWS-3.0, restfulWSClient-3.0, servlet-5.0, ssl-1.0, transportSecurity-1.0].
+[AUDIT   ] CWWKF0011I: The defaultServer server is ready to run a smarter planet. The defaultServer server started in 0.262 seconds.
+```
+
+The podman command may no longer need to mount `ns_last_pid` nor `seccomp` parameter at a newer OS version. The following CHECKPOINT_RESTORE command worked on macOS Monterey 12.6.  
+
+```
+podman run \
+  --rm \
+  --cap-add=CHECKPOINT_RESTORE \
+  --cap-add=NET_ADMIN \
+  --cap-add=SYS_PTRACE \
+  -p 9080:9080 \
+  getting-started-instanton
+```
+The above command ran successfully on the following MacOS version. 
+```
+$ sw_vers
+ProductName:	macOS
+ProductVersion:	12.6
+BuildVersion:	21G115
+```
 
 As a final step, stop the virtual environment with `podman machine stop rootful` command and restore the default connection with `podman system connection default podman-machine-default` command.
 
