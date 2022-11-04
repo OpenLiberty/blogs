@@ -1,0 +1,95 @@
+---
+layout: post
+title: "Deploy Java application to IBM Cloud Code Engine using the Paketo Buildpack for Liberty"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/kevin-ortega
+author_github: https://github.com/kevin-ortega
+seo-title:  Deploy Java application to IBM Cloud Code Engine (ICCE) using the Paketo Buildpack for Liberty - OpenLiberty.io
+seo-description: Learn to deploy your applications to ICCE easily with the Paketo Buildpack for Liberty
+blog_description: "Learn to deploy your applications to ICCE easily with the Paketo Buildpack for Liberty"
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+---
+= Deploy Java application to IBM Cloud Code Engine using the Paketo Buildpack for Liberty
+Kevin Ortega <https://github.com/kevin-ortega>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+
+IBM Cloud has announced the link:https://cloud.ibm.com/docs/cloud-foundry-public?topic=cloud-foundry-public-deprecation[deprecation of Cloud Foundry]. link:https://www.ibm.com/cloud/code-engine[IBM Cloud Code Engine] provides the next level of easy application deployment and mature management of critical business applications in IBM Cloud.  Open Liberty is easily available to deploy Java applications to Code Engine with the link:https://openliberty.io/blog/2022/04/01/cloud-native-liberty-buildpack.html[Paketo Buildpack for Liberty] using container images or your source code. 
+
+The intent of this blog is not a Code Engine tutorial but to provide instructions on how to use the Liberty Cloud Native buildpack in Code Engine. 
+
+== What do you need?
+* An https://www.ibm.com/cloud[IBM Cloud] Account
+* Your application source
+
+To deploy container images you'll also need:
+
+* The link:https://buildpacks.io/docs/tools/pack/[pack CLI]
+* https://www.docker.com/[Docker]
+* An externally accessible container registry that can host your images. 
+
+== Code Engine build strategies
+Code Engine can build your container from source with link:paketo.io:[Paketo buildpacks] using the link:https://cloud.ibm.com/docs/codeengine?topic=codeengine-plan-build#build-buildpack-strat[Cloud Native Buildpacks] build strategy. The Paketo Buildpack for Liberty is included in the composite Paketo Buildpack for Java that also includes `tomcat` and `tomee` application servers. Tomcat is the default application server and to use Open Liberty requires a little extra configuration. The application server that the Paketo Buildpack for Java will use is influenced by the environment variable `BP_JAVA_APP_SERVER`.  If undefined, the order of Java application servers in the buildpack dictates which one will be picked. Normally, environment variables are provided to buildpacks using the `--env` parameter on the `pack build` CLI command. Code Engine does not use `pack` so the environment variables have to be provided in a `.buildenv` file in the application's root source directory.  
+
+== Let's get started
+
+Login to the IBM Cloud console and head to the link:https://cloud.ibm.com/codeengine/overview[Code Engine overview] page.  When building from source, enter the url of the respository hosting your source. 
+[.img_border_light]
+image:/img/blog/code_engine_overview.png[IBM Cloud Code Engine Overview,width=70%,align="center"]
+
+On the `Start creating` page it's important to enter the `9080` for `Listening port`.
+[.img_border_light]
+image:img/blog/code_engine_start_creating.png[Start creating,width=70%,align="center"] 
+
+In this example, the source root is the `finish` directory and contains the `.buildenv` file. 
+[.img_border_light]
+image:/img/blog/code_engine_build_details.png[Build details,width=70%,align="center]
+[.img_border_light]
+image:/img/blog/code_engine_git_repo.png[Root of the application's source directory,width=70%,align="center]
+
+At a minimum, `.buildenv` should contain `BP_JAVA_APP_SERVER=liberty` but can contain any environment variable consumed by buildpacks.
+```
+BP_JAVA_APP_SERVER=liberty
+```
+The `Build step details` output will show the Paketo Buildpack for Liberty contributed to the image.
+[.img_border_light]
+image:/img/blog/code_engine_build_step_details.png[Build output,width=70%,align="center"]
+
+Similarly, if you're creating your app from source using the Code Engine CLI you need to specify the `port` and build strategy along with the `.buildenv` file present in the application source root directory:
+
+  $ ibmcloud ce app create --name MYAPPNAME --image REGISTRY/NAMESPACE/REPOSITORY --registry-secret SECRET --build-source . --strategy buildpacks --port 9080
+
+```
+[finish (prod=)]$ ls -la
+total 24
+drwxr-xr-x   7 kevin  staff   224 Oct 28 14:54 .
+drwxr-xr-x  12 kevin  staff   384 Oct 19 11:07 ..
+-rw-r--r--@  1 kevin  staff    26 Nov  4 12:53 .buildenv
+-rw-r--r--   1 kevin  staff   790 Oct 19 11:07 Dockerfile
+-rw-r--r--@  1 kevin  staff  4066 Oct 19 11:07 pom.xml
+drwxr-xr-x   4 kevin  staff   128 Oct 19 11:07 src
+drwxr-xr-x  11 kevin  staff   352 Oct 20 08:53 target
+```
+
+.To summarize, two important configuration steps are required to use the Paketo Buildpack for Liberty in Code Engine:
+. Create a `.buildenv` file with `BP_JAVA_APP_SERVER=liberty`
+. Set the listening port to 9080
+
+= Other configurations using the `.buildenv` file
+`BP_LIBERTY_PROFILE` to specify which liberty profile to install.   Valid profiles for Open Liberty are documented link:https://github.com/paketo-buildpacks/liberty#profiles[here].
+`BP_LIBERTY_FEATURES` a space separated list of Liberty features to be installed with the Liberty runtime. Supports any valid Liberty feature.
+
+== Taking full advantage of all what the Paketo Buildpack for Liberty has to offer
+Code Engine doesn't use the `pack build` CLI to create container images.  It plugs into the cloud native buildpack's lifecycle natively. As a result, some features of the Paketo Buildpack for Liberty are not easily available to Code Engine.  Features like link:https://github.com/paketo-buildpacks/liberty/blob/main/docs/installing-ifixes.md[installing iFixes] and link:https://github.com/paketo-buildpacks/liberty#using-custom-features[custom features], and installing from a link:https://github.com/paketo-buildpacks/liberty#building-from-a-packaged-server[packaged server] or link:https://github.com/paketo-buildpacks/liberty#building-from-a-liberty-server[server directory] can't be utilized using Code Engine to create the container image.   For these features, you can use the `pack build` CLI to create the container image, push the image to an external container registry and use Code Engine to deploy and manage your container by pulling your container image from the container registry from the Code Engine console or CLI.  
+
+link:[Follow these instructions] to deploy applications from the IBM Cloud Container Registry. 
+
+== Additional Resources
+* https://cloud.ibm.com/docs/codeengine[Getting started with IBM Cloud Code Engine]
+* https://cloud.ibm.com/docs/codeengine?topic=codeengine-app-local-source-code[Deploying app from local source code using CLI]
+* https://cloud.ibm.com/docs/codeengine?topic=codeengine-build-standalone[Building a container image]
+* https://github.com/paketo-buildpacks/liberty#gcriopaketo-buildpacksliberty[Paketo Buildpack for Liberty]
+* https://paketo.io[Paketo buildpacks]
