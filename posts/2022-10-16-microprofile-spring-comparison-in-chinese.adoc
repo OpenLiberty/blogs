@@ -1,0 +1,1057 @@
+---
+title: 构建云原生微服务，我该选择哪种技术路线？
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars1.githubusercontent.com/Emily-Jiang
+author_github: https://github.com/Emily-Jiang
+seo-title: 构建云原生微服务，我该选择哪种技术路线？原著：Emily Jiang， 翻译：赵欣
+blog_description: 这篇文章主要介绍MicroProfile 和 Spring 的相同和差别。为你的云原生技术路线选择提供全面信息
+open-graph-image: https://avatars1.githubusercontent.com/Emily-Jiang
+additional_authors: 
+- name: 赵欣
+---
+
+= 构建云原生微服务，我该选择哪种技术路线？
+原出版: Eclipse 基金会2019年9月月报: https://www.eclipse.org/community/eclipse_newsletter/2019/september/microprofile.php
+
+作者： Emily Jiang
+翻译： 赵欣
+
+== 为什么选择云原生微服务？
+
+云，可见或不可见，无处不在。在这篇文章中，我谈论的是无形的云，云计算。云分为三种类型：私有云、公共云和混合云。越来越多的公司正在致力于应用程序现代化，以便他们可以创建云原生微服务，以节省成本并充分利用云资源。当微服务在云中运行时，它只会在运行时产生费用。根据负载，它可以弹性伸缩。在这种情况下，您只需为使用的内容付费，不会有闲置成本，您无需担心购买任何硬件只是为了偶尔使用，即用即付模式。
+
+在应用程序现代化方面，实现目标有不同的途径。对于现有的单体应用程序，是时候考虑如何在云中部署它们了。您可以将它们容器化或将它们分解为微服务。对于新编写的应用程序，最好的选择是构建新型云原生微服务。本文重点介绍如何开发最高效的云原生微服务，可以在云端正常运行。我们先明确一下云原生是什么意思。
+
+== 什么是云原生？
+
+您可能首先想到的问题是：云原生是什么意思？一般来说，云原生是指为云构建的应用程序。云原生微服务充分利用了云基础设施，形成了一个很好的生态系统。无需重新打包即可轻松配置、具备安全、弹性、可监控、可追溯等特性。我们来总结一下云原生微服务的特点。
+
+*外部化配置*
+
+云原生微服务必须是可配置的。更改配置时，不需重新打包微服务。一次构建，到处配置。这也是link:https://www.12factor.net/[12因子方法论]强烈推荐的。
+
+*RESTful*
+
+云原生微服务最好是无状态的。状态应该存储在数据库中，而不是内存中。云原生微服务具有共性，不管几个同时运行，它们都是一模一样的。微服务本身应该被视为牲畜，而不是宠物。在这种情况下，当微服务容器没有响应时，底层云基础设施可以替换它而不会丢失任何信息。
+
+*容错*
+
+云原生微服务应该具有弹性。它应该在任何情况下发挥作用。比如，即使它的下游服务宕掉。
+
+*可发现*
+
+云原生微服务应该能够对外提供自身功能或能力，以便客户端可以调用服务。
+
+*安全性*
+
+安全性在云原生微服务中极为重要。在单体应用程序中，只有一小部分功能被公开，而大部分功能被隐藏。当迁移到云原生时，每一项服务都有一个唯一的身份。您需要确保只有经过身份验证和授权的用户才能调用相关的微服务。例如，如果你部署一个工资查询的微服务，你可能只希望具有“经理”和“所有者”访问权限的调用者访问该服务。
+
+*可观测性*
+
+一旦云原生微服务在云中运行，就必须发出一些指标，以便 DevOps
+可以对其进行监控，以了解它的响应速度和负载量等。
+
+*可追溯性*
+
+云原生微服务主要需要与其他不同的微服务通信，然后再与其他不同的服务通信。如果您尝试绘制一个调用链，您可能会以
+a->b->d->f->e
+等结尾。一旦服务无法运行，您需要找出哪个服务出现故障。如果没有可视化调用链的能力，将很难识别出故障服务。为了构建调用链，微服务需要能够传播关联ID。有了这个，ZipKin 或 Jaeger
+等一些工具可以构建一个跟踪范围来说明每个服务状态。
+
+*与云通信的能力*
+
+云原生微服务需要能够与云基础设施就其健康状态进行通信。它应该能够告诉基础设施它是否准备好接收请求或者它是否仍然存在。如果它不存在，云基础设施（例如 Kubernetes）可以轻松替换它。如果它没有准备好，例如它的数据库连接没有准备好，云基础设施将不会将请求路由到这个服务。
+
+读到这里，你可能会感叹，别说你的业务逻辑了，还有很多 QoS
+需要担心。如果您管理好所有这些，您可能不得不花费大部分时间来担心上述要求，而花更少的时间做与您的业务相关的事情。实在是太多了。我听到你的困难了。幸运的是，我是来帮助你的。我们继续。
+
+== 如何构建云原生微服务
+
+无需从头开始构建，有一些框架可以帮助你；开发云原生微服务最流行的框架是link:https://microprofile.io/[MicroProfile]和link:https://spring.io/[Spring框架]。
+
+Spring 框架已经发展了几年，因此我不会过多谈论它。MicroProfile
+相对较新。它由 IBM、Red Hat、Payara、Tomitribe、LJC 和其他个人于 2016
+年年中成立。后来，其他公司，如Microsoft, Oracle等也加入了社区。MicroProfile
+的目标是发展用于开发云原生微服务的最佳编程模型。到目前为止，它已经发布了八个以上的版本，不久前发布了
+MicroProfile 5.0。最近，它引起了广泛的关注。大多数 Jakarta EE
+运行时现在都支持 MicroProfile，例如 Open
+Liberty、Quarkus、Payara、TomEE、Helidon、KumuluzEE 等。您可以在 link:https://wiki.eclipse.org/MicroProfile/Implementation[此处]找到实现细节。
+
+[cols=",,",options="header",]
+|===
+| |Spring |MicroProfile
+|*REST APIs* | |
+|REST Service |Spring MVC |JAX-RS
+|Dependency Injection |Spring IoC & DI |CDI
+|API Documentation |Spring REST Docs |MicroProfile Open API
+|REST Client |Spring MVC Feign |MicroProfile REST Client
+|JSON Binding/Processing |Bring Your Own Library +
+Jackson |JSON-B +
+JSON-P
+|处理多个微服务Handling 100s of Services | |
+|Configuration |Spring Boot Config +
+Spring Cloud Config |MicroProfile Config
+|Fault Tolerance |Netflix Hystrix |MicroProfile Fault Tolerance
+|Security |Spring Security +
+Spring Cloud Security |Jakarta EE Security +
+MicroProfile JWT Propagation
+|Operation Focus | |
+|Health |Spring Boot Actuator |MicroProfile Health
+|Metrics |Spring Boot Actuator |MicroProfile Metrics
+|Distributed Tracing |Spring Cloud Sleuth |MicroProfile Open Tracing
+|===
+
+让我们将进行详细介绍。
+
+== 开发云原生微服务
+
+RESTful API 是一种被广泛采用的开发云原生微服务的方式。让我们关注如何使用
+RESTful API 和相关技术来编写松耦合的微服务。
+
+=== *REST API*
+
+REST（Representational State Transfer）是一种架构风格，用于定义服务之间的通信标准，使系统之间的通信更容易。MicroProfile 和 Spring 都支持 REST。
+
+==== *JAX-RS*
+
+MicroProfile 使用来自Jakarta EE的JAX-RS。在 JAX-RS中，您需要定义一个应用程序和 JAX-RS
+资源。在以下示例中，定义了应用程序CatalogApplication和 JAX-RS资源CatalogService，详细信息如下。
+
+[source]
+----
+@ApplicationPath("/rest")
+public class CatalogApplication extends Application {
+}
+@Path("/items")
+@Produces(MediaType.APPLICATION_JSON)
+public class CatalogService {..}
+@GET
+public List<Item> getInventory() {...}
+@GET
+@Path("{id}")
+public Response getById(@PathParam("id") long id) {...}
+----
+在上面提到的例子中，一个端点 http://${host}:${port}/rest/items
+将被暴露。
+
+请参阅link:https://openliberty.io/guides/rest-intro.html[此]Open Liberty
+以了解有关 JAX-RS 的更多信息。
+
+==== *Spring*
+
+在 Spring 框架中，您将需要创建一个 SpringBootApplication 和
+Controller。在以下示例中，Application并CatalogController相应地创建。
+
+[source]
+----
+
+@SpringBootApplication
+public class Application {
+    public static void main(String[] args)
+    SpringApplication.run(Application.class, args);}
+}
+
+@RestController
+public class CatalogController {..}
+@RequestMapping(value = "/items", method = RequestMethod.GET)
+@ResponseBody
+List<Item> getInventory() {..}
+@RequestMapping(value = "/items/{id}", method = RequestMethod.GET)
+ResponseEntity<?> getById(@PathVariable long id) {...}
+----
+
+在上面提到的例子中，一个端点 http://${host}:${port}/rest/items
+将被暴露。
+
+=== *依赖注入*
+
+在设计云原生微服务时，最佳实践是创建松耦合的微服务。MicroProfile 采用
+Jakarta EE 的上下文和依赖注入 (CDI)，而 Spring 使用 Spring DI、IoC
+来达到相同的效果。
+
+==== *CDI*
+
+下面展示如何使用CDI进行依赖注入
+
+[source]
+----
+@ApplicationPath("/rest")
+public class JaxrsApplication extends Application {
+@Inject
+private InventoryRefreshTask refreshTask;
+----
+
+上面的代码片段将注入InventoryRefreshTask到一个实例refreshTask。
+
+CDI 是 Jakarta EE 和 MicroProfile 的核心部分。了解 CDI非常重要。请参阅link:https://openliberty.io/guides/cdi-intro.html[此]Open
+Liberty 指南以了解有关 CDI 的一些基础知识。
+
+==== _Spring DI 和 IoC_
+
+Spring使用依赖注入，控制反转来实现松耦合。以下代码片段说明了如何通过
+@Autowired 使用 Spring
+DI的一个实例InventoryRefreshTask将被注入到变量refreshTask中。顺便说一句，Spring
+也支持@Inject，相当于@Autowired.
+
+[source]
+----
+@SpringBootApplication
+public class Application {
+    @Autowired
+    private InventoryRefreshTask refreshTask;
+    ...
+}
+----
+
+=== *文档 API*
+
+微服务需要宣传他们的能力，以便潜在客户可以使用他们的服务。在记录 API
+时，MicroProfile 和 Spring 处理的方式不同。
+
+==== MicroProfile 开放 API
+
+MicroProfile
+使用link:https://github.com/eclipse/microprofile-open-api/releases[MicroProfile
+Open API]来记录 API，它基于 Swagger API。在 MicroProfile Open API
+中，任何 JAX-RS 资源都会自动选择生成其 API。它还可以在 META-INF
+文件夹下获取文件名为 openapi.yaml 或 openapi.yml 或 openapi.json 的打开
+API 的yaml文件。以下是如何记录API响应和操作的示例。
+
+[source]
+----
+@GET
+@Produces(MediaType.APPLICATION_JSON)
+@APIResponse(
+    responseCode = "200",
+    description = "host:properties pairs stored in the inventory.",
+    content = @Content(mediaType = "application/json",
+    schema = @Schema(type = SchemaType.OBJECT,
+    implementation = InventoryList.class)))
+@Operation(summary = "List inventory contents.",
+    description = "Returns the stored host:properties pairs.")
+public InventoryList listContents() {
+    return manager.list();
+}
+----
+
+在上述代码段中，端点 http://{host.name}:${port}/openapi
+将通过以下输出公开。
+
+[source]
+----
+openapi: 3.0.0
+info:
+    title: Inventory App
+    description: App for storing JVM system properties of various hosts.
+license:
+    name: Eclipse Public License - v 1.0
+    url: https://www.eclipse.org/legal/epl-v10.html
+version: "1.0"
+    servers: - url: http://localhost:{port} description: Simple Open Liberty.
+variables:
+    port:
+        description: Server HTTP port.
+        default: "9080"
+paths:
+    /inventory/systems:
+get:
+    summary: List inventory contents.
+    description: Returns the currently stored host:properties pairs in the
+    inventory.
+    operationId: listContents
+responses:
+    200:
+        description: host:properties pairs stored in the inventory.
+        content:
+        application/json:
+        schema:
+        $ref: '#/components/schemas/InventoryList'
+... .
+----
+
+如果您使用 Open Liberty，端点
+http://{host.name}:${port.number}/openapi/ui
+也将被公开，这允许最终用户直接调用各个端点。
+
+image::/img/blog/MP_OpenAPI_UI.png[OpenAPI UI, width=70%,align="center"]
+
+如果您熟悉 Swagger API，您会发现这很熟悉。
+
+请参阅link:https://openliberty.io/guides/microprofile-openapi.html[此]Open
+Liberty 指南以了解有关 MicroProfile Open API 的更多信息。
+
+==== Spring文档
+
+Spring 使用测试来记录 API，并能够生成 API
+文档作为测试运行的一部分。这是生成 Spring 文档的方法。
+
+1.定义依赖
+
+[source]
+----
+<dependency>
+    <groupId>org.springframework.restdocs</groupId>
+    <artifactId>spring-restdocs-mockmvc</artifactId>
+    <scope>test</scope>
+</dependency>
+<dependency>
+    <groupId>org.springframework.restdocs </groupId>
+    <artifactId>spring-restdocs-core</artifactId>
+    <scope>test</scope>
+</dependency>
+----
+
+2. 定义你的 Rest 服务
+
+[source]
+----
+@RestController
+public class CatalogController {
+    @RequestMapping("/")
+    public @ResponseBody String index() {
+        return "Greetings from Catalog Service!";
+    }
+}
+----
+
+3.定义所有必要的测试类
+
+[source]
+----
+
+@RunWith(SpringRunner.class)
+@SpringBootTest(classes = CatalogController.class)
+@WebAppConfiguration
+public class CatalogControllerTest {
+    @Rule public JUnitRestDocumentation restDocumentation = new
+    JUnitRestDocumentation("target/generated-snippets");
+    private MockMvc mockMvc;
+    @Autowired private WebApplicationContext context;
+    @Before public void setUp() {
+        mockMvc = MockMvcBuilders.webAppContextSetup(context)
+        .apply(documentationConfiguration(restDocumentation)) .build();
+
+    }
+}
+
+----
+
+4.alwaysDo(), responseFileds(), requestPayload(), links(),fieldWithPath(), requestParameters(), pathParameters()用于记录
+
+[source]
+----
+@Test
+public void crudDeleteExample() throws Exception {
+    this.mockMvc.perform(delete("/crud/{id}",
+    10)).andExpect(status().isOk())
+    .andDo(document("crud-delete-example",
+    pathParameters(
+    parameterWithName("id").description("The id of the input to delete")
+    )));
+
+}
+----
+
+运行测试时，将生成 API 文档。
+
+=== *Rest Client*
+
+云原生微服务不是独立的。微服务相互交互。一个微服务调用第二个微服务，然后第二个微服务调用第三个微服务，依此类推。通常，它是一种网状结构。例如，在微服务A调用微服务B的场景中，微服务 A 表现为客户端。如何建立从微服务A到微服务B的连接？ Rest client 来解决！
+
+==== MicroProfile Rest Client
+
+JAX-RS 客户端可用于进行客户端服务器通信，详述如下。
+
+[source]
+----
+Client client = ClientBuilder.newClient();
+Response res = client.target("http://example.org/hello").request("text/plain").get();
+----
+
+但是，它不是类型安全的客户端，因此容易出错。传入错误参数的调用会导致运行时错误，这为时已晚。
+
+link:https://github.com/eclipse/microprofile-rest-client/releases[MicroProfile
+Rest Client]是一种类型安全的 Rest
+Client，它提供了一种更简单的方式来进行客户端服务器通信。它是如何工作的？以下是步骤。
+
+步骤 1：注册一个 REST 客户端 API
+
+[source]
+----
+@Dependent
+
+@RegisterRestClient(baseUri=http://localhost:9080/system)
+@RegisterProvider(InventoryResponseExceptionMapper.class)
+public interface InventoryServiceClient {
+    @GET
+    @Produces(MediaType.APPLICATION_JSON)
+    List<Item> getAllItems() throws UnknownUrlException,
+    ServiceNotReadyException;
+}
+----
+
+第 2 步：将客户端 API 注入客户端微服务 JAX-RS 资源
+
+[source]
+----
+@Inject
+@RestClient
+private InventoryServiceClient invClient;
+final List<Item> allItems = invClient.getAllItems();
+----
+
+第3步：重新绑定后端微服务
+
+io.openliberty.guides.inventory.client.SystemClient/mp-rest/url=http://otherhost:8080/system
+
+使用附加的完全限定类名/mp-rest/url作为键，使用后端服务端点作为值。在云端部署此微服务时，后端URL会与其他环境不同。通常，您需要通过 Kubernetes ConfigMap 在客户端的
+deployment.yaml 中重新绑定后端服务。
+
+请参阅link:https://openliberty.io/guides/microprofile-rest-client.html[此]Open
+Liberty 指南以了解有关 MicroProfile Rest Client 的更多信息。
+
+==== Spring
+
+Spring 使用了与 MicroProfile Rest Client 类似的方法，并使用了
+FeignClient 和 Injection 等相应技术。
+
+_第 1 步：定义客户端_
+
+[source]
+----
+@FeignClient(name="inventory-service", url="${inventoryService.url}")
+public interface InventoryServiceClient {
+    @RequestMapping(method=RequestMethod.GET,
+    value="/micro/inventory", produces={MediaType.APPLICATION_JSON_VALUE})
+    List<Item> getAllItems();
+}
+----
+
+第2步：启用客户端并注入客户端
+
+[source]
+----
+@EnableFeignClients
+public class Application {
+    @Autowired
+    private InventoryServiceClient invClient;
+    final List<Item> allItems = invClient.getAllItems();
+    ...
+}
+----
+
+=== *在线负载 - JSON*
+
+JSON 格式是网络上常见的媒体类型。JSON-B 和 JSON-P 是帮助处理 JSON
+媒体类型的流行技术。
+
+==== JSON-P 和 JSON-B
+
+MicroProfile 2.0 及更高版本同时支持JSON-B和JSON-P，这极大地简化了JSON 对象的序列化和反序列化。下面是使用 JSON-B 序列化artists对象的示例。
+
+[source]
+----
+public class car {
+    private String make;
+    private String model;
+    private String reg;
+    ...
+}
+import javax.json.bind.Jsonb;
+import javax.json.bind.JsonbBuilder;
+Car car = new Car("VW", "TGUAN", "HN19MDZ");
+Jsonb jsonb = JsonbBuilder.create();
+String json = jsonb.toJson(car);
+----
+
+The toJson () 方法返回序列化的 car对象。
+[source]
+----
+{
+"make": "VW",
+"model": "TGUAN",
+"reg": "HN19MFZ"
+}
+----
+
+使用 JSON-B 进行反序列化同样简单。
+[source]
+----
+Car car = Jsonb.fromJson(json, Car.class);
+----
+
+为了在线传输 JSON 对象，您只需定义一个 POJO，例如
+
+[source]
+----
+public class InventoryList {
+    private List<SystemData> systems;
+    public InventoryList(List<SystemData> systems) {
+        this.systems = systems;
+    }
+    public List<SystemData> getSystems() {
+        return systems;
+    }
+
+    public int getTotal() {
+        return systems.size();
+    }
+}
+----
+
+在 JAX-RS 资源中，您可以直接将此类型作为 JSON 对象返回。
+
+[source]
+----
+@GET
+@Produces(MediaType.APPLICATION_JSON)
+
+public InventoryList listContents() {
+    return manager.list();
+}
+----
+
+请参阅link:https://cloud.ibm.com/docs/java?topic=java-mp-json[本文]以了解有关
+JSON-B 的更多信息。
+
+==== Spring
+
+Spring 可以直接使用 Jackson 或 JSON-B。
+
+[source]
+----
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+final ObjectMapper objMapper = new ObjectMapper();
+jsonString = objMapper.writeValueAsString(car);
+// or use JSON-B
+import javax.json.bind.Jsonb;
+import javax.json.bind.JsonbBuilder;
+Jsonb jsonb = JsonbBuilder.create();
+String result = jsonb.toJson(car);
+----
+
+== 处理 100 个微服务
+
+在您的云基础架构中通常有 100 个微服务。在处理
+100个服务时，您将需要监控服务、配置服务、对服务进行安全防护等。
+
+=== *配置微服务*
+
+云原生微服务是可配置的，因此它们可以由 DevOps
+更新。开发人员不必因为配置值更改而重新打包微服务。设计原则是这些配置可以存储在微服务外部的某个地方，并且这些配置可供微服务使用。这被称为外部化配置，这是link:https://12factor.net/[12因素 APP]强调的因素之一。下面我们来看看 MicroProfile 和 Spring
+是如何帮助我们配置微服务的。
+
+==== *MicroProfile配置*
+
+link:https://github.com/eclipse/microprofile-config/releases[MicroProfile
+Config]通过将配置值放在配置源中来启用外部化配置，然后微服务可以使用注入或以编程方式查找来获取相应的配置值。
+
+第 1
+步：在配置源中指定配置，可以是系统属性、环境变量、microprofile-config.properties
+或自定义配置源。
+[source]
+----
+# Elasticsearch
+elasticsearch_url=http://es-catalog-elasticsearch:9200
+elasticsearch_index=micro
+elasticsearch_doc_type=items
+----
+
+第 2 步：使用编程查找或注入
+[source]
+----
+Config config = ConfigProvider.getConfig();
+private String url = config.getValue("elasticsearch_url",
+String.class);
+----
+或者
+[source]
+----
+@Inject @ConfigProperty(name="elasticsearch_url") String url;
+----
+
+请参阅link:https://openliberty.io/guides/microprofile-config.html[此]Open
+Liberty 指南以了解有关 MicroProfile Config 的更多信息。
+
+让我们看看如何用 Spring 框架做同样的事情。
+
+==== Spring配置
+
+您可以使用 Spring config 通过以下步骤实现配置外部化。
+
+第 1 步：在配置源中定义配置
+
+# Elasticsearch
+[source]
+----
+elasticsearch:
+    url: http://localhost:9200
+    user:
+    password:
+    index: micro
+    doc_type: items
+----
+
+第 2 步：将配置属性注入 bean
+[source]
+----
+@Component("ElasticConfig")
+@ConfigurationProperties(prefix = "elasticsearch")
+public class ElasticsearchConfig {
+    // Elasticsearch stuff
+    private String url;
+    private String user;
+    ...
+    public String getUrl() {
+        return url;
+    }
+    public void setUrl(String url) {
+        this.url = url;
+    }
+}
+----
+第 3 步：将配置 bean 注入其他类
+[source]
+----
+@Autowired
+private ElasticsearchConfig config;
+String url = config.getUrl();
+----
+=== *容错*
+
+云原生微服务需要容错，因为不确定因素或移动部件太多。MicroProfile和Spring都提供了一个模型来实现容错。
+
+==== MicroProfile 容错
+
+link:https://github.com/eclipse/microprofile-fault-tolerance/releases[MicroProfile Fault Tolerance]通过使用@Timeout、@Retry、@Fallback、@Bulkhead、@CircuitBreaker
+的注解提供以下能力：
+
+[arabic]
+. {blank}
++
+____
+超时：定义超时的持续时间
+____
+. {blank}
++
+____
+重试：定义何时重试的标准
+____
+. {blank}
++
+____
+回退：为失败的执行提供替代解决方案。
+____
+. {blank}
++
+____
+故障隔离：隔离部分系统的故障，而系统的其余部分仍能工作。
+____
+. {blank}
++
+____
+断路器：通过自动执行失败，提供一种快速故障方式，以防止系统过载和客户端无限期等待或超时。
+____
+
+以下代码片段描述了getInventory()2s 后超时的调用。如果操作失败，则在 2s
+的总时长内最多重试 2 次。连续 20
+次调用，如果发生一半故障，电路将被困开。如果重试后仍然失败，fallbackInventory将调用回退操作方法。
+[source]
+----
+@Timeout(value = 2, unit = ChronoUnit.SECONDS)
+@Retry(maxRetries = 2, maxDuration = 2000)
+@CircuitBreaker
+@Fallback(fallbackMethod = "fallbackInventory")
+@GET
+public List<Item> getInventory() {
+    return items;
+}
+public List<Item> fallbackInventory() {
+    //Returns a default fallback
+    return fallbackitemslist;
+}
+----
+
+请参阅link:https://openliberty.io/guides/retry-timeout.html[[.underline]#此#]交互式
+Open Liberty 指南以了解有关 MicroProfile 容错的更多信息。
+
+==== Spring Fault Tolerance
+
+Spring 使用 Hysterix 来实现容错，下文详述。
+[source]
+----
+@Service
+public class AppService {
+    @HystrixCommand(fallbackMethod = "fallback")
+    public List<Item> getInventory() {
+        return items;
+    }
+    public List<Item> fallback() {
+        //Returns a default fallback
+        return fallbackitemslist;
+    }
+}
+
+import
+org.springframework.cloud.client.circuitbreaker.EnableCircuitBreaker
+@SpringBootApplication
+@RestController
+@EnableCircuitBreaker
+public class Application {
+    ...
+}
+----
+
+=== *Microservices安全*
+
+云原生微服务应该是安全的，因为它们是公开的，容易受到攻击。MicroProfile
+将 MicroProfile JWT 与 Java EE Security 一起使用，而 Spring 使用 Spring
+安全性。
+
+==== MicroProfile JWT
+
+MicroProfile JWT 构建在 JWT 之上，向 JWT 添加了一些声明以识别用户ID和用户规则。以下代码片段演示了端点 /orders
+只能由具有“admin”角色的人访问。
+[source]
+----
+@DeclareRoles({"Admin", "User"})
+@RequestScoped
+@Path("/orders")
+public class OrderService {
+@Inject private JsonWebToken jwt;
+@GET
+@RolesAllowed({ "admin" })
+@Produces(MediaType.APPLICATION_JSON)
+public InventoryList listContents() {
+    return manager.list();
+}
+...
+}
+----
+
+请参阅此link:https://openliberty.io/guides/microprofile-jwt.html[Open Liberty
+指南]以了解如何使用 MicroProfile JWT。
+
+==== Spring Security
+
+您可以通过配置 Spring Security 来保护 Spring 微服务。如果 Spring Security 在类路径上，则 Spring Boot 使用基本身份验证自动保护所有 HTTP端点。
+
+首先，您需要指定对spring-boot-starter-security. +
+其次，在您的微服务中，指定以下注释EnableWebSecurity或EnableResourceServer保护微服务。请参见下面的示例
+[source]
+----
+@Configuration
+@EnableWebSecurity
+@EnableResourceServer
+public class OAuth2ResourceServerConfig extends
+ResourceServerConfigurerAdapter {
+    @Autowired
+    Private JWTConfig securityConfig;
+    ....
+}
+----
+
+微服务性能
+
+在云中部署微服务后，DevOps 负责监控微服务的性能。如果出现问题，DevOps需要一些监控数据来识别瓶颈或从指标数据中发现任何警告。智能云原生微服务应该能够与云基础设施就其健康状态进行通信，了解它是否准备好接收流量或服务请求等。让我们看看编程模型在这方面必须提供什么。
+
+=== *健康检查*
+
+云原生微服务应该能够与云基础设施就其健康状态进行通信。MicroProfile和Spring都提供了这种能力。Kubernetes
+是最流行的微服务编排器，可以检查容器（正在运行的微服务实例）的就绪或活跃状态。如果微服务不活跃，需要执行pod
+重启，比如内存不足。未就绪是指微服务还没有为服务器请求做好准备，比如数据库连接异常等。
+
+==== MicroProfile Health
+
+MicroProfile Health 2.0及更高版本提供就绪和在线端点。微服务可以提供HealthCheck带有注释的实现@Readiness以配置就绪检查过程。所有bean实现HealthCheck和注解的聚合@Readiness配置了/ready的端点。
+
+[source]
+----
+@Readiness
+public class HealthEndpoint implements HealthCheck {
+    @Override
+    public HealthCheckResponse call() {...}
+}
+----
+
+类似地，微服务可以提供带有注释的 HealthCheck
+实现，@Liveness以配置活动检查过程。HealthCheck带有注解的所有 bean
+实现的聚合@Liveness配置了 /live 的端点。
+
+[source]
+----
+@Liveness
+public class HealthEndpoint implements HealthCheck {
+    @Override
+    public HealthCheckResponse call() {...}
+}
+----
+Kubernetes 可以根据下面的代码片段在其 liveness 或 readiness或startup探针中相应地查询 /health/live 或 /health/ready 或/health/started端点。
+
+[source,json]
+----
+livenessProbe:
+    exec:
+        command:
+            - curl
+            - -f
+            - http://localhost:9080/health/live
+    initialDelaySeconds: 120
+    periodSeconds: 10
+readinessProbe:
+    exec:
+        command:
+            - curl
+            - -f
+            - http://localhost:9080/health/ready
+    initialDelaySeconds: 120
+    periodSeconds: 10
+----
+
+请参阅此link:https://openliberty.io/guides/kubernetes-microprofile-health.html[Open Liberty指南]以了解如何使用 MicroProfile Health。
+
+==== Spring
+
+Spring Boot使用Actuator 提供应用程序的健康状态。SpringBoot Actuator
+
+暴露 /health
+端点来指示正在运行的应用程序的健康状态，例如数据库连接、磁盘空间不足等。应用程序通过HealthIndicator. 此健康信息是从所有实现__HealthIndicator__应用程序上下文中配置的接口的bean中收集的。下面是自定义运行状况实施的示例。
+[source]
+----
+@Component
+public class HealthCheck implements HealthIndicator {
+    @Override
+    public Health health() {
+        int errorCode = check(); // perform some specific health check
+        if (errorCode != 0) {
+            return Health.down().withDetail("Error Code", errorCode).build();
+        }
+        return Health.up().build();
+    }
+    public int check() {
+        // Our logic to check health
+        return 0;
+    }
+}
+----
+
+=== *Metrics*
+
+对于正在运行的云原生微服务，了解它正在服务的流量、吞吐量是多少以及它可能很快停止工作的任何迹象都是很有用的。Metrics可以帮助解决这个问题。
+
+==== MicroProfile Metrics
+
+link:https://github.com/eclipse/microprofile-metrics/releases[MicroProfileMetrics]提供了一个端点/metrics来公开所有指标信息，包括下划线运行时。/metrics
+的端点显示一些基本指标。例如，Open Liberty
+提供了以下开箱即用的指标类型。本文省略了每种类型的详细信息。
+[source]
+----
+# TYPE base:classloader_total_loaded_class_count counter
+# TYPE base:gc_global_count counter
+# TYPE base:cpu_system_load_average gauge
+# TYPE base:thread_count counter
+# TYPE base:classloader_current_loaded_class_count counter
+# TYPE base:gc_scavenge_time_seconds gauge
+# TYPE base:jvm_uptime_seconds gauge
+# TYPE base:memory_committed_heap_bytes gauge
+# TYPE base:thread_max_count counter
+# TYPE base:cpu_available_processors gauge
+# TYPE base:thread_daemon_count counter
+# TYPE base:gc_scavenge_count counter
+# TYPE base:classloader_total_unloaded_class_count counter
+# TYPE base:memory_max_heap_bytes gauge
+# TYPE base:cpu_process_cpu_load_percent gauge
+# TYPE base:memory_used_heap_bytes gauge
+# TYPE base:gc_global_time_seconds gauge
+...
+----
+
+您可以添加特定于应用程序的指标以收集更多指标。以下是如何收集关联端点的响应时间和调用次数等的示例。
+[source]
+----
+@Timed(name = "Inventory.timer", absolute = true, displayName="Inventory
+Timer", description = "Time taken by the Inventory", reusable=true)
+
+@Counted(name="Inventory", displayName="Inventory Call count",
+description="Number of times the Inventory call happened.",
+monotonic=true, reusable=true)
+
+@Metered(name="InventoryMeter", displayName="Inventory Call Frequency",
+description="Rate of the calls made to Inventory", reusable=true)
+// Get all rows from database
+
+public List<Item> findAll(){ }
+----
+
+请参阅此link:https://openliberty.io/guides/microprofile-metrics.html[Open
+Liberty 指南]以了解如何使用 MicroProfile Metrics。
+
+==== Spring Actuator
+
+Spring 通过 Spring Actuator 提供度量指标。Spring Actuator公开一个端点/metrics以显示应用程序指标。在以下代码片段中，/metrics显示有效列表的数量和无效列表的计数。下面是自定义
+Metrics 实现的示例。
+[source]
+----
+@Service
+public class LoginServiceImpl {
+    private final CounterService counterService;
+    public List<Item> findAll (CounterService counterService) {
+        this.counterService = counterService;
+        if(list.size()>1)
+            counterService.increment("counter.list.valid ");
+        else
+            counterService.increment("counter.list.invalid");
+}
+----
+
+=== *分布式跟踪*
+
+在微服务架构中，一个微服务调用另一个微服务是很常见的。对于
+DevOps，查看调用链很重要。当出现问题时，应立即将故障服务固定下来。为了支持这一点，我们需要一种方法来创建调用链。幸运的是，这就是分布式跟踪发挥作用的地方。分布式跟踪的实现细节是将关联
+id 沿调用链传播，以便 Zipkin 或 Jaeger 可以使用此公共关联 id
+形成一条链。MicroProfile 和 Spring 都具有分布式跟踪支持。
+
+==== MicroProfile Open Tracing
+
+link:https://github.com/eclipse/microprofile-opentracing/releases[[.underline]#MicroProfile Open Tracing#]定义了用于访问 JAX-RS 应用程序中符合 OpenTracing的Tracer对象的行为和 API。这些行为指定传入和传出请求将如何自动创建OpenTracing Span。
+
+当从被跟踪的客户端发送请求时，会创建一个新的 Span，并将其 SpanContext注入到出站请求中以向下游传播。如果存在活动 Span，则新 Span 将是活动 Span
+的孩子。当出站请求完成时，新的 Span 将完成。所有 JAX-RS 和 Rest Client调用都会自动传播相关 ID。
+
+您可以指定非JAX-RS操作以通过传播相关ID @Traced，详情如下。
+
+自定义跟踪实现
+[source]
+----
+import org.eclipse.microprofile.opentracing.Traced;
+import io.opentracing.ActiveSpan;
+import io.opentracing.Tracer;
+@Traced(value = true, operationName ="getCatalog.list")
+public List<Item> getInventory() {
+    try (ActiveSpan childSpan = tracer.buildSpan("Grabbing messages from Messaging System").startActive()) {...}
+
+}
+----
+
+访问此 Open Liberty link:https://openliberty.io/guides/microprofile-opentracing.html[指南]，了解有关
+MicroProfile Open Tracing 的更多信息。
+
+==== Spring Tracing
+
+Spring 使用 Spring Cloud Sleuth来提供分布式跟踪支持。如果在类路径中配置了Spring cloud sleuth，则会自动生成trace信息。
+[source]
+----
+<dependency>
+    <groupId>org.springframework.cloud</groupId>
+    <artifactId>spring-cloud-starter-sleuth</artifactId>
+</dependency>
+----
+
+至此，您应该对 MicroProfile 和 Spring
+的功能有了一些了解，让我们开始创建您的云原生微服务。
+
+== 入门
+
+MicroProfile和Spring 都有一个起始页。
+
+=== MicroProfile 入门
+
+MicroProfile starter ( https://start.microprofile.io/ )
+为您提供了一种使用 MicroProfile
+创建微服务的好方法，您可以选择自己喜欢的运行容器，例如link:https://openliberty.io/[Open
+Liberty]、link:https://thorntail.io/[Thorntail]、link:https://www.payara.fish/[Payara]、link:https://tomee.apache.org/[TomEE]、link:https://ee.kumuluz.com/[KumuluzEE]、link:https://helidon.io/[Helidon]等.
+
+image::img/blog/MP_starter.png[MicroProfile Starter, width=70%,align="center"]
+
+您还可以使用命令行使用 MicroProfile
+创建微服务。有关如何使用命令行工具，请参阅link:https://microprofile.io/2019/07/08/command-line-interface-for-microprofile-starter-is-available-now/[Karm
+的博客]我们提供 VS Code 和 Intellij扩展插件，以允许您直接从您的 IDE
+创建微服务。我们计划为其他 IDE 创建扩展，例如Eclipse IDE 等。敬请期待！
+
+=== Spring Starter
+
+Spring 有一个起始页面 ( https://start.spring.io/ ) 可帮助您创建 Spring
+Boot 应用程序。
+
+image::/img/blog/sspring_starter.png[SpringBoot starter, width=70%,align="center"]
+
+== 差异
+
+从功能的角度来看，MicroProfile 和 Spring
+具有可比性。但是，它们确实存在差异，总结如下。
+
+[cols=",,",options="header",]
+|===
+| |*Spring* |*MicroProfile*
+|*APIs* a|
+开源
+
+WMware 驱动 +
+Spring 定义
+
+|开源 +
+社区驱动 +
+开放标准，符合规范行为
+|代码行 a|
+多代码
+
+做你想做/需要的事情
+
+a|
+少代码
+
+自定义服务器配置
+
+|库/依赖项 a|
+查找、混合和匹配您喜欢的内容
+
+管理您自己的依赖项
+
+|服务器提供每个规范所需的内容
+|应用程序包装 |Fat JARs |Thin/Skinny JARs +
+注意：Liberty 已优化对容器中的 Spring Boot 应用程序的支持
+|===
+
+== 总结
+
+Spring 和 Eclipse MicroProfile
+都为开发人员提供了构建下一代云原生微服务的工具，并具有以下观察结果。它们有相似之处，也有不同之处（有时是重要的）
+
+Spring已经存在了好几年，并获得了很多人气。MicroProfile 和 Jakarta
+EE作为社区驱动和基于标准的企业 Java
+微服务和云原生应用程序开发工作正在迅速发展（并获得动力）。
+
+开发人员现在可以选择他们喜欢的东西，这很棒。公司应该为开发人员提供能够实现创新和灵活性并为企业和生产做好准备的平台。Open
+Liberty ( https://openliberty.io/ )
+是一个快速、小型和轻量级的运行时，同时支持MicroProfile/Jakarta EE 和
+Spring。
+
+== 致谢
+
+本文深受将 IBM BlueCompute 微服务从 Spring 迁移到 Eclipse MicroProfile
+实践的影响。可以在link:https://www.ibm.com/cloud/blog/migrate-java-microservices-from-spring-to-microprofile-p1[此处]找到描述迁移的系列博客。非常感谢我的同事
+YK Chang 对本文的贡献。
+
+== 参考
+
+[arabic]
+. https://www.ibm.com/blogs/bluemix/2018/09/migrate-java-microservices-from-spring-to-microprofile-p1/[将
+Bluecompte 应用程序从 Spring 迁移到 MicroProfile 博客]
+. https://microprofile.io/[MicroProfile 网站]
+. https://wiki.eclipse.org/MicroProfile/Implementation[MicroProfile
+实现运行时]
+. https://start.microprofile.io/[MicroProfile 起始页]
+. https://microprofile.io/blog/[MicroProfile 博客]
+. https://openliberty.io/[Open Liberty网站]
+. https://www.eclipse.org/community/eclipse_newsletter/2018/september/MicroProfile_istio.php[MicroProfile
+和 Istio 生态系统]
+. https://github.com/IBM/cloud-native-starter[带有 MicroProfile 和 Istio
+的 Cloud Native Starter]
+
+== 关于作者
+
+原著：Emily Jiang， 翻译：赵欣
+
+EmilyJiang https://twitter.com/emilyfhjiang
