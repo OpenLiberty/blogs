@@ -23,24 +23,24 @@ additional_authors:
 
 == Liberty InstantOnとは
 
-2022年9月29日にLiberty InstantOnが発表されました。これはフル機能のJava EEアプリケーションサーバーを数百ミリ秒で起動する技術です。
+2022年9月29日にLiberty InstantOnが発表されました。これはフル機能のクラウドネイティブJavaランタイムを数百ミリ秒で起動する技術です。Libertyは、MicroProfileとJakartaのWebProfileをサポートしています。
 
-コンテナ環境でServerless技術を利用する場合には，プロセスの起動時間が重要となります。リクエストがきてからコンテナ環境を起動するServerlessでは，コンテナのプロセスが起動する時間がレスポンスタイムに含まれるために，その短さはサービスの品質に直接影響します。
+コンテナ環境でServerless技術を利用する場合には，プロセスの起動時間が重要となります。リクエストがきてからコ￥ンテナ環境を起動するServerlessでは，コンテナのプロセスが起動する時間がレスポンスタイムに含まれるために，その短さはサービスの品質に直接影響します。
 
-Javaのアプリケーションの起動時間を短縮する取り組みとしては，GraalVMの機能を使ってアプリケーションをネイティブの実行可能ファイルに変換する方法が試みられています。ただ，GraalVMのネイティブ化では，Javaの全ての機能を利用できるわけではないので，広く使われているJava EEのアプリケーションを実行可能ファイルに変換することはできません。
+Javaのアプリケーションの起動時間を短縮する取り組みとしては，GraalVMの機能を使ってアプリケーションをネイティブの実行可能ファイルに変換する方法が試みられています。ただ，GraalVMのネイティブ化では，Javaの全ての機能を利用できるわけではないので，広く使われているJava EEまたはJakartaEEのアプリケーションを実行可能ファイルに変換することはできません。
 
 Liberty InstantOnはこれとは異なる方法で起動時間を短縮する機能です。LinuxのCRIU（Checkpoint/Restore In Userspace）という技術を利用します。CRIUは，起動しているプロセスの情報をファイルに記録（Checkpoint）し，ファイルからプロセスを復帰（Restore）させるための一連の機能です。これを組み込んだOpenJ9 VMでOpen Liberty/WebSphere Libertyを起動し，アプリケーションの初期化が終わった時点でCheckpointを取得します。この状態のコンテナをCommitし，そこから再開することでごく短時間での起動を実現します。
 
 == Intel MacでInstantOnを試す
 
-link:https://openliberty.io/blog/2022/09/29/instant-on-beta.html[Open Liberty の開始] で紹介されているサンプル手順はRed Hat Enterprise Linux上での実行が前提となっていますが，同じ内容をmacOS Monterey（バージョン12.x）を搭載したIntel Macでも実行できましたので手順を公開します。
+link:https://openliberty.io/blog/2022/09/29/instant-on-beta.html[Open Liberty の開始] で紹介されているサンプル手順はRed Hat Enterprise Linux上での実行が前提となっていますが，同じ内容をmacOS Monterey（バージョン12.x）を搭載したIntel Macでも実行できましたので手順を公開します。現在のところInstantOnフィーチャーはMI aach64アーキテクチャーではサポートされていません。
 
 InstantOnのサンプル環境はコンテナイメージとしてIBM Cloud Registryから公開されています。コンテナ実行環境としてはHomebrewで導入したpodmanを使用します。ページの記述にしたがって普通に実行しただけだとエラーで失敗しますので，最終的に成功した手順を載せておきます。
 
 === Podmanの準備
 
 
-InstantOnではLinuxのカーネルのCAP_CHECKPOINT_RESTORE機能を使用するため，podmanをrootlessモードで起動していると正常に稼働しません。また，いちど仮想環境（podman machine）をrootlessモードで起動してしまっていると，rootfulモードで実行しても失敗してしまうので，専用の新しい仮想マシンを作成するようにします。
+InstantOnではLinuxのカーネルのCAP_CHECKPOINT_RESTORE機能を使用するため，podmanをrootlessモードで起動していると正常に稼働しません。また，いちど仮想環境（podman machine）をrootlessモードで起動してしまっていると，rootfulモードで実行しても失敗してしまうので，専用の新しい仮想マシンを作成するようにします。（`podman machine list` でリストして `podman machine rm` で古い仮想マシンを削除できます）
 
 podmanの仮想環境を作成し，rootfulモードで起動します。デフォルトで起動した仮想マシンに接続するように構成します。
 
@@ -72,17 +72,16 @@ $ podman system connection default rootful-root
 ----
 $ podman version
 Client:       Podman Engine
-Version:      4.2.1
-API Version:  4.2.1
-Go Version:   go1.18.6
-Built:        Wed Sep  7 04:16:02 2022
+Version:      4.3.0
+API Version:  4.3.0
+Go Version:   go1.18.7
+Built:        Tue Oct 18 13:55:57 2022
 OS/Arch:      darwin/amd64
-
 Server:       Podman Engine
-Version:      4.2.1
-API Version:  4.2.1
-Go Version:   go1.18.5
-Built:        Thu Sep  8 04:58:19 2022
+Version:      4.3.0
+API Version:  4.3.0
+Go Version:   go1.18.7
+Built:        Fri Oct 21 04:16:35 2022
 OS/Arch:      linux/amd64
 ----
 
@@ -227,6 +226,7 @@ CWWKE0953W: This version of Open Liberty is an unsupported early release version
 /opt/ol/wlp/bin/server: line 946:   130 Killed                  "${JAVA_CMD}" "$@" >> "${CHECKPOINT_CONSOLE_LOG}" 2>&1 < /dev/null 
 ----
 
+このコマンドで、コンテナが立ち上がり、アプリケーションが起動されます。アプリケーションが立ち上がったところで、ランタイムはプロセスの”チェックポイント”を行います。プロセスの状態が保存されたところで、コンテナを終了します。
 今回は--rmをつけずにコンテナを起動したので，実行後のコンテナ環境がそのまま残っています。この環境にcheckpointでプロセスの情報が記録されたファイルが保存されています
 
 [source]
@@ -235,7 +235,7 @@ $ podman ps -a
 CONTAINER ID  IMAGE                             COMMAND               CREATED        STATUS                    PORTS       NAMES
 940fd476eccc  localhost/getting-started:latest  /opt/ol/wlp/bin/s...  4 minutes ago  Exited (0) 4 minutes ago              getting-started-checkpoint-container
 ----
-これをcommitして新しいイメージとして登録します。
+これをcommitして`getting-started-instanton`という新しいイメージにしました。このイメージは、先ほどのアプリケーションが起動した状態のチェックポイント・プロセスを保持しています。このコンテナは、このプロセスの状態から起動します。
 
 [source]
 ----
@@ -264,6 +264,66 @@ icr.io/appcafe/open-liberty          beta-instanton  7cd2ddfe28da  2 weeks ago  
 
 手元の環境では0.1〜0.2秒でLibertyが起動しました。curlコマンドやブラウザなどでアクセスすると，普通にLibertyが起動していることがわかると思います。LibertyはCtrl+Cで止めてください。このイメージは，もちろん何度でも起動することができます。
 
+== `--prividelged` をつけないでRestoreする場合
+
+上記の例では、InstantOnの効果を簡単にご覧いただくためにコンテナを`--privileged`で起動しましたが、ベストプラクティスは必要最低限の権限でコンテナを使うことです。
+
+InstantOnは、podmanの `--security-opt` オプションを使って、下記の例のように必要な権限だけを指定して動かすことができます。必要な権限や、ファイルで権限を指定する方法についての詳細は、 link:https://openliberty.io/ja/blog/2022/11/01/instant-on-beta.html[クラウド・ネイティブ Java アプリケーション用の Liberty InstantOn 始動] を参照ください。
+
+`podman` コマンドを `--security-opt`  で起動した例
+```
+$ podman run \
+  --rm \
+  --cap-add=CHECKPOINT_RESTORE \
+  --cap-add=NET_ADMIN \
+  --cap-add=SYS_PTRACE \
+  --security-opt seccomp=unconfined \
+  --security-opt systempaths=unconfined \
+  --security-opt apparmor=unconfined \
+  -p 9080:9080 \
+  getting-started-instanton
+
+[AUDIT   ] CWWKZ0001I: Application guide-getting-started started in 0.101 seconds.
+[AUDIT   ] CWWKC0452I: The Liberty server process resumed operation from a checkpoint in 0.229 seconds.
+[AUDIT   ] CWWKF0012I: The server installed the following features: [cdi-3.0, checkpoint-1.0, concurrent-2.0, ... transportSecurity-1.0].
+[AUDIT   ] CWWKF0011I: The defaultServer server is ready to run a smarter planet. The defaultServer server started in 0.283 seconds
+```
+`podman` コマンドを `seccomp` を使って必要なシステムコールだけで動かした場合
+```
+$ podman run \
+  --rm \
+  --cap-add=CHECKPOINT_RESTORE \
+  --cap-add=NET_ADMIN \
+  --cap-add=SYS_PTRACE \
+  --security-opt seccomp=/Users/htakamiy@us.ibm.com/InstantOn/guide-getting-started/finish/criuRequiredSysCalls.json \
+  -v /proc/sys/kernel/ns_last_pid:/proc/sys/kernel/ns_last_pid \
+  -p 9080:9080 \
+  getting-started-instanton
+
+[AUDIT   ] CWWKZ0001I: Application guide-getting-started started in 0.101 seconds.
+[AUDIT   ] CWWKC0452I: The Liberty server process resumed operation from a checkpoint in 0.220 seconds.
+[AUDIT   ] CWWKF0012I: The server installed the following features: [cdi-3.0, checkpoint-1.0, concurrent-2.0, distributedMap-1.0, jndi-1.0, json-1.0, jsonb-2.0, jsonp-2.0, monitor-1.0, mpConfig-3.0, mpHealth-4.0, mpMetrics-4.0, restfulWS-3.0, restfulWSClient-3.0, servlet-5.0, ssl-1.0, transportSecurity-1.0].
+[AUDIT   ] CWWKF0011I: The defaultServer server is ready to run a smarter planet. The defaultServer server started in 0.262 seconds.
+```
+
+比較的新しいOSのバージョンでは、`podman` コマンドは  `ns_last_pid` をマウントする必要や `seccomp` パラメーターを使う必要がなくなります。
+```
+podman run \
+  --rm \
+  --cap-add=CHECKPOINT_RESTORE \
+  --cap-add=NET_ADMIN \
+  --cap-add=SYS_PTRACE \
+  -p 9080:9080 \
+  getting-started-instanton
+```
+上記の CHECKPOINT_RESTORE command は macOS Monterey 12.6　のご覧のバージョンで動きました。
+
+```
+$ sw_vers
+ProductName:	macOS
+ProductVersion:	12.6
+BuildVersion:	21G115
+```
 あとしまつとしては，podman machine stop rootfulで仮想環境を停止し，podman system connection default podman-machine-defaultなどでデフォルトの接続を元に戻しておきましょう。
 
 // // // // // // // //
