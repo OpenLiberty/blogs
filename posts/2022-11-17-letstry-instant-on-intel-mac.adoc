@@ -1,51 +1,51 @@
 ---
 layout: post
-title: Intel MacでOpen LibertyのInstantOnを試す
+title: Let's try Liberty InstantOn on Intel Mac
 # Do NOT change the categories section
 categories: blog
 author_picture: https://avatars3.githubusercontent.com/takakiyo
 author_github: https://github.com/takakiyo
-seo-title: Intel MacでOpen LibertyのInstantOnを試す - OpenLiberty.io
-seo-description: Intel MacでOpen LibertyのInstantOnを試す　サーバーレスでJavaのアプリを動かそう
-blog_description: "Intel MacでOpen LibertyのInstantOnを試す"
+seo-title: Let's try Liberty InstantOn on Intel Mac  - OpenLiberty.io
+seo-description: Try Liberty InstantOn on Intel Mac to run Java applications in serverless environment 
+blog_description: "Let's try Liberty InstantOn on Intel Mac"
 open-graph-image: https://openliberty.io/img/blog/instantonperf.png
 blog-available-in-languages:
-- lang: en
-  path: /blog/2022/11/17/letstry-instant-on-intel-mac.html
+- lang: ja
+  path: /ja/blog/2022/11/17/letstry-instant-on-intel-mac.html
 additional_authors: 
-- name: 高宮裕子
+- name: Hiroko Takamiya
   github: https://github.com/una-tapa
   image: https://avatars0.githubusercontent.com/una-tapa
 ---
-= Intel MacでOpen LibertyのInstantOnを試す
-田中孝清 <https://github.com/takakiyo>
+= Let's try Open Liberty InstantOn on Intel Mac
+Takakiyo Tanaka <https://github.com/takakiyo>
 :imagesdir: /
 :url-prefix:
 :url-about: /
 
-== Liberty InstantOnとは
+== What is Liberty InstantOn ? 
 
-2022年9月29日にLiberty InstantOnのベータ版が発表されました。これはフル機能のクラウドネイティブJavaランタイムを数百ミリ秒で起動する技術です。Libertyは、MicroProfileとJakartaのWebProfileをサポートしています。
+Liberty InstantOn was announced as a beta feature on September 29, 2022. It is a technology that provides a full-featured cloud-native Java runtime supporting MicroProfile and Jakarta WebProfile APIs that enables applications to start in hundreds of milliseconds. InstantOn is currently available as a special beta release container image.
 
-コンテナ環境でServerless技術を利用する場合には，プロセスの起動時間が重要となります。リクエストがきてからコ￥ンテナ環境を起動するServerlessでは，コンテナのプロセスが起動する時間がレスポンスタイムに含まれるために，その短さはサービスの品質に直接影響します。
+When using Serverless technology in a container environment, the startup time is important. The response time includes the time it takes for the container process to start.  So the startup time directly affects the quality of service.
 
-Javaのアプリケーションの起動時間を短縮する取り組みとしては，GraalVMの機能を使ってアプリケーションをネイティブの実行可能ファイルに変換する方法が試みられています。ただ，GraalVMのネイティブ化では，Javaの全ての機能を利用できるわけではないので，広く使われているJava EEまたはJakartaEEのアプリケーションを実行可能ファイルに変換することはできません。
+Many efforts have been made to reduce the startup time for Java applications. For example, one of the efforts is to use the capabilities of GraalVM to transform the application into a native executable. However, GraalVM does not allow all Java features to be used, so it is not possible to convert widely used Java EE or Jakarta EE applications into executables.
 
-Liberty InstantOnはこれとは異なる方法で起動時間を短縮する機能です。LinuxのCRIU（Checkpoint/Restore In Userspace）という技術を利用します。CRIUは，起動しているプロセスの情報をファイルに記録（Checkpoint）し，ファイルからプロセスを復帰（Restore）させるための一連の機能です。これを組み込んだOpenJ9 VMでOpen Liberty/WebSphere Libertyを起動し，アプリケーションの初期化が終わった時点でCheckpointを取得します。この状態のコンテナをCommitし，そこから再開することでごく短時間での起動を実現します。
+Liberty InstantOn takes a totally different approach to reduce the startup time. It takes advantage of the Linux CRIU (Checkpoint/Restore In Userspace) technology. CRIU is a set of functions for recording (Checkpoint) the information of the running process in a file and restoring (Restore) the process from the file. 
 
+Open Liberty with an Eclipse OpenJ9 VM incorporates CRIU technology to get a checkpoint when the application finishes initializing. By committing the container in this state and resuming it from there, it can be started in a lightning fast time.
 
-== Intel MacでInstantOnを試す
+== Let's try InstantOn on Intel Mac
 
-link:https://openliberty.io/blog/2022/09/29/instant-on-beta.html[Open Liberty の開始] で紹介されているサンプル手順はRed Hat Enterprise Linux上での実行が前提となっていますが，同じ内容をmacOS Monterey（バージョン12.x）を搭載したIntel Macでも実行できましたので手順を公開します。現在のところInstantOnフィーチャーはMI aach64アーキテクチャーではサポートされていません。
+The InstantOn steps in the blog article link:https://openliberty.io/blog/2022/09/29/instant-on-beta.html[Liberty InstantOn startup for cloud native Java applications] are based on the Red Hat Enterprise Linux. The same experience can be achieved on an Intel Mac with macOS Monterey (version 12.x). This article shares the steps to experience the exciting technology on Mac. Currently, InstantOn feature is not available on M1 aarch64 architecture. 
 
-InstantOnのサンプル環境はコンテナイメージとしてIBM Cloud Registryから公開されています。コンテナ実行環境としてはHomebrewで導入したpodmanを使用します。ページの記述にしたがって普通に実行しただけだとエラーで失敗しますので，最終的に成功した手順を載せておきます。
+The InstantOn sample environment is published as a container image from IBM Cloud Registry. As the container execution environment, we can use podman, which one can install via Homebrew by `brew install podman`. On Mac, we needed to tweak the steps a little bit to see the InstantOn in action.
 
-=== Podmanの準備
+=== Preparing the Podman
 
+Since InstantOn uses the CAP_CHECKPOINT_RESTORE function of the Linux kernel, the InstantOn feature does not work properly if podman is started in rootless mode, Also, once the virtual environment (podman machine) has been started in rootless mode, it will fail even if it is run in rootful mode. The solution is to create a new dedicated virtual machine. It may be necessary to remove existing VM by `podman machine list` and `podman machine rm` commands. 
 
-InstantOnではLinuxのカーネルのCAP_CHECKPOINT_RESTORE機能を使用するため，podmanをrootlessモードで起動していると正常に稼働しません。また，いちど仮想環境（podman machine）をrootlessモードで起動してしまっていると，rootfulモードで実行しても失敗してしまうので，専用の新しい仮想マシンを作成するようにします。（`podman machine list` でリストして `podman machine rm` で古い仮想マシンを削除できます）
-
-podmanの仮想環境を作成し，rootfulモードで起動します。デフォルトで起動した仮想マシンに接続するように構成します。
+The followng steps create a podman virtual environment and start it in rootful mode. We will configure it to connect to a virtual machine by default.
 
 [source]
 ----
@@ -69,7 +69,7 @@ Machine "rootful" started successfully
 $ podman system connection default rootful-root
 ----
 
-使用したpodmanのバージョンは以下の通りです。
+The following is version of podman used for this article. 
 
 [source]
 ----
@@ -89,9 +89,9 @@ OS/Arch:      linux/amd64
 ----
 
 
-=== テストアプリケーションのcloneとビルド
+=== Cloning and building the test application
 
-テストに使用するアプリケーションをGitHubからcloneし，ビルドします。
+Let's clone the sample application from GitHub and build it.
 
 [source]
 ----
@@ -106,7 +106,7 @@ Resolving deltas: 100% (1097/1097), done.
 $ cd guide-getting-started/finish
 $ mvn package
 [INFO] Scanning for projects...
-（中略）
+（...）
 [INFO] ------------------------------------------------------------------------
 [INFO] BUILD SUCCESS
 [INFO] ------------------------------------------------------------------------
@@ -116,16 +116,16 @@ $ mvn package
 
 ----
 
-=== コンテナイメージの作成
+=== Create a container image
 
-同ディレクトリにあるDockerfileの1行目を以下のように書き換えます。beta-instantonのタグを使用します。このタグがつけられたイメージが，InstantOnのためのサンプル環境です（いろいろ試したい方は，このイメージの中をみて，独自のテストをしてみてください）。
+To use the InstantOn image, rewrite the first line of the Dockerfile in the same directory with `beta-instanton`` tag. If you want to play around, look inside this image and do your experiment! 
 
 [source]
 ----
 FROM icr.io/appcafe/open-liberty:beta-instanton
 ----
 
-コンテナイメージをビルドします。
+Next, we are going to build a container image.
 
 [source]
 ----
@@ -134,7 +134,7 @@ STEP 1/7: FROM icr.io/appcafe/open-liberty:beta-instanton
 Trying to pull icr.io/appcafe/open-liberty:beta-instanton...
 Getting image source signatures
 Copying blob sha256:3d49a5e804a4e5da1ee053e0dd6fda7c4011458bf43f658d45a7fe5d064d0a5f
-（中略）
+（...）
 Copying blob sha256:b23a0409c41c442e8f1bf00d2649fa127f63f92e131d5ccf39a1d0ae82ec3cd6
 Copying blob sha256:308dc9b7079f15af4e4f23cab1fd5082fadf4052d237959e3bdd4c8fa73a6346
 Copying config sha256:7cd2ddfe28da75e669998130b99bb7fb48e255ba9d9f776804b78d630f2e0469
@@ -157,7 +157,7 @@ Successfully tagged localhost/getting-started:latest
 612b43d3e785166c3d9c05c315944921333748dba432a5b53640ea240f77092c
 ----
 
-このまま普通に実行すると，単にOpen Libertyが起動して，アプリケーションが実行できるようになります。
+If you run it normally, it will start Open Liberty and the application as usual.
 
 [source]
 ----
@@ -181,14 +181,14 @@ CWWKE0953W: This version of Open Liberty is an unsupported early release version
 [AUDIT   ] CWWKF0011I: The defaultServer server is ready to run a smarter planet. The defaultServer server started in 6.851 seconds.
 ----
 
-この状態でも，手元の環境では6〜7秒で起動します。別Windowのコマンドプロンプトからcurlコマンドなどで正常に稼働していることを確認します。
+Even without InstantOn, the application starts in 6 to 7 seconds in my environment. Not bad at all. From the command prompt in another window, use the curl command to confirm that the application started successfully. 
 
 [source]
 ----
 $ curl http://localhost:9080/dev/system/properties   
 ----
 
-コンテナを起動したWindowでCtrl+Cを押すと，Libertyが稼働しているコンテナが停止します。
+If you press Ctrl+C in the window that started the container, the container in which Liberty is running stops.
 
 [source]
 ----
@@ -202,9 +202,10 @@ $ curl http://localhost:9080/dev/system/properties
 [AUDIT   ] CWWKE0036I: The server defaultServer stopped after 2 minutes, 32.806 seconds.  
 ----
 
-==== Checkpointの取得
 
-それでは，アプリケーションの起動準備ができたタイミングでCheckpointを取得してみましょう。いろいろと権限が必要なため--privilegedオプションをつけて実行します。また環境変数WLP_CHECKPOINTにapplicationsを指定し，アプリケーションの初期化が終わった時点でOpenJ9のCheckpoint機能を呼び出します。
+==== Checkpoint the application
+
+Now let's get a checkpoint. Since various privileges are required, we will run with the `--privileged` option. By specifying `applications` for the environment variable `WLP_CHECKPOINT`, Open Liberty can save the checkpoint when the application initialization was completed. 
 
 [source]
 ----
@@ -229,8 +230,7 @@ CWWKE0953W: This version of Open Liberty is an unsupported early release version
 /opt/ol/wlp/bin/server: line 946:   130 Killed                  "${JAVA_CMD}" "$@" >> "${CHECKPOINT_CONSOLE_LOG}" 2>&1 < /dev/null 
 ----
 
-このコマンドで、コンテナが立ち上がり、アプリケーションが起動されます。アプリケーションが立ち上がったところで、ランタイムはプロセスの”チェックポイント”を行います。プロセスの状態が保存されたところで、コンテナを終了します。
-今回は--rmをつけずにコンテナを起動したので，実行後のコンテナ環境がそのまま残っています。この環境にcheckpointでプロセスの情報が記録されたファイルが保存されています
+This starts the application container and proceeds to start the application. After the application has started the runtime will perform a checkpoint of the process. When the process state has been saved the container exits. Since the container was started without `--rm` this time, the stopped container remains available for inspection. This stopped container, named `getting-started-checkpoint-container`, contains the checkpoint process state information.
 
 [source]
 ----
@@ -238,7 +238,8 @@ $ podman ps -a
 CONTAINER ID  IMAGE                             COMMAND               CREATED        STATUS                    PORTS       NAMES
 940fd476eccc  localhost/getting-started:latest  /opt/ol/wlp/bin/s...  4 minutes ago  Exited (0) 4 minutes ago              getting-started-checkpoint-container
 ----
-これをcommitして`getting-started-instanton`という新しいイメージにしました。このイメージは、先ほどのアプリケーションが起動した状態のチェックポイント・プロセスを保持しています。このコンテナは、このプロセスの状態から起動します。
+
+The following command commits the container into a new image. This new image, named `getting-started-instanton`, will contain the checkpoint process state for the application. This process state is then used to quickly start the application when the `getting-started-instanton` image is run as a container.
 
 [source]
 ----
@@ -251,9 +252,9 @@ localhost/getting-started            latest          1049db82664e  31 minutes ag
 icr.io/appcafe/open-liberty          beta-instanton  7cd2ddfe28da  2 weeks ago     864 MB
 ----
 
-== Restoreによる起動
+== Starting Open Liberty using the InstantOn feature 
 
-さていよいよInstantOnの実行です。このイメージを使ってLibertyを起動すると，爆速でサーバーが起動します。
+Now it's time to execute InstantOn. When you start Liberty using this image, the server will start in a flash.
 
 [source]
 ----
@@ -265,15 +266,15 @@ icr.io/appcafe/open-liberty          beta-instanton  7cd2ddfe28da  2 weeks ago  
 [AUDIT   ] CWWKF0011I: The defaultServer server is ready to run a smarter planet. The defaultServer server started in 0.167 seconds.
 ----
 
-手元の環境では0.1〜0.2秒でLibertyが起動しました。curlコマンドやブラウザなどでアクセスすると，普通にLibertyが起動していることがわかると思います。LibertyはCtrl+Cで止めてください。このイメージは，もちろん何度でも起動することができます。
+Liberty started in 0.1-0.2 seconds in my environment. If you access it with the curl command or browser, you can see that the application is running successfully. Stop Liberty with Ctrl+C. This image can be used as many times as you want. 
 
-== `--prividelged` をつけないでRestoreする場合
+== Starting Open Liberty using the InstantOn feature without `--privileged`
 
-上記の例では、InstantOnの効果を簡単にご覧いただくためにコンテナを`--privileged`で起動しましたが、ベストプラクティスは必要最低限の権限でコンテナを使うことです。
+Running fully privileged containers is not recommended. The best practice is to instead reduce the elevated privileges down to only what is required to run the container. 
 
-InstantOnは、podmanの `--security-opt` オプションを使って、下記の例のように必要な権限だけを指定して動かすことができます。必要な権限や、ファイルで権限を指定する方法についての詳細は、 link:https://openliberty.io/ja/blog/2022/11/01/instant-on-beta.html[クラウド・ネイティブ Java アプリケーション用の Liberty InstantOn 始動] を参照ください。
+It is possible to run podman with unconfined --security-opt options below also worked on the Mac OS mentioned below. For more details of the parameters and the input file, refer to link:https://openliberty.io/blog/2022/09/29/instant-on-beta.html[the original InstantOn blog] .
 
-`podman` コマンドを `--security-opt`  で起動した例
+podman command with unconfined `--security-opt` options
 ```
 $ podman run \
   --rm \
@@ -291,7 +292,8 @@ $ podman run \
 [AUDIT   ] CWWKF0012I: The server installed the following features: [cdi-3.0, checkpoint-1.0, concurrent-2.0, ... transportSecurity-1.0].
 [AUDIT   ] CWWKF0011I: The defaultServer server is ready to run a smarter planet. The defaultServer server started in 0.283 seconds
 ```
-`podman` コマンドを `seccomp` を使って必要なシステムコールだけで動かした場合
+
+podman command with seccomp to only required system calls. 
 ```
 $ podman run \
   --rm \
@@ -309,7 +311,8 @@ $ podman run \
 [AUDIT   ] CWWKF0011I: The defaultServer server is ready to run a smarter planet. The defaultServer server started in 0.262 seconds.
 ```
 
-比較的新しいOSのバージョンでは、`podman` コマンドは  `ns_last_pid` をマウントする必要や `seccomp` パラメーターを使う必要がなくなります。
+The podman command may no longer need to mount `ns_last_pid` nor `seccomp` parameter at a newer OS version. The following CHECKPOINT_RESTORE command worked on macOS Monterey 12.6.  
+
 ```
 podman run \
   --rm \
@@ -319,15 +322,15 @@ podman run \
   -p 9080:9080 \
   getting-started-instanton
 ```
-上記の CHECKPOINT_RESTORE command は macOS Monterey 12.6　のご覧のバージョンで動きました。
-
+The above command ran successfully on the following MacOS version. 
 ```
 $ sw_vers
 ProductName:	macOS
 ProductVersion:	12.6
 BuildVersion:	21G115
 ```
-あとしまつとしては，podman machine stop rootfulで仮想環境を停止し，podman system connection default podman-machine-defaultなどでデフォルトの接続を元に戻しておきましょう。
+
+As a final step, stop the virtual environment with `podman machine stop rootful` command and restore the default connection with `podman system connection default podman-machine-default` command.
 
 // // // // // // // //
 // LINKS
