@@ -1,0 +1,344 @@
+---
+layout: post
+title: Let’s try Liberty InstantOn on Intel Mac
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/takakiyo
+author_github: https://github.com/takakiyo
+seo-title: Let’s try Liberty InstantOn on Intel Mac  - OpenLiberty.io
+seo-description: Try Liberty InstantOn on Intel Mac to run Java applications in serverless environment 
+blog_description: "Let’s try Liberty InstantOn on Intel Mac"
+open-graph-image: https://openliberty.io/img/blog/instantonperf.png
+blog-available-in-languages:
+- lang: ja
+  path: /ja/blog/2022/11/17/letstry-instant-on-intel-mac.html
+additional_authors: 
+- name: Hiroko Takamiya
+  github: https://github.com/una-tapa
+  image: https://avatars0.githubusercontent.com/una-tapa
+---
+= Let’s try Open Liberty InstantOn on Intel Mac
+Takakiyo Tanaka <https://github.com/takakiyo>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+
+== What is Liberty InstantOn ? 
+
+Liberty InstantOn was announced as a beta feature on September 29, 2022. It is a technology that provides a full-featured cloud-native Java runtime supporting MicroProfile and Jakarta WebProfile APIs that enables applications to start in hundreds of milliseconds. InstantOn is currently available as a special beta release container image.
+
+When using Serverless technology in a container environment, the startup time is important. The response time includes the time it takes for the container process to start.  So the startup time directly affects the quality of service.
+
+Many efforts have been made to reduce the startup time for Java applications. For example, one of the efforts is to use the capabilities of GraalVM to transform the application into a native executable. However, GraalVM does not allow all Java features to be used, so it is not possible to convert widely used Java EE or Jakarta EE applications into executables.
+
+Liberty InstantOn takes a totally different approach to reduce the startup time. It takes advantage of the Linux CRIU (Checkpoint/Restore In Userspace) technology. CRIU is a set of functions for recording (Checkpoint) the information of the running process in a file and restoring (Restore) the process from the file. 
+
+Open Liberty with an Eclipse OpenJ9 VM incorporates CRIU technology to get a checkpoint when the application finishes initializing. By committing the container in this state and resuming it from there, it can be started in a lightning fast time.
+
+== Let's try InstantOn on Intel Mac
+
+The InstantOn steps in the blog article link:https://openliberty.io/blog/2022/09/29/instant-on-beta.html[Liberty InstantOn startup for cloud native Java applications] are based on the Red Hat Enterprise Linux. The same experience can be achieved on an Intel Mac with macOS Monterey (version 12.x). This article shares the steps to experience the exciting technology on Mac. Currently, InstantOn feature is not available on M1 aarch64 architecture. 
+
+The InstantOn sample environment is published as a container image from IBM Cloud Registry. As the container execution environment, we can use podman, which one can install via Homebrew by `brew install podman`. On Mac, we needed to tweak the steps a little bit to see the InstantOn in action.
+
+=== Preparing the Podman
+
+Since InstantOn uses the CAP_CHECKPOINT_RESTORE function of the Linux kernel, the InstantOn feature does not work properly if podman is started in rootless mode, Also, once the virtual environment (podman machine) has been started in rootless mode, it will fail even if it is run in rootful mode. The solution is to create a new dedicated virtual machine. It may be necessary to remove existing VM by `podman machine list` and `podman machine rm` commands. 
+
+The followng steps create a podman virtual environment and start it in rootful mode. We will configure it to connect to a virtual machine by default.
+
+[source]
+----
+$ podman machine init rootful
+Extracting compressed file
+Image resized.
+Machine init complete
+To start your machine run:
+
+	podman machine start rootful
+
+$ podman machine set --rootful rootful
+$ podman machine start rootful
+Starting machine "rootful"
+Waiting for VM ...
+Mounting volume... /Users/takakiyo:/Users/takakiyo
+API forwarding listening on: /var/run/docker.sock
+Docker API clients default to this address. You do not need to set DOCKER_HOST.
+
+Machine "rootful" started successfully
+$ podman system connection default rootful-root
+----
+
+The following is version of podman used for this article. 
+
+[source]
+----
+$ podman version
+Client:       Podman Engine
+Version:      4.3.0
+API Version:  4.3.0
+Go Version:   go1.18.7
+Built:        Tue Oct 18 13:55:57 2022
+OS/Arch:      darwin/amd64
+Server:       Podman Engine
+Version:      4.3.0
+API Version:  4.3.0
+Go Version:   go1.18.7
+Built:        Fri Oct 21 04:16:35 2022
+OS/Arch:      linux/amd64
+----
+
+
+=== Cloning and building the test application
+
+Let's clone the sample application from GitHub and build it.
+
+[source]
+----
+$ git clone https://github.com/openliberty/guide-getting-started.git
+Cloning into 'guide-getting-started'...
+remote: Enumerating objects: 2747, done.
+remote: Counting objects: 100% (537/537), done.
+remote: Compressing objects: 100% (275/275), done.
+remote: Total 2747 (delta 172), reused 447 (delta 116), pack-reused 2210
+Receiving objects: 100% (2747/2747), 859.87 KiB | 2.74 MiB/s, done.
+Resolving deltas: 100% (1097/1097), done.
+$ cd guide-getting-started/finish
+$ mvn package
+[INFO] Scanning for projects...
+（...）
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  2.240 s
+[INFO] Finished at: 2022-10-16T21:09:55+09:00
+[INFO] ------------------------------------------------------------------------
+
+----
+
+=== Create a container image
+
+To use the InstantOn image, rewrite the first line of the Dockerfile in the same directory with `beta-instanton`` tag. If you want to play around, look inside this image and do your experiment! 
+
+[source]
+----
+FROM icr.io/appcafe/open-liberty:beta-instanton
+----
+
+Next, we are going to build a container image.
+
+[source]
+----
+$ podman build -t getting-started .
+STEP 1/7: FROM icr.io/appcafe/open-liberty:beta-instanton
+Trying to pull icr.io/appcafe/open-liberty:beta-instanton...
+Getting image source signatures
+Copying blob sha256:3d49a5e804a4e5da1ee053e0dd6fda7c4011458bf43f658d45a7fe5d064d0a5f
+（...）
+Copying blob sha256:b23a0409c41c442e8f1bf00d2649fa127f63f92e131d5ccf39a1d0ae82ec3cd6
+Copying blob sha256:308dc9b7079f15af4e4f23cab1fd5082fadf4052d237959e3bdd4c8fa73a6346
+Copying config sha256:7cd2ddfe28da75e669998130b99bb7fb48e255ba9d9f776804b78d630f2e0469
+Writing manifest to image destination
+Storing signatures
+STEP 2/7: ARG VERSION=1.0
+--> 3816b6a9a20
+STEP 3/7: ARG REVISION=SNAPSHOT
+--> b82ea29da9b
+STEP 4/7: LABEL   org.opencontainers.image.authors="Your Name"   org.opencontainers.image.vendor="IBM"   org.opencontainers.image.url="local"   org.opencontainers.image.source="https://github.com/OpenLiberty/guide-getting-started"   org.opencontainers.image.version="$VERSION"   org.opencontainers.image.revision="$REVISION"   vendor="Open Liberty"   name="system"   version="$VERSION-$REVISION"   summary="The system microservice from the Getting Started guide"   description="This image contains the system microservice running with the Open Liberty runtime."
+--> 1781202e3e0
+STEP 5/7: COPY --chown=1001:0 src/main/liberty/config/ /config/
+--> 3d515ebf80e
+STEP 6/7: COPY --chown=1001:0 target/*.war /config/apps/
+--> b56dbcc57b8
+STEP 7/7: RUN configure.sh
+COMMIT getting-started
+--> 612b43d3e78
+Successfully tagged localhost/getting-started:latest
+612b43d3e785166c3d9c05c315944921333748dba432a5b53640ea240f77092c
+----
+
+If you run it normally, it will start Open Liberty and the application as usual.
+
+[source]
+----
+$ podman run -it --name getting-started --rm -p 9080:9080 getting-started
+
+WARNING: Unknown module: jdk.management.agent specified to --add-exports
+WARNING: Unknown module: jdk.attach specified to --add-exports
+Launching defaultServer (Open Liberty 22.0.0.11-beta/wlp-1.0.69.cl221020220912-1100) on Eclipse OpenJ9 VM, version 17.0.5-ea+2 (en_US)
+CWWKE0953W: This version of Open Liberty is an unsupported early release version.
+[AUDIT   ] CWWKE0001I: The server defaultServer has been launched.
+[AUDIT   ] CWWKG0093A: Processing configuration drop-ins resource: /opt/ol/wlp/usr/servers/defaultServer/configDropins/defaults/checkpoint.xml
+[AUDIT   ] CWWKG0093A: Processing configuration drop-ins resource: /opt/ol/wlp/usr/servers/defaultServer/configDropins/defaults/keystore.xml
+[AUDIT   ] CWWKG0093A: Processing configuration drop-ins resource: /opt/ol/wlp/usr/servers/defaultServer/configDropins/defaults/open-default-port.xml
+[AUDIT   ] CWWKZ0058I: Monitoring dropins for applications.
+[AUDIT   ] CWWKT0016I: Web application available (default_host): http://de537b960bc9:9080/ibm/api/
+[AUDIT   ] CWWKT0016I: Web application available (default_host): http://de537b960bc9:9080/health/
+[AUDIT   ] CWWKT0016I: Web application available (default_host): http://de537b960bc9:9080/metrics/
+[AUDIT   ] CWWKT0016I: Web application available (default_host): http://de537b960bc9:9080/dev/
+[AUDIT   ] CWWKZ0001I: Application guide-getting-started started in 1.978 seconds.
+[AUDIT   ] CWWKF0012I: The server installed the following features: [cdi-3.0, checkpoint-1.0, concurrent-2.0, distributedMap-1.0, jndi-1.0, json-1.0, jsonb-2.0, jsonp-2.0, monitor-1.0, mpConfig-3.0, mpHealth-4.0, mpMetrics-4.0, restfulWS-3.0, restfulWSClient-3.0, servlet-5.0, ssl-1.0, transportSecurity-1.0].
+[AUDIT   ] CWWKF0011I: The defaultServer server is ready to run a smarter planet. The defaultServer server started in 6.851 seconds.
+----
+
+Even without InstantOn, the application starts in 6 to 7 seconds in my environment. Not bad at all. From the command prompt in another window, use the curl command to confirm that the application started successfully. 
+
+[source]
+----
+$ curl http://localhost:9080/dev/system/properties   
+----
+
+If you press Ctrl+C in the window that started the container, the container in which Liberty is running stops.
+
+[source]
+----
+^C[AUDIT   ] CWWKE0085I: The server defaultServer is stopping because the JVM is exiting.
+[AUDIT   ] CWWKE1100I: Waiting for up to 30 seconds for the server to quiesce.
+[AUDIT   ] CWWKT0017I: Web application removed (default_host): https://de537b960bc9:9443/dev/
+[AUDIT   ] CWWKT0017I: Web application removed (default_host): https://de537b960bc9:9443/health/
+[AUDIT   ] CWWKT0017I: Web application removed (default_host): https://de537b960bc9:9443/metrics/
+[AUDIT   ] CWWKT0017I: Web application removed (default_host): https://de537b960bc9:9443/ibm/api/
+[AUDIT   ] CWWKZ0009I: The application guide-getting-started has stopped successfully.
+[AUDIT   ] CWWKE0036I: The server defaultServer stopped after 2 minutes, 32.806 seconds.  
+----
+
+
+==== Checkpoint the application
+
+Now let's get a checkpoint. Since various privileges are required, we will run with the `--privileged` option. By specifying `applications` for the environment variable `WLP_CHECKPOINT`, Open Liberty can save the checkpoint when the application initialization was completed. 
+
+[source]
+----
+$ podman run --name getting-started-checkpoint-container --privileged --env WLP_CHECKPOINT=applications getting-started
+Performing checkpoint --at=applications
+
+WARNING: Unknown module: jdk.management.agent specified to --add-exports
+WARNING: Unknown module: jdk.attach specified to --add-exports
+Launching defaultServer (Open Liberty 22.0.0.11-beta/wlp-1.0.69.cl221020220912-1100) on Eclipse OpenJ9 VM, version 17.0.5-ea+2 (en_US)
+CWWKE0953W: This version of Open Liberty is an unsupported early release version.
+[AUDIT   ] CWWKE0001I: The server defaultServer has been launched.
+[AUDIT   ] CWWKG0093A: Processing configuration drop-ins resource: /opt/ol/wlp/usr/servers/defaultServer/configDropins/defaults/checkpoint.xml
+[AUDIT   ] CWWKG0093A: Processing configuration drop-ins resource: /opt/ol/wlp/usr/servers/defaultServer/configDropins/defaults/keystore.xml
+[AUDIT   ] CWWKG0093A: Processing configuration drop-ins resource: /opt/ol/wlp/usr/servers/defaultServer/configDropins/defaults/open-default-port.xml
+[AUDIT   ] CWWKZ0058I: Monitoring dropins for applications.
+[AUDIT   ] CWWKT0016I: Web application available (default_host): http://940fd476eccc:9080/ibm/api/
+[AUDIT   ] CWWKT0016I: Web application available (default_host): http://940fd476eccc:9080/health/
+[AUDIT   ] CWWKT0016I: Web application available (default_host): http://940fd476eccc:9080/metrics/
+[AUDIT   ] CWWKT0016I: Web application available (default_host): http://940fd476eccc:9080/dev/
+[AUDIT   ] CWWKZ0001I: Application guide-getting-started started in 1.340 seconds.
+[AUDIT   ] CWWKC0451I: A server checkpoint was requested. When the checkpoint completes, the server stops.
+/opt/ol/wlp/bin/server: line 946:   130 Killed                  "${JAVA_CMD}" "$@" >> "${CHECKPOINT_CONSOLE_LOG}" 2>&1 < /dev/null 
+----
+
+This starts the application container and proceeds to start the application. After the application has started the runtime will perform a checkpoint of the process. When the process state has been saved the container exits. Since the container was started without `--rm` this time, the stopped container remains available for inspection. This stopped container, named `getting-started-checkpoint-container`, contains the checkpoint process state information.
+
+[source]
+----
+$ podman ps -a
+CONTAINER ID  IMAGE                             COMMAND               CREATED        STATUS                    PORTS       NAMES
+940fd476eccc  localhost/getting-started:latest  /opt/ol/wlp/bin/s...  4 minutes ago  Exited (0) 4 minutes ago              getting-started-checkpoint-container
+----
+
+The following command commits the container into a new image. This new image, named `getting-started-instanton`, will contain the checkpoint process state for the application. This process state is then used to quickly start the application when the `getting-started-instanton` image is run as a container.
+
+[source]
+----
+$ podman commit getting-started-checkpoint-container getting-started-instanton
+a856d767b8c31718dfbc6e60f742675448086fb4421490b5bfde6d3392d2f879
+$ podman images
+REPOSITORY                           TAG             IMAGE ID      CREATED         SIZE
+localhost/getting-started-instanton  latest          a856d767b8c3  7 seconds ago   990 MB
+localhost/getting-started            latest          1049db82664e  31 minutes ago  890 MB
+icr.io/appcafe/open-liberty          beta-instanton  7cd2ddfe28da  2 weeks ago     864 MB
+----
+
+== Starting Open Liberty using the InstantOn feature 
+
+Now it's time to execute InstantOn. When you start Liberty using this image, the server will start in a flash.
+
+[source]
+----
+% podman run -it --rm --privileged -p 9080:9080 getting-started-instanton
+
+[AUDIT   ] CWWKZ0001I: Application guide-getting-started started in 0.066 seconds.
+[AUDIT   ] CWWKC0452I: The Liberty server process resumed operation from a checkpoint in 0.131 seconds.
+[AUDIT   ] CWWKF0012I: The server installed the following features: [cdi-3.0, checkpoint-1.0, concurrent-2.0, distributedMap-1.0, jndi-1.0, json-1.0, jsonb-2.0, jsonp-2.0, monitor-1.0, mpConfig-3.0, mpHealth-4.0, mpMetrics-4.0, restfulWS-3.0, restfulWSClient-3.0, servlet-5.0, ssl-1.0, transportSecurity-1.0].
+[AUDIT   ] CWWKF0011I: The defaultServer server is ready to run a smarter planet. The defaultServer server started in 0.167 seconds.
+----
+
+Liberty started in 0.1-0.2 seconds in my environment. If you access it with the curl command or browser, you can see that the application is running successfully. Stop Liberty with Ctrl+C. This image can be used as many times as you want. 
+
+== Starting Open Liberty using the InstantOn feature without `--privileged`
+
+Running fully privileged containers is not recommended. The best practice is to instead reduce the elevated privileges down to only what is required to run the container. 
+
+It is possible to run podman with unconfined --security-opt options below also worked on the Mac OS mentioned below. For more details of the parameters and the input file, refer to link:https://openliberty.io/blog/2022/09/29/instant-on-beta.html[the original InstantOn blog] .
+
+podman command with unconfined `--security-opt` options
+```
+$ podman run \
+  --rm \
+  --cap-add=CHECKPOINT_RESTORE \
+  --cap-add=NET_ADMIN \
+  --cap-add=SYS_PTRACE \
+  --security-opt seccomp=unconfined \
+  --security-opt systempaths=unconfined \
+  --security-opt apparmor=unconfined \
+  -p 9080:9080 \
+  getting-started-instanton
+
+[AUDIT   ] CWWKZ0001I: Application guide-getting-started started in 0.101 seconds.
+[AUDIT   ] CWWKC0452I: The Liberty server process resumed operation from a checkpoint in 0.229 seconds.
+[AUDIT   ] CWWKF0012I: The server installed the following features: [cdi-3.0, checkpoint-1.0, concurrent-2.0, ... transportSecurity-1.0].
+[AUDIT   ] CWWKF0011I: The defaultServer server is ready to run a smarter planet. The defaultServer server started in 0.283 seconds
+```
+
+podman command with seccomp to only required system calls. 
+```
+$ podman run \
+  --rm \
+  --cap-add=CHECKPOINT_RESTORE \
+  --cap-add=NET_ADMIN \
+  --cap-add=SYS_PTRACE \
+  --security-opt seccomp=/Users/htakamiy@us.ibm.com/InstantOn/guide-getting-started/finish/criuRequiredSysCalls.json \
+  -v /proc/sys/kernel/ns_last_pid:/proc/sys/kernel/ns_last_pid \
+  -p 9080:9080 \
+  getting-started-instanton
+
+[AUDIT   ] CWWKZ0001I: Application guide-getting-started started in 0.101 seconds.
+[AUDIT   ] CWWKC0452I: The Liberty server process resumed operation from a checkpoint in 0.220 seconds.
+[AUDIT   ] CWWKF0012I: The server installed the following features: [cdi-3.0, checkpoint-1.0, concurrent-2.0, distributedMap-1.0, jndi-1.0, json-1.0, jsonb-2.0, jsonp-2.0, monitor-1.0, mpConfig-3.0, mpHealth-4.0, mpMetrics-4.0, restfulWS-3.0, restfulWSClient-3.0, servlet-5.0, ssl-1.0, transportSecurity-1.0].
+[AUDIT   ] CWWKF0011I: The defaultServer server is ready to run a smarter planet. The defaultServer server started in 0.262 seconds.
+```
+
+The podman command may no longer need to mount `ns_last_pid` nor `seccomp` parameter at a newer OS version. The following CHECKPOINT_RESTORE command worked on macOS Monterey 12.6.  
+
+```
+podman run \
+  --rm \
+  --cap-add=CHECKPOINT_RESTORE \
+  --cap-add=NET_ADMIN \
+  --cap-add=SYS_PTRACE \
+  -p 9080:9080 \
+  getting-started-instanton
+```
+The above command ran successfully on the following MacOS version. 
+```
+$ sw_vers
+ProductName:	macOS
+ProductVersion:	12.6
+BuildVersion:	21G115
+```
+
+As a final step, stop the virtual environment with `podman machine stop rootful` command and restore the default connection with `podman system connection default podman-machine-default` command.
+
+// // // // // // // //
+// LINKS
+//
+// OpenLiberty.io site links:
+// link:/guides/microprofile-rest-client.html[Consuming RESTful Java microservices]
+// 
+// Off-site links:
+// link:https://openapi-generator.tech/docs/installation#jar[Download Instructions]
+//
+// // // // // // // //
