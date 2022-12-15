@@ -144,6 +144,13 @@ def make_blog(issues, is_beta):
 
     return '\n'.join(titles), '\n'.join(contents)
 
+def convert_markdown_links_to_asciidoc(content):
+    # May need to expend support beyond just inline links without titles
+    inline_links_regex = re.compile(r'\[(?P<text>.+?)\]\((?P<url>.+?)\)')
+    
+    return inline_links_regex.sub(r'link:\2[\1]', content)
+
+
 def main():
     arg_count = len(sys.argv) - 1
     if arg_count != 4:
@@ -161,6 +168,8 @@ def main():
 
     issues = json.loads(requests.get(BLOG_ISSUE_URL).text)
     toc, content = make_blog(issues, is_beta)
+
+    content = convert_markdown_links_to_asciidoc(content)
 
     template = requests.get(BETA_TEMPLATE_URL if is_beta else GA_TEMPLATE_URL).text;
 
