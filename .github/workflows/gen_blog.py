@@ -137,12 +137,20 @@ def make_blog(issues, is_beta):
             if body == "":
                 body = issue['body']
 
+        body = convert_markdown_links_to_asciidoc(body)
         titles.append(f'* <<SUB_TAG_{i}, {title}>>') # TODO: get/make meaningful tags
         blogSection = BLOG_ISSUE_SECTION_START.replace(BLOG_ISSUE_URL_PLACEHOLDER, issue["html_url"]).replace(BLOG_CONTACT_PLACEHOLDER, reviewers_string)
         contents.append(f'{blogSection} {closed_issue_warning}\n[#SUB_TAG_{i}]\n== {title}\n{previous_posts}{body}\n{BLOG_ISSUE_SECTION_END}\n')
         # contents.append(f'{BLOG_ISSUE_SECTION_START} {issue["html_url"]}{closed_issue_warning}\n[#SUB_TAG_{i}]\n== {title}\n{previous_posts}{body}\n{BLOG_ISSUE_SECTION_END}\n')
 
     return '\n'.join(titles), '\n'.join(contents)
+
+def convert_markdown_links_to_asciidoc(content):
+    # May need to expend support beyond just inline links without titles
+    inline_links_regex = re.compile(r'\[(?P<text>.+?)\]\((?P<url>.+?)\)')
+    
+    return inline_links_regex.sub(r'link:\2[\1]', content)
+
 
 def main():
     arg_count = len(sys.argv) - 1
