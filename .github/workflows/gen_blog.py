@@ -137,6 +137,7 @@ def make_blog(issues, is_beta):
             if body == "":
                 body = issue['body']
 
+        body = convert_markdown_links_to_asciidoc(body)
         titles.append(f'* <<SUB_TAG_{i}, {title}>>') # TODO: get/make meaningful tags
         blogSection = BLOG_ISSUE_SECTION_START.replace(BLOG_ISSUE_URL_PLACEHOLDER, issue["html_url"]).replace(BLOG_CONTACT_PLACEHOLDER, reviewers_string)
         contents.append(f'{blogSection} {closed_issue_warning}\n[#SUB_TAG_{i}]\n== {title}\n{previous_posts}{body}\n{BLOG_ISSUE_SECTION_END}\n')
@@ -168,8 +169,6 @@ def main():
 
     issues = json.loads(requests.get(BLOG_ISSUE_URL).text)
     toc, content = make_blog(issues, is_beta)
-
-    content = convert_markdown_links_to_asciidoc(content)
 
     template = requests.get(BETA_TEMPLATE_URL if is_beta else GA_TEMPLATE_URL).text;
 
