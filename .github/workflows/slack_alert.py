@@ -82,7 +82,7 @@ if __name__ == "__main__":
     parser.add_argument('slack_notification', type=str)
     parser.add_argument('slackhook', type=str)
     parser.add_argument('slackhook_test', type=str)
-    parser.add_argument('pr_number', type=str)
+    parser.add_argument('pr_url', type=str)
     parser.add_argument('pr_branch', type=str)
     parser.add_argument('url', type=str)
     args = parser.parse_args()
@@ -125,8 +125,9 @@ if __name__ == "__main__":
     message["attachments"][0]["blocks"][1]["fields"][2]["text"] = f"*Author:*\n {args.author}"
     message["attachments"][0]["blocks"][1]["fields"][3]["text"] = f"*Author GitHub:*\n <{github_url}| {args.github_username}>"
 
-    draft_pr_url = f"https://github.com/OpenLiberty/blogs/pull/{args.pr_number}"
-    message["attachments"][0]["blocks"][2]["fields"][0]["text"] = f"*{args.pr_branch} PR:* <{draft_pr_url}| #{args.pr_number}>"
+    #draft_pr_url = f"https://github.com/OpenLiberty/blogs/pull/{args.pr_number}"
+    pr_number = args.pr_url.rsplit('/', 1)[-1]
+    message["attachments"][0]["blocks"][2]["fields"][0]["text"] = f"*{args.pr_branch} PR:* <{args.pr_url}| #{pr_number}>"
     message["attachments"][0]["blocks"][2]["fields"][1]["text"] = f"*<{args.url}| Preview {args.pr_branch} Post>*"
 
     version_no_dots = args.version.replace('.', '')

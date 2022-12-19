@@ -41,8 +41,13 @@ jobs:
       
       - name: Create PR
         id: create-pr
-        run: gh pr create --base staging --head ${{ inputs.version }}-post --title "${{ inputs.version }} staging" --assignee ${{ github.actor }} --body "Preview at draft site:&nbsp;${{ steps.gen-url.outputs.draft-url }}<br><br>After this PR is merged, preview at staging site:&nbsp;${{ steps.gen-url.outputs.staging-url }}" --reviewer ${{ steps.get-reviewers.outputs.reviewers }}
-      
+        run: |
+          if [[ -n $steps.get-reviewers.outputs.reviewers]]; then
+            echo "::set-output name=pr-url::$(gh pr create --base staging --head ${{ inputs.version }}-post --title "${{ inputs.version }} staging" --assignee ${{ github.actor }} --body "Preview at draft site:&nbsp;${{ steps.gen-url.outputs.draft-url }}<br><br>After this PR is merged, preview at staging site:&nbsp;${{ steps.gen-url.outputs.staging-url }}" --reviewer ${{ steps.get-reviewers.outputs.reviewers }})"
+          else
+            echo "::set-output name=pr-url::$(gh pr create --base staging --head ${{ inputs.version }}-post --title "${{ inputs.version }} staging" --assignee ${{ github.actor }} --body "Preview at draft site:&nbsp;${{ steps.gen-url.outputs.draft-url }}<br><br>After this PR is merged, preview at staging site:&nbsp;${{ steps.gen-url.outputs.staging-url }})"
+          fi
+
       - name: Create PR Old
         if: false
         id: create-pr-old
@@ -60,6 +65,6 @@ jobs:
         if: false
         run: |
           python3 .github/workflows/slack_alert.py \
-          ${{ inputs.version }} ${{ steps.get-reviewers.outputs.publish-date }} "${{ inputs.author-name }}" ${{ inputs.github-username }} "${{ inputs.slack-notification }}" \
+          ${{ inputs.version }} ${{ steps.get-reviewers.outputs.publish-date }} "${{ steps.get-reviewers.outputs.author-name }}" ${{ steps.get-reviewers.outputs.github-username }} "${{ inputs.slack-notification }}" \
           ${{ secrets.SLACK_HOOK }} ${{ secrets.SLACK_HOOK_TEST }} \
-          ${{ steps.create-pr.outputs.pull-request-number }} ${{ steps.gen-url.outputs.pr-branch }} ${{ steps.gen-url.outputs.staging-url }}
+          ${{ steps.create-pr.outputs.pr-url}} ${{ steps.gen-url.outputs.pr-branch }} ${{ steps.gen-url.outputs.staging-url }}
