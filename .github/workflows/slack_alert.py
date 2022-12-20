@@ -131,13 +131,14 @@ if __name__ == "__main__":
     message["attachments"][0]["blocks"][2]["fields"][1]["text"] = f"*<{args.url}| Preview {args.pr_branch} Post>*"
 
     version_no_dots = args.version.replace('.', '')
-    ISSUE_URL = f"https://api.github.com/repos/OpenLiberty/open-liberty/issues?labels=blog,target:{version_no_dots}"
+    ISSUE_URL = f"https://api.github.com/repos/OpenLiberty/open-liberty/issues?labels=blog,target:{version_no_dots};state=all"
     issues = json.loads(requests.get(ISSUE_URL).text)
-    for i, issue in enumerate(issues):
-        issue_url = issue["html_url"]
-        issue_title = issue["title"]
-        issue_number = issue["number"]
-        message["attachments"][0]["blocks"][3]["text"]["text"] += f"\n <{issue_url}| {issue_title}> #{issue_number}"
+    if len(issues) > 0:
+        for i, issue in enumerate(issues):
+            issue_url = issue["html_url"]
+            issue_title = issue["title"]
+            issue_number = issue["number"]
+            message["attachments"][0]["blocks"][3]["text"]["text"] += f"\n <{issue_url}| {issue_title}> #{issue_number}"
 
     bug_issue_url = f"https://github.com/OpenLiberty/open-liberty/issues?q=+label%3A%22release+bug%22+label%3Arelease%3A{version_no_dots}"    
     if not "beta" in args.version.lower():
