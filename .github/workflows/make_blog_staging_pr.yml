@@ -42,9 +42,12 @@ jobs:
       - name: Create PR
         id: create-pr
         run: |
+          echo "Reviewers: $steps.get-draft-data.outputs.reviewers"
           if [[ -n "$steps.get-draft-data.outputs.reviewers" ]]; then
+            echo "The following reviewers will be assigned to the PR: $steps.get-draft-data.outputs.reviewers"
             echo "::set-output name=pr-url::$(gh pr create --base staging --head ${{ inputs.version }}-post --title "${{ inputs.version }} staging" --assignee ${{ github.actor }} --body "Preview at draft site:&nbsp;${{ steps.gen-url.outputs.draft-url }}<br><br>After this PR is merged, preview at staging site:&nbsp;${{ steps.gen-url.outputs.staging-url }}" --reviewer ${{ steps.get-draft-data.outputs.reviewers }})"
           else
+            echo "No reviewers to assign to the PR"
             echo "::set-output name=pr-url::$(gh pr create --base staging --head ${{ inputs.version }}-post --title "${{ inputs.version }} staging" --assignee ${{ github.actor }} --body "Preview at draft site:&nbsp;${{ steps.gen-url.outputs.draft-url }}<br><br>After this PR is merged, preview at staging site:&nbsp;${{ steps.gen-url.outputs.staging-url }}")"
           fi
 
@@ -62,7 +65,6 @@ jobs:
           reviewers: ${{ steps.get-draft-data.outputs.reviewers }}
 
       - name: Send Slack alert
-        if: false
         run: |
           python3 .github/workflows/slack_alert.py \
           ${{ inputs.version }} ${{ steps.get-draft-data.outputs.publish-date }} "${{ steps.get-draft-data.outputs.author-name }}" ${{ steps.get-draft-data.outputs.github-username }} "${{ inputs.slack-notification }}" \
