@@ -38,10 +38,14 @@ jobs:
     name: Automate release and beta blog PR creation for `draft` branch
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout prod
         uses: actions/checkout@v3
         with:
           ref: prod
+        
+      - name: Create new branch ${{ inputs.version }}-post
+        if: false
+        run: git checkout -b ${{ inputs.version }}-post
 
       - name: Create blog
         run: |
@@ -54,8 +58,19 @@ jobs:
           echo "::set-output name=staging-url::https://blogs-staging-openlibertyio.mqj6zf7jocq.us-south.codeengine.appdomain.cloud/blog/$(echo ${{ inputs.publish-date }} | tr - /)/${{ inputs.version }}.html"
           echo "::set-output name=pr-branch::Draft"
 
-      - name: Create PR
+      - name: Commit post and create PR to draft branch
         id: create-pr
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add -A
+          git commit -m ${{ inputs.version }} --author "${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>"
+          git push origin prod:${{ inputs.version }}-post
+          echo "::set-output name=pr-url::$(gh pr create --base draft --head ${{ inputs.version }}-post --title "${{ inputs.version }} draft" --assignee ${{ github.actor }} --body "After this PR is merged, preview at draft site:&nbsp;${{ steps.gen-url.outputs.draft-url }}")"
+          
+      - name: Create PR using action from marketplace
+        if: false
+        id: create-pr-old
         uses: peter-evans/create-pull-request@v4
         with:
           commit-message: ${{ inputs.version }}
@@ -66,12 +81,12 @@ jobs:
           body: "After this PR is merged, preview at draft site: ${{ steps.gen-url.outputs.draft-url }}"
         
       - name: Update PR to draft branch
+        if: false
         run: gh pr edit ${{ steps.create-pr.outputs.pull-request-number }} --base draft
           
-
       - name: Send Slack alert
         run: |
           python3 .github/workflows/slack_alert.py \
           ${{ inputs.version }} ${{ inputs.publish-date }} "${{ inputs.author-name }}" ${{ inputs.github-username }} "${{ inputs.slack-notification }}" \
           ${{ secrets.SLACK_HOOK }} ${{ secrets.SLACK_HOOK_TEST }} \
-          ${{ steps.create-pr.outputs.pull-request-number }} ${{ steps.gen-url.outputs.pr-branch }} ${{ steps.gen-url.outputs.draft-url }}
+          ${{ steps.create-pr.outputs.pr-url }} ${{ steps.gen-url.outputs.pr-branch }} ${{ steps.gen-url.outputs.draft-url }}
