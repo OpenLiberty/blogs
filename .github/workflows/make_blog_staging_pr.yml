@@ -28,21 +28,28 @@ jobs:
         with:
           ref: ${{ inputs.version }}-post
 
-      - name: Get list of reviewers and publish date
-        id: get-reviewers
+      - name: Get data from the draft post
+        id: get-draft-data
         run: python3 .github/workflows/get_draft_blog_data.py ${{ inputs.version }}
      
       - name: Generate draft and staging URLs
         id: gen-url
         run: |
-          echo "::set-output name=draft-url::https://blogs-draft-openlibertyio.mqj6zf7jocq.us-south.codeengine.appdomain.cloud/blog/$(echo ${{ steps.get-reviewers.outputs.publish-date }} | tr - /)/${{ inputs.version }}.html"
-          echo "::set-output name=staging-url::https://blogs-staging-openlibertyio.mqj6zf7jocq.us-south.codeengine.appdomain.cloud/blog/$(echo ${{ steps.get-reviewers.outputs.publish-date }} | tr - /)/${{ inputs.version }}.html"
+          echo "::set-output name=draft-url::https://blogs-draft-openlibertyio.mqj6zf7jocq.us-south.codeengine.appdomain.cloud/blog/$(echo ${{ steps.get-draft-data.outputs.publish-date }} | tr - /)/${{ inputs.version }}.html"
+          echo "::set-output name=staging-url::https://blogs-staging-openlibertyio.mqj6zf7jocq.us-south.codeengine.appdomain.cloud/blog/$(echo ${{ steps.get-draft-data.outputs.publish-date }} | tr - /)/${{ inputs.version }}.html"
           echo "::set-output name=pr-branch::Staging"
       
       - name: Create PR
         id: create-pr
-        run: gh pr create --base staging --head ${{ inputs.version }}-post --title "${{ inputs.version }} staging" --assignee ${{ github.actor }} --body "Preview at draft site:&nbsp;${{ steps.gen-url.outputs.draft-url }}<br><br>After this PR is merged, preview at staging site:&nbsp;${{ steps.gen-url.outputs.staging-url }}" --reviewer ${{ steps.get-reviewers.outputs.reviewers }}
-      
+        run: |
+          if [[ "${{ steps.get-draft-data.outputs.reviewers }}" != "" ]]; then
+            echo "The following reviewers will be assigned to the PR: ${{ steps.get-draft-data.outputs.reviewers }}"
+            echo "::set-output name=pr-url::$(gh pr create --base staging --head ${{ inputs.version }}-post --title "${{ inputs.version }} staging" --assignee ${{ github.actor }} --body "Preview at draft site:&nbsp;${{ steps.gen-url.outputs.draft-url }}<br><br>After this PR is merged, preview at staging site:&nbsp;${{ steps.gen-url.outputs.staging-url }}" --reviewer ${{ steps.get-draft-data.outputs.reviewers }})"
+          else
+            echo "No reviewers to assign to the PR"
+            echo "::set-output name=pr-url::$(gh pr create --base staging --head ${{ inputs.version }}-post --title "${{ inputs.version }} staging" --assignee ${{ github.actor }} --body "Preview at draft site:&nbsp;${{ steps.gen-url.outputs.draft-url }}<br><br>After this PR is merged, preview at staging site:&nbsp;${{ steps.gen-url.outputs.staging-url }}")"
+          fi
+
       - name: Create PR Old
         if: false
         id: create-pr-old
@@ -54,12 +61,11 @@ jobs:
           title: ${{ inputs.version }} staging
           assignees: ${{ github.actor }}
           body: "Preview at draft site: ${{ steps.gen-url.outputs.draft-url }}\nAfter this PR is merged, preview at staging site: ${{ steps.gen-url.outputs.staging-url }}"
-          reviewers: ${{ steps.get-reviewers.outputs.reviewers }}
+          reviewers: ${{ steps.get-draft-data.outputs.reviewers }}
 
       - name: Send Slack alert
-        if: false
         run: |
           python3 .github/workflows/slack_alert.py \
-          ${{ inputs.version }} ${{ steps.get-reviewers.outputs.publish-date }} "${{ inputs.author-name }}" ${{ inputs.github-username }} "${{ inputs.slack-notification }}" \
+          ${{ inputs.version }} ${{ steps.get-draft-data.outputs.publish-date }} "${{ steps.get-draft-data.outputs.author-name }}" ${{ steps.get-draft-data.outputs.github-username }} "${{ inputs.slack-notification }}" \
           ${{ secrets.SLACK_HOOK }} ${{ secrets.SLACK_HOOK_TEST }} \
-          ${{ steps.create-pr.outputs.pull-request-number }} ${{ steps.gen-url.outputs.pr-branch }} ${{ steps.gen-url.outputs.staging-url }}
+          ${{ steps.create-pr.outputs.pr-url}} ${{ steps.gen-url.outputs.pr-branch }} ${{ steps.gen-url.outputs.staging-url }}

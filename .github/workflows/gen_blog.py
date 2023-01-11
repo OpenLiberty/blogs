@@ -121,7 +121,7 @@ def make_blog(issues, is_beta):
         body = ""
         # For now, just be greedy and grab everything between "<GHA-BLOG-RELATED-FEATURES>" and "</GHA-BLOG-SUMMARY>"
         if "<GHA-BLOG-RELATED-FEATURES>" in issue['body'] and "</GHA-BLOG-SUMMARY>" in issue['body'] :
-            body = body.partition("<GHA-BLOG-RELATED-FEATURES>")[2].partition("</GHA-BLOG-SUMMARY>")[0]
+            body = issue['body'].partition("<GHA-BLOG-RELATED-FEATURES>")[2].partition("</GHA-BLOG-SUMMARY>")[0]
         else:
             body = linked_issue['body'] if (linked_issue != None and linked_issue['body']) else issue['body']
             # find the content of blog for old template formats
@@ -137,12 +137,20 @@ def make_blog(issues, is_beta):
             if body == "":
                 body = issue['body']
 
+        body = convert_markdown_links_to_asciidoc(body)
         titles.append(f'* <<SUB_TAG_{i}, {title}>>') # TODO: get/make meaningful tags
         blogSection = BLOG_ISSUE_SECTION_START.replace(BLOG_ISSUE_URL_PLACEHOLDER, issue["html_url"]).replace(BLOG_CONTACT_PLACEHOLDER, reviewers_string)
         contents.append(f'{blogSection} {closed_issue_warning}\n[#SUB_TAG_{i}]\n== {title}\n{previous_posts}{body}\n{BLOG_ISSUE_SECTION_END}\n')
         # contents.append(f'{BLOG_ISSUE_SECTION_START} {issue["html_url"]}{closed_issue_warning}\n[#SUB_TAG_{i}]\n== {title}\n{previous_posts}{body}\n{BLOG_ISSUE_SECTION_END}\n')
 
     return '\n'.join(titles), '\n'.join(contents)
+
+def convert_markdown_links_to_asciidoc(content):
+    # May need to expend support beyond just inline links without titles
+    inline_links_regex = re.compile(r'\[(?P<text>.+?)\]\((?P<url>.+?)\)')
+    
+    return inline_links_regex.sub(r'link:\2[\1]', content)
+
 
 def main():
     arg_count = len(sys.argv) - 1
