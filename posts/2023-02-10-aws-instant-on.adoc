@@ -1,0 +1,222 @@
+---
+layout: post
+title: "Liberty InstantOn on Amazon EKS"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/jgawor
+author_github: https://github.com/jgawor
+seo-title: Liberty InstantOn on Amazon EKS - OpenLiberty.io
+seo-description: Taking advantage of Liberty InstantOn on Amazon EKS
+blog_description: Taking advantage of Liberty InstantOn on Amazon EKS
+---
+= Liberty InstantOn on Amazon EKS
+Jarek Gawor <https://github.com/jgawor>
+
+//Blank line here is necessary before starting the body of the post.
+
+The link:https://openliberty.io/blog/2022/09/29/instant-on-beta.html[Liberty InstantOn] feature dramatically speeds up the start up time of Liberty applications. In this blog post, we will deploy a simple Liberty application to Amazon Elastic Kubernetes Service (Amazon EKS) and take advantage of the InstantOn functionality to quickly spin up application containers. 
+
+First, we will build an InstantOn container image and push it to link:https://aws.amazon.com/ecr/[Amazon Elastic Container Registry (Amazon ECR)]. Next, we will create a new Amazon EKS cluster, deploy the Liberty application to the cluster, and scale the application up.
+
+To complete the steps outlined in this post, you will need the following:
+
+* link:https://maven.apache.org/[Maven] to build the Liberty application
+* link:https://podman.io/[Podman] to build the InstantOn image
+* An link:https://aws.amazon.com/[Amazon AWS] Account
+* The link:https://aws.amazon.com/cli/[AWS CLI] to create and manage AWS services
+* The link:https://eksctl.io/[Amazon EKS CLI] to create and manage EKS clusters
+* The link:https://kubernetes.io/docs/tasks/tools/#kubectl[kubectl] command-line tool to interact with a Kubernetes cluster
+
+
+== Build InstantOn image
+
+First, clone the repository of the sample Liberty application. We are checking out the `instanton` branch as it contains the InstantOn modifications. 
+```
+$ git clone -b instanton https://github.com/OpenLiberty/sample-getting-started.git
+$ cd sample-getting-started
+```
+
+Next, build the application code using Maven:
+```
+$ mvn install
+```
+
+Once the code is compiled, we can build the InstantOn container image. The process actually involves creating two container images. The first container image is a base image that just contains the application. The second container image extends the first image and adds the checkpoint data needed for a quick start up.  
+
+NOTE: Elevated Linux permissions are required to build the InstantOn container image. However, for simplicity, the next few commands will need to run as the `root` user using the `sudo` command.
+
+To build the base image run:
+```
+$ sudo ./build-og.sh
+```
+The script runs a simple `podman build` command and creates the `dev.local/getting-started` container image.
+
+To build the InstantOn image run:
+```
+$ sudo ./build-instanton.sh
+```
+The scripts runs a sequence of `podman` commands that create the checkpoint data and save that data in a new `dev.local/getting-started-instanton` container image.
+
+== Push image to ECR
+
+At this point, the InstantOn image on exits on a local machine. We will need to push it to some container registry to make it available to the EKS cluster. One option is to make the image available in a public registry such as link:https://hub.docker.com/[DockerHub] or link:https://quay.io[Quay]. Another option is to use Amazon ECR. 
+
+In this post, we will use Amazon ECR for a couple of reasons. First, a default private Amazon ECR is provided with each AWS account. That means, we do not have to set up and configure a separate registry elsewhere. Second, Amazon ECR can seamlessly integrate with EKS and other similar AWS services such as link:https://aws.amazon.com/ecs/[Amazon ECS)]. That means, we do not have to configure any image pull secrets in our EKS cluster to pull down images from the private container registry.
+
+To use the private Amazon ECR registry, first you will need create a repository for the InstantOn image:
+```
+$ aws ecr create-repository --repository-name getting-started-instanton
+```
+
+In the output of this command, note the `repositoryUri` value. It should match the `<aws_account_id>.dkr.ecr.<region>.amazonaws.com/getting-started-instanton` pattern. For example: `1234567890.dkr.ecr.us-east-1.amazonaws.com/getting-started-instanton`. 
+
+Next, you will need to authenticate to the registry in order to push or pull images using Podman. To do that, use the following command:
+```
+$ aws ecr get-login-password | sudo podman login --username AWS --password-stdin <aws_account_id>.dkr.ecr.<region>.amazonaws.com
+```
+
+Once authenticated, you can tag and push the InstantOn image to the private ECR registry:
+```
+$ sudo podman tag dev.local/getting-started-instanton <aws_account_id>.dkr.ecr.<region>.amazonaws.com/getting-started-instanton
+$ sudo podman push <aws_account_id>.dkr.ecr.<region>.amazonaws.com/getting-started-instanton
+```
+
+=== Provision EKS cluster
+
+We are ready to provision an EKS cluster now. The first step is to create a `cluster.yaml` file with the following contents. 
+
+.cluster.yaml
+[source,yaml]
+----
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: instanton
+  region: us-east-1
+  version: "1.24"
+
+managedNodeGroups:
+  - name: ng-instanton
+    instanceType: t3.micro
+    desiredCapacity: 3
+    amiFamily: Bottlerocket
+    iam:
+       attachPolicyARNs:
+          - arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy
+          - arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
+          - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+          - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+----
+
+The initial `cluster.yaml` file requests a Kuberentes v1.24 cluster to be provisioned with three link:https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html[managed EC2 nodes] that are running the link:https://docs.aws.amazon.com/eks/latest/userguide/eks-optimized-ami-bottlerocket.html[Bottlerocket operating system]. The cluster is just big enough to handle the sample application. If you are planning to deploy other applications to the cluster, adjust the `instanceType` and/or the `desiredCapacity` parameters. Also, make sure that the `region` parameter matches your region. See the link:https://eksctl.io/usage/schema/[config file schema] for additional settings that can be configured when provisioning a cluster.
+
+NOTE: The cluster nodes are created with the EKS optimized Bottlerocket Amazon Machine Image (AMI) instead of the default Amazon Linux AMI. The Bottlerocket AMI as well as the Ubuntu 20 AMI are using a Linux kernel version that supports InstantOn. As of this writing, the Amazon Linux AMI is running a slightly older kernel version that does not fully support InstantOn.
+
+After making updates to the `cluster.yaml`, run the following command to provision the EKS cluster:
+```
+$ eksctl create cluster -f cluster.yaml
+```
+
+After 15 or so minutes the cluster should be provisioned and ready to use. Double check by running the following command to see the cluster nodes:
+```
+$ kubectl get node -o wide
+```
+
+You should see a similar output:
+```
+NAME                             STATUS   ROLES    AGE     VERSION               INTERNAL-IP      EXTERNAL-IP      OS-IMAGE                                KERNEL-VERSION   CONTAINER-RUNTIME
+ip-xxx-xxx-xx-xxx.ec2.internal   Ready    <none>   2m44s   v1.24.6-eks-4360b32   xxx.xxx.xx.xxx   xx.xxx.xxx.xxx   Bottlerocket OS 1.11.1 (aws-k8s-1.24)   5.15.59          containerd://1.6.8+bottlerocket
+ip-xxx-xxx-xx-xxx.ec2.internal   Ready    <none>   2m42s   v1.24.6-eks-4360b32   xxx.xxx.xx.xxx   xx.xx.xx.xx      Bottlerocket OS 1.11.1 (aws-k8s-1.24)   5.15.59          containerd://1.6.8+bottlerocket
+```
+
+=== Deploy InstantOn application
+
+Once the cluster is up and running, we can deploy the Liberty InstantOn application. 
+
+First, create a `deployment.yaml` file with the following contents:
+
+.deployment.yaml
+[source,yaml]
+----
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: open-liberty-instanton
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: open-liberty-instanton
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: open-liberty-instanton
+    spec:
+      containers:
+      - image: <aws_account_id>.dkr.ecr.<region>.amazonaws.com/getting-started-instanton
+        imagePullPolicy: IfNotPresent
+        name: app
+        ports:
+        - containerPort: 9080
+          name: 9080-tcp
+          protocol: TCP
+        resources:
+          limits:
+            cpu: 1
+            memory: 512Mi
+          requests:
+            cpu: 500m
+            memory: 256Mi
+        securityContext:
+          runAsNonRoot: true
+          privileged: false
+          capabilities:
+            add:
+            - CHECKPOINT_RESTORE
+            - SETPCAP
+            drop:
+            - ALL
+----
+
+Make sure to update the `image` value to match the `repositoryUri` from the `create-repository` step. 
+
+Next, deploy the application by running the following:
+```
+$ kubectl apply -f deployment.yaml
+```
+
+Check the logs to see if the application started up successfully. Keep in mind that it might take a few extra seconds for the pod to start for very first time:
+```
+$ kubectl logs -l app.kubernetes.io/name=open-liberty-instanton --tail=-1
+```
+
+You should see the following if the application started successfully with InstantOn:
+```
+[AUDIT   ] CWWKZ0001I: Application io.openliberty.sample.getting.started started in 0.331 seconds.
+[AUDIT   ] CWWKC0452I: The Liberty server process resumed operation from a checkpoint in 0.464 seconds.
+[AUDIT   ] CWWKF0012I: The server installed the following features: [cdi-2.0, checkpoint-1.0, distributedMap-1.0, jaxrs-2.1, jaxrsClient-2.1, jndi-1.0, json-1.0, jsonp-1.1, monitor-1.0, mpConfig-2.0, mpHealth-3.1, mpMetrics-3.0, servlet-4.0, ssl-1.0].
+[AUDIT   ] CWWKF0011I: The defaultServer server is ready to run a smarter planet. The defaultServer server started in 0.510 seconds.
+[AUDIT   ] CWWKS4104A: LTPA keys created in 0.919 seconds. LTPA key file: /opt/ol/wlp/output/defaultServer/resources/security/ltpa.keys
+[AUDIT   ] CWPKI0803A: SSL certificate created in 3.290 seconds. SSL key file: /opt/ol/wlp/output/defaultServer/resources/security/key.p12
+```
+
+Now, you can scale the application up to see how quickly the new pod instances are coming up!
+```
+$ kubectl scale deployment/open-liberty-instanton --replicas=3
+```
+
+In a follow on blog post, we will combine InstantOn with link:https://knative.dev/docs/serving/[Knative] and explore the scale-to-zero scenario.
+
+=== Clean up
+
+If you no longer need the EKS cluster, make sure to delete the cluster by running the following command:
+
+```
+$ eksctl delete cluster -f cluster.yaml
+```
+
+Similarly, if you no longer need the ERC repository, delete it using the following command:
+```
+$ aws ecr delete-repository --repository-name getting-started-instanton --force
+```
