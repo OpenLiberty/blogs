@@ -1,0 +1,465 @@
+---
+layout: post
+title: "Open Liberty での Java SE 19 および分散セキュリティー・キャッシュのサポート 22.0.0.11"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/mbroz2
+author_github: https://github.com/mbroz2
+seo-title: Open Liberty 22.0.0.11 での Java SE 19 および分散セキュリティー・キャッシュのサポート - OpenLiberty.io
+seo-description: Open Liberty 22.0.0.11 は、 Java SE 19 および分散セキュリティー・キャッシュをサポートします。これにより、パフォーマンスと障害のリカバリーが改善されます。  また、 CVE およびバグ修正と共に BELL フィーチャーの改善も含まれています。
+blog_description: Open Liberty 22.0.0.11 は、 Java SE 19 および分散セキュリティー・キャッシュをサポートします。これにより、パフォーマンスと障害のリカバリーが改善されます。  また、 CVE およびバグ修正と共に BELL フィーチャーの改善も含まれています。
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+blog-available-in-languages:
+- lang: en
+  path: /blog/2022/10/25/22.0.0.11.html
+---
+= Open Liberty 22.0.0.11 での Java SE 19 および分散セキュリティー・キャッシュのサポート
+Michal Broz <https://github.com/mbroz2>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+Open Liberty 22.0.0.11 は、Java SE 19 および分散セキュリティー・キャッシュのサポートを提供します。Java SE 19 には、レコード パターンや仮想スレッドなど、魅力的な新機能や変更が多数含まれています。分散セキュリティー・キャッシュのサポートにより、複数の Liberty サーバーが JCache プロバイダーを使用してキャッシュを共有できます。
+
+22.0.0.11 の一部として、BELL サービスを使用して SPI インターフェイスを実装し、BELL サービスが構成プロパティを受信できるようにすることもできるようになりました。これらの BELL 機能拡張により、ユーザー機能を記述するより簡単な代替手段が提供されます。このリリースには、重要なセキュリティ脆弱性 (CVE) の修正と多くの重要なバグ修正も含まれています。
+
+下記が link:{url-about}[Open Liberty] 22.0.0.11の見どころです。
+
+* <<java19, Java SE 19 サポート>>
+* <<security_caches, 分散セキュリティキャッシュ>>
+* <<bell, BELLサービスにおけるSPIインターフェースの実装と、Liberty構成プロパティの受け取り>>
+* <<CVEs, 脆弱性(CVE)修正>>
+* <<bugs, バグ修正>>
+
+詳しくは、link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A220011+label%3A%22release+bug%22[22.0.0.11で修正されたバグのリスト]を参照ください。
+
+またlink:{url-prefix}/blog/?search=release&search!=beta[以前のOpen Liberty のリリースのブログのリスト]も参照ください。
+
+
+[#run]
+
+== 22.0.0.11 を使用してアプリを実行する
+
+link:{url-prefix}/guides/maven-intro.html[Maven]を使用している場合、pom.xmlへの変更は次のとおりです。
+
+[source,xml]
+----
+<dependency>
+    <groupId>io.openliberty</groupId>
+    <artifactId>openliberty-runtime</artifactId>
+    <version>22.0.0.11</version>
+    <type>zip</type>
+</dependency>
+----
+
+link:{url-prefix}/guides/gradle-intro.html[Gradle]の場合は下記の変更となります。
+
+[source,gradle]
+----
+dependencies {
+    libertyRuntime group: 'io.openliberty', name: 'openliberty-runtime', version: '[22.0.0.11,)'
+}
+----
+
+または、Docker を使用している場合、Dockerfileでイメージの指定は次のようになります。
+
+[source]
+----
+FROM open-liberty
+----
+
+link:{url-prefix}/downloads/[ダウンロード・ページ]はこちらです。
+
+[link=https://stackoverflow.com/tags/open-liberty]
+image::img/blog/blog_btn_stack.svg[Stack Overflowで質問しよう（英語）, align="center"]
+
+
+[#java19]
+== Java SE 19 のサポート
+
+Java SE 19 がリリースされ、次の機能が追加されました。
+
+* link:https://openjdk.org/jeps/405[パターンの記録] (Preview)
+* link:https://openjdk.org/jeps/422[Linux/RISC-V ポート]
+* link:https://openjdk.org/jeps/424[外部関数とメモリ API] (Preview)
+* link:https://openjdk.org/jeps/425[仮想スレッド] (Preview)
+* link:https://openjdk.org/jeps/426[ベクター API] (Fourth Incubator)
+* link:https://openjdk.org/jeps/427[スイッチのパターン マッチング] (Third Preview)
+* link:https://openjdk.org/jeps/428[構造化された同時実行y] (Incubator)
+
+Java SE 19 は、22.0.0.10 のリリース時点ではサポートされていませんでしたが、さかのぼってサポートが追加されています。したがって、Java SE 19 は、Open Liberty 22.0.0.10 以降で公式にサポートされています。今すぐこれを試すには、link:https://adoptium.net/temurin/releases/?version=19[Java SE 19をダウンロード]し、link:{url-prefix}/start/#runtime_releases[22.0.0.10] バージョン以降の Open Liberty をインストールし、Liberty サーバーのlink:{url-prefix}/docs/latest/reference/config/server-configuration-overview.html#server-env[server.env file] ファイルを編集して `JAVA_HOME` がJava SE 19 インストールを指すようにしてください。
+
+Java SE 19 の詳細については、Java SE 19link:https://jdk.java.net/19/release-notes[リリース ノート ページ]または　link:https://docs.oracle.com/en/java/javase/19/docs/api/index.html[API Javadoc ページ] を参照してください。また、link:{url-prefix}/docs/latest/java-se.html[Java SE サポートページ]も参照してください。
+
+NOTE: Open Liberty で Java SE 19 プレビュー機能を試すには、必ず `jvm.options` ファイル に `--enable-preview` を追加してください。
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/22913
+// Contact/Reviewer: jvanhill,ReeceNana
+// // // // // // // // 
+[#security_caches]
+== 分散セキュリティ キャッシュ
+
+分散セキュリティー・キャッシュのサポートが導入されました。これにより、複数の Liberty サーバーが JCache プロバイダーを使用してキャッシュを共有できるようになります。このリリースより前は、認証 (サブジェクト) キャッシュとログアウト Cookie キャッシュは両方とも、ローカルおよびメモリ内に制限されていました。複数のサーバーが、同じ環境で動いている他のサーバーからのキャッシュの内容を受け取ることができず、各サーバーはそれぞれのキャッシュで開始されました。今回の更新の一環として、両方のキャッシュを分散 JCache プロバイダーに格納できるようになりました。この更新により、パフォーマンスと障害回復が改善され、バックエンド ユーザー レジストリの負荷が軽減され、IDP への冗長なリダイレクトが減少し、サーバーのセキュリティ体制が改善されます。
+
+=== 分散認証キャッシュの構成
+
+このセクションのserver.xmlファイル例では `appSecurity-3.0` を指定していますが、任意のバージョンの link:https://openliberty.io/docs/latest/reference/feature/appSecurity-4.0.html[Jakartaセキュリティ( `appSecurity-4.0` 以上) ]機能でも、分散認証キャッシュを構成できます。
+
+サブジェクトの作成はパフォーマンスに影響を与える可能性があるため、Liberty は、ユーザーの認証が成功した後にサブジェクトを保管するための認証キャッシュを提供します。認証キャッシュは、サードパーティの JCache プロバイダーを使用して、複数のサーバーで使用できるようになりました。`jCacheLibraryRef` は、JCache キャッシング プロバイダーの実装を含むライブラリを参照します。
+
+分散認証キャッシュを構成するには、次の `server.xml` 構成を使用します。
+
+
+[source, xml]
+----
+    <featureManager>
+        <feature>appSecurity-3.0</feature>
+    </featureManager>
+
+    <!-- 
+        The 3rd-party JCache provider library that Liberty will use to manage and connect to the cache.
+     -->
+    <library id="JCacheProviderLib">
+        <fileset dir="${shared.resource.dir}" includes="jcacheprovider.jar" />
+    </library>
+
+    <!-- 
+        Configure the JCache cache instance.
+     -->
+    <cache id="AuthCache" name="AuthCache">
+        <cacheManager uri="uri://someuri">
+            <properties prop1="value1" prop2="value2" />
+
+            <cachingProvider jCacheLibraryRef="JCacheProviderLib" />
+        </cacheManager>
+    </cache>
+
+    <!-- 
+        Configure the authentication cache.
+     -->
+    <authCache cacheRef="AuthCache" />
+----
+
+もし、Libertyの環境が、カスタムの `LoginModule` または トラスト アソシエーション インターセプター ( `TAI` )などを使って、ユーザーのSubjectに、カスタムの PrincipalやCredentialを追加する場合、それらを分散認証キャッシュに格納するためには、追加するオブジェクトが `Serializable` である必要があります。
+さらに、これらのクラスを含む共有ライブラリは、キャッシング プロバイダーおよびそれらのクラスへのアクセスを必要とするその他の構成で使用できる必要があります。それぞれに同じ共有ライブラリが使用されていない場合 `ClassCastExceptions` 、分散キャッシュから取得されたクラスを操作するときに発生する可能性があります。`commonLibraryRef` は、オプショナルで、シリアル化してキャッシュに格納できるカスタム クラスを含むライブラリを参照できます。複数のライブラリをコンマで区切って定義できます。
+
+[source, xml]
+----
+<featureManager>
+    <feature>appSecurity-3.0</feature>
+</featureManager>
+
+<!-- 
+    The 3rd-party JCache provider library that Liberty will use to manage and connect to the cache.
+ -->
+<library id="JCacheProviderLib">
+    <fileset dir="${shared.resource.dir}" includes="jcacheprovider.jar" />
+</library>
+
+<!-- 
+    This shared library contains any custom credentials and/or principals that
+    are stored in the subject.
+ -->
+<library id="CustomLib">
+    <fileset dir="${shared.resource.dir}" includes="customlibrary.jar" />
+</library>
+
+<cache ... >
+    <cacheManager ... >
+        <cachingProvider jCacheLibraryRef="JCacheProviderLib" commonLibraryRef="CustomLib" />
+    </cacheManager>
+</cache>
+
+<!--
+　これはJAAS カスタム・ログイン・モジュール構成のサンプルです。このカスタムログインモジュールの例では、
+カスタムのクレデンシャルやプリンシパルをサブジェクトに挿入します。
+jaasLoginModuleのlibraryRefの値は、キャッシング プロバイダーから参照されるライブラリと同じ値に設定する必要があります
+ -->
+ 
+<jaasLoginContextEntry id="system.WEB_INBOUND"
+    name="system.WEB_INBOUND"
+    loginModuleRef="custom, hashtable, userNameAndPassword, certificate, token" />
+
+<jaasLoginModule id="custom"
+    className="org.acme.CustomLoginModule"
+    controlFlag="REQUIRED" libraryRef="CustomLib" />
+
+<!-- 
+    サブジェクトからクラスにアクセスするすべてのアプリケーションが、同じライブラリを参照を使用することが必要です。
+ -->
+<application ...>
+    <classloader commonLibraryRef="CustomLib" />
+</application>
+----
+
+認証キャッシュとして使用するために JCache を構成する際には、下記の点を考慮してください。
+
+* 分散認証キャッシュは、`Object` タイプ のキーと値で構成されます。
+* Libertyに付属の認証キャッシュの動作と、分散認証キャッシュの動作を一致させるには、エビクション ( `LRU` ) ポリシー（キャッシュからエントリーを取り除くポリシー）を、次のように設定します：
+    ** 最大エントリ数を 25000を超えない
+    **  キャッシュに存続するエントリのTTL（TimeToLive）は最大 600 秒とする
+
+* 分散キャッシュでは、キャッシュのパーティショニングにより、実際の容量が構成された値を下回る可能性があります。
+* JCache プロバイダーの実装の仕方によっては、クライアント側のキャッシュを利用して、分散キャッシュにかかるトランザクションの量を減らすことができます。またクライアント側のキャッシュが、逆シリアル化されたオブジェクトを格納する機能をサポートしていることがあります。これらの機能を使うと、パフォーマンスをさらに向上させることができます。
+
+* 分散キャッシュ内のサブジェクトは、ユーザー名やパスワードなど、その他の機密情報を扱う場合と同様に扱う必要があります。JCache プロバイダーの構成の際には、移動中および停止中のデータ(Data in motion, Data at rest)を保護することを念頭に、暗号化やアクセス制御を選択してください。
+
+詳細については、link:{url-prefix}/docs/latest/distributed-caching-jcache.html[Distributed caching with JCache]（JCache を使用した分散キャッシュ）を確認してください
+
+=== 分散ログアウト Cookie キャッシュの設定
+
+ログアウトした Cookie キャッシュには、ログアウトした`LTPA` または `JWT` Cookieが保存されます。ログアウトした Cookie キャッシュは、サードパーティの JCache プロバイダーを使用して配布できるようになりました。これにより、ログアウトした Cookie が複数のサーバーに適用され、あるサーバーでログアウトしたユーザーが別のサーバーにログインするのを防止することができます。分散ログアウト Cookie キャッシュを構成するには、次のserver.xml構成を使用します。
+
+[source, xml]
+----
+    <featureManager>
+        <feature>appSecurity-3.0</feature>
+    </featureManager>
+
+    <!-- 
+        The 3rd-party JCache provider library that Liberty will use to manage and connect to the cache.
+     -->
+    <library id="JCacheProviderLib">
+        <fileset dir="${shared.resource.dir}" includes="jcacheprovider.jar" />
+    </library>
+
+    <!-- 
+        Configure the JCache instances.
+     -->
+    <cache id="LoggedOutCookieCache" name="LoggedOutCookieCache">
+        <cacheManager uri="uri://someuri">
+            <properties prop1="value1" prop2="value2" />
+
+            <cachingProvider jCacheLibraryRef="JCacheProviderLib" />
+        </cacheManager>
+    </cache>
+
+    <!-- 
+        Configure the authentication cache to use the JCache. 
+     -->
+    <webAppSecurity loggedoutCookieCacheRef="LoggedOutCookieCache" />
+----
+
+JCacheを使って、ログアウトした Cookie をキャッシュする場合、下記の点を考慮してください。
+
+* Libertyに付属のログアウトCookieキャッシュの動作と、分散認証キャッシュの動作を一致させるには、エビクション ( `LRU` ) ポリシー（キャッシュからエントリーを取り除くポリシー）を、次のように設定します：
+    ** 最大エントリ数は10000
+    **  キャッシュに存続するエントリのTTL（TimeToLive）は無制限
+* 分散キャッシュでは、キャッシュのパーティショニングにより、実際の容量が構成された値を下回る可能性があることに注意してください。
+* キャッシュ容量は、新しくログアウトした Cookie がキャッシュに挿入されたために有効期限が切れていない Cookie が削除されないように十分な大きさにする必要があります。
+* JCache プロバイダーの実装の仕方によっては、クライアント側のキャッシュを利用して、分散キャッシュにかかるトランザクションの量を減らすことができます。またクライアント側のキャッシュが、逆シリアル化されたオブジェクトを格納する機能をサポートしていることがあります。これらの機能を使うと、パフォーマンスをさらに向上させることができます。
+
+詳細については、link:{url-prefix}/docs/latest/track-loggedout-sso.html[Track logged-out SSO cookies] を参照してください。
+
+=== 分散セッション キャッシュの構成
+
+`sessionCache-1.0` フィーチャーが更新されて、新しい分散キャッシュ構成要素を使用できるようになりました。これにより全フィーチャーで、共通のJCache構成が可能になりました。セッション キャッシュ用に個別に JCache を構成する必要がなくなります。
+
+[source, xml]
+----
+    <featureManager>
+        <feature>sessionCache-1.0</feature>
+    </featureManager>
+
+    <!-- 
+        The 3rd-party JCache provider library that Liberty will use to manage and connect to the cache.
+     -->
+    <library id="JCacheProviderLib">
+        <fileset dir="${shared.resource.dir}" includes="jcacheprovider.jar" />
+    </library>
+
+    <!-- 
+        Configure the JCache cache manager.
+     -->
+    <cacheManager id="CacheManager" uri="uri://someuri">
+        <properties prop1="value1" prop2="value2" />
+
+        <cachingProvider jCacheLibraryRef="JCacheProviderLib" />
+    </cacheManager>
+
+    <!--
+        Configure the HTTP session cache.
+     -->
+    <httpSessionCache cacheManagerRef="CacheManager" ... />
+----
+
+=== 複数のキャッシュの構成
+
+複数の分散キャッシュを構成する場合、キャッシュ要素内にcacheManagerの構成をネストする代わりに、キャッシュ要素はcacheRef属性を介してキャッシュ マネージャーを参照してください。
+
+[source, xml]
+----
+    <featureManager>
+        <feature>appSecurity-3.0</feature>
+        <feature>sessionCache-1.0</feature>
+    </featureManager>
+
+    <!-- 
+        The 3rd-party JCache provider library that Liberty will use to manage and connect to the cache.
+     -->
+    <library id="JCacheProviderLib">
+        <fileset dir="${shared.resource.dir}" includes="jcacheprovider.jar" />
+    </library>
+
+    <!-- 
+        Configure the JCache cache manager.
+     -->
+    <cacheManager id="CacheManager" uri="uri://someuri">
+        <properties prop1="value1" prop2="value2" />
+
+        <cachingProvider jCacheLibraryRef="JCacheProviderLib" />
+    </cacheManager>
+
+    <!-- 
+        Configure the JCache cache instances.
+     -->
+    <cache id="AuthCache" name="AuthCache" cacheManagerRef="CacheManager" />
+    <cache id="LoggedOutCookieCache" name="LoggedOutCookieCache" cacheManagerRef="CacheManager" />
+
+    <!-- 
+        Configured the authentication cache, logged-out cookie cache and HTTP session cache.
+     -->
+    <authCache cacheRef="AuthCache" />
+    <webAppSecurity loggedoutCookieCacheRef="LoggedOutCookieCache" ... />
+    <httpSessionCache cacheManagerRef="CacheManager" ... />
+----
+
+詳細については、 appSecurity機能によって有効化される link:https://openliberty.io/docs/latest/reference/config/authentication.html[authentication] 要素と link:{url-prefix}/docs/latest/reference/config/authCache.html[authCache] 要素、およびlink:{url-prefix}/docs/latest/reference/feature/sessionCache.html#_examples[JCache Session Persistence の例] を確認してください。
+
+[#bell]
+== BELL サービスで SPI インターフェイスを実装し、BELL サービスが構成プロパティを受信できます
+
+Liberty ライブラリーを使用した基本拡張機能 (link:{url-prefix}/docs/latest/reference/feature/bells-1.0.html[Basic extensions using Liberty libraries (BELL) 1.0]) フィーチャーにより、共有ライブラリーは、Java link:https://docs.oracle.com/javase/9/docs/api/java/util/ServiceLoader.html[ServiceLoader] 構成ファイルを使用して Liberty API インターフェースの実装を提供できるようになります。
+
+22.0.0.11 では、BELL サービスに 2 つの機能が導入されています。SPI の可視性と、プロパティの構成と注入です。以前のLibertyのバージョンでは、これらの機能は、Eclipseのユーザーフィーチャーを作って、Libertyに構成することによってのみ使用できましたが、ユーザーフィーチャーは、少し複雑な開発手順が必要でした。今回入ったBELLの機能により、Libertyの機能を拡張されるデベロッパーは、BELL サービスのシンプルさを活用できます。
+
+BELL SPI の可視性により、BELL 構成で参照されている共有ライブラリは、 フィーチャーSPI パッケージを参照できるようになります。BELL SPI の可視性の導入により、開発者は、ユーザーフィーチャーを作るのと同様に、BELL サービスとして SPI インターフェースの実装を提供できるようになります。
+
+BELL プロパティの構成とインジェクションにより、BELL サービスはserver.xmlファイルで構成されたプロパティを受け取ることができます。BELL プロパティーの導入により、ユーザーは Liberty 構成の利点を活用できるようになります。従来のように、環境変数または JVM システム・プロパティーを使用して BELL サービスを構成する必要がなくなります。
+
+=== 共有ライブラリの SPI 可視性
+
+共有ライブラリは、SPI パッケージへのアクセスをサポートしていません。BELL SPI 可視性の導入により、`bell` の構成で参照される共有ライブラリーでは、Liberty SPI インターフェースの実装を提供できるようになります。
+
+新しいspiVisibility構成属性を使用して、ライブラリが SPI パッケージにアクセスできるかどうかを示すことができます。ライブラリが SPI インターフェイスの実装を提供する場合は、属性を `true` に設定します。
+
+
+[source, xml]
+----
+<server>
+    <featureManager>
+        <feature>bells-1.0</feature>
+    </featureManager>
+    ...
+    <bell libraryRef="servicesLib" spiVisibility="true"/>
+</server>
+----
+
+上記の構成の例では、BELL フィーチャーは、`serviceLib` ライブラリーの中から、実装クラスをロードしますが、ここでロードできる実装クラスは、通常のライブラリーのバイナリーと、APIタイプサービスに加え、SPIパッケージもロードします。このためにBELLに特化したクラスローダーが使用されています。
+
+=== プロパティの構成と注入
+
+BELL プロパティの導入により、サービス実装はbell構成で宣言されたプロパティを受け取ることができます。新しい機能により、従来のように環境変数と JVM システム プロパティを使用して BELL サービスを構成する必要がなくなります。
+
+新しい `properties` 要素を使用して、構成内の 1 つ以上のプロパティを `bell` 構成します。`name="value"` 各プロパティを要素内の属性として宣言します。プロパティは型 `String` であり、それらを受け取ることができるすべてのサービス実装に挿入されます。次の例では、`hello` と `serverHome`　の2つのプロパティと を宣言しています。
+
+[source, xml]
+----
+<server>
+    <featureManager>
+        <feature>bells-1.0</feature>
+    </featureManager>
+    ...
+    <bell libraryRef="servicesLib">
+        <properties hello="WORLD" serverHome="${server.output.dir}" />
+    </bell>
+</server>
+----
+
+サービス実装が構成プロパティを受け取ることができるようにするためには、、サービス実装クラスの中で、名前が `updateBell` であるパブリック メソッドを定義するか、またはパブリックのコンストラクターを定義する必要があります。この場合、メソッド シグネチャーは、 `java.util.Map<String,String>` の引数を１つ宣言する必要があります。
+
+[source, java]
+----
+public YourServiceImpl(java.util.Map<String,String> bellProperties) {...}
+// OR
+public void updateBell(java.util.Map<String,String> bellProperties) {...}
+----
+
+サービスの作成時に、BELL 機能はメソッドを検出し、それを呼び出して、各プロパティのキーと値のペアを含む変更不可能なマップを挿入します。上記の例では、マップには "hello"/"WORLD" と "serverHome"/"<${server.out.dir} の解決された値>" のペアが含まれています。
+
+
+詳細については、次のリンクを参照してください。
+
+* link:{url-prefix}/docs/latest/reference/feature/bells-1.0.html[Open Liberty BELL 1.0 フィーチャー]
+* link:{url-prefix}/docs/latest/reference/config/bell.html[Open Liberty BELL サーバー構成]
+* link:https://docs.oracle.com/javase/9/docs/api/java/util/ServiceLoader.html[Java サービスローダー]
+
+
+[#CVEs]
+== Security vulnerability (CVE) fixes in this release
+[cols="5*"]
+このリリースでのセキュリティの脆弱性 (CVE) の修正
+
+|===
+|CVE |CVSS Score |Vulnerability Assessment |Versions Affected |Notes
+
+|http://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2022-24839[CVE-2022-24839]
+|7.5
+|Denial of service
+|17.0.0.3 - 22.0.0.10
+|link:{url-prefix}/docs/latest/reference/feature/openid-2.0.html[OpenID 2.0] フィーチャーに影響
+|===
+
+過去のセキュリティ脆弱性の修正のリストについては、link:{url-prefix}/docs/latest/security-vulnerabilities.html[セキュリティ脆弱性 (CVE) リスト]を参照してください。
+
+[#bugs]
+== Notable bugs fixed in this release このリリースで修正された重要なバグ
+
+下記に、link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A220011+label%3A%22release+bug%22[22.0.0.11 で修正されたバグのリスト]から、いくつかの修正をピックアップしてみました。
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/22688[HTTP アクセス ログが、複数の X-Forwarded-For ヘッダーを記録されない]
++
+HTTP アクセス ログが、複数の `X-Forwarded-For` ヘッダーを記録できるようになりました
++
+修正前は、HTTP アクセス ロギング `X-Forwarded-For` は、すべてのヘッダーではなく、リクエストごとに1 つのヘッダーのみをログに記録していました。
++
+この問題は解決され、すべてのX-Forwarded-Forヘッダーが適切にログに記録されるようになりました。
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/22397[MYFACES-4450: outputLabel の tabindex がレンダリングされない]
++
+`h:outputLabel` が、JSFのページで、tabindex 属性をレンダリングできませんでした。たとえば、 `<h:outputLabel tabindex="2" value="test"/>` が `<label tabindex="2">test</label>` とレンダリングされるべきところ、 `<label>test</label>` となっていました。
++
+この問題は解決され、正しい出力が表示されるようになりました
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/22361[AD 認証を使用している場合、Java 17 で Jenkins 2.346.3 を起動できない]
++
+AD（Active Directory) 認証を使用している場合、Java 17 で Jenkins 2.346.3 を起動できない
++
+Java SE 17 で実行されている OpenLiberty 22.0.0.9 を使用すると、次のような FFDC が発生する可能性があります。
++
+[source]
+----
+0000002f com.ibm.ws.logging.internal.impl.IncidentImpl                I FFDC1015I: An FFDC Incident has been created: "java.lang.IllegalAccessException: class com.ibm.ws.jndi.internal.WASInitialContextFactoryBuilder cannot access class com.sun.jndi.dns.DnsContextFactory (in module jdk.naming.dns) because module jdk.naming.dns does not export com.sun.jndi.dns to unnamed module @3ce42ee7 com.ibm.ws.jndi.internal.WASInitialContextFactoryBuilder 58" at ffdc_22.08.31_18.04.56.0.log
+----
++
+この問題は、`jdk.naming.dns` モジュールをエクスポートすることで解決されました。
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/22227[フィールドがシリアル化不可能なクラスとして宣言されている場合、Yoko が null フィールドを正しくマーシャリングしない]
++
+`null` シリアライズ不可能なクラスとして宣言されたフィールドを使用して、Yoko が Java 値オブジェクトをマーシャリングすると、`null` フィールドは、正しくマーシャリングされません。これは、2 つの Liberty プロセスが IIOP を介して通信している場合には問題を引き起こしませんが、他の Java プロセスと相互運用する場合には問題を引き起こす可能性があります。
++
+オブジェクトが正しくマーシャリングされるようになり、問題が解決されました。
++
+* link:https://github.com/OpenLiberty/open-liberty/issues/22584[Liberty イメージに `com.ibm.websphere.appserver.api.kernel.service_1.1-javadoc.zip` がありません]
++
+Liberty イメージを使用する場合、`com.ibm.websphere.appserver.api.kernel.service_1.1-javadoc.zip` ファイルはディレクトリー  `dev/api/ibm/javadoc` に存在しません。
++
+この問題は解決され、javadoc zip が `dev/api/ibm/javadoc` ディレクトリに正しく含まれるようになりました。
+
+== Open Liberty 22.0.0.11 を今すぐ入手
+
+下記のリンク <<run,Maven, Gradle, Docker>> から入手可能です。 
+
