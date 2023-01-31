@@ -33,41 +33,38 @@ Thomas Watson <https://github.com/tjwatson>
 
 == Open Liberty是如何实现InstantOn的呢？
 
-为了实现InstantOn，Open Liberty使用了OpenJ9 JVM的新特性和一种叫做Checkpoint/Restore In Userspace CRIU的Linux技术，在应用进程启动时对其设置检查点。这个检查点是正在运行的应用程序进程的快照，可以被持久化，也可以快速恢复，使应用程序进程回到检查点时的状态。这个过程使Liberty实例，以及任何受保护的应用程序，可以多次恢复为应用程序的不同实例。
+为了实现InstantOn，Open Liberty使用了link:https://www.eclipse.org/openj9/[OpenJ9] JVM的新特性和一种叫做Checkpoint/Restore In Userspace link:https://criu.org/[CRIU]的Linux技术，在应用进程启动时对其设置检查点。这个检查点是正在运行的应用程序进程的快照，可以被持久化，也可以快速恢复，使应用程序进程回到检查点时的状态。这个过程使Liberty实例，以及任何受保护的应用程序，可以多次恢复为应用程序的不同实例。
 
-要了解InstantOn的启动速度有多快，请跳转到链接"<<benchmark, 有多快>>"。关于这种方法优势的更多细节，参考OpenJ9 CRIU下快速JVM启动博文和早期的Open Liberty博文，其中我们首次讨论了CRIU对快速启动Java应用程序的能力。
+要了解InstantOn的启动速度有多快，请跳转到链接"<<benchmark, 有多快>>"。关于这种方法优势的更多细节，参考link:https://blog.openj9.org/2022/09/26/fast-jvm-startup-with-openj9-criu-support/[OpenJ9 CRIU]下快速JVM启动博文和早期的link:/blog/2020/02/12/faster-startup-Java-applications-criu.html[Open Liberty]博文，其中我们首次讨论了CRIU对快速启动Java应用程序的能力。
 
 Open Liberty InstantOn功能提供了一个新的检查点行为，可以针对你现有的Open Liberty服务器有效，你可以很容易地使用它。可以具体指定一个阶段作为检查点，让Liberty在这个检查点启动、停止、保存这个检查点。当Liberty启动时，它将检测到保存的检查点进程，并从保存的检查点中恢复进程状态。
 
 == 应用程序示例
 
-在我们讨论检查点如何工作的细节之前，让我们建立一个实例。对于这个例子，我们将了解一下Open Liberty入门指南。从克隆一个样例代码的Git仓库开始：
+在我们讨论检查点如何工作的细节之前，让我们建立一个实例。对于这个例子，我们将了解一下link:/guides/getting-started.html[Open Liberty]入门指南。从克隆一个样例代码的link:https://github.com/openliberty/guide-getting-started.git[Git]仓库开始：
+[source]
+----
 
-```
 git clone https://github.com/openliberty/guide-getting-started.git
 cd guide-getting-started
-```
-
+---
 在本演示中，我们将在finish/目录下工作。请运行以下Maven goal，构建该应用程序并将其部署到Open Liberty：
-
-```
+[source]
+----
 cd finish
 mvn liberty:run
-```
-
+---
 以下信息说明你的应用服务器已经准备好了：
-
-```
+[source]
+----
 The defaultServer server is ready to run a smarter planet.
-```
-
+---
 通过浏览器访问http://localhost:9080/dev/system/properties ，查看服务。在查看完应用程序后，在运行服务器的命令行会话中按CTRL+C停止Open Liberty服务器。下一步为应用程序构建WAR，请运行以下命令：
-
-```
+[source]
+----
 mvn package
-```
-
-这个命令建立了一个target/guide-getting-started.war文件。我们现在可以把这个WAR包含在使用InstantOn功能的容器镜像中。
+---
+这个命令建立了一个`target/guide-getting-started.war`文件。我们现在可以把这个WAR包含在使用InstantOn功能的容器镜像中。
 
 == 容器化应用程序
 
