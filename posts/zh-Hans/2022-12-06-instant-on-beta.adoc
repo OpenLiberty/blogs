@@ -35,13 +35,13 @@ Thomas Watson <https://github.com/tjwatson>
 
 为了实现InstantOn，Open Liberty使用了link:https://www.eclipse.org/openj9/[OpenJ9] JVM的新特性和一种叫做Checkpoint/Restore In Userspace link:https://criu.org/[CRIU]的Linux技术，在应用进程启动时对其设置检查点。这个检查点是正在运行的应用程序进程的快照，可以被持久化，也可以快速恢复，使应用程序进程回到检查点时的状态。这个过程使Liberty实例，以及任何受保护的应用程序，可以多次恢复为应用程序的不同实例。
 
-要了解InstantOn的启动速度有多快，请跳转到链接"<<benchmark, 有多快>>"。关于这种方法优势的更多细节，参考link:https://blog.openj9.org/2022/09/26/fast-jvm-startup-with-openj9-criu-support/[OpenJ9 CRIU]下快速JVM启动博文和早期的link:/blog/2020/02/12/faster-startup-Java-applications-criu.html[Open Liberty]博文，其中我们首次讨论了CRIU对快速启动Java应用程序的能力。
+要了解InstantOn的启动速度有多快，请跳转到链接"<<benchmark, 有多快>>"。关于这种方法优势的更多细节，参考link:https://blog.openj9.org/2022/09/26/fast-jvm-startup-with-openj9-criu-support/[OpenJ9 CRIU下快速JVM启动]博文和早期的link:/blog/2020/02/12/faster-startup-Java-applications-criu.html[Open Liberty]博文，其中我们首次讨论了CRIU对快速启动Java应用程序的能力。
 
 Open Liberty InstantOn功能提供了一个新的检查点行为，可以针对你现有的Open Liberty服务器有效，你可以很容易地使用它。可以具体指定一个阶段作为检查点，让Liberty在这个检查点启动、停止、保存这个检查点。当Liberty启动时，它将检测到保存的检查点进程，并从保存的检查点中恢复进程状态。
 
 == 应用程序示例
 
-在我们讨论检查点如何工作的细节之前，让我们建立一个实例。对于这个例子，我们将了解一下link:/guides/getting-started.html[Open Liberty]入门指南。从克隆一个样例代码的link:https://github.com/openliberty/guide-getting-started.git[Git]仓库开始：
+在我们讨论检查点如何工作的细节之前，让我们建立一个实例。对于这个例子，我们将了解一下link:/guides/getting-started.html[Open Liberty入门]指南。从克隆一个样例代码的link:https://github.com/openliberty/guide-getting-started.git[Git仓库]开始：
 [source]
 ----
 
@@ -68,7 +68,7 @@ mvn package
 
 == 容器化应用程序
 
-要使用Open Liberty InstantOn支持的应用程序，它必须首先使用Open Liberty beta InstantOn镜像进行容器化。关于如何使用Open Liberty对应用程序进行容器化，请参见容器化微服务指南或用Podman容器化微服务指南。如果你不熟悉Podman，请先了解一下Podman指南，因为Open Liberty InstantOn目前需要使用到Podman。后期，一旦Docker支持CRIU所需的功能，InstantOn也会对Docker支持。
+要使用Open Liberty InstantOn支持的应用程序，它必须首先使用Open Liberty beta InstantOn镜像进行容器化。关于如何使用Open Liberty对应用程序进行容器化，请参见link:https://openliberty.io/guides/containerize.html[容器化微服务]指南或用link:https://openliberty.io/guides/containerize-podman.html[Podman容器化微服务]指南。如果你不熟悉Podman，请先了解一下Podman指南，因为Open Liberty InstantOn目前需要使用到Podman。后期，一旦Docker支持CRIU所需的功能，InstantOn也会对Docker支持。
 
 == 使用Open Liberty Beta InstantOn镜像对一个应用程序进行容器化
 
@@ -98,7 +98,7 @@ Liberty InstantOn测试版包含了构建带有检查点进程的应用容器镜
 
 == 为应用程序创建Dockerle
 
-对于开始使用Open Liberty的例子，第一步是创建一个Docker文件，提供创建应用程序的容器化版本的说明。注意，podman也支持使用Containerfile格式来构建容器镜像。
+对于link:https://openliberty.io/guides/getting-started.html[Open Liberty入门]指南的例子，第一步是创建一个Docker文件，提供创建应用程序的容器化版本的说明。注意，podman也支持使用Containerfile格式来构建容器镜像。
 
 在这个例子中，我们将使用IBM容器注册中心（ICR）的一个特殊镜像，icr.io/appcafe/open-liberty:beta-instanton，作为父镜像。这个镜像被标记为beta，意味着它包括了所有Liberty beta的功能以及完整镜像中的所有Liberty功能。这个镜像被标记为instanton，意思是它包括所有产生检查点进程镜像的先决条件，比如必要的criu二进制文件。
 
@@ -134,7 +134,7 @@ RUN configure.sh
 
 == 构建应用容器镜像
 
-为了使 criu 能够对进程进行检查点和恢复，criu 二进制文件必须被授予额外的 Linux 能力。特别是对于Open Liberty，它需要被授予cap_checkpoint_restore、cap_net_admin和cap_sys_ptrace。Open Liberty InstantOn 测试版镜像包括 criu 二进制文件，以及criu 二进制文件所需要的功能。为了使criu二进制文件在运行时被赋予访问权限，运行criu的容器在启动时也必须被授予必要的权限。你可以通过以下两种方式之一授予容器这些权限：
+为了使 criu 能够对进程进行检查点和恢复，criu 二进制文件必须被授予额外的link:https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux_atomic_host/7/html/container_security_guide/linux_capabilities_and_seccomp[Linux功能]。特别是对于Open Liberty，它需要被授予cap_checkpoint_restore、cap_net_admin和cap_sys_ptrace。Open Liberty InstantOn 测试版镜像包括 criu 二进制文件，以及criu 二进制文件所需要的功能。为了使criu二进制文件在运行时被赋予访问权限，运行criu的容器在启动时也必须被授予必要的权限。你可以通过以下两种方式之一授予容器这些权限：
 
 . 使用-privileged选项使用特权容器
 
@@ -1152,7 +1152,7 @@ getting-started-instanton
 
 * link:https://github.com/blueperf/acmeair-mainservice-java#acme-air-main-service---javaliberty/[AcmeAir Microservice Main]使用了MicroProfile的功能。
 
-这些实验是在一个24核的系统上运行的。我使用taskset -c为运行在容器中的Liberty进程分配了4个CPU。InstantOn时间是使用应用程序的检查点阶段消耗的时间。Baseline Startup是从启动Liberty服务器到服务器准备接受请求的时间，不包括启动容器本身所需的时间。这些应用程序的InstantOn与正常启动时间在此以毫秒为单位显示。你的结果可能会根据你的环境、你系统上安装的硬件和软件以及其他因素而有所不同。数据显示越低越好：
+这些实验是在一个24核的系统上运行的。我使用taskset -c为运行在容器中的Liberty进程分配了4个CPU。InstantOn时间是使用应用程序的检查点阶段消耗的时间。Baseline Startup是从启动Liberty服务器到服务器准备接受请求的时间，不包括启动容器本身所需的时间，以messages.log中信息显示“这个<server name>服务器已准备好运行更智能的星球“为准。这些应用程序的InstantOn与正常启动时间在此以毫秒为单位显示。你的结果可能会根据你的环境、你系统上安装的硬件和软件以及其他因素而有所不同。数据显示越低越好：
 
 image::img/blog/instantonperf.png[Startup Performance,width=70%,align="center"]
 
