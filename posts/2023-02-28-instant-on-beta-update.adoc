@@ -17,9 +17,9 @@ Thomas Watson <https://github.com/tjwatson>
 :url-prefix:
 :url-about: /
 
-The Open Liberty 22.0.0.11-beta introduced InstantOn, an exciting new feature that provides incredibly fast startup times for MicroProfile and Jakarta EE applications. For details on the initial beta of InstantOn, see the link:https://openliberty.io/blog/2022/09/29/instant-on-beta.html[Liberty InstantOn startup for cloud native Java applications] blog post. Since the initial InstantOn beta there have been a few changes and enhancements to Liberty InstantOn which make it easier to create and deploy applications with Liberty InstantOn. For the remainder of this blog the project setup of the original blog will be referenced.  If you would like to follow along then you should read and follow the instructions in the link:https://openliberty.io/blog/2022/09/29/instant-on-beta.html[Liberty InstantOn startup for cloud native Java applications] blog post first.
+The Open Liberty 22.0.0.11-beta introduced InstantOn, an exciting new feature that provides incredibly fast startup times for MicroProfile and Jakarta EE applications. For details on the initial beta of InstantOn, see the link:https://openliberty.io/blog/2022/09/29/instant-on-beta.html[Liberty InstantOn startup for cloud native Java applications] article. Since the initial InstantOn beta there have been a few changes and enhancements to Liberty InstantOn which make it easier to create and deploy applications with Liberty InstantOn. The remainder of this article uses the project setup of the original InstantOn article for reference.  If you would like to follow along then you should read and follow the instructions in the link:https://openliberty.io/blog/2022/09/29/instant-on-beta.html[Liberty InstantOn startup for cloud native Java applications] article first.
 
-=== Available checkpoint phases
+== Removed the features checkpoint phase
 
 Initially the IntantOn beta provided three available phases during the startup process where a checkpoint can occur:
 
@@ -29,19 +29,19 @@ Initially the IntantOn beta provided three available phases during the startup p
 
 The `features` phase offers the least in terms of improving an application startup time. Scenarios where an application deployment would want to use `features` over `deployment` are very limited and are not important use cases for Liberty InstantOn. For the 23.0.0.2-beta the `features` checkpoint phase has been removed.  This leaves only two options to choose from for the checkpoint: `deployement` and `applications`. 
 
-== Reduce the set of required capabilities to checkpoint and restore
+== Reduce the set of required Linux capabilities to checkpoint and restore
 
-For `criu` to be able to take a checkpoint of and restore a process, the `criu` binary must be granted additional link:https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux_atomic_host/7/html/container_security_guide/linux_capabilities_and_seccomp[Linux capabilities]. In particular, for the Open Liberty 22.0.0.10-beta, it needs to be granted `cap_checkpoint_restore`, `cap_net_admin` and `cap_sys_ptrace`. For the Open Liberty 23.0.0.2-beta the need for the `cap_net_admin` capability has been removed for both the checkpoint and restore of a process. Additionally, the need for `cap_sys_ptrace` is no longer necessary in order to restore the process when running the application with Liberty InstantOn. This is good because the `cap_net_admin` and `cap_sys_ptrace` are rather powerful and grant a broad set of capabilities that may be unacceptable when deploying an application to the cloud. Instead, the much more limited `cap_setpcap` and the `cap_checkpoint_restore`  capabilities are required.
+For `criu` to be able to take a checkpoint of and restore a process, the `criu` binary must be granted additional link:https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux_atomic_host/7/html/container_security_guide/linux_capabilities_and_seccomp[Linux capabilities]. In particular, for the Open Liberty 22.0.0.11-beta, it needed to be granted `cap_checkpoint_restore`, `cap_net_admin` and `cap_sys_ptrace`. For the Open Liberty 23.0.0.2-beta the need for the `cap_net_admin` capability has been removed for both the checkpoint and restore of a process. Additionally, the `cap_sys_ptrace` is no longer necessary in order to restore the process when running the application with Liberty InstantOn. This is good because the `cap_net_admin` and `cap_sys_ptrace` are rather powerful and grant a broad set of capabilities that may be unacceptable when deploying an application to the cloud. Instead, the much more limited `cap_setpcap` and the `cap_checkpoint_restore`  capabilities are required.
 
 == Simplify container image builds with InstantOn
 
-The Liberty InstantOn beta image contains the prerequisites for building an application container image with a checkpoint server process.  Applications can use the Liberty InstantOn beta image as a base to build their own application container images and from that create their own application container image with a checkpoint process. For the 22.0.0.10-beta this is a three step process:
+The Liberty InstantOn beta image contains the prerequisites for building an application container image with a checkpoint server process.  Applications can use the Liberty InstantOn beta image as a base to build their own application container images and from that create their own application container image with a checkpoint process. For the 22.0.0.11-beta this was a three step process:
 
 1. Build the application container image.
 2. Checkpoint the application by running the application container.
 3. Commit the application container with the checkpoint process to a new container image.
 
-For the 23.0.0.2-beta, this process has been simplified for systems that are running on kernel versions with the `clone3` system call and the `checkpoint_restore` capability. These kernel features makes it possible to perform the process checkpoint during the container build.
+For the 23.0.0.2-beta, this process has been simplified for systems that are running on kernel versions with the `clone3` system call and the `checkpoint_restore` capability. These kernel features, available in kernel version 5.9 or greater, make it possible to perform the process checkpoint during the container build. One additional Linux capability, called `setpcap`, needs to be granted to `criu` to allow the process checkpoint from a container build to be restored successfully. TODO add more words on how `setpcap` us used here!!!
 
 In order to do the process checkpoint during the container build step, the `Dockerfile` for the application needs to be updated to add an additional `RUN` instruction at the end to perform the process checkpoint. Using the example application project from the original blog, add the `RUN checkpoint.sh applications` to the end of the `Dockerfile`:
 
@@ -89,7 +89,7 @@ podman build \
 
 == Running the application with InstantOn
 
-If the host OS has both the `clone3` system call then the need to mount `ns_last_pid` is not necessary. With the 23.0.0.2-beta the `getting-started-instanton` container can be run with the following:
+If the host OS has the `clone3` system call then the need to mount `ns_last_pid` is not necessary. With the 23.0.0.2-beta the `getting-started-instanton` container can be run with the following:
 
 .podman run with limited capabilities added
 [source]
@@ -102,7 +102,11 @@ podman run \
   getting-started-instanton
 ----
 
-The 23.0.0.2-beta removes the requirement to add the `SYS_PTRACE` or `NET_ADMIN` when running the application container with Liberty Instanton. Note that `podman`, by default, grants running containers the `SETPCAP` capability. You may be able to run the container without explicitly adding this capability with `--cap-add`.
+The 23.0.0.2-beta removes the requirement to add the `SYS_PTRACE` or `NET_ADMIN` when running the application container with Liberty Instanton. Note that `podman`, by default, grants running containers the `SETPCAP` capability. So, you may be able to run the container without explicitly adding this capability with `--cap-add`.
+
+== What is next?
+
+As you can see, we have been continuing to refine the InstantOn beta to make it easier to consume. Stay tuned for more updates in coming beta releases, including how to deploy InstantOn to public clouds like AWS. If you have any requests or suggestions, we would love to hear from you!
 
 // // // // // // // //
 // LINKS
