@@ -1,0 +1,116 @@
+---
+layout: post
+title: "TITLE"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/tjwatson
+author_github: https://github.com/tjwatson
+seo-title: Liberty InstantOn beta update - OpenLiberty.io
+seo-description: The Open Liberty 23.0.0.2-beta brings new enhancements to the InstantOn feature that make it easier to build and deploy Jakarta EE and MicroProfile applications with incredibly fast startup times.
+blog_description: "The Open Liberty 23.0.0.2-beta brings new enhancements to the InstantOn feature that make it easier to build and deploy Jakarta EE and MicroProfile applications with incredibly fast startup times."
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+---
+= TITLE
+AUTHOR_NAME <https://github.com/tjwatson>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+
+The Open Liberty 22.0.0.11-beta introduced InstantOn, an exciting new feature that provides incredibly fast startup times for MicroProfile and Jakarta EE applications. For details on the initial beta of InstantOn, see the link:https://openliberty.io/blog/2022/09/29/instant-on-beta.html[Liberty InstantOn startup for cloud native Java applications] blog post. Since the initial InstantOn beta there have been a few changes and enhancements to Liberty InstantOn which make it easier to create and deploy applications with Liberty InstantOn. For the remainder of this blog the project setup of the original blog will be referenced.  If you would like to follow along then you should read and follow the instructions in the link:https://openliberty.io/blog/2022/09/29/instant-on-beta.html[Liberty InstantOn startup for cloud native Java applications] blog post first.
+
+=== Available checkpoint phases
+
+Initially the IntantOn beta provided three available phases during the startup process where a checkpoint can occur:
+
+1. `features` - This is the earliest phase where a checkpoint can happen.  The checkpoint occurs after all of the configured Open Liberty features are started, but before any processing occurs for the installed applications.
+2. `deployment` - The checkpoint happens after processing the configured application metadata.  If the application has any components that get run as part of the application starting, the checkpoint is taken before executing any code from the application.
+3. `applications` - This is the last phase where a checkpoint can happen, so it has the potential to provide the fastest startup time when restoring the application instance. The checkpoint happens after all configured applications are reported as started.  This phase happens before opening any ports for listening to incoming requests for the applications.
+
+The `features` phase offers the least in terms of improving an application startup time. Scenarios where an application deployment would want to use `features` over `deployment` are very limited and are not important use cases for Liberty InstantOn. For the 23.0.0.2-beta the `features` checkpoint phase has been removed.  This leaves only two options to choose from for the checkpoint: `deployement` and `applications`. 
+
+== Reduce the set of required capabilities to checkpoint and restore
+
+For `criu` to be able to take a checkpoint of and restore a process, the `criu` binary must be granted additional link:https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux_atomic_host/7/html/container_security_guide/linux_capabilities_and_seccomp[Linux capabilities]. In particular, for the Open Liberty 22.0.0.10-beta, it needs to be granted `cap_checkpoint_restore`, `cap_net_admin` and `cap_sys_ptrace`. For the Open Liberty 23.0.0.2-beta the need for the `cap_net_admin` capability has been removed for both the checkpoint and restore of a process. Additionally, the need for `cap_sys_ptrace` is no longer necessary in order to restore the process when running the application with Liberty InstantOn. This is good because the `cap_net_admin` and `cap_sys_ptrace` are rather powerful and grant a broad set of capabilities that may be unacceptable when deploying an application to the cloud. Instead, the much more limited `cap_setpcap` and the `cap_checkpoint_restore`  capabilities are required.
+
+== Simplify container image builds with InstantOn
+
+The Liberty InstantOn beta image contains the prerequisites for building an application container image with a checkpoint server process.  Applications can use the Liberty InstantOn beta image as a base to build their own application container images and from that create their own application container image with a checkpoint process. For the 22.0.0.10-beta this is a three step process:
+
+1. Build the application container image.
+2. Checkpoint the application by running the application container.
+3. Commit the application container with the checkpoint process to a new container image.
+
+For the 23.0.0.2-beta, this process has been simplified for systems that are running on kernel versions with the `clone3` system call and the `checkpoint_restore` capability. These kernel features makes it possible to perform the process checkpoint during the container build.
+
+In order to do the process checkpoint during the container build step, the `Dockerfile` for the application needs to be updated to add an additional `RUN` instruction at the end to perform the process checkpoint. Using the example application project from the original blog, add the `RUN checkpoint.sh applications` to the end of the `Dockerfile`:
+
+.Dockerfile
+[source]
+----
+FROM icr.io/appcafe/open-liberty:beta-instanton
+
+ARG VERSION=1.0
+ARG REVISION=SNAPSHOT
+
+LABEL \
+  org.opencontainers.image.authors="Your Name" \
+  org.opencontainers.image.vendor="IBM" \
+  org.opencontainers.image.url="local" \
+  org.opencontainers.image.source="https://github.com/OpenLiberty/guide-getting-started" \
+  org.opencontainers.image.version="$VERSION" \
+  org.opencontainers.image.revision="$REVISION" \
+  vendor="Open Liberty" \
+  name="system" \
+  version="$VERSION-$REVISION" \
+  summary="The system microservice from the Getting Started guide" \
+  description="This image contains the system microservice running with the Open Liberty runtime."
+
+COPY --chown=1001:0 src/main/liberty/config/ /config/
+COPY --chown=1001:0 target/*.war /config/apps/
+
+RUN configure.sh
+
+RUN checkpoint.sh applications
+----
+
+This adds the application process checkpoint as the last layer of the application container image. The `checkpoint.sh` script allows you to specify either `applications` or `deployement` to indicate what phase of the startup should perform the process checkpoint. With `podman` you can use the `--add-cap` and `--security-opt` options to grant the container build the necessary capabilities to take a checkpoint during the container build step. This reduces the application container image build to the following step:
+
+.podman build with required capabilities added
+[source]
+----
+podman build \
+   -t dev.local/getting-started-instanton \
+   --cap-add=CHECKPOINT_RESTORE \
+   --cap-add=SYS_PTRACE\
+   --cap-add=SETPCAP \
+   --security-opt seccomp=unconfined .
+----
+
+== Running the application with InstantOn
+
+If the host OS has both the `clone3` system call then the need to mount `ns_last_pid` is not necessary. With the 23.0.0.2-beta the `getting-started-instanton` container can be run with the following:
+
+.podman run with limited capabilities added
+[source]
+----
+podman run \
+  --rm \
+  --cap-add=CHECKPOINT_RESTORE \
+  --cap-add=SETPCAP \
+  -p 9080:9080 \
+  getting-started-instanton
+----
+
+The 23.0.0.2-beta removes the requirement to add the `SYS_PTRACE` or `NET_ADMIN` when running the application container with Liberty Instanton. Note that `podman`, by default, grants running containers the `SETPCAP` capability. You may be able to run the container without explicitly adding this capability with `--cap-add`.
+
+// // // // // // // //
+// LINKS
+//
+// OpenLiberty.io site links:
+// link:/guides/microprofile-rest-client.html[Consuming RESTful Java microservices]
+// 
+// Off-site links:
+// link:https://openapi-generator.tech/docs/installation#jar[Download Instructions]
+//
+// // // // // // // //
