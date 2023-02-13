@@ -18,12 +18,11 @@ Kevin Ortega <https://github.com/kevin-ortega>
 Azure and Google Cloud have built-in support for link:https://buildpacks.io[cloud native buildpacks].  
 You can use link:https://learn.microsoft.com/en-us/azure/container-registry/container-registry-tasks-pack-build[Azure] or link:https://cloud.google.com/docs/buildpacks/build-application[Google Cloud] to easily deploy Java applications by using the link:https://openliberty.io/blog/2022/04/01/cloud-native-liberty-buildpack.html[Paketo Buildpack for Liberty] with your source code or container images.
 
-This post provides instructions on how to use the Paketo Buildpack for Liberty with Azure and Google Cloud. To learn more about using Azure and Google Cloud see their respective documentation.  
+This post provides instructions on how to use the Paketo Buildpack for Liberty with Azure and Google Cloud. To learn more about using Azure and Google Cloud, see their respective documentation.  
 
 == What do you need?
 * An https://azure.microsoft.com/en-us/free/[Azure] or https://cloud.google.com/free/[Google Cloud] Account
-* The link:https://learn.microsoft.com/en-us/cli/azure/install-azure-cli[Azure cli] or
-* The link:https://cloud.google.com/sdk/docs/install[gcloud cli]
+* The link:https://learn.microsoft.com/en-us/cli/azure/install-azure-cli[Azure cli] or the link:https://cloud.google.com/sdk/docs/install[gcloud cli]
 * Your application source
 
 To build and deploy container images or create a link:https://buildpacks.io/docs/concepts/components/builder/[custom builder], you'll also need:
@@ -32,15 +31,17 @@ To build and deploy container images or create a link:https://buildpacks.io/docs
 * https://www.docker.com/[Docker] or https://podman.io[Podman]. This post focuses on Docker. For information about using Podman with Paketo, refer to the buildpacks.io documentation for https://buildpacks.io/docs/app-developer-guide/building-on-podman/[Building on Podman]. 
 * An externally accessible container registry that can host your images.
 
-The Paketo Buildpack for Liberty is included in the composite Paketo Buildpack for Java that also includes `tomcat` and `tomee` application servers. Tomcat is the default application server and to use Open Liberty requires a little extra configuration.  The Paketo Buildpack for Java includes the Bellsofit Liberica as the default JVM provider.  To use other JVM providers requires extra configuration.  
+The Paketo Buildpack for Liberty is included in the composite Paketo Buildpack for Java that also includes `tomcat` and `tomee` application servers. Tomcat is the default application server and to use Open Liberty requires a little extra configuration.  The Paketo Buildpack for Java includes Bellsoft Liberica as the default JVM provider.  To use other JVM providers requires extra configuration.  
 
 You can set the application server that the Paketo Buildpack for Java uses by specifying the `BP_JAVA_APP_SERVER` environment variable and select an alternate JVM provider using a link:https://buildpacks.io/docs/app-developer-guide/using-project-descriptor/[project descriptor]. 
 
 == Let's get started
 
-Create the project descriptior file, `project.toml`, in the application's root source directory. At a minimum, `project.toml` should contain `BP_JAVA_APP_SERVER=liberty` but can contain other environment variables consumed by buildpacks.  To use the alternate and preferred JVM, eclipse openj9, we change the order that the buildpacks run in the project descriptor.   To minimize the size of the application container image, the buildpack by default installs the kernel profile.  You can override the profile using the `BP_LIBERTY_PROFILE` environment variable or use the `BP_LIBERTY_FEATURES` environment variable to install the features required by the application.  
+Create the project descriptior file, `project.toml`, in the application's root source directory. At a minimum, `project.toml` must  specify the `BP_JAVA_APP_SERVER=liberty` environment variable but can contain other environment variables that are consumed by buildpacks.  
 
-For example, your project descriptor should contain the following content to use the liberty applicaiton server, install eclipse openj9, install the kernel profile and install a set of liberty features:
+To use the alternate and preferred Eclipse OpenJ9 JVM,  change the order that the buildpacks run in the project descriptor.  To minimize the size of the application container image, the buildpack installs the Liberty kernel profile by default.  You can override the profile using the `BP_LIBERTY_PROFILE` environment variable or use the `BP_LIBERTY_FEATURES` environment variable to install the Liberty features your application requires.  
+
+For example, your project descriptor might contain the following content to use the Liberty runtime and install Eclipse OpenJ9, the Liberty kernel profile, and a set of Liberty features:
 ```
 [[build.env]]
     name = "BP_JAVA_APP_SERVER"
@@ -57,9 +58,9 @@ For example, your project descriptor should contain the following content to use
   uri = "docker://gcr.io/paketo-buildpacks/java"
 ```
 
-== Using Azure
+== Build and push a container image with Azure
 Use the link:https://learn.microsoft.com/en-us/cli/azure/acr/pack?view=azure-cli-latest#az_acr_pack_build[az acr pack build] command to build and push a container image using the built-in cloud native buildpack support.   
-For example, the following command builds and pushes the container image using the `mycr` Azure container registry and the full paketo buildacks builder.  The resulting image name is `myapp` and the application source resides in `~/myappsourcedir`.  The application source could also be the url of a git repo.  This example assumes the `mycr` Azure container registry was previously created.  
+For example, the following command builds and pushes the container image using the `mycr` Azure container registry and the full Paketo Buildpacks builder.  The resulting image name is `myapp` and the application source resides in `~/myappsourcedir`.  The application source can also be specified as the URL of a Git repo.  This example assumes the `mycr` Azure container registry was previously created.  
 
 ```
 az acr pack build 
@@ -69,16 +70,16 @@ az acr pack build
     ~/myappsourcedir
 ```
 
-== Using Google Cloud
+== Build and push a container image with Google Cloud
 Use the link:https://cloud.google.com/docs/buildpacks/build-application#remote_builds[gcloud builds] command to build and push a container image using the built-in cloud native buildpack support.  
 Follow the link:https://cloud.google.com/docs/buildpacks/build-application#before-you-begin[Before you begin] instructions to setup your environment.  
 
-The basic command syntax is:
+The command uses the following basic syntax:
 ```
 gcloud builds submit --pack image=LOCATION-docker.pkg.dev/PROJECT_ID/REPO_NAME/IMAGE_NAME
 ```
 
-In the following example, `us-east1` is the LOCATION, `paketobuildpacks` is the PROJECT_ID, `paketobuildpacktest`` is the REPO_NAME and `javatest` is the IMAGE_NAME.  The command is executed from the application's root directory.  
+In the following example, `us-east1` is the LOCATION, `paketobuildpacks` is the PROJECT_ID, `paketobuildpacktest` is the REPO_NAME and `javatest` is the IMAGE_NAME.  The command is executed from the application's root directory.  
 
 ```
 gcloud builds submit --pack 
@@ -86,20 +87,20 @@ gcloud builds submit --pack
 
 ```
 
-== Other environment variables you can set in the `project.toml` file
+== Liberty environment variables you can set in the `project.toml` file
 BP_LIBERTY_INSTALL_TYPE::
 Specifies the link:https://github.com/paketo-buildpacks/liberty#install-types[Install type] of Liberty. Open Liberty (value of `ol`) is the default.  Use `wlp` for WebSphere Liberty.  
 
 BP_LIBERTY_PROFILE::
-Specifies which liberty profile to install. Valid profiles for Liberty are documented link:https://github.com/paketo-buildpacks/liberty#profiles[in the buildpacks documentation].  The default profile is `kernel`.  
+Specifies which Liberty profile to install. Valid profiles for Liberty are documented link:https://github.com/paketo-buildpacks/liberty#profiles[in the buildpacks documentation]. The default profile is `kernel`.  
 
 BP_LIBERTY_FEATURES::
 Specifies a space-separated list of Liberty features to be installed with the Liberty runtime. Supports any valid Liberty feature.
 
-== Taking full advantage of all what the Paketo Buildpack for Liberty has to offer
-Some features of the Paketo Buildpack for Liberty are not easily available to Azure or Google Cloud. Features like link:https://github.com/paketo-buildpacks/liberty/blob/main/docs/installing-ifixes.md[installing iFixes], link:https://github.com/paketo-buildpacks/liberty#using-custom-features[custom features], and installing from a link:https://github.com/paketo-buildpacks/liberty#building-from-a-packaged-server[packaged server] or link:https://github.com/paketo-buildpacks/liberty#building-from-a-liberty-server[server directory] aren't available when you use the built-in support to create the container image.
+== Take full advantage of the Paketo Buildpack for Liberty with the pack build CLI
+Some features of the Paketo Buildpack for Liberty are not easily available to Azure or Google Cloud. Features like link:https://github.com/paketo-buildpacks/liberty/blob/main/docs/installing-ifixes.md[installing iFixes], link:https://github.com/paketo-buildpacks/liberty#using-custom-features[custom features], and installing from a link:https://github.com/paketo-buildpacks/liberty#building-from-a-packaged-server[packaged server] or link:https://github.com/paketo-buildpacks/liberty#building-from-a-liberty-server[server directory] aren't available when you use the built-in support to create the container image.  
 
-For these features, you can use the `pack build` CLI to create the container image, tag and push the image to an external container registry. Then, use Azure or Google Cloud to deploy and manage your container by pulling your container image from the container registry.
+For these features, you can use the `pack build` CLI to create the container image, tag and push the image to an external container registry. Then, use Azure or Google Cloud to deploy and manage your container by pulling your container image from the container registry.  See link:https://openliberty.io/blog/2022/04/01/cloud-native-liberty-buildpack.html[Introducing the Paketo Liberty Buildpack] for details on using the `pack build` CLI with Liberty.  
 
 == Additional Resources
 * https://learn.microsoft.com/en-us/azure/container-registry/container-registry-tasks-pack-build[Using cloud native buildpacks in Azure]
