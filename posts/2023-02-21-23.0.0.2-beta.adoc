@@ -56,9 +56,9 @@ Open Liberty 23.0.0.2-beta includes several new enhancements and changes for Lib
 The link:{url-about}[Open Liberty] 23.0.0.2-beta includes the following beta features (along with link:{url-prefix}/docs/latest/reference/feature/feature-overview.html[all GA features]):
 
 * <<instanton, New enhancements for Liberty InstantOn>>
-* <<validation, Testing database connections in Open Liberty apps using Admin Center>>
+* <<validation, Testing database connections using Admin Center>>
 * <<data, A Very early preview of Jakarta Data>>
-* <<ee10, Jakarta EE Platform 10 & MicroProfile 10>>
+* <<ee10, Jakarta EE Platform 10 and MicroProfile 10>>
 
 // // // // // // // //
 // In the preceding section:
@@ -73,13 +73,130 @@ See also link:{url-prefix}/blog/?search=beta&key=tag[previous Open Liberty beta 
 
 [#instanton]
 == New enhancements for Liberty InstantOn
-The Open Liberty 22.0.0.11-beta introduced InstantOn, an exciting new feature that provides incredibly fast startup times for MicroProfile and Jakarta EE applications. Since this initial beta release, we've made a few changes and enhancements to make it easier to create and deploy applications with Liberty InstantOn.  They are as follows: 
+The Open Liberty 22.0.0.11-beta introduced InstantOn, an exciting new feature that provides incredibly fast startup times for MicroProfile and Jakarta EE applications. Since the initial beta release, we've made a few changes and enhancements to make it easier to create and deploy applications with Liberty InstantOn.  They are as follows: 
 
 * Removal of the features checkpoint phase 
 * Reduced set of required Linux capabilities to checkpoint and restore
 * Simplified container image builds with InstantOn
 
 To learn more about these changes and InstantOn, refer to the link:{url-prefix}/blog/2023/02/10/instant-on-beta-update.html[New enhancements for Liberty InstantOn in 23.0.0.2-beta] blog post.
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/23629
+// Contact/Reviewer: ReeceNana,k8vance88
+// // // // // // // // 
+[#validation]
+== Testing database connections in using Admin Center   
+Looking for a simple way to test your database connections? With this beta release, you can now validate your connections using the Liberty Admin Center feature. The test connection will exercise the same code paths as your applications, giving you confidence in your server configuration. The Admin Center connection validation feature is enabled by REST APIs featured in the link:{url-prefix}/blog/2019/09/13/testing-database-connections-REST-APIs.html[Testing database connections in Open Liberty apps with REST APIs] blog post.
+
+To enable database connection testing, the following minimum set of features must be present in your server's configuration:
+[source, xml]
+----
+    <feature>adminCenter-1.0</feature>
+    <feature>appSecurity-2.0</feature>
+    <feature>restConnector-2.0</feature>
+    <feature>mpOpenApi-1.0</feature>
+----
+
+To provide an example, we'll start by testing the server resource `DefaultDataSource` which is configured to connect to a Derby database using container authentication via an auth alias.
+
+Sample server.xml:
+[source, xml]
+----
+<server description="new server">
+
+    <!-- Enable features -->
+    <featureManager>
+        <feature>adminCenter-1.0</feature>
+        <feature>appSecurity-2.0</feature>
+        <feature>restConnector-2.0</feature>
+        <feature>jdbc-4.3</feature>
+        <feature>mpOpenApi-1.0</feature>
+    </featureManager>
+
+    <!-- To access this server from a remote client add a host attribute to the following element, e.g. host="*" -->
+    <httpEndpoint id="defaultHttpEndpoint" httpPort="9080" httpsPort="9443"/>
+
+    <library id="derby">
+      <file name="${server.config.dir}/derby/derby.jar"/>
+    </library>
+
+    <dataSource id="DefaultDataSource">
+      <jdbcDriver libraryRef="derby"/>
+      <!-- Example properties referencing an in-memory Derby Embedded database -->
+      <properties.derby.embedded databaseName="memory:defaultdb" createDatabase="create"/>
+    </dataSource>
+
+    <authData id="myAuth" user="dbuser" password="dbpass"/>
+
+    <!-- Default SSL configuration enables trust for default certificates from the Java runtime --> 
+    <ssl id="defaultSSLConfig" trustDefaultCerts="true"/>
+
+    <remoteFileAccess>
+       <writeDir>${server.config.dir}</writeDir>
+    </remoteFileAccess>
+
+    <basicRegistry id="basic">
+       <user name="admin" password="adminpwd"/>
+    </basicRegistry>
+
+    <!-- Assign 'admin' to Administrator -->
+    <administrator-role>
+        <user>admin</user>
+    </administrator-role>
+
+</server>
+----
+
+For this `server.xml` example, you will need to add the derby jar to the server configuration or use your own database configuration.
+
+Configure a Liberty server using the above `server.xml` for guidance and then start the server. Once started, you can check the logs to find the URL to navigate to the Admin Center. In the above example, you would navigate to the Admin Center using https://localhost:9443/adminCenter/ URL.
+
+Select "Server Config" tool.
+
+[.img_border_light]
+image::img/blog/ac_db_test_server_config.png[Server Config Tool,width=20%,align="center"]
+
+Select "server.xml" to edit.
+
+[.img_border_light]
+image::img/blog/ac_db_test_serverxml.png[server.xml,width=50%,align="center"]
+
+Navigate to the resource you would like to test and click the "Test" button.
+
+[.img_border_light]
+image::img/blog/ac_db_test_resource[Select resource,width=50%,align="center"]
+
+Choose which type of authentication your application uses:
+
+* For applications that use container authentication: 
++
+For this example, the config doesn't have default authentication specified on the datasource element nor are there any login modules configured, therefore you will need to specify an authentication alias by using the dropdown.
++
+[.img_border_light]
+image::img/blog/ac_db_test_container_auth.png[Container authentication,width=50%,align="center"]
+
+
+* For applications that use application authentication, choose the "Application authentication" tab and fill in a valid user name and password for the database resource.
++
+[.img_border_light]
+image::img/blog/ac_db_test_app_auth.png[Application authentication,width=50%,align="center"]
+
+* If your application does not use a resource reference and you have not `enableContainerAuthForDirectLookups="true"` in the config element, then choose "No resource reference" tab and fill in a valid user name and password for the database resource.
++
+[.img_border_light]
+image::img/blog/ac_db_test_no_resource_ref.png[No Resource Reference,width=50%,align="center"]
+
+Click the 'Connection Test' button and results will be displayed at the bottom.  A successful Connection Test will look like this:
+
+[.img_border_light]
+image::img/blog/ac_db_test_successful_test.png[Successful connection test example,width=50%,align="center"]
+
+In addition to link:{url-prefix}/docs/latest/reference/feature/jdbc-4.3.html[Java Database Connectivity] you can also test connections to link:{url-prefix}/docs/latest/reference/feature/connectors-2.0.html[Jakarta Connectors], link:{url-prefix}/docs/latest/reference/feature/messaging-3.0.html[Jakarta Messaging] and link:{url-prefix}/docs/latest/reference/feature/cloudant-1.0.html[Cloudant Integration] resources. 
+
+For more information regarding administering Liberty using a GUI, refer to the link:{url-prefix}/docs/latest/admin-center.html[Manage Open Liberty with Admin Center] documentation.
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
 
 // // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
 // Blog issue: https://github.com/OpenLiberty/open-liberty/issues/23987
@@ -235,123 +352,8 @@ Your feedback is welcome on all of the Jakarta Data features and will be helpful
     
 // DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
 
-// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
-// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/23629
-// Contact/Reviewer: ReeceNana,k8vance88
-// // // // // // // // 
-[#validation]
-== Testing database connections in Open Liberty apps using Admin Center   
-Looking for a simple way to test your database connections? With this beta release, you can now validate your connections using the Liberty Admin Center feature. The test connection will exercise the same code paths as your applications, giving you confidence in your server configuration. The Admin Center connection validation feature is enabled by REST APIs featured in the link:{url-prefix}/blog/2019/09/13/testing-database-connections-REST-APIs.html[Testing database connections in Open Liberty apps with REST APIs] blog post.
-
-To enable database connection testing, the following features must be present in your server's configuration:
-[source, xml]
-----
-    <feature>adminCenter-1.0</feature>
-    <feature>appSecurity-2.0</feature>
-    <feature>restConnector-2.0</feature>
-    <feature>mpOpenApi-1.0</feature>
-----
-
-To provide an example, we'll start by testing the server resource `DefaultDataSource` which is configured to connect to a Derby database using container authentication via an auth alias.
-
-Sample server.xml:
-[source, xml]
-----
-<server description="new server">
-
-    <!-- Enable features -->
-    <featureManager>
-        <feature>adminCenter-1.0</feature>
-        <feature>appSecurity-2.0</feature>
-        <feature>restConnector-2.0</feature>
-        <feature>jdbc-4.3</feature>
-        <feature>mpOpenApi-1.0</feature>
-    </featureManager>
-
-    <!-- To access this server from a remote client add a host attribute to the following element, e.g. host="*" -->
-    <httpEndpoint id="defaultHttpEndpoint" httpPort="9080" httpsPort="9443"/>
-
-    <library id="derby">
-      <file name="${server.config.dir}/derby/derby.jar"/>
-    </library>
-
-    <dataSource id="DefaultDataSource">
-      <jdbcDriver libraryRef="derby"/>
-      <!-- Example properties referencing an in-memory Derby Embedded database -->
-      <properties.derby.embedded databaseName="memory:defaultdb" createDatabase="create"/>
-    </dataSource>
-
-    <authData id="myAuth" user="dbuser" password="dbpass"/>
-
-    <!-- Default SSL configuration enables trust for default certificates from the Java runtime --> 
-    <ssl id="defaultSSLConfig" trustDefaultCerts="true"/>
-
-    <remoteFileAccess>
-       <writeDir>${server.config.dir}</writeDir>
-    </remoteFileAccess>
-
-    <basicRegistry id="basic">
-       <user name="admin" password="adminpwd"/>
-    </basicRegistry>
-
-    <!-- Assign 'admin' to Administrator -->
-    <administrator-role>
-        <user>admin</user>
-    </administrator-role>
-
-</server>
-----
-
-For this `server.xml` example, you will need to add the derby jar to the server configuration or use your own database configuration.
-
-Configure a Liberty server using the above `server.xml` for guidance and then start the server. Once started, you can check the logs to find the URL to navigate to the Admin Center. In the above example, you would navigate to the Admin Center using https://localhost:9443/adminCenter/ URL.
-
-Select "Server Config" tool.
-
-[.img_border_light]
-image::img/blog/ac_db_test_server_config.png[Server Config Tool,width=70%,align="center"]
-
-Select "server.xml" to edit.
-
-[.img_border_light]
-image::img/blog/ac_db_test_serverxml.png[server.xml,width=70%,align="center"]
-
-Navigate to the resource you would like to test and click the "Test" button.
-
-[.img_border_light]
-image::img/blog/ac_db_test_resource[Select resource,width=70%,align="center"]
-
-Choose which type of authentication your application uses:
-
-* For applications that use container authentication: 
-+
-For this example, the config doesn't have default authentication specified on the datasource element nor are there any login modules configured, therefore you will need to specify an authentication alias by using the dropdown.
-+
-[.img_border_light]
-image::img/blog/ac_db_test_container_auth.png[Container authentication,width=70%,align="center"]
-
-
-* For applications that use application authentication, choose the "Application authentication" tab and fill in a valid user name and password for the database resource.
-+
-[.img_border_light]
-image::img/blog/ac_db_test_app_auth.png[Application authentication,width=70%,align="center"]
-
-* If your application does not use a resource reference and you have not `enableContainerAuthForDirectLookups="true"` in the config element, then choose "No resource reference" tab and fill in a valid user name and password for the database resource.
-+
-[.img_border_light]
-image::img/blog/ac_db_test_no_resource_ref.png[No Resource Reference,width=70%,align="center"]
-
-Click the 'Connection Test' button and results will be displayed at the bottom.  A successful Connection Test will look like this:
-
-[.img_border_light]
-image::img/blog/ac_db_test_successful_test.png[Successful connection test example,width=70%,align="center"]
-
-In addition to link:{url-prefix}/docs/latest/reference/feature/jdbc-4.3.html[Java Database Connectivity] you can also test connections to link:{url-prefix}/docs/latest/reference/feature/connectors-2.0.html[Jakarta Connectors], link:{url-prefix}/docs/latest/reference/feature/messaging-3.0.html[Jakarta Messaging] and link:{url-prefix}/docs/latest/reference/feature/cloudant-1.0.html[Cloudant Integration] resources. 
-
-// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
-
 [#ee10]
-== Jakarta EE 10 & MicroProfile 10
+== Jakarta EE 10 and MicroProfile 10
 This beta release also includes Jakarta EE Platform 10 and MicroProfile 6 which were first made available in the 22.0.0.13-beta. To find out more, reference the link:{url-prefix}/blog/2022/12/06/22.0.0.13-beta.html[22.0.0.13-beta blog post].
 
 
