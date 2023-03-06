@@ -258,195 +258,60 @@ For a list of past security vulnerability fixes, reference the link:{url-prefix}
 [#bugs]
 == Notable bugs fixed in this release
 
-
 We’ve spent some time fixing bugs. The following sections describe just some of the issues resolved in this release. If you’re interested, here’s the  link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A23002+label%3A%22release+bug%22[full list of bugs fixed in 23.0.0.2].
 
 * link:https://github.com/OpenLiberty/open-liberty/issues/24371[Server fails to start due to conflict on servlet feature]
 +
-When individually installing a set of EE7 or EE8 features, the server can fail to start due to a conflict on servlet features, as shown in the following example.
+When individually installing a set of EE7 or EE8 features using the link:link:{url-prefix}/docs/latest/reference/command/featureUtility-installFeature.html[`featureUtility installFeature`] command, the server can fail to start due to a conflict on servlet features, as shown in the following example.
 +
-[1/10/23, 4:08:27:359 GMT] 00000027 id=         com.ibm.ws.kernel.feature.internal.FeatureManager            E CWWKF0033E: The singleton features servlet-3.1 and servlet-3.0 cannot be loaded at the same time.  The configured features servlet-3.1 and apiDiscovery-1.0 include one or more features that cause the conflict. Your configuration is not supported; update server.xml to remove incompatible features.
-[1/10/23, 4:08:27:419 GMT] 00000027 id=         com.ibm.ws.logging.internal.impl.IncidentImpl                I FFDC1015I: An FFDC Incident has been created: "java.lang.IllegalArgumentException: Unable to load conflicting versions of features "com.ibm.websphere.appserver.servlet-3.1" and "com.ibm.websphere.appserver.servlet-3.0".  The feature dependency chains that led to the conflict are: com.ibm.websphere.appserver.servlet-3.1 and com.ibm.websphere.appserver.apiDiscovery-1.0 -> com.ibm.websphere.appserver.restHandler-1.0 -> io.openliberty.restHandler.internal-1.0 -> io.openliberty.webBundleSecurity.internal-1.0 -> io.openliberty.servlet.internal-3.0 -> com.ibm.websphere.appserver.servlet-3.0 
+[source]
+----
+com.ibm.ws.kernel.feature.internal.FeatureManager            E CWWKF0033E: The singleton features servlet-3.1 and servlet-3.0 cannot be loaded at the same time.  The configured features servlet-3.1 and apiDiscovery-1.0 include one or more features that cause the conflict. Your configuration is not supported; update server.xml to remove incompatible features.
+com.ibm.ws.logging.internal.impl.IncidentImpl                I FFDC1015I: An FFDC Incident has been created: "java.lang.IllegalArgumentException: Unable to load conflicting versions of features "com.ibm.websphere.appserver.servlet-3.1" and "com.ibm.websphere.appserver.servlet-3.0".  The feature dependency chains that led to the conflict are: com.ibm.websphere.appserver.servlet-3.1 and com.ibm.websphere.appserver.apiDiscovery-1.0 -> com.ibm.websphere.appserver.restHandler-1.0 -> io.openliberty.restHandler.internal-1.0 -> io.openliberty.webBundleSecurity.internal-1.0 -> io.openliberty.servlet.internal-3.0 -> com.ibm.websphere.appserver.servlet-3.0
+----
++
+The problem does not occur if the link:link:{url-prefix}/docs/latest/reference/command/featureUtility-installServerFeatures.html[`featureUtility installServerFeatures`] command is used instead. It can also be worked around by installing the `mpJwt-1.2` feature if using Jakarta EE 8 features.
++
+The issue has been resolved and the `featureUtility installFeature` command will install the features in a way to allow all of them to be included in a `server.xml` and the server will be able to start properly.
 
 * link:https://github.com/OpenLiberty/open-liberty/issues/24293[Scheduled Futures leak resources from Managed Executor Services on application stop]
 +
-The [`futures` queue](https://github.com/OpenLiberty/open-liberty/blob/aa6a9f874b88a4940fc58fdb5e6a0184f148fbe4/dev/com.ibm.ws.concurrent/src/com/ibm/ws/concurrent/internal/ManagedScheduledExecutorServiceImpl.java#L63) in ManagedScheduledExecutorServiceImpl holds references to scheduled futures, even once they have completed.
+The `futures` queue in `ManagedScheduledExecutorServiceImpl` holds references to scheduled futures, even once they have completed.
 +
-The queue is periodically cleaned when new tasks are scheduled, by the private [`purgeFutures()` method](https://github.com/OpenLiberty/open-liberty/blob/aa6a9f874b88a4940fc58fdb5e6a0184f148fbe4/dev/com.ibm.ws.concurrent/src/com/ibm/ws/concurrent/internal/ManagedScheduledExecutorServiceImpl.java#L89), but otherwise they are not actively removed, and it isn't called when applications are shutdown. As purgeFutures is private, applications can't call it themselves.
+The queue is periodically cleaned when new tasks are scheduled, by the private `purgeFutures()` method, but otherwise they are not actively removed, and it isn't called when applications are shutdown. As `purgeFutures()` is private, applications can't call it themselves.
 +
-There's also a [deactivate method](https://github.com/OpenLiberty/open-liberty/blob/aa6a9f874b88a4940fc58fdb5e6a0184f148fbe4/dev/com.ibm.ws.concurrent/src/com/ibm/ws/concurrent/internal/ManagedScheduledExecutorServiceImpl.java#L70-L82) that aggressively cleans up when the server is shutdown.
-+
-Our application does a lot of work via scheduled tasks, and in a test/dev environment we want to stop and start the application without restarting the server. We do have other memory leaks that we're tracking down, but this one is making it harder to see what else is going on.
-
-* link:https://github.com/OpenLiberty/open-liberty/issues/24277[Backport CXF-8706: CXF MTOM handler allow content injection]
-+
-
-* link:https://github.com/OpenLiberty/open-liberty/issues/24276[Upgrade mime4j to 0.8.9]
-+
+This issue has been resolved and the resources are now released automatically when an application stops.
 
 * link:https://github.com/OpenLiberty/open-liberty/issues/24157[Validate HTTP header names]
 +
-
-* link:https://github.com/OpenLiberty/open-liberty/issues/24155[Memory leak in JaxRsFactoryImplicitBeanCDICustomizer]
+Due to a bug, HTTP requests were not being checked for invalid characters.
 +
+The issue has been resolved and an HTTP request with an invalid character now causes the HTTP response to contain a `400` response code.
 
 * link:https://github.com/OpenLiberty/open-liberty/issues/24077[DoNotAllowDuplicateSetCookies http channel config option is not working]
 +
-The http channel config property DoNotAllowDuplicateSetCookies=true, when set, still allows duplicate set-cookie cookies in http responses.
+The HTTP channel config property `DoNotAllowDuplicateSetCookies=true`, when set, still allows duplicate `Set-Cookie` cookies in HTTP responses.
++
+This issue has been resolved and the response headers no longer contain the duplicate `Set-Cookie` cookies when `DoNotAllowDuplicateSetCookies=true` is set.
 
 * link:https://github.com/OpenLiberty/open-liberty/issues/24056[batch-2.1 feature content is active even when configuring batch-1.0 or 2.0]
 +
-Content added as part of the batch-2.1 feature update will be loaded and active even if the user configures the server for batch-1.0  or batch-2.0. This is unintended and may cause conflicts based on the user's environment.
-
-* link:https://github.com/OpenLiberty/open-liberty/issues/24048[Possible performance issue in com.ibm.ws.wsat.service.impl.WebClientImpl]
+Content added as part of the beta `batch-2.1` feature will be loaded and active even if the user configures the server for link:{url-prefix}/docs/latest/reference/feature/batch-1.0.html[`batch-1.0`] or link:{url-prefix}/docs/latest/reference/feature/batch-2.0.html[`batch-2.0`]. This is unintended and may cause conflicts based on the user's environment.
 +
-
-* link:https://github.com/OpenLiberty/open-liberty/issues/24047[Memory in com.ibm.ws.wsat.service.WebClient when creating thread context class loaders]
-+
-Repeated calls to LogManager$Lock.getLogDomain(Bundle), each one adding a bundle named "gateway.bundle.Thread_Context...." to the "domains" HashMap in Felix SCR.  These entries never get removed and the Map keeps growing leading to a memory leak.
-```
- at org/apache/felix/scr/impl/logger/LogManager$Lock.getLogDomain(LogManager.java:69)
- at org/apache/felix/scr/impl/logger/LogManager.getLogger(LogManager.java:174)
- at org/apache/felix/scr/impl/logger/ScrLogManager.bundle(ScrLogManager.java:97)
- at org/apache/felix/scr/impl/logger/ScrLogManager$ScrLoggerFacade.bundle(ScrLogManager.java:282)
- at org/apache/felix/scr/impl/BundleComponentActivator.(BundleComponentActivator.java:202)
- at org/apache/felix/scr/impl/Activator.loadComponents(Activator.java:552)
- at org/apache/felix/scr/impl/Activator.access$200(Activator.java:70)
- at org/apache/felix/scr/impl/Activator$ScrExtension.start(Activator.java:421)
- at org/apache/felix/scr/impl/AbstractExtender.createExtension(AbstractExtender.java:196)
- at org/apache/felix/scr/impl/AbstractExtender.modifiedBundle(AbstractExtender.java:169)
- at org/apache/felix/scr/impl/AbstractExtender.addingBundle(AbstractExtender.java:139)
- at org/apache/felix/scr/impl/AbstractExtender.addingBundle(AbstractExtender.java:49)
- at org/osgi/util/tracker/BundleTracker$Tracked.customizerAdding(BundleTracker.java:475)
- at org/osgi/util/tracker/BundleTracker$Tracked.customizerAdding(BundleTracker.java:1)
- at org/osgi/util/tracker/AbstractTracked.trackAdding(AbstractTracked.java:256)
- at org/osgi/util/tracker/AbstractTracked.track(AbstractTracked.java:229(Compiled Code))
- at org/osgi/util/tracker/BundleTracker$Tracked.bundleChanged(BundleTracker.java:450(Compiled Code))
- at org/eclipse/osgi/internal/framework/BundleContextImpl.dispatchEvent(BundleContextImpl.java:935(Compiled Code))
- at org/eclipse/osgi/framework/eventmgr/EventManager.dispatchEvent(EventManager.java:228(Compiled Code))
- at org/eclipse/osgi/framework/eventmgr/ListenerQueue.dispatchEventSynchronous(ListenerQueue.java:151)
- at org/eclipse/osgi/internal/framework/EquinoxEventPublisher.publishBundleEventPrivileged(EquinoxEventPublisher.java:229)
- at org/eclipse/osgi/internal/framework/EquinoxEventPublisher.publishBundleEvent(EquinoxEventPublisher.java:138)
- at org/eclipse/osgi/internal/framework/EquinoxEventPublisher.publishBundleEvent(EquinoxEventPublisher.java:130)
- at org/eclipse/osgi/internal/framework/EquinoxContainerAdaptor.publishModuleEvent(EquinoxContainerAdaptor.java:206(Compiled Code))
- at org/eclipse/osgi/container/Module.publishEvent(Module.java:499(Compiled Code))
- at org/eclipse/osgi/container/Module.start(Module.java:486)
- at org/eclipse/osgi/internal/framework/EquinoxBundle.start(EquinoxBundle.java:439)
- at com/ibm/ws/classloading/internal/GatewayBundleFactory.start(GatewayBundleFactory.java:129)
- at com/ibm/ws/classloading/internal/GatewayBundleFactory.createGatewayBundleClassLoader(GatewayBundleFactory.java:90)
- at com/ibm/ws/classloading/internal/ClassLoadingServiceImpl.createTCCL(ClassLoadingServiceImpl.java:633(Compiled Code))
- at com/ibm/ws/classloading/internal/ClassLoadingServiceImpl.access$200(ClassLoadingServiceImpl.java:102)
- at com/ibm/ws/classloading/internal/ClassLoadingServiceImpl$4.createInstance(ClassLoadingServiceImpl.java:593)
- at com/ibm/ws/classloading/internal/ClassLoadingServiceImpl$4.createInstance(ClassLoadingServiceImpl.java:590)
- at com/ibm/ws/classloading/internal/util/CanonicalStore.retrieveOrCreate(CanonicalStore.java:84(Compiled Code))
- at com/ibm/ws/classloading/internal/util/CanonicalStore.retrieveOrCreate(CanonicalStore.java:74)
- at com/ibm/ws/classloading/internal/ClassLoadingServiceImpl.createThreadContextClassLoader(ClassLoadingServiceImpl.java:590)
- at com/ibm/ws/classloading/internal/ClassLoadingServiceImpl.createThreadContextClassLoader(ClassLoadingServiceImpl.java:98)
- at com/ibm/ws/wsat/tm/impl/TranManagerImpl.getThreadClassLoader(TranManagerImpl.java:338)
- at com/ibm/ws/wsat/service/impl/WebClientImpl$9.run(WebClientImpl.java:218)
- at java/security/AccessController.doPrivileged(AccessController.java:738(Compiled Code))
- at com/ibm/ws/wsat/service/impl/WebClientImpl.invoke(WebClientImpl.java:214)
- at com/ibm/ws/wsat/service/impl/WebClientImpl.prepared(WebClientImpl.java:146)
- at com/ibm/ws/wsat/tm/impl/CoordinatorResource.replayCompletion(CoordinatorResource.java:43)
- at com/ibm/tx/jta/embeddable/impl/WSATRecoveryCoordinator.replayCompletion(WSATRecoveryCoordinator.java:133)
- at com/ibm/tx/jta/embeddable/impl/EmbeddableTransactionImpl.replay(EmbeddableTransactionImpl.java:1067)
- at com/ibm/tx/jta/embeddable/impl/EmbeddableTransactionImpl.retryCompletion(EmbeddableTransactionImpl.java:1020)
- at com/ibm/tx/jta/embeddable/impl/EmbeddableTransactionImpl.recover(EmbeddableTransactionImpl.java:770)
- at com/ibm/tx/jta/impl/RecoveryManager.resync(RecoveryManager.java:1457)
- at com/ibm/tx/jta/impl/RecoveryManager.performResync(RecoveryManager.java:2188)
- at com/ibm/tx/jta/impl/RecoveryManager.run(RecoveryManager.java:2143)
- at java/lang/Thread.run(Thread.java:830)
-```
-+
-Ultimately this is getting driven by this code:
-+
-https://github.com/OpenLiberty/open-liberty/blob/14225e8f48a9040e72e0128f63ecd28de4f57f0f/dev/com.ibm.ws.wsat.common/src/com/ibm/ws/wsat/service/impl/WebClientImpl.java#L214-L235
- 
-That code seems to have a very large overhead to create a new TCCL each time for the WebClientImpl class `tranService.getThreadClassLoader(WebClientImpl.class);`.  That leads to a bug in Felix SCR which has been fixed in version 2.2.6 (https://issues.apache.org/jira/browse/FELIX-6581).
-+
-
-* link:https://github.com/OpenLiberty/open-liberty/issues/24007[server dump command fails in WL on IBM i]
-+
-When the `server dump` command is run on the IBM i platform in QSH, it fails with a message similar to this one:
-```
-/QIBM/ProdData/WebSphere/LibertyServer/V22.0.0.13/Base/bin/server dump  dumptest
-+
-Dumping server dumptest.                                                                         
-The command introspect#23.01.20_20.22.52 failed because of a communication error with the server.
-Server dumptest dump failed. Check server logs for details.
-```
-+
-and an FFDC file is created with
-```
-------Start of DE processing------ = [1/20/23 20:22:52:492 CST]                                                      
-Exception = java.lang.IllegalStateException                                                                          
-Source = com.ibm.ws.kernel.launch.internal.ServerCommandListener                                                     
-probeid = 437                                                                                                        
-Stack Dump = java.lang.IllegalStateException: introspections directory could not be created.                         
- at com.ibm.ws.kernel.launch.internal.FrameworkManager$IntrospectionContext.introspectAll(FrameworkManager.java:1240)
- at com.ibm.ws.kernel.launch.internal.FrameworkManager.introspectFramework(FrameworkManager.java:1214)               
- at com.ibm.ws.kernel.launch.internal.ServerCommandListener.executeCommand(ServerCommandListener.java:467)           
- at com.ibm.ws.kernel.launch.internal.ServerCommandListener.acceptAndExecuteCommand(ServerCommandListener.java:427)  
- at com.ibm.ws.kernel.launch.internal.ServerCommandListener.startListening(ServerCommandListener.java:355)           
- at com.ibm.ws.kernel.launch.internal.FrameworkManager$6.run(FrameworkManager.java:891)                              
-```
-+
-If there is a stack trace, please include the FULL stack trace (without any `[internal classes]` lines in it). To find the full stack trace, you may need to check in `$WLP_OUTPUT_DIR/messages.log`
+The issue has been resolved and the new `batch-2.1` specific content will no longer be exposed in `batch-1.0` nor `batch-2.0` features.
 
 * link:https://github.com/OpenLiberty/open-liberty/issues/24001[Fix configuration attribute name used in CWWKS1738E message]
 +
-
-When using an OIDC RP via the social login feature, it's possible for the wrong configuration attribute name to be included in the error message emitted when the expected user name claim is not in the ID token returned from the OP. An example of such an error message is below.
+When using an OIDC RP via the link:{url-prefix}/docs/latest/reference/feature/socialLogin-1.0.html[Social Media Login feature], it's possible for the wrong configuration attribute name to be included in the error message emitted when the expected user name claim is not in the ID token returned from the OP. An example of such an error message is below.
 +
-> [1/20/23, 12:26:44:281 CST] 00000044 .ws.security.openidconnect.clients.common.AttributeToSubject E CWWKS1738E: The OpenID Connect client [client01] failed to authenticate the JSON Web Token because the claim [someBadName] specified by the [userIdentifier] configuration attribute was not included in the token.
+[source]
+----
+.ws.security.openidconnect.clients.common.AttributeToSubject E CWWKS1738E: The OpenID Connect client [client01] failed to authenticate the JSON Web Token because the claim [someBadName] specified by the [userIdentifier] configuration attribute was not included in the token.
+----
 +
-The error message refers to the `userIdentifier` configuration attribute. However, in the social login feature the equivalent configuration attribute is actually called `userNameAttribute`. The message needs to be updated to use the correct attribute name.
-
-* link:https://github.com/OpenLiberty/open-liberty/issues/23976[Add option to support old format of start-info in multipart/related SOAP messages]
+The error message refers to the `userIdentifier` configuration attribute. However, in the `socialLogin-1.0` feature the equivalent configuration attribute is actually called `userNameAttribute`. 
 +
-
-* link:https://github.com/OpenLiberty/open-liberty/issues/23954[The authCache->cacheRef and webAppSecurity->loggedOutCookieCacheRef server configuration elements are not included in the documentation.]
-+
-
-* link:https://github.com/OpenLiberty/open-liberty/issues/23676[Transaction manager unavailable when stopping resource adapters during server shutdown]
-+
-Transaction manager might not be available when resource adapter is stopped.
-+
-```
-java.lang.IllegalStateException java.lang.IllegalStateException
-	at com.ibm.tx.jta.impl.TranManagerImpl.<init>(TranManagerImpl.java:61)
-	at com.ibm.tx.jta.embeddable.impl.EmbeddableTranManagerImpl.<init>(EmbeddableTranManagerImpl.java:28)
-	at com.ibm.tx.jta.embeddable.impl.EmbeddableTranManagerSet$1.initialValue(EmbeddableTranManagerSet.java:55)
-	at com.ibm.tx.jta.embeddable.impl.EmbeddableTranManagerSet$1.initialValue(EmbeddableTranManagerSet.java:52)
-	at java.lang.ThreadLocal.setInitialValue(ThreadLocal.java:193)
-	at java.lang.ThreadLocal.get(ThreadLocal.java:183)
-	at com.ibm.tx.jta.embeddable.impl.EmbeddableTranManagerSet.self(EmbeddableTranManagerSet.java:66)
-	at com.ibm.tx.jta.embeddable.impl.EmbeddableTranManagerSet.self(EmbeddableTranManagerSet.java:34)
-	at com.ibm.tx.jta.impl.TranManagerSet.suspend(TranManagerSet.java:149)
-	at [com.ibm.ws](http://com.ibm.ws/).uow.embeddable.EmbeddableUOWManagerImpl.suspend(EmbeddableUOWManagerImpl.java:63)
-	at [com.ibm.ws](http://com.ibm.ws/).transaction.context.internal.TransactionContextImpl.taskStarting(TransactionContextImpl.java:105)
-	at [com.ibm.ws](http://com.ibm.ws/).context.service.serializable.ThreadContextDescriptorImpl.taskStarting(ThreadContextDescriptorImpl.java:413)
-	at [com.ibm.ws](http://com.ibm.ws/).jca.internal.BootstrapContextImpl.startTask(BootstrapContextImpl.java:1170)
-	at [com.ibm.ws](http://com.ibm.ws/).jca.internal.BootstrapContextImpl.stopResourceAdapter(BootstrapContextImpl.java:1109)
-	at [com.ibm.ws](http://com.ibm.ws/).jca.internal.BootstrapContextImpl.deactivate(BootstrapContextImpl.java:664)
-```
-
-* link:https://github.com/OpenLiberty/open-liberty/issues/23410[UnrecoverableKeyException occurs when using WS-Security Callback handler on Liberty 22.0.0.9]
-+
-
-* link:https://github.com/OpenLiberty/open-liberty/issues/16007[Runtime injection of detailed method trace fails for a CDI bean]
-+
-
-
-// // // // // // // //
-// In the preceding section:
-// For this section ask either Michal Broz or Tom Evans or the #openliberty-release-blog channel for Notable bug fixes in this release.
-// Present them as a list in the order as provided, linking to the issue and providing a short description of the bug and the resolution.
-// If the issue on Github is missing any information, leave a comment in the issue along the lines of:
-// "@[issue_owner(s)] please update the description of this `relesae bug` using the [bug report template](https://github.com/OpenLiberty/open-liberty/issues/new?assignees=&labels=release+bug&template=bug_report.md&title=)" 
-// Feel free to message the owner(s) directly as well, especially if no action has been taken by them.
-// For inspiration about how to write this section look at previous blogs e.g- 20.0.0.10 or 21.0.0.12 (https://openliberty.io/blog/2021/11/26/jakarta-ee-9.1.html#bugs)
-// // // // // // // //
+This issue has been resolved by updating the NLS message to reference the correct attribute name.
 
 
 [#guides]
