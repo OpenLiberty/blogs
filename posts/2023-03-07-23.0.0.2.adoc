@@ -1,0 +1,330 @@
+---
+layout: post
+title: "Test database connections and set server stop time out in Open Liberty 23.0.0.2"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/mbroz2
+author_github: https://github.com/mbroz2
+seo-title: Test database connections and set server stop time out in Open Liberty 23.0.0.2 - OpenLiberty.io
+seo-description: Open Liberty 23.0.0.2 introduces a new capability to test database connections with the Admin Center Server Config tool. The server stop command adds the the --timeout option to specify the maximum amount of time to wait for the server to stop. This release also provides many significant bug fixes, including one that addresses a CVE in Jakarta RESTful Web Services 3.0 feature.
+blog_description: Open Liberty 23.0.0.2 introduces a new capability to test database connections with the Admin Center Server Config tool. The server stop command adds the the --timeout option to specify the maximum amount of time to wait for the server to stop. This release also provides many significant bug fixes, including one that addresses a CVE in Jakarta RESTful Web Services 3.0 feature.
+open-graph-image: https://openliberty.io/img/blog/ac_db_test_container_auth.png
+open-graph-image-alt: Open Liberty Admin Center connection test panel
+---
+= Test database connections and set server stop time out in Open Liberty 23.0.0.2
+Michal Broz <https://github.com/mbroz2>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+Open Liberty 23.0.0.2 introduces a new capability to test database connections with the Admin Center Server Config tool.  The `server stop` command adds the the `--timeout` option to specify the maximum amount of time to wait for the server to stop.  This release also provides many significant bug fixes, including one that addresses a CVE in Jakarta RESTful Web Services 3.0 feature.
+
+
+In link:{url-about}[Open Liberty] 23.0.0.2:
+
+* <<db_test, Test database connections using Admin Center>>
+* <<timeout, Specify how long to wait for the server to stop>>
+* <<CVEs, Security Vulnerability (CVE) Fixes>>
+* <<bugs, Notable bug fixes>>
+
+
+Along with the new features and functions added to the runtime, we’ve also made <<guides, updates to our guides>>.
+
+
+View the list of fixed bugs in link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A23002+label%3A%22release+bug%22[23.0.0.2].
+
+Check out link:{url-prefix}/blog/?search=release&search!=beta[previous Open Liberty GA release blog posts].
+
+
+[#run]
+
+
+== Run your apps using 23.0.0.2
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], here are the coordinates:
+
+[source,xml]
+----
+<dependency>
+    <groupId>io.openliberty</groupId>
+    <artifactId>openliberty-runtime</artifactId>
+    <version>23.0.0.2</version>
+    <type>zip</type>
+</dependency>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+dependencies {
+    libertyRuntime group: 'io.openliberty', name: 'openliberty-runtime', version: '[23.0.0.2,)'
+}
+----
+
+Or if you're using Docker:
+
+[source]
+----
+FROM open-liberty
+----
+
+Or take a look at our link:{url-prefix}/downloads/[Downloads page].
+
+[link=https://stackoverflow.com/tags/open-liberty]
+image::img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="center"]
+
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/24124
+// Contact/Reviewer: aknguyen7,ReeceNana
+// // // // // // // // 
+[#db_test]
+== Test database connections using Admin Center   
+
+Looking for a simple way to test your database connections? With this release, you can now validate your connections using the Liberty Admin Center feature. The connection test exercises the same code paths as your applications, giving you confidence in your server configuration. The Admin Center connection validation feature is enabled by the same REST APIs featured in the link:{url-prefix}/blog/2019/09/13/testing-database-connections-REST-APIs.html[Testing database connections in Open Liberty apps with REST APIs] blog post.
+
+
+To enable database connection testing, the following minimum set of features must be present in your server configuration:
+
+[source, xml]
+----
+    <feature>adminCenter-1.0</feature>
+    <feature>restConnector-2.0</feature>
+    <feature>mpOpenApi-3.0</feature>
+----
+
+Although this example uses the `mpOpenApi-3.0` feature, you can use any MicroProfile OpenAPI version that is compatible with your other features.
+
+
+To provide an example, we'll start by testing the server resource `DefaultDataSource`, which is configured to connect to a Derby database using container authentication with an authentication alias.
+
+
+The following sample `server.xml` file enables the features to configure the Admin Center test connection function and configures the connection to the Derby database:
+
+[source, xml]
+----
+<server description="new server">
+
+    <!-- Enable features -->
+    <featureManager>
+        <feature>adminCenter-1.0</feature>
+        <feature>restConnector-2.0</feature>
+        <feature>jdbc-4.3</feature>
+        <feature>mpOpenApi-3.0</feature>
+    </featureManager>
+
+    <!-- To access this server from a remote client add a host attribute to the following element, e.g. host="*" -->
+    <httpEndpoint id="defaultHttpEndpoint" httpPort="9080" httpsPort="9443"/>
+
+    <library id="derby">
+      <file name="${server.config.dir}/derby/derby.jar"/>
+    </library>
+
+    <dataSource id="DefaultDataSource">
+      <jdbcDriver libraryRef="derby"/>
+      <!-- Example properties referencing an in-memory Derby Embedded database -->
+      <properties.derby.embedded databaseName="memory:defaultdb" createDatabase="create"/>
+    </dataSource>
+
+    <authData id="myAuth" user="dbuser" password="dbpass"/>
+
+    <!-- Default SSL configuration enables trust for default certificates from the Java runtime --> 
+    <ssl id="defaultSSLConfig" trustDefaultCerts="true"/>
+
+    <remoteFileAccess>
+       <writeDir>${server.config.dir}</writeDir>
+    </remoteFileAccess>
+
+    <basicRegistry id="basic">
+       <user name="admin" password="adminpwd"/>
+    </basicRegistry>
+
+    <!-- Assign 'admin' to Administrator -->
+    <administrator-role>
+        <user>admin</user>
+    </administrator-role>
+
+</server>
+----
+
+For this `server.xml` example, you will need to add the Derby JAR to the server configuration or use your own database configuration.
+
+
+1. Configure a Liberty server using the example `server.xml` file for guidance and then start the server. After the server is started, you can check the logs to find the URL to navigate to the Admin Center. In the previous example, you can navigate to the Admin Center using the `https://localhost:9443/adminCenter/` URL.
+
+
+2. In the Admin Center UI, select the **Server Config** tool.
+
++
+[.img_border_light]
+image::img/blog/ac_db_test_server_config.png[Server Config Tool,width=20%,align="center"]
+
+3. Select **server.xml** to edit.
+
++
+[.img_border_light]
+image::img/blog/ac_db_test_serverxml.png[server.xml,width=50%,align="center"]
+
+4. In the **Design > Server** menu, navigate to the resource you want to test and click the **Test** button.
+
++
+[.img_border_light]
+image::img/blog/ac_db_test_resource.png[Select resource,width=50%,align="center"]
+
+5. Choose the type of authentication your application uses:
+
++
+* For applications that use container authentication, choose the **Container authentication** tab and select whether to use default authentication, specify an authentication alias, or choose a login module configuration.
+
++
+For this example, the configuration doesn't specify default authentication on the `dataSource` element or configure any login modules. Therefore, you must specify an authentication alias by using the drop-down field.
+
++
+[.img_border_light]
+image::img/blog/ac_db_test_container_auth.png[Container authentication,width=50%,align="center"]
+
+
+* For applications that use application authentication, choose the **Application authentication** tab and fill in a valid username and password for the database resource.
+
++
+[.img_border_light]
+image::img/blog/ac_db_test_app_auth.png[Application authentication,width=50%,align="center"]
+
+* If your application does not use a resource reference and the `server.xml` doesn't include `enableContainerAuthForDirectLookups="true"` in the link:{url-prefix}/docs/latest/reference/config/connectionManager.html[`connectionManager` element], then choose the **No resource reference** tab and fill in a valid username and password for the database resource.
+
+
++
+[.img_border_light]
+image::img/blog/ac_db_test_no_resource_ref.png[No Resource Reference,width=50%,align="center"]
+
+6. Click the **Connection Test** button to run the test and display the results.  The following example shows a successful connection test:
+
+
+[.img_border_light]
+image::img/blog/ac_db_test_successful_test.png[Successful connection test example,width=50%,align="center"]
+
+In addition to link:{url-prefix}/docs/latest/reference/feature/jdbc-4.3.html[Java Database Connectivity], you can also test connections to link:{url-prefix}/docs/latest/reference/feature/connectors-2.0.html[Jakarta Connectors], link:{url-prefix}/docs/latest/reference/feature/messaging-3.0.html[Jakarta Messaging] and link:{url-prefix}/docs/latest/reference/feature/cloudant-1.0.html[Cloudant Integration] resources. 
+
+For more information about administering Liberty using a GUI, refer to the link:{url-prefix}/docs/latest/admin-center.html[Manage Open Liberty with Admin Center] documentation.
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/23282
+// Contact/Reviewer: jimblye,ReeceNana
+// // // // // // // // 
+[#timeout]
+== Specify how long to wait for the server to stop
+
+Open Liberty 23.0.0.2 introduces a `--timeout` command line option for the `server stop` command.  You can use this option to specify the maximum amount of time the `server stop` command waits for confirmation that the server has stopped.  
+
+Prior to this update, the default maximum waiting period of 30 seconds could not be adjusted.
+
+The timeout value can be specified in minutes (`m`), seconds (`s`), or a combination of both.  When a unit is not specified, the default of seconds is used.  Minutes and seconds can be combined, for example `2m30s`, which means 2 minutes and 30 seconds.  Examples:
+   
+[source, xml]
+----
+   ./server stop                   // 30 seconds
+   ./server stop --timeout=45      // 45 seconds
+   ./server stop --timeout=45s     // 45 seconds
+   ./server stop --timeout=3m20s   // 3 minutes, 20 seconds
+----
+
+The default timeout value is 30 seconds. If the server consistently takes longer than 30 seconds to stop, consider increasing the timeout value by using the --timeout option.
+   
+For more information, refer to the link:{url-prefix}/docs/latest/reference/command/server-stop.html[server stop command] documentation.
+   
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
+
+
+[#CVEs]
+== Security vulnerability (CVE) fixes in this release
+[cols="5*"]
+|===
+|CVE |CVSS Score |Vulnerability Assessment |Versions Affected |Notes
+
+|http://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2022-45787[CVE-2022-45787]
+|5.5
+|Information disclosure
+|21.0.0.12 - 23.0.0.1
+|Affects the link:{url-prefix}/docs/latest/reference/feature/restfulWS-3.0.html[restfulWS-3.0] feature
+|===
+
+For a list of past security vulnerability fixes, reference the link:{url-prefix}/docs/latest/security-vulnerabilities.html[Security vulnerability (CVE) list].
+
+
+[#bugs]
+== Notable bugs fixed in this release
+
+We’ve spent some time fixing bugs. The following sections describe just some of the issues resolved in this release. If you’re interested, here’s the  link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A23002+label%3A%22release+bug%22[full list of bugs fixed in 23.0.0.2].
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/24371[Server fails to start due to conflict on servlet feature]
++
+When individually installing a set of EE7 or EE8 features using the link:link:{url-prefix}/docs/latest/reference/command/featureUtility-installFeature.html[`featureUtility installFeature`] command, the server can fail to start due to a conflict on servlet features, as shown in the following example.
++
+[source]
+----
+com.ibm.ws.kernel.feature.internal.FeatureManager            E CWWKF0033E: The singleton features servlet-3.1 and servlet-3.0 cannot be loaded at the same time.  The configured features servlet-3.1 and apiDiscovery-1.0 include one or more features that cause the conflict. Your configuration is not supported; update server.xml to remove incompatible features.
+com.ibm.ws.logging.internal.impl.IncidentImpl                I FFDC1015I: An FFDC Incident has been created: "java.lang.IllegalArgumentException: Unable to load conflicting versions of features "com.ibm.websphere.appserver.servlet-3.1" and "com.ibm.websphere.appserver.servlet-3.0".  The feature dependency chains that led to the conflict are: com.ibm.websphere.appserver.servlet-3.1 and com.ibm.websphere.appserver.apiDiscovery-1.0 -> com.ibm.websphere.appserver.restHandler-1.0 -> io.openliberty.restHandler.internal-1.0 -> io.openliberty.webBundleSecurity.internal-1.0 -> io.openliberty.servlet.internal-3.0 -> com.ibm.websphere.appserver.servlet-3.0
+----
++
+The problem does not occur if the link:link:{url-prefix}/docs/latest/reference/command/featureUtility-installServerFeatures.html[`featureUtility installServerFeatures`] command is used instead. It can also be worked around by installing the `mpJwt-1.2` feature if using Jakarta EE 8 features.
++
+The issue has been resolved and the `featureUtility installFeature` command will install the features in a way to allow all of them to be included in a `server.xml` and the server will be able to start properly.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/24293[Scheduled Futures leak resources from Managed Executor Services on application stop]
++
+The `futures` queue in `ManagedScheduledExecutorServiceImpl` holds references to scheduled futures, even once they have completed.
++
+The queue is periodically cleaned when new tasks are scheduled, by the private `purgeFutures()` method, but otherwise they are not actively removed, and it isn't called when applications are shutdown. As `purgeFutures()` is private, applications can't call it themselves.
++
+This issue has been resolved and the resources are now released automatically when an application stops.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/24157[Validate HTTP header names]
++
+Due to a bug, HTTP requests were not being checked for invalid characters.
++
+The issue has been resolved and an HTTP request with an invalid character now causes the HTTP response to contain a `400` response code.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/24077[DoNotAllowDuplicateSetCookies http channel config option is not working]
++
+The HTTP channel config property `DoNotAllowDuplicateSetCookies=true`, when set, still allows duplicate `Set-Cookie` cookies in HTTP responses.
++
+This issue has been resolved and the response headers no longer contain the duplicate `Set-Cookie` cookies when `DoNotAllowDuplicateSetCookies=true` is set.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/24056[batch-2.1 feature content is active even when configuring batch-1.0 or 2.0]
++
+Content added as part of the beta `batch-2.1` feature will be loaded and active even if the user configures the server for link:{url-prefix}/docs/latest/reference/feature/batch-1.0.html[`batch-1.0`] or link:{url-prefix}/docs/latest/reference/feature/batch-2.0.html[`batch-2.0`]. This is unintended and may cause conflicts based on the user's environment.
++
+The issue has been resolved and the new `batch-2.1` specific content will no longer be exposed in `batch-1.0` nor `batch-2.0` features.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/24001[Fix configuration attribute name used in CWWKS1738E message]
++
+When using an OIDC RP via the link:{url-prefix}/docs/latest/reference/feature/socialLogin-1.0.html[Social Media Login feature], it's possible for the wrong configuration attribute name to be included in the error message emitted when the expected user name claim is not in the ID token returned from the OP. The following is an example of such an error message.
++
+[source]
+----
+.ws.security.openidconnect.clients.common.AttributeToSubject E CWWKS1738E: The OpenID Connect client [client01] failed to authenticate the JSON Web Token because the claim [someBadName] specified by the [userIdentifier] configuration attribute was not included in the token.
+----
++
+The error message refers to the `userIdentifier` configuration attribute. However, in the `socialLogin-1.0` feature the equivalent configuration attribute is actually called `userNameAttribute`. 
++
+This issue has been resolved by updating the NLS message to reference the correct attribute name.
+
+
+[#guides]
+== New and updated guides since the previous release
+As Open Liberty features and functionality continue to grow, we continue to add link:https://openliberty.io/guides/?search=new&key=tag[new guides to openliberty.io] on those topics to make their adoption as easy as possible.  Existing guides also receive updates to address any reported bugs/issues, keep their content current, and expand what their topic covers.
+
+* link:{url-prefix}/guides/grpc-intro.html[Streaming messages between client and server services using gRPC] 
+** A cloud-hosted version of this recently published guide is now available.
+
+[.img_border_light]
+image::img/blog/grpc_guide.png[Application authentication,width=50%,align="center"]
+
+
+== Get Open Liberty 23.0.0.2 now
+
+Available through <<run,Maven, Gradle, Docker, and as a downloadable archive>>.
