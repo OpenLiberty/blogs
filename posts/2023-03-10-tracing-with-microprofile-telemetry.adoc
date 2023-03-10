@@ -5,13 +5,13 @@ title: "Tracing your microservices made easy with MicroProfile Telemetry 1.0"
 categories: blog
 author_picture: https://avatars3.githubusercontent.com/yasmin-aumeeruddy
 author_github: https://github.com/yasmin-aumeeruddy
-seo-title: Logs aren't always enough- Tracing your microservices made easy with MicroProfile Telemetry 1.0
+seo-title: Tracing your microservices made easy with MicroProfile Telemetry 1.0
 seo-description: Distributed tracing helps DevOps teams keep track of requests between microservices. MicroProfile adopts OpenTelemetry Tracing to allow developers to observe requests across their distributed systems.
 blog_description: Distributed tracing helps DevOps teams keep track of requests between microservices. MicroProfile adopts OpenTelemetry Tracing to allow developers to observe requests across their distributed systems.
-open-graph-image: https://openliberty.io/img/twitter_card.jpg
-open-graph-image-alt: Open Liberty Logo
+open-graph-image: https://openliberty.io/img/blog/mptelemetry_diagram.png
+open-graph-image-alt: MicroProfile Telemetry usage architecture
 ---
-= Microservices tracing made easy with MicroProfile Telemetry 1.0
+= Tracing your microservices made easy with MicroProfile Telemetry 1.0
 Yasmin Aumeeruddy <https://github.com/yasmin-aumeeruddy>
 :imagesdir: /
 :url-prefix:
@@ -26,7 +26,7 @@ Let's start with the key concepts involved in distributed tracing:
 Traces::
 Traces represent requests and consist of multiple spans.
 Spans::
-Spans are representative of single operations in a request and contain a name, time-related data, log messages and metadata to give information about what occurs during a transaction.
+Spans are representative of single operations in a request. A span contains a name, time-related data, log messages, and metadata to give information about what occurs during a transaction.
 Context::
 Context is an immutable object contained in the span data to identify the unique request that each span is a part of. This data is required for moving trace information across service boundaries, allowing developers to follow a single request through a potentially complex distributed system.
 Exporters:: 
@@ -34,20 +34,21 @@ Exports are components that send data to a backend service so you can visualise 
 
 You can export the data that MicroProfile Telemetry 1.0 collects to link:https://www.jaegertracing.io/[Jaeger] or link:https://zipkin.io/[Zipkin]. OpenTelemetry also provides a simple logging exporter so that you can check whether spans are created by viewing the data in your console. This exporter can be helpful for debugging.
 
-The following diagram shows a system that consists of two services that both have applications running on Open Liberty. With MicroProfile Telemetry 1.0 installed, the requests and responses generate spans and the paths between the services are monitored using their context. The spans are then exported to a dedicated backend services where they can be viewed in a user interface or the console logs. 
+The following diagram shows a system that consists of two services that both have applications running on Open Liberty. With MicroProfile Telemetry 1.0 installed, the requests and responses generate spans and the paths between the services are monitored using their context. The spans are then exported to dedicated backend services where they can be viewed in a user interface or the console logs. 
 
 image::img/blog/mptelemetry_diagram.png[Typical mpTelemetry usage architecture]
 
-There are multiple ways that you can collect this data: automatic instrumentation, manual instrumentation, and the link:https://opentelemetry.io/docs/instrumentation/java/automatic/[Open Telemetry Java Agent].
+There are multiple ways that you can collect this data: <<#auto,automatic instrumentation>>, <<#manual,manual instrumentation>>, and the <<#agent,Open Telemetry Java Agent>>.
 
-MicroProfile Telemetry 1.0 is currently released as beta content. You can download the lastest version of the Open Liberty beta link:https://openliberty.io/start/#runtime_betas[here]. In this post, we'll use a simple demo application to show you how to collect traces from multiple services. Check out the code in the following repository: 
+MicroProfile Telemetry 1.0 is currently released as beta content. You can download the lastest version of the Open Liberty beta from the link:https://openliberty.io/start/#runtime_betas[Get Started] page. In this post, we'll use a simple demo application to show you how to collect traces from multiple services. Check out the code in the following repository: 
 
 link:https://github.com/yasmin-aumeeruddy/mpTelemetry-Demo[https://github.com/yasmin-aumeeruddy/mpTelemetry-Demo]
 
 Before we get started, let's get the backend set up. 
 To use Jaeger, follow the  link:https://www.jaegertracing.io/docs/1.39/getting-started/[Jaeger Getting Started instructions]. 
-If you would rather use Zipkin, you can follow the steps link:https://zipkin.io/pages/quickstart[the Zipkin Quickstart].
+If you would rather use Zipkin, you can follow the link:https://zipkin.io/pages/quickstart[Zipkin Quickstart].
 
+[#auto]
 ## Automatic instrumentation
 
 MicroProfile Telemetry 1.0 allows you to observe traces without modifying source code in your Jakarta RESTful web service (aka JAX-RS) applications. 
@@ -61,11 +62,11 @@ As you can see in the `system` service in the demo application, you can enable `
 </featureManager>
 ----
 
-By default, MicroProfile Telemetry tracing is off. To enable any tracing aspects, specify `otel.sdk.disabled=false` as a config property or `OTEL_SDK_DISABLED=false` as an environment property for your server. This property is enabled in the demo link:https://github.com/yasmin-aumeeruddy/mpTelemetry-Demo/blob/main/inventoy/src/main/resources/META-INF/microprofile-config.properties#L2[microprofile-config.properties]  file.
+By default, MicroProfile Telemetry tracing is off. To enable any tracing aspects, specify `otel.sdk.disabled=false` as a MicroProfile Config property or `OTEL_SDK_DISABLED=false` as an environment variable for your server. This property is enabled in the demo link:https://github.com/yasmin-aumeeruddy/mpTelemetry-Demo/blob/main/inventoy/src/main/resources/META-INF/microprofile-config.properties#L2[microprofile-config.properties] file along with the exporter configuration.
 
 For more information on these properties, see link:https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/sdk-environment-variables.md[OpenTelemetry's configuration documentation].
 
-Open a new command-line session and navigate to the `system` directory:
+To begin, open a new command-line session and navigate to the `system` directory:
 
 `cd system`
 
@@ -77,15 +78,16 @@ Navigate to the system properties endpoint:
 
 `http://localhost:9080/system/properties`
 
-A span for this request will be automatically created by MicroProfile Telemetry. Check for the span in the exporter's endpoint. For example: 
+A span for this request will be automatically created by MicroProfile Telemetry. Check for the span in your chosen exporter's endpoint. For example: 
 
 image::img/blog/mptelemetry_system_span.png[System span]
 
-You just collected traces using Automatic Instrumentation! However, you might want to annotate selected methods or collect custom telemetry data. It's now time to modify source code to add more data to your spans. 
+You just collected traces using automatic instrumentation! However, you might want to annotate selected methods or collect custom telemetry data. It's now time to modify source code to add more data to your spans. 
 
+[#manual]
 ## Manual instrumentation
 
-The automatic instrumentation only instruments Jakarta RESTful web service applications. To get further spans on other operations, such as database calls, manual instrumentation can be added to the source code.
+Automatic instrumentation only instruments Jakarta RESTful web service applications. To get further spans on other operations, such as database calls, you can add manual instrumentation to the source code.
 
 ### Prerequisites
 
@@ -119,9 +121,9 @@ link:https://github.com/yasmin-aumeeruddy/mpTelemetry-Demo/blob/main/system/src/
 </dependency>
 ----
 
-### Code Instrumentation
+### Manual instrumentation of application code
 
-Now you are all set to instrument your code to manually create traces. We start by link:https://github.com/yasmin-aumeeruddy/mpTelemetry-Demo/blob/main/inventory/src/main/java/io/openliberty/demo/inventory/InventoryResource.java#L38-L42[`injecting a Tracer and Span`] object: 
+Now you are all set to instrument your code to manually create traces. We start by link:https://github.com/yasmin-aumeeruddy/mpTelemetry-Demo/blob/main/inventory/src/main/java/io/openliberty/demo/inventory/InventoryResource.java#L38-L42[injecting a Tracer and Span] object: 
 
 [source, java]
 ----
@@ -157,7 +159,7 @@ public void add(@SpanAttribute(value = "hostname") String hostname, Properties s
 }
 ----
 
-A span created using the `@WithSpan` annotation can be given a name. For example, link:https://github.com/yasmin-aumeeruddy/mpTelemetry-Demo/blob/main/inventory/src/main/java/io/openliberty/demo/inventory/InventoryManager.java#L58[this span] is given the name "list":
+A span created using the `@WithSpan` annotation can be given a name. For example, link:https://github.com/yasmin-aumeeruddy/mpTelemetry-Demo/blob/main/inventory/src/main/java/io/openliberty/demo/inventory/InventoryManager.java#L58[this span] is given the name `list`:
 
 [source,java]
 ----
@@ -185,9 +187,10 @@ These spans are all part of one single trace that is emitted from the request to
 
 For more information, see link:https://opentelemetry.io/docs/instrumentation/java/manual/[OpenTelemetry's manual instrumentation documentation].
 
-## Java Agent
+[#agent]
+## Java agent instrumentation
 
-The OpenTelemetry Java Agent enables Java applications to generate and capture telemetry data automatically using a JAR that can be attached to any Java 8+ application. Out-of-the-box tracing is provided for many link:https://github.com/open-telemetry/opentelemetry-java-instrumentation/blob/main/docs/supported-libraries.md#libraries--frameworks[libraries].
+link:https://opentelemetry.io/docs/instrumentation/java/automatic/[Open Telemetry Java Agent] enables Java applications to generate and capture telemetry data automatically using a JAR that can be attached to any Java 8+ application. Out-of-the-box tracing is provided for many link:https://github.com/open-telemetry/opentelemetry-java-instrumentation/blob/main/docs/supported-libraries.md#libraries--frameworks[libraries].
 
 You can attach the JAR by adding the following to your `pom.xml`:
 
@@ -226,7 +229,7 @@ You can then run Maven with the `package` goal, which copies the OpenTelemetry J
 
 `mvn package` 
 
-Add the following line to your `jvm.options` file along with the link:https://opentelemetry.io/docs/instrumentation/java/automatic/agent-config/[agent configuration]:
+Add the following line to your `jvm.options` file, along with the link:https://opentelemetry.io/docs/instrumentation/java/automatic/agent-config/[agent configuration]:
 
 ```
 -javaagent:opentelemetry-javaagent.jar
@@ -246,7 +249,7 @@ The following limitations apply to using the agent to trace services:
 ### Annotations
 * The agent instruments rest calls and methods annotated with `@WithSpan`. Therefore, the created spans may be slightly different to those you would see with MicroProfile Telemetry's manual instrumentation.
 
-### Library Instrumentation
+### Library instrumentation
 * Open Liberty uses many open source libraries internally. Some of these might be instrumented automatically by the agent.
 
 The agent creates and configures a global OpenTelemetry object using link:https://github.com/open-telemetry/opentelemetry-java-instrumentation#configuring-the-agent[environment variables and system properties]. Therefore, configuration is not read from link:https://openliberty.io/docs/latest/microprofile-config-properties.html[MicroProfile Config].
