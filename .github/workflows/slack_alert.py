@@ -155,6 +155,8 @@ if __name__ == "__main__":
     if "test channel" == args.slack_notification.lower():
         slackhook = args.slackhook_test
     
+    print("message: " + message)
+    print("Request data: " + json.dumps(message))
     response = requests.post(slackhook, headers=headers, data=json.dumps(message))
 
     if response.status_code != 200:
