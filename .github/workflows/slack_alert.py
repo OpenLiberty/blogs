@@ -131,6 +131,7 @@ if __name__ == "__main__":
     message["attachments"][0]["blocks"][2]["fields"][0]["text"] = f"*{args.pr_branch} PR:* <{args.pr_url}| #{pr_number}>"
     message["attachments"][0]["blocks"][2]["fields"][1]["text"] = f"*<{args.url}| Preview {args.pr_branch} Post>*"
 
+    version_no_dots = args.version.replace('.', '')
     bug_issue_url = f"https://github.com/OpenLiberty/open-liberty/issues?q=+label%3A%22release+bug%22+label%3Arelease%3A{version_no_dots}"    
     if not "beta" in args.version.lower():
         message["attachments"][0]["blocks"].append({
@@ -146,7 +147,6 @@ if __name__ == "__main__":
     if "test channel" == args.slack_notification.lower():
         slackhook = args.slackhook_test
 
-    version_no_dots = args.version.replace('.', '')
     ISSUE_URL = f"https://api.github.com/repos/OpenLiberty/open-liberty/issues?labels=blog,target:{version_no_dots};state=all"
     issues = json.loads(requests.get(ISSUE_URL).text)
     if len(issues) > 0:
