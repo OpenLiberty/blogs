@@ -159,7 +159,7 @@ if __name__ == "__main__":
             # Slack API only allows up to 4000 characters; if we're getting close, break up the msg
             if len(json.dumps(message)) > 3500:
                 response = requests.post(slackhook, headers=headers, data=json.dumps(message))
-                message = None
+                del message
 
                 if response.status_code != 200:
                     raise ValueError(
