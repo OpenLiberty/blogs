@@ -47,6 +47,13 @@ message = {
                 },
                 {
                     "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": "*Corresponding Blog Issues:*"
+                    }
+                },
+                {
+                    "type": "section",
                     "fields": [
                         {
                             "type": "mrkdwn",
@@ -58,13 +65,24 @@ message = {
                         }
                     ]
                 },
+            ]
+        }
+    ]
+}
+
+messageExtra = {
+    "attachments": [
+        {
+            "blocks": [
                 {
                     "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": "*Corresponding Blog Issues:*"
-                    }
-                }
+                    "fields": [
+                        {
+                            "type": "mrkdwn",
+                            "text": "*PR:* <fakeLink.toEmployeeProfile.com| #pr_number>"
+                        }
+                    ]
+                },
             ]
         }
     ]
@@ -159,7 +177,7 @@ if __name__ == "__main__":
             # Slack API only allows up to 4000 characters; if we're getting close, break up the msg
             if len(json.dumps(message)) > 3500:
                 response = requests.post(slackhook, headers=headers, data=json.dumps(message))
-                del message
+                message = messageExtra
 
                 if response.status_code != 200:
                     raise ValueError(
