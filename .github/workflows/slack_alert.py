@@ -157,7 +157,7 @@ if __name__ == "__main__":
             message["attachments"][0]["blocks"][3]["text"]["text"] += f"\n <{issue_url}| {issue_title}> #{issue_number}"
             
             # Slack API only allows up to 4000 characters; if we're getting close, break up the msg
-            if len(json.dumps(message)) > 3900:
+            if len(json.dumps(message)) > 3500:
                 response = requests.post(slackhook, headers=headers, data=json.dumps(message))
                 message = None
 
