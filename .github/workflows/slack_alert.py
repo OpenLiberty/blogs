@@ -70,7 +70,7 @@ message = {
     ]
 }
 
-messageExtra = {
+messageContinuation = {
     "attachments": [
         {
             "blocks": [
@@ -144,11 +144,6 @@ if __name__ == "__main__":
     message["attachments"][0]["blocks"][1]["fields"][2]["text"] = f"*Author:*\n {args.author}"
     message["attachments"][0]["blocks"][1]["fields"][3]["text"] = f"*Author GitHub:*\n <{github_url}| {args.github_username}>"
 
-    #draft_pr_url = f"https://github.com/OpenLiberty/blogs/pull/{args.pr_number}"
-    pr_number = args.pr_url.rsplit('/', 1)[-1]
-    message["attachments"][0]["blocks"][2]["fields"][0]["text"] = f"*{args.pr_branch} PR:* <{args.pr_url}| #{pr_number}>"
-    message["attachments"][0]["blocks"][2]["fields"][1]["text"] = f"*<{args.url}| Preview {args.pr_branch} Post>*"
-
     version_no_dots = args.version.replace('.', '')
     bug_issue_url = f"https://github.com/OpenLiberty/open-liberty/issues?q=+label%3A%22release+bug%22+label%3Arelease%3A{version_no_dots}"    
     if not "beta" in args.version.lower():
@@ -160,6 +155,11 @@ if __name__ == "__main__":
                 }
             }
         )
+
+    #draft_pr_url = f"https://github.com/OpenLiberty/blogs/pull/{args.pr_number}"
+    pr_number = args.pr_url.rsplit('/', 1)[-1]
+    message["attachments"][0]["blocks"][2]["fields"][0]["text"] = f"*{args.pr_branch} PR:* <{args.pr_url}| #{pr_number}>"
+    message["attachments"][0]["blocks"][2]["fields"][1]["text"] = f"*<{args.url}| Preview {args.pr_branch} Post>*"
 
     slackhook = args.slackhook
     if "test channel" == args.slack_notification.lower():
@@ -177,7 +177,7 @@ if __name__ == "__main__":
             # Slack API only allows up to 4000 characters; if we're getting close, break up the msg
             if len(json.dumps(message)) > 3500:
                 response = requests.post(slackhook, headers=headers, data=json.dumps(message))
-                message = messageExtra
+                message = messageContinuation
 
                 if response.status_code != 200:
                     raise ValueError(
