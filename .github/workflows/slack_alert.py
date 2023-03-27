@@ -163,7 +163,8 @@ if __name__ == "__main__":
             block = 3
             print("Issue number: ", i)
             if block == 0:
-                print(message)
+                print("messageContinuation: " + json.dumps(messageContinuation))
+                print("message: " + json.dumps(message))
             print(message["attachments"][0]["blocks"][block]["text"]["text"])
             message["attachments"][0]["blocks"][block]["text"]["text"] += f"\n <{issue_url}| {issue_title}> #{issue_number}"
             
