@@ -74,7 +74,7 @@ messageContinuation = {
     "attachments": [
         {
             "blocks": [
-                {}, {}, {},
+                # {}, {}, {},
                 {
                     "type": "section",
                     "text": {
@@ -160,10 +160,12 @@ if __name__ == "__main__":
             issue_url = issue["html_url"]
             issue_title = issue["title"]
             issue_number = issue["number"]
-            message["attachments"][0]["blocks"][3]["text"]["text"] += f"\n <{issue_url}| {issue_title}> #{issue_number}"
+            block = 3
+            message["attachments"][0]["blocks"][block]["text"]["text"] += f"\n <{issue_url}| {issue_title}> #{issue_number}"
             
             # Slack API only allows up to 4000 characters; if we're getting close, break up the msg
             if len(json.dumps(message)) > 3500:
+                block = 0
                 response = requests.post(slackhook, headers=headers, data=json.dumps(message))
                 message = messageContinuation
 
@@ -197,6 +199,8 @@ if __name__ == "__main__":
     
     # for i, math.ceil(len(postData)/3900)
 
+    messageString = json.dumps(message)
+    print("Request data: " + messageString)
     response = requests.post(slackhook, headers=headers, data=json.dumps(message))
 
     if response.status_code != 200:
