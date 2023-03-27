@@ -106,7 +106,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if "off" == args.slack_notification.lower():
-    quit()
+        quit()
 
     # If publish_date, author, and github_username are missing, retrieve them from draft blog
     if args.version != "" and args.publish_date == "" and args.author == "" and args.github_username == "":
