@@ -163,15 +163,15 @@ if __name__ == "__main__":
             issue_number = issue["number"]
             print("Issue number: ", i)
             if block == 0:
-                print("messageContinuation: " + json.dumps(messageContinuation))
-                print("message: " + json.dumps(message))
             print(message["attachments"][0]["blocks"][block]["text"]["text"])
             message["attachments"][0]["blocks"][block]["text"]["text"] += f"\n <{issue_url}| {issue_title}> #{issue_number}"
             
             # Slack API only allows up to 4000 characters; if we're getting close, break up the msg
             if len(json.dumps(message)) > 3500:
                 block = 0
-                response = requests.post(slackhook, headers=headers, data=json.dumps(message))
+                messageString = json.dumps(message)
+                print("Request data: " + messageString)
+                response = requests.post(slackhook, headers=headers, data=messageString)
                 message = messageContinuation
 
                 if response.status_code != 200:
@@ -190,23 +190,10 @@ if __name__ == "__main__":
                 }
             }
         )
-    
-    # slackhook = args.slackhook
-    # if "test channel" == args.slack_notification.lower():
-    #     slackhook = args.slackhook_test
-    
-    # messageString = json.dumps(message)
-    # print("Request data: " + messageString)
-    # postData = messageString+json.dumps(headers)
-    # print("Request data length (max length 4000 characters): ", len(postData))
-
-    # if len(postData) > 3900:
-    
-    # for i, math.ceil(len(postData)/3900)
 
     messageString = json.dumps(message)
     print("Request data: " + messageString)
-    response = requests.post(slackhook, headers=headers, data=json.dumps(message))
+    response = requests.post(slackhook, headers=headers, data=messageString)
 
     if response.status_code != 200:
         raise ValueError(
