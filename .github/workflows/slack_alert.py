@@ -47,13 +47,6 @@ message = {
                 },
                 {
                     "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": "*Corresponding Blog Issues:*"
-                    }
-                },
-                {
-                    "type": "section",
                     "fields": [
                         {
                             "type": "mrkdwn",
@@ -65,6 +58,13 @@ message = {
                         }
                     ]
                 },
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": "*Corresponding Blog Issues:*"
+                    }
+                }
             ]
         }
     ]
@@ -74,15 +74,14 @@ messageContinuation = {
     "attachments": [
         {
             "blocks": [
+                {}, {}, {},
                 {
                     "type": "section",
-                    "fields": [
-                        {
-                            "type": "mrkdwn",
-                            "text": "*PR:* <fakeLink.toEmployeeProfile.com| #pr_number>"
-                        }
-                    ]
-                },
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": "*Corresponding Blog Issues Continued:*"
+                    }
+                }
             ]
         }
     ]
@@ -107,7 +106,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if "off" == args.slack_notification.lower():
-        quit()
+    quit()
 
     # If publish_date, author, and github_username are missing, retrieve them from draft blog
     if args.version != "" and args.publish_date == "" and args.author == "" and args.github_username == "":
@@ -144,18 +143,6 @@ if __name__ == "__main__":
     message["attachments"][0]["blocks"][1]["fields"][2]["text"] = f"*Author:*\n {args.author}"
     message["attachments"][0]["blocks"][1]["fields"][3]["text"] = f"*Author GitHub:*\n <{github_url}| {args.github_username}>"
 
-    version_no_dots = args.version.replace('.', '')
-    bug_issue_url = f"https://github.com/OpenLiberty/open-liberty/issues?q=+label%3A%22release+bug%22+label%3Arelease%3A{version_no_dots}"    
-    if not "beta" in args.version.lower():
-        message["attachments"][0]["blocks"].append({
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": f"*<{bug_issue_url}| Corresponding Notable Fixes>*\n"
-                }
-            }
-        )
-
     #draft_pr_url = f"https://github.com/OpenLiberty/blogs/pull/{args.pr_number}"
     pr_number = args.pr_url.rsplit('/', 1)[-1]
     message["attachments"][0]["blocks"][2]["fields"][0]["text"] = f"*{args.pr_branch} PR:* <{args.pr_url}| #{pr_number}>"
@@ -184,6 +171,17 @@ if __name__ == "__main__":
                         'Request to slack returned an error %s, the response is:\n%s'
                         % (response.status_code, response.text)
                     )
+
+    bug_issue_url = f"https://github.com/OpenLiberty/open-liberty/issues?q=+label%3A%22release+bug%22+label%3Arelease%3A{version_no_dots}"    
+    if not "beta" in args.version.lower():
+        message["attachments"][0]["blocks"].append({
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": f"*<{bug_issue_url}| Corresponding Notable Fixes>*"
+                }
+            }
+        )
     
     # slackhook = args.slackhook
     # if "test channel" == args.slack_notification.lower():
