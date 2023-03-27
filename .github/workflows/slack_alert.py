@@ -152,6 +152,7 @@ if __name__ == "__main__":
     if "test channel" == args.slack_notification.lower():
         slackhook = args.slackhook_test
 
+    version_no_dots = args.version.replace('.', '')
     ISSUE_URL = f"https://api.github.com/repos/OpenLiberty/open-liberty/issues?labels=blog,target:{version_no_dots};state=all"
     issues = json.loads(requests.get(ISSUE_URL).text)
     if len(issues) > 0:
