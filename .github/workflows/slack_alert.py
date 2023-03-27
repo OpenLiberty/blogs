@@ -156,11 +156,11 @@ if __name__ == "__main__":
     ISSUE_URL = f"https://api.github.com/repos/OpenLiberty/open-liberty/issues?labels=blog,target:{version_no_dots};state=all"
     issues = json.loads(requests.get(ISSUE_URL).text)
     if len(issues) > 0:
+        block = 3
         for i, issue in enumerate(issues):
             issue_url = issue["html_url"]
             issue_title = issue["title"]
             issue_number = issue["number"]
-            block = 3
             print("Issue number: ", i)
             if block == 0:
                 print("messageContinuation: " + json.dumps(messageContinuation))
