@@ -10,6 +10,7 @@
 import requests
 import json
 import os
+import math
 from argparse import ArgumentParser
 
 message = {
@@ -62,6 +63,23 @@ message = {
                     "text": {
                         "type": "mrkdwn",
                         "text": "*Corresponding Blog Issues:*"
+                    }
+                }
+            ]
+        }
+    ]
+}
+
+messageContinuation = {
+    "attachments": [
+        {
+            "blocks": [
+                # {}, {}, {},
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": "*Corresponding Blog Issues Continued:*"
                     }
                 }
             ]
@@ -130,15 +148,35 @@ if __name__ == "__main__":
     message["attachments"][0]["blocks"][2]["fields"][0]["text"] = f"*{args.pr_branch} PR:* <{args.pr_url}| #{pr_number}>"
     message["attachments"][0]["blocks"][2]["fields"][1]["text"] = f"*<{args.url}| Preview {args.pr_branch} Post>*"
 
+    slackhook = args.slackhook
+    if "test channel" == args.slack_notification.lower():
+        slackhook = args.slackhook_test
+
     version_no_dots = args.version.replace('.', '')
     ISSUE_URL = f"https://api.github.com/repos/OpenLiberty/open-liberty/issues?labels=blog,target:{version_no_dots};state=all"
     issues = json.loads(requests.get(ISSUE_URL).text)
     if len(issues) > 0:
+        block = 3
         for i, issue in enumerate(issues):
             issue_url = issue["html_url"]
             issue_title = issue["title"]
             issue_number = issue["number"]
-            message["attachments"][0]["blocks"][3]["text"]["text"] += f"\n <{issue_url}| {issue_title}> #{issue_number}"
+
+            message["attachments"][0]["blocks"][block]["text"]["text"] += f"\n <{issue_url}| {issue_title}> #{issue_number}"
+            
+            # Slack API only allows up to 4000 characters; if we're getting close, break up the msg
+            if len(json.dumps(message)) > 3500:
+                block = 0
+                messageString = json.dumps(message)
+                print("Request data: " + messageString)
+                response = requests.post(slackhook, headers=headers, data=messageString)
+                message = messageContinuation
+
+                if response.status_code != 200:
+                    raise ValueError(
+                        'Request to slack returned an error %s, the response is:\n%s'
+                        % (response.status_code, response.text)
+                    )
 
     bug_issue_url = f"https://github.com/OpenLiberty/open-liberty/issues?q=+label%3A%22release+bug%22+label%3Arelease%3A{version_no_dots}"    
     if not "beta" in args.version.lower():
@@ -150,12 +188,10 @@ if __name__ == "__main__":
                 }
             }
         )
-    
-    slackhook = args.slackhook
-    if "test channel" == args.slack_notification.lower():
-        slackhook = args.slackhook_test
-    
-    response = requests.post(slackhook, headers=headers, data=json.dumps(message))
+
+    messageString = json.dumps(message)
+    print("Request data: " + messageString)
+    response = requests.post(slackhook, headers=headers, data=messageString)
 
     if response.status_code != 200:
         raise ValueError(
