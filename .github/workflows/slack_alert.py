@@ -161,6 +161,8 @@ if __name__ == "__main__":
             issue_title = issue["title"]
             issue_number = issue["number"]
             block = 3
+            print("Issue number: " + i)
+            print(message["attachments"][0]["blocks"][block]["text"]["text"])
             message["attachments"][0]["blocks"][block]["text"]["text"] += f"\n <{issue_url}| {issue_title}> #{issue_number}"
             
             # Slack API only allows up to 4000 characters; if we're getting close, break up the msg
