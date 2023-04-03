@@ -93,9 +93,6 @@ Jakarta EE 10 Core Profile, Web Profile and Platform are now officially supporte
 
 Jakarta EE 10 marks a major milestone. It is the first Jakarta release to provide updates to the specifications since Java EE 8 in 2017 and, therefore, the first to provide spec updates since the spec was taken over by the Eclipse Foundation. Among the many updates to existing specifications, it also introduces the Core Profile. The Core Profile is aimed at lightweight runtimes, like Open Liberty, that are optimized for running cloud-native Java microservices.
 
-
-Liberty provides convenience features for running all of the component specifications that are contained in the Jakarta EE 10 Web Profile (`link:{url-prefix}/docs/latest/reference/feature/webProfile-10.0.html[webProfile-10.0]`) and Jakarta EE 10 Platform (`link:{url-prefix}/docs/latest/reference/feature/jakartaee-10.0.html[jakartaee-10.0]`).  For Jakarta EE 10 features in the application client, use the `jakartaeeClient-10.0` Liberty feature.  These convenience features enable you to rapidly develop applications using all of the APIs contained in their respective specifications.
-
 The following specifications make up the Jakarta Platform and the Core and Web profiles:
 
 [#coreprofile]
@@ -288,7 +285,7 @@ Alternatively, to enable the Jakarta EE Web Profile 10 features, add the `webPro
   </featureManager>
 ----
 
-Although no convenience feature exists for the Core Profile, you can enable the its equivalent by adding the following features to your `server.xml` file:
+Although no convenience feature exists for the Core Profile, you can enable its equivalent by adding the following features to your `server.xml` file:
 
 [source,xml]
 ----
@@ -377,7 +374,7 @@ MicroProfile continues to innovate how the industry optimizes Java microservices
 
 |===
 
-To enable all the MicroProfile 6 features, add the `microProfile-6.0` to your `server.xml` file:
+To enable all the MicroProfile 6 features, add the `microProfile-6.0` feature to your `server.xml` file:
 
 
 [source,xml]
@@ -419,8 +416,7 @@ To use Java 20:
 
 3. Edit your Liberty link:{url-prefix}/docs/latest/reference/config/server-configuration-overview.html#server-env[server.env file] to point `JAVA_HOME` to your Java 20 installation.
 
-For more information on Java 20, reference the Java 20 link:https://jdk.java.net/20/release-notes[release notes page], link:https://docs.oracle.com/en/java/javase/20/docs/api/index.html[API Javadoc page], link:https://adoptium.net/temurin/releases/?version=20[download page] or link:https://docs.oracle.com/en/java/javase/20/migrate/toc.htm[Java 20 migration guide].
-
+For more information on Java 20, reference the Java 20 link:https://jdk.java.net/20/release-notes[release notes page], link:https://docs.oracle.com/en/java/javase/20/docs/api/index.html[API Javadoc page], link:https://adoptium.net/temurin/releases/?version=20[download page] and link:https://docs.oracle.com/en/java/javase/20/migrate/toc.htm[Java 20 migration guide].
 
 
 NOTE: To try out Java 20 preview features in Open Liberty, make sure to compile with `--enable-preview` and add the same parameter to your link:{url-prefix}/docs/latest/reference/directory-locations-properties.html[`jvm.options` file].
@@ -433,11 +429,68 @@ NOTE: To try out Java 20 preview features in Open Liberty, make sure to compile 
 
 We’ve spent some time fixing bugs. The following sections describe just some of the issues resolved in this release. If you’re interested, here’s the link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A23003+label%3A%22release+bug%22[full list of bugs fixed in 23.0.0.3].
 
+
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/24566[AcmeCA feature with revocation enabled can fail to initialize on certain OS and JDK combinations]
++
+When running with a hybrid JDK for MacOS with IBMJDK8 and  the Automatic Certificate Management Environment (ACME) Support 2.0 feature with certification revocation checking enabled, the SSL/TLS endpoint can fail to complete initialization and will not be available for traffic.
++
+The following `NullPointerException` is logged in the FFDC, indicating the failure in the initialization flow:
++
+[source]
+----
+Exception = java.lang.NullPointerException
+Source = com.ibm.ws.security.acme.internal.AcmeProviderImpl
+probeid = 921
+Stack Dump = java.lang.NullPointerException
+at sun.security.provider.certpath.CertPathHelper.setDateAndTime(CertPathHelper.java:71)
+at sun.security.provider.certpath.RevocationChecker.checkCRLs(RevocationChecker.java:525)
+at sun.security.provider.certpath.RevocationChecker.checkCRLs(RevocationChecker.java:464)
+at sun.security.provider.certpath.RevocationChecker.check(RevocationChecker.java:393)
+at sun.security.provider.certpath.RevocationChecker.check(RevocationChecker.java:336)
+at sun.security.provider.certpath.PKIXMasterCertPathValidator.validate(PKIXMasterCertPathValidator.java:125)
+at sun.security.provider.certpath.PKIXCertPathValidator.validate(PKIXCertPathValidator.java:225)
+at sun.security.provider.certpath.PKIXCertPathValidator.validate(PKIXCertPathValidator.java:145)
+at sun.security.provider.certpath.PKIXCertPathValidator.engineValidate(PKIXCertPathValidator.java:84)
+at java.security.cert.CertPathValidator.validate(CertPathValidator.java:304)
+at com.ibm.ws.security.acme.internal.CertificateRevocationChecker.isRevoked(CertificateRevocationChecker.java:371)
+....
+----
++
+This issue has been resolved and the endpoint successfully initializes and is available to service traffic.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/24631[Fix ClassCastException during the de-serialization of CDI Injected Event]
++
+A passivated (i.e. serializable) bean which has an injected `jakarta.enterprise.event.Event` (or `javax` equivalent) will not be properly restored.  This can be encountered when session persistence is enabled and session data is serialized and de-serialized from a database.  This causes the following FFDC to occur:
++
+[source]
+----
+Stack Dump = java.lang.ClassCastException: cannot assign instance of org.jboss.weld.event.EventImpl$SerializationProxy to field org.apache.myfaces.flow.cdi.FlowScopeContextualStorageHolder.flowDestroyedEvent of type jakarta.enterprise.event.Event in instance of org.apache.myfaces.flow.cdi.FlowScopeContextualStorageHolder
+	at java.base/java.io.ObjectStreamClass$FieldReflector.setObjFieldValues(ObjectStreamClass.java:2076)
+	at java.base/java.io.ObjectStreamClass$FieldReflector.checkObjectFieldValueTypes(ObjectStreamClass.java:2039)
+	at java.base/java.io.ObjectStreamClass.checkObjFieldValueTypes(ObjectStreamClass.java:1293)
+	at java.base/java.io.ObjectInputStream.defaultCheckFieldValues(ObjectInputStream.java:2512)
+----
++
+This issue has been resolved and the CDI event objects is restored without errors.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/24465[JDBC DB2 values for queryDataSize need to be updated]
++
+When setting the `queryDataSize` for the DB2 DataSource to valid values for DB2 11.5.7+, the following error occurs:
++
+[source]
+----
+[ERROR   ] CWWKG0075E: The value 10452991 is not valid for attribute `queryDataSize` of configuration element dataSource. The validation message was: Value "10452991" is out of range..
+----
++
+This issue has been resolved and the new `queryDataSize` range is correctly accepted.
+
 * link:https://github.com/OpenLiberty/open-liberty/issues/24651[Liberty Server Hang randomly]
 +
-Liberty Server hang happened randomly within docker containers which are deployed in k8s cluster in an Integration Pipeline. The javacore dumps were collected to analyze the issue. 
-In one javacore, one deadlock was identified and all operational threads are blocked due to the deadlock
-```
+A https://github.com/eclipse-openj9/openj9/issues/14037[bug in OpenJ9] can cause the Liberty server to hang due to a deadlock when using JAX-RS.  For example:
++
+[source]
+----
 2LKMONINUSE      sys_mon_t:0x00007FCE3C16F258 infl_mon_t: 0x00007FCE3C16F2D8:
 3LKMONOBJECT       org/apache/cxf/jaxrs/interceptor/CachedTime@0x00000000FBF1D0C8: Flat locked by "Default Executor-thread-8" (J9VMThread:0x0000000001B4BF00), entry count 1
 3LKWAITERQ            Waiting to enter:
@@ -455,7 +508,7 @@ In one javacore, one deadlock was identified and all operational threads are blo
 3LKWAITER                "Default Executor-thread-59" (J9VMThread:0x0000000001B74900)
 3LKWAITER                "Default Executor-thread-60" (J9VMThread:0x0000000002178F00)
 3LKWAITER                "Default Executor-thread-62" (J9VMThread:0x0000000001B72300)
-+
+
 "Default Executor-thread-8" J9VMThread:0x0000000001B4BF00, omrthread_t:0x00007FCE18012DF0, java/lang/Thread:0x00000000FBF99E78, state:B, prio=5
        (java/lang/Thread getId:0x4C, isDaemon:true)
        com/ibm/ws/classloading/internal/ThreadContextClassLoader(0x0000000086272FF8)
@@ -469,159 +522,9 @@ Blocked on: java/lang/StringBuffer@0x00000000FBF99F10 Owned by: "Default Executo
              (entered lock: java/lang/StringBuffer@0x00000000FBF99F10, entry count: 1)
           at org/apache/cxf/jaxrs/interceptor/CachedTime.updateTime(CachedTime.java:86)
           at org/apache/cxf/jaxrs/interceptor/CachedTime.getTimeAsString(CachedTime.java:134)
-             (entered lock: org/apache/cxf/jaxrs/interceptor/CachedTime@0x00000000FBF1D0C8, entry count: 1)
-          at org/apache/cxf/jaxrs/interceptor/JAXRSOutInterceptor.setResponseDate(JAXRSOutInterceptor.java:451)
-          at org/apache/cxf/jaxrs/interceptor/JAXRSOutInterceptor.prepareResponseHeaders(JAXRSOutInterceptor.java:304)
-          at org/apache/cxf/jaxrs/interceptor/JAXRSOutInterceptor.serializeMessage(JAXRSOutInterceptor.java:171)
-          at org/apache/cxf/jaxrs/interceptor/JAXRSOutInterceptor.processResponse(JAXRSOutInterceptor.java:124)
-          at org/apache/cxf/jaxrs/interceptor/JAXRSOutInterceptor.handleMessage(JAXRSOutInterceptor.java:85)
-          at org/apache/cxf/phase/PhaseInterceptorChain.doIntercept(PhaseInterceptorChain.java:308)
-             (entered lock: org/apache/cxf/phase/PhaseInterceptorChain@0x00000000FBF9A0D0, entry count: 1)
-          at org/apache/cxf/interceptor/OutgoingChainInterceptor.handleMessage(OutgoingChainInterceptor.java:90)
-          at org/apache/cxf/phase/PhaseInterceptorChain.doIntercept(PhaseInterceptorChain.java:308)
-             (entered lock: org/apache/cxf/phase/PhaseInterceptorChain@0x00000000FBF9A148, entry count: 1)
-          at org/apache/cxf/transport/ChainInitiationObserver.onMessage(ChainInitiationObserver.java:123)
-          at org/apache/cxf/transport/http/AbstractHTTPDestination.invoke(AbstractHTTPDestination.java:277)
-          at com/ibm/ws/jaxrs20/endpoint/AbstractJaxRsWebEndpoint.invoke(AbstractJaxRsWebEndpoint.java:137)
-          at com/ibm/websphere/jaxrs/server/IBMRestServlet.handleRequest(IBMRestServlet.java:146)
-          at com/ibm/websphere/jaxrs/server/IBMRestServlet.doDelete(IBMRestServlet.java:131)
-          at javax/servlet/http/HttpServlet.service(HttpServlet.java:712)
-          at com/ibm/websphere/jaxrs/server/IBMRestServlet.service(IBMRestServlet.java:96)
-          at com/ibm/ws/webcontainer/servlet/ServletWrapper.service(ServletWrapper.java:1258)
-          at com/ibm/ws/webcontainer/servlet/ServletWrapper.handleRequest(ServletWrapper.java:746)
-          at com/ibm/ws/webcontainer/servlet/ServletWrapper.handleRequest(ServletWrapper.java:443)
-          at com/ibm/ws/webcontainer/filter/WebAppFilterChain.invokeTarget(WebAppFilterChain.java:193)
-          at com/ibm/ws/webcontainer/filter/WebAppFilterChain.doFilter(WebAppFilterChain.java:98)
-          at com/ibm/entity/analytics/api/rest/filter/LoggingFilterBase.doFilter(LoggingFilterBase.java:83)
-          at com/ibm/ws/webcontainer/filter/FilterInstanceWrapper.doFilter(FilterInstanceWrapper.java:201)
-          at com/ibm/ws/webcontainer/filter/WebAppFilterChain.doFilter(WebAppFilterChain.java:91)
-          at com/ibm/ws/security/jaspi/JaspiServletFilter.doFilter(JaspiServletFilter.java:56)
-          at com/ibm/ws/webcontainer/filter/FilterInstanceWrapper.doFilter(FilterInstanceWrapper.java:201)
-          at com/ibm/ws/webcontainer/filter/WebAppFilterChain.doFilter(WebAppFilterChain.java:91)
-          at com/ibm/ws/webcontainer/filter/WebAppFilterManager.doFilter(WebAppFilterManager.java:1004)
-          at com/ibm/ws/webcontainer/filter/WebAppFilterManager.invokeFilters(WebAppFilterManager.java:1142)
-          at com/ibm/ws/webcontainer/webapp/WebApp.handleRequest(WebApp.java:5078)
-          at com/ibm/ws/webcontainer/osgi/DynamicVirtualHost$2.handleRequest(DynamicVirtualHost.java:316)
-          at com/ibm/ws/webcontainer/WebContainer.handleRequest(WebContainer.java:1007)
-          at com/ibm/ws/webcontainer/osgi/DynamicVirtualHost$2.run(DynamicVirtualHost.java:281)
-          at com/ibm/ws/http/dispatcher/internal/channel/HttpDispatcherLink$TaskWrapper.run(HttpDispatcherLink.java:1246)
-          at com/ibm/ws/http/dispatcher/internal/channel/HttpDispatcherLink.wrapHandlerAndExecute(HttpDispatcherLink.java:468)
-          at com/ibm/ws/http/dispatcher/internal/channel/HttpDispatcherLink.ready(HttpDispatcherLink.java:427)
-          at com/ibm/ws/http/channel/internal/inbound/HttpInboundLink.handleDiscrimination(HttpInboundLink.java:567)
-          at com/ibm/ws/http/channel/internal/inbound/HttpInboundLink.handleNewRequest(HttpInboundLink.java:501)
-          at com/ibm/ws/http/channel/internal/inbound/HttpInboundLink.processRequest(HttpInboundLink.java:361)
-          at com/ibm/ws/http/channel/internal/inbound/HttpInboundLink.ready(HttpInboundLink.java:328)
-          at com/ibm/ws/channel/ssl/internal/SSLConnectionLink.determineNextChannel(SSLConnectionLink.java:1129)
-          at com/ibm/ws/channel/ssl/internal/SSLConnectionLink$MyReadCompletedCallback.complete(SSLConnectionLink.java:678)
-          at com/ibm/ws/channel/ssl/internal/SSLReadServiceContext$SSLReadCompletedCallback.complete(SSLReadServiceContext.java:1824)
-          at com/ibm/ws/tcpchannel/internal/WorkQueueManager.requestComplete(WorkQueueManager.java:514)
-          at com/ibm/ws/tcpchannel/internal/WorkQueueManager.attemptIO(WorkQueueManager.java:584(Compiled Code))
-          at com/ibm/ws/tcpchannel/internal/WorkQueueManager.workerRun(WorkQueueManager.java:968)
-          at com/ibm/ws/tcpchannel/internal/WorkQueueManager$Worker.run(WorkQueueManager.java:1057)
-          at com/ibm/ws/threading/internal/ExecutorServiceImpl$RunnableWrapper.run(ExecutorServiceImpl.java:245(Compiled Code))
-          at java/util/concurrent/ThreadPoolExecutor.runWorker(Bytecode PC:94(Compiled Code))
-          at java/util/concurrent/ThreadPoolExecutor$Worker.run(Bytecode PC:5)
-          at java/lang/Thread.run(Bytecode PC:13)
-```
+----
 +
-
-In another javacore generated in different time when server hang, there were thousands locks of `JIT-QueueSlotMonitor-<number> lock` like below, which is very abnormal
-```
-2LKREGMON          JIT-QueueSlotMonitor-3735 lock (0x00007F28A82383F8): <unowned>
-2LKREGMON          JIT-QueueSlotMonitor-3736 lock (0x00007F28A82384A8): <unowned>
-2LKREGMON          JIT-QueueSlotMonitor-3737 lock (0x00007F28A8238558): <unowned>
-2LKREGMON          JIT-QueueSlotMonitor-3738 lock (0x00007F28A8238608): <unowned>
-2LKREGMON          JIT-QueueSlotMonitor-3739 lock (0x00007F28A82386B8): <unowned>
-2LKREGMON          JIT-QueueSlotMonitor-3740 lock (0x00007F28A8238768): <unowned>
-2LKREGMON          JIT-QueueSlotMonitor-3741 lock (0x00007F28A8238818): <unowned>
-2LKREGMON          JIT-QueueSlotMonitor-3742 lock (0x00007F28A82388C8): <unowned>
-2LKREGMON          JIT-QueueSlotMonitor-3743 lock (0x00007F28A8238978): <unowned>
-2LKREGMON          JIT-QueueSlotMonitor-3744 lock (0x00007F28A8238A28): <unowned>
-2LKREGMON          JIT-QueueSlotMonitor-3745 lock (0x00007F28A8238AD8): <unowned>
-2LKREGMON          JIT-QueueSlotMonitor-3746 lock (0x00007F28A8238B88): <unowned>
-2LKREGMON          JIT-QueueSlotMonitor-3747 lock (0x00007F28A8238C38): <unowned>
-2LKREGMON          JIT-QueueSlotMonitor-3748 lock (0x00007F28A8238CE8): <unowned>
-2LKREGMON          JIT-QueueSlotMonitor-3749 lock (0x00007F28A8238D98): <unowned>
-2LKREGMON          JIT-QueueSlotMonitor-3750 lock (0x00007F28A8238E48): <unowned>
-2LKREGMON          JIT-QueueSlotMonitor-3751 lock (0x00007F28A8238EF8): <unowned>
-2LKREGMON          JIT-QueueSlotMonitor-3752 lock (0x00007F28A8238FA8): <unowned>
-2LKREGMON          JIT-QueueSlotMonitor-3753 lock (0x00007F28A8239058): <unowned>
-2LKREGMON          JIT-QueueSlotMonitor-3754 lock (0x00007F28A8239108): <unowned>
-2LKREGMON          JIT-QueueSlotMonitor-3755 lock (0x00007F28A82391B8): <unowned>
-2LKREGMON          JIT-QueueSlotMonitor-3756 lock (0x00007F28A8239268): <unowned>
-2LKREGMON          JIT-QueueSlotMonitor-3757 lock (0x00007F28A8239318): <unowned>
-2LKREGMON          JIT-QueueSlotMonitor-3758 lock (0x00007F28A82393C8): <unowned>
-2LKREGMON          JIT-QueueSlotMonitor-3759 lock (0x00007F28A8239478): <unowned>
-2LKREGMON          JIT-QueueSlotMonitor-3760 lock (0x00007F28A8239528): <unowned>
-2LKREGMON          JIT-QueueSlotMonitor-3761 lock (0x00007F28A82395D8): <unowned>
-2LKREGMON          JIT-QueueSlotMonitor-3762 lock (0x00007F28A8239688): <unowned>
-2LKREGMON          JIT-QueueSlotMonitor-3763 lock (0x00007F28A8239738): <unowned>
-2LKREGMON          JIT-QueueSlotMonitor-3764 lock (0x00007F28A82397E8): <unowned>
-2LKREGMON          JIT-QueueSlotMonitor-3765 lock (0x00007F28A8239898): <unowned>
-2LKREGMON          JIT-QueueSlotMonitor-3766 lock (0x00007F28A8239948): <unowned>
-2LKREGMON          JIT-QueueSlotMonitor-3767 lock (0x00007F28A82399F8): <unowned>
-2LKREGMON          JIT-QueueSlotMonitor-3768 lock (0x00007F28A8239AA8): <unowned>
-2LKREGMON          JIT-QueueSlotMonitor-3769 lock (0x00007F28A8239B58): <unowned>
-2LKREGMON          JIT-QueueSlotMonitor-3770 lock (0x00007F28A8239C08): <unowned>
-2LKREGMON          JIT-QueueSlotMonitor-3771 lock (0x00007F28A8239CB8): <unowned>
-2LKREGMON          JIT-QueueSlotMonitor-3772 lock (0x00007F28A8239D68): <unowned>
-2LKREGMON          JIT-QueueSlotMonitor-3773 lock (0x00007F28A8239E18): <unowned>
-```
-
-* link:https://github.com/OpenLiberty/open-liberty/issues/24631[Fix ClassCastException during the de-serialization of CDI Injected Event]
-+
-A passivated (i.e. serializable) bean which has an injected jakarta.enterprise.event.Event (or javax equivalent) will not be properly restored.  This can be encountered when session persistence is enabled and session data is serialized and de-serialized from a database.
-+
-The FFDC: 
-```
-Stack Dump = java.lang.ClassCastException: cannot assign instance of org.jboss.weld.event.EventImpl$SerializationProxy to field org.apache.myfaces.flow.cdi.FlowScopeContextualStorageHolder.flowDestroyedEvent of type jakarta.enterprise.event.Event in instance of org.apache.myfaces.flow.cdi.FlowScopeContextualStorageHolder
-	at java.base/java.io.ObjectStreamClass$FieldReflector.setObjFieldValues(ObjectStreamClass.java:2076)
-	at java.base/java.io.ObjectStreamClass$FieldReflector.checkObjectFieldValueTypes(ObjectStreamClass.java:2039)
-	at java.base/java.io.ObjectStreamClass.checkObjFieldValueTypes(ObjectStreamClass.java:1293)
-	at java.base/java.io.ObjectInputStream.defaultCheckFieldValues(ObjectInputStream.java:2512)
-```
- 
-
-* link:https://github.com/OpenLiberty/open-liberty/issues/24584[pluginUtility merge action generates incorrect output for some inputs]
-+
-
-* link:https://github.com/OpenLiberty/open-liberty/issues/24566[AcmeCA feature with revocation enabled can fail to initialize on certain OS and JDK combinations]
-+
-
-* link:https://github.com/OpenLiberty/open-liberty/issues/24543[oidc client issue in cluster environment, starting 22.0.0.10 version]
-+
-OIDC client feature in cluster environment fails on one cluster member (after applying WLP V22.0.0.10)
-+
-```
-[10/13/22 19:51:08:332 UTC] 000000bb com.ibm.ws.logging.internal.impl.IncidentImpl I FFDC1015I: An FFDC Incident has been created: "io.openliberty.security.oidcclientcore.http.BadPostRequestException com.ibm.ws.security.openidconnect.clients.common.AuthorizationCodeHandler 112" at ffdc_22.10.13_19.51.08.0.log [10/13/22 19:51:08:337 UTC] 
-+
-
-000000bb curity.openidconnect.clients.common.AuthorizationCodeHandler E CWWKS1708E: The OpenID Connect client [NGQyYTU2Y2EtNDY3OS00] is unable to contact the OpenID Connect provider at […………..] to receive an ID token due to [{"error_description":"CSIAQ0173E The received redirection URI [………..] does not match the redirection URI that this grant was issued to.","error":"invalid_request"
-```
-
-* link:https://github.com/OpenLiberty/open-liberty/issues/24465[JDBC DB2 values for queryDataSize need to be updated]
-+
-
-* link:https://github.com/OpenLiberty/open-liberty/issues/24444[JAX-RS NPE in Singleton EJB Sub Resource]
-+
-
-* link:https://github.com/OpenLiberty/open-liberty/issues/24223[monitor-1.0 returns strange values for standard deviation]
-+
-
-* link:https://github.com/OpenLiberty/open-liberty/issues/24092[Aborted managed connections invoking endRequest and end are causing problems in JDBC driver code]
-+
-
-
-// // // // // // // //
-// In the preceding section:
-// For this section ask either Michal Broz or Tom Evans or the #openliberty-release-blog channel for Notable bug fixes in this release.
-// Present them as a list in the order as provided, linking to the issue and providing a short description of the bug and the resolution.
-// If the issue on Github is missing any information, leave a comment in the issue along the lines of:
-// "@[issue_owner(s)] please update the description of this `relesae bug` using the [bug report template](https://github.com/OpenLiberty/open-liberty/issues/new?assignees=&labels=release+bug&template=bug_report.md&title=)" 
-// Feel free to message the owner(s) directly as well, especially if no action has been taken by them.
-// For inspiration about how to write this section look at previous blogs e.g- 20.0.0.10 or 21.0.0.12 (https://openliberty.io/blog/2021/11/26/jakarta-ee-9.1.html#bugs)
-// // // // // // // //
-
+This issue has been mitigated in Liberty by removing the usage of `SimpleDateFormat` from CXF's `CachedTime` class and the deadblock no longer occurs.
 
 
 == Get Open Liberty 23.0.0.3 now
