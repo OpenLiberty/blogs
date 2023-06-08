@@ -1,0 +1,174 @@
+---
+layout: post
+title: "OIDC Clients gain PKCE and Private Key JWT authentication support in Open Liberty 23.0.0.6-beta"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/mbroz2
+author_github: https://github.com/mbroz2
+seo-title: OIDC Clients gain PKCE and Private Key JWT authentication support in Open Liberty 23.0.0.6-beta - OpenLiberty.io
+seo-description: Open Liberty 23.0.0.6-beta includes support for Private Key JWT authentication and Proof Key for Code Exchange (PKCE) for OpenID Connect clients.
+blog_description: Open Liberty 23.0.0.6-beta includes support for Private Key JWT authentication and Proof Key for Code Exchange (PKCE) for OpenID Connect clients.
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+---
+= OIDC Clients gain PKCE and Private Key JWT authentication support in Open Liberty 23.0.0.6-beta 
+Michal Broz <https://github.com/mbroz2>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+Open Liberty 23.0.0.6-beta includes support for Private Key JWT authentication and Proof Key for Code Exchange (PKCE) for OpenID Connect clients.
+
+This release also includes the latest updates to our ongoing link:{url-prefix}/blog/2023/02/10/instant-on-beta-update.html[InstantOn functionality], which provides incredibly fast startup times, as well as the latest link:{url-prefix}/blog/2023/04/18/23.0.0.4-beta.html[Jakarta Data preview]. 
+
+If you'd like to know what else the team is currently considering or actively working on, refer to the https://github.com/orgs/OpenLiberty/projects/2[Open Liberty Roadmap] and the https://github.com/OpenLiberty/open-liberty/issues?q=is%3Aopen+is%3Aissue+label%3A%22In+Progress%22[in progress work items].
+
+The link:{url-about}[Open Liberty] 23.0.0.6-beta includes the following beta features (along with link:{url-prefix}/docs/latest/reference/feature/feature-overview.html[all GA features]):
+
+* <<pkjwt, Private Key JWT authentication support for OpenID Connect clients>>
+* <<pkce, PKCE support for OpenID Connect clients>>
+
+See also link:{url-prefix}/blog/?search=beta&key=tag[previous Open Liberty beta blog posts].
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/25333
+// Contact/Reviewer: ayoho
+// // // // // // // // 
+[#pkjwt]
+== Private Key JWT authentication support for OpenID Connect clients
+OpenID Connect clients in Liberty now support the `private_key_jwt` client authentication method with OpenID Connect token endpoints. 
+
+OpenID Connect clients are required to provide authentication data to the OpenID Connect provider when invoking the provider's token endpoint. Clients can authenticate using several different methods, but most of those methods require a client secret. The new `private_key_jwt` authentication method allows clients to make use of asymmetric keys to create signed JSON Web Tokens (JWTs) to authenticate instead of client secrets. OpenID Connect clients using this authentication method are no longer required to have a client secret.
+
+Server administrators can enable this functionality using the new `private_key_jwt` option for the `tokenEndpointAuthMethod` attribute, as well as the new `tokenEndpointAuthSigningAlgorithm` and `keyAliasName` attributes in either the `<openidConnectClient>` or `<oidcLogin>` elements in their `server.xml`.
+
+For example, when using OpenID Connect Client feature, include:
+
+[source,xml]
+----
+    <featureManager>
+        <feature>openidConnectClient-1.0</feature>
+    </featureManager>
+    ...
+    <openidConnectClient tokenEndpointAuthMethod="private_key_jwt" keyAliasName="privatekeyaliasRS512" ... />
+----
+
+For example, when using Social Media Login feature, include:
+
+[source,xml]
+----
+    <featureManager>
+        <feature>socialLogin-1.0</feature>
+    </featureManager>
+    ...
+    <oidcLogin tokenEndpointAuthMethod="private_key_jwt" tokenEndpointAuthSigningAlgorithm="E512" keyAliasName="privatekeyaliasES512" ... />
+----
+
+The `tokenEndpointAuthSigningAlgorithm` attribute specifies the signing algorithm to use to sign the JWT used for client authentication. The `keyAliasName` attribute points to the key to use to sign the JWT.
+
+More information about the configuration options can be found in the docs for the link:https://openliberty.io/docs/latest/reference/config/openidConnectClient.html[openidConnectClient element] and the link:https://openliberty.io/docs/latest/reference/config/oidcLogin.html[oidcLogin element]. 
+
+More information about `private_key_jwt` client authentication can be found in the link:https://openid.net/specs/openid-connect-core-1_0.html#ClientAuthentication[OpenID Connect core specification] and link:https://datatracker.ietf.org/doc/html/rfc7523[RFC 7523].
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
+
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/25332
+// Contact/Reviewer: ayoho
+// // // // // // // // 
+[#pkce]
+== PKCE support for OpenID Connect clients
+OpenID Connect clients in Open Liberty now support Proof Key for Code Exchange (PKCE) (RFC 7636). PKCE is an extension of the OAuth 2.0 specification that provides protection from authorization code interception attacks for OAuth 2.0 public clients. In very specific scenarios, a malicious application can intercept an authorization code intended for a legitimate OAuth 2.0 public client and use the authorization code to obtain access and ID tokens on behalf of the client. PKCE introduces additional steps and request parameters to prevent such interception attacks.
+
+Server administrators can enable this functionality using the `pkceCodeChallengeMethod` attribute in either the `<openidConnectClient>` or `<oidcLogin>` elements in their `server.xml`.
+
+For example, when using OpenID Connect Client feature, include:
+
+[source,xml]
+----
+    <featureManager>
+        <feature>openidConnectClient-1.0</feature>
+    </featureManager>
+    ...
+    <openidConnectClient pkceCodeChallengeMethod="S256" ... />
+----
+
+For example, when using Social Media Login feature, include:
+
+[source,xml]
+----
+    <featureManager>
+        <feature>socialLogin-1.0</feature>
+    </featureManager>
+    ...
+    <oidcLogin pkceCodeChallengeMethod="S256" ... />
+----
+
+More information about the Liberty configuration options can be found in the docs for the link:https://openliberty.io/docs/latest/reference/config/openidConnectClient.html[openidConnectClient element] and the link:https://openliberty.io/docs/latest/reference/config/oidcLogin.html[oidcLogin element]. 
+More information about PKCE can be found in link:https://datatracker.ietf.org/doc/html/rfc7636[RFC 7636].
+    
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
+
+
+[#run]
+=== Try it now 
+
+To try out these features, update your build tools to pull the Open Liberty All Beta Features package instead of the main release. The beta works with Java SE 20, Java SE 17, Java SE 11, and Java SE 8.
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], you can install the All Beta Features package using:
+
+[source,xml]
+----
+<plugin>
+    <groupId>io.openliberty.tools</groupId>
+    <artifactId>liberty-maven-plugin</artifactId>
+    <version>RELEASE</version>
+    <configuration>
+        <runtimeArtifact>
+          <groupId>io.openliberty.beta</groupId>
+          <artifactId>openliberty-runtime</artifactId>
+          <version>23.0.0.6-beta</version>
+          <type>zip</type>
+        </runtimeArtifact>
+    </configuration>
+</plugin>
+----
+
+You must also add dependencies to your pom.xml file for the beta version of the APIs that are associated with the beta features that you want to try.  For example, for Jakarta Data beta 2, you would include:
+[source,xml]
+----
+<dependency>
+  <groupId>jakarta.data</groupId>
+  <artifactId>jakarta-data-api</artifactId>
+  <version>1.0.0-b2</version>
+</dependency>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+dependencies {
+    libertyRuntime group: 'io.openliberty.beta', name: 'openliberty-runtime', version: '[23.0.0.6-beta,)'
+}
+----
+
+Or if you're using link:{url-prefix}/docs/latest/container-images.html[container images]:
+
+[source]
+----
+FROM icr.io/appcafe/open-liberty:beta
+----
+
+Or take a look at our link:{url-prefix}/downloads/#runtime_betas[Downloads page].
+
+For more information on using a beta release, refer to the link:{url-prefix}docs/latest/installing-open-liberty-betas.html[Installing Open Liberty beta releases] documentation.
+
+[#feedback]
+== We welcome your feedback
+
+Let us know what you think on link:https://groups.io/g/openliberty[our mailing list]. If you hit a problem, link:https://stackoverflow.com/questions/tagged/open-liberty[post a question on StackOverflow]. If you hit a bug, link:https://github.com/OpenLiberty/open-liberty/issues[please raise an issue].
+
+
