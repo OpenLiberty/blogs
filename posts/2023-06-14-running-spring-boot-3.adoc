@@ -1,0 +1,166 @@
+---
+layout: post
+title: "Running a Spring Boot 3.x application WAR file on Liberty"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/cbridgha
+author_github: https://github.com/cbridgha
+seo-title: Running a Spring Boot 3.x application WAR file on Liberty
+seo-description: In version 22.0.0.3 and later, you can easily run a Spring Boot 3.x application from a WAR file on Open Liberty. 
+blog_description: In version 22.0.0.3 and later, you can easily run a Spring Boot 3.x application from a WAR file on Open Liberty.  
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+---
+= Running a Spring Boot 3.x application WAR file on Liberty
+Chuck Bridgham <https://github.com/cbridgha>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+In version 22.0.0.3 and later, you can easily run a Spring Boot 3.x application from a WAR file on Open Liberty.
+
+== Prerequisites
+
+- Java 17
+- Open Liberty version 23.0.0.3 or later, with the link:{url-prefix}/docs/latest/reference/feature/servlet-6.0.html[Jakarta Servlet 6.0] (`servlet-6.0`) feature enabled in the `server.xml` file
+
+
+== Getting started with the Spring Petclinic Sample Application
+
+This tutorial uses the 3.1 release of the link:https://github.com/spring-projects/spring-petclinic[Spring PetClinic Sample Application].
+
+To run this application on Open Liberty, you can add the link:https://github.com/OpenLiberty/ci.maven[Liberty Maven plugin] to the existing Petclinic `pom.xml` file. You can also configure a package that runs the required `servlet-6.0` feature and other helpful features by default.
+
+When you package any Spring Boot application as a WAR file, another requirement is to ensure a `ServletInitializer` class exists and that it points to the main Spring Boot Application class.
+
+1. Clone the sample repo to your machine.
++
+[source,sh]
+----
+git clone https://github.com/spring-projects/spring-petclinic.git 
+cd spring-petclinic
+----
+
+2. Edit the Petclinic `pom.xml` file.
++
+First, change the name of the sample from `petclinic` to `liberty-spring-petclinic` and add the `war` packaging type:
++
+[source,xml]
+----
+<name>liberty-spring-petclinic</name>
+<packaging>war</packaging>
+----
++
+Next, specify a WAR file name under the `build` section:
++
+[source,xml]
+----
+<build>
+    <finalName>liberty-${project.artifactId}</finalName>
+----
++
+And finally, under the `build`: `plugins`` section, add the Liberty Maven plugin:
++
+[source,xml]
+----
+<plugin>
+  <groupId>io.openliberty.tools</groupId>
+  <artifactId>liberty-maven-plugin</artifactId>
+  <version>3.8.1</version>
+  <configuration>
+      <runtimeArtifact>
+          <groupId>io.openliberty</groupId>
+          <artifactId>openliberty-webProfile10</artifactId>
+          <version>23.0.0.5</version>
+          <type>zip</type>
+      </runtimeArtifact>
+  </configuration>
+</plugin>
+----
++
+This example specifies a recent version of the `webProfile10` package, which includes the required `servlet-6.0` feature.
+
+3. Add the Servlet Initializer class under `/src/main/java` 
++
+This class extends the `SpringBootServletInitializer` class and points to the sample Petclinic application.
++
+[source,java]
+----
+PetClinicServletInitializer.java
+
+    package org.springframework.samples.petclinic;
+
+    import org.springframework.boot.builder.SpringApplicationBuilder;
+    import org.springframework.boot.web.servlet.support.SpringBootServletInitializer;
+
+    public class PetClinicServletInitializer extends SpringBootServletInitializer {
+
+        @Override
+        protected SpringApplicationBuilder configure(SpringApplicationBuilder application) {
+            return application.sources(PetClinicApplication.class);
+        }
+
+    }
+----
+
+Now we are ready to compile and run!
+
+== Compile and run the sample application
+
+1. Run maven clean to clear out any existing classes from a previous compile
++
+[source,sh]
+----
+$ ./mvnw clean
+----
+
+2. Compile the project to ensure the initializer class looks ok, and you were able to download all the necessary dependencies.
++
+[source,sh]
+----
+$ ./mvnw compile
+----
+
+3. Use the Liberty plugin to define a "loose application" based on the sample app, which automatically deploys all the source and dependencies to Liberty.
++
+[source,sh]
+----
+$ ./mvnw liberty:run
+----
++
+This command also downloads and starts the server.
++
+Look for the sample application banner in the console:
++
+[source,sh]
+----
+[INFO]               |\      _,,,--,,_
+[INFO]              /,`.-'`'   ._  \-;;,_
+[INFO]   _______ __|,4-  ) )_   .;.(__`'-'__     ___ __    _ ___ _______
+[INFO]  |       | '---''(_/._)-'(_\_)   |   |   |   |  |  | |   |       |
+[INFO]  |    _  |    ___|_     _|       |   |   |   |   |_| |   |       | __ _ _
+[INFO]  |   |_| |   |___  |   | |       |   |   |   |       |   |       | \ \ \ \
+[INFO]  |    ___|    ___| |   | |      _|   |___|   |  _    |   |      _|  \ \ \ \
+[INFO]  |   |   |   |___  |   | |     |_|       |   | | |   |   |     |_    ) ) ) )
+[INFO]  |___|   |_______| |___| |_______|_______|___|_|  |__|___|_______|  / / / /
+[INFO]  ==================================================================/_/_/_/
+[INFO] 
+[INFO] :: Built with Spring Boot :: 3.1.0
+----
+
+4. Test the application by visitng the following URL in a browser: http://localhost:9080/liberty-spring-petclinic/ 
+ 
+5. When you finish testing the application, stop the server by running the following command    
++
+[source,sh]
+---
+$ ./mvnw liberty:stop
+---
+
+== Results
+
+You ran a sample Spring Boot 3 application from a WAR file on Open Liberty. These steps demonstrate a simple way to create and run any WAR file from an existing Spring Boot application on Liberty.
+
+For a closer look at the changes you make to the Petclinic application to run it on Open Liberty, see this https://github.com/spring-projects/spring-petclinic/compare/cf6d44b045f6cafe6c2c50b38d9de39389801ba5...cbridgha:spring-petclinic:RunAsWarOnLiberty[change comparison on GitHub].
+
