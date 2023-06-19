@@ -1,0 +1,209 @@
+---
+layout: post
+title: "Open Liberty 23.0.0.4では、ARM64アーキテクチャのコンテナ・イメージが利用可能になりました"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/mbroz2
+author_github: https://github.com/mbroz2
+seo-title: Open Liberty 23.0.0.4のARM64コンテナ・イメージ  - OpenLiberty.io
+seo-description: Open Liberty 23.0.0.4では、ランタイムが実行されている機能に対して、より優れた一貫したロギングを提供します。 このリリースより、既存のAMD64、PPC64LE、S390Xアーキテクチャに加え、ARM64アーキテクチャのコンテナ・イメージが利用可能になりました。 このリリースには、重要なセキュリティ脆弱性（CVE）の修正と多くの重要なバグ修正も含まれています。
+blog_description: Open Liberty 23.0.0.4では、ランタイムが実行されている機能に対して、より優れた一貫したロギングを提供します。 このリリースより、既存のAMD64、PPC64LE、S390Xアーキテクチャに加え、ARM64アーキテクチャのコンテナ・イメージが利用可能になりました。 このリリースには、重要なセキュリティ脆弱性（CVE）の修正と多くの重要なバグ修正も含まれています。
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+additional_authors:
+- name: 浅田 かおり (翻訳)
+  github: https://github.com/kaori-asa
+  image: https://avatars0.githubusercontent.com/kaori-asa
+blog-available-in-languages:
+- lang: en
+  path: /blog/2023/05/02/23.0.0.4.html
+---
+= Open Liberty 23.0.0.4では、ARM64アーキテクチャのコンテナ・イメージが利用可能になりました
+Michal Broz <https://github.com/mbroz2>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+Open Liberty 23.0.0.4では、ランタイムが実行されている機能に対して、より優れた一貫したロギングを提供します。 このリリースより、既存のAMD64、PPC64LE、S390Xアーキテクチャに加え、ARM64アーキテクチャのコンテナ・イメージが利用可能になりました。 このリリースには、重要なセキュリティ脆弱性（CVE）の修正と多くの重要なバグ修正も含まれています。
+
+In link:{url-about}[Open Liberty] 23.0.0.4:
+
+* <<arm64, ARM64コンテナ・イメージ>>
+* <<log, サーバー起動時のフィーチャーを常に記録>>
+//* <<api, Open Liberty APIとSPIドキュメント>>
+* <<CVEs, セキュリティ脆弱性(CVE)修正プログラム>>
+* <<bugs, 主なバグ修正>>
+
+
+
+link:{url-prefix}/blog/?search=release&search!=beta[これまでのOpen Liberty GAのリリースブログ記事]もご確認ください。
+
+
+[#run]
+
+== 23.0.0.4を使ってアプリを実行する
+
+link:{url-prefix}/guides/maven-intro.html[Maven], を使う時は下記の設定をお使いください。
+
+[source,xml]
+----
+<dependency>
+    <groupId>io.openliberty</groupId>
+    <artifactId>openliberty-runtime</artifactId>
+    <version>23.0.0.4</version>
+    <type>zip</type>
+</dependency>
+----
+
+link:{url-prefix}/guides/gradle-intro.html[Gradle]の場合はこちらです。:
+
+[source,gradle]
+----
+dependencies {
+    libertyRuntime group: 'io.openliberty', name: 'openliberty-runtime', version: '[23.0.0.4,)'
+}
+----
+
+link:{url-prefix}/docs/latest/container-images.html[コンテナ・イメージ]はこちらです。:
+
+[source]
+----
+FROM icr.io/appcafe/open-liberty
+----
+
+またはlink:{url-prefix}/downloads/[ダウンロード・ページ]をご参照ください.
+
+[link=https://stackoverflow.com/tags/open-liberty]
+image::img/blog/blog_btn_stack_ja.svg[Stack Overflowで質問する, align="center"]
+
+[#arm64]
+== ARM64コンテナ・イメージ
+23.0.0.3リリースから、LibertyはARM64アーキテクチャ用のRed Hat Universal Based Images（UBI）を利用できるようになりました。 つまり、AppleのARMベースのシリコン（Mシリーズプロセッサなど）やAmazonのAWS Gravitonなど、さらに多くのプラットフォームでOpen Libertyベースのコンテナイメージをネイティブに実行できるようになったということです。 この変更に先立ち、提供するコンテナイメージは、AMD64、PPC64LE、S390Xの各アーキテクチャで利用できるようになりました。
+
+Docker Hubのようなレート制限がないため、IBM Container Registry（ICR）の利用をお勧めします。
+
+link:{url-prefix}/docs/latest/container-images.html[Open Libertyコンテナ・イメージ]をご参照ください。
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/24985
+// Contact/Reviewer: brenthdaniel,ReeceNana
+// // // // // // // // 
+[#log]
+== サーバー起動時のフィーチャーを常に記録
+
+以前のバージョンのLibertyでは、サーバー起動時にfeature managerは追加された機能のリストを`CWWKF0012I`監査メッセージに、削除されたフィーチャーを`CWWKF0013I`監査メッセージに記録していました。ウォームスタートの場合、feature managerは代わりにインストールされたフィーチャーの全リストを`CWWKF0012I`メッセージに出力します。
+[source, xml]
+----
+[AUDIT ] CWWKF0012I: The server installed the following features: [el-3.0, jsp-2.3, servlet-3.1].
+----
+
+この動作は、`CWWKF0012I`が常に有効なフィーチャーの全リストを出力することを期待していたユーザーの混乱を招きました。サーバーを起動する間にフィーチャーのリストが更新される場合、以前有効だったフィーチャーはもう含まれていないと考える人がいるかもしれません。
+
+23.0.0.4以降、Libertyはサーバーを起動するたびに、常に有効になっているフィーチャーの全リストを提供するようになりました。また、前回の起動以降に追加または削除されたフィーチャーを特定するためのメッセージも表示されます。
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
+
+// [#api]
+// == Open Liberty APIとSPIドキュメント
+// 以前のリリースでは、ドキュメントにはJava EE、Jakarta EE、およびMicroProfileのJavadocのみが含まれていました。 Open Liberty 23.0.0.4から、Open Libertyのドキュメントには、Libertyランタイムが公開するAPIとSPIのJavadocが追加されました。 これらのJavadocを追加することで、Liberty固有のフィーチャーをアプリケーションで簡単に活用できるようになります。
+
+[#CVEs]
+== 本リリースにおけるセキュリティ脆弱性(CVE)修正プログラム
+[cols="2,1,2,2,3",options="header"]
+|===
+|CVE |CVSSスコア |脆弱性評価 |影響を受けるバージョン |ノート
+
+|http://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2023-24998[CVE-2023-24998]
+|7.5
+|Denial of service
+|17.0.0.3 - 23.0.0.3
+|link:{url-prefix}/docs/latest/reference/feature/servlet-3.0[servlet-3.0], link:{url-prefix}/docs/latest/reference/feature/servlet-3.1[servlet-3.1], link:{url-prefix}/docs/latest/reference/feature/servlet-4.0[servlet-4.0], link:{url-prefix}/docs/latest/reference/feature/servlet-5.0[servlet-5.0], link:{url-prefix}/docs/latest/reference/feature/servlet-6.0[servlet-6.0] フィーチャーに影響あり
+|===
+
+過去のセキュリティ脆弱性の修正のリストについては、link:{url-prefix}/docs/latest/security-vulnerabilities.html[Security vulnerability (CVE) list]をご参照ください。
+
+
+[#bugs]
+== 主なバグ修正
+
+
+We’ve spent some time fixing bugs. The following sections describe just some of the issues resolved in this release. If you’re interested, here’s the 
+以下のセクションでは、このリリースで修正したバグの一部について説明します。興味がある場合はlink:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A23004+label%3A%22release+bug%22[full list of bugs fixed in 23.0.0.4]をご参照ください。
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/24585[Liberty httpSessionCacheのInfinispanキャッシュの作成が不足する]
++
+
+Infinispanで Libertyがキャッシュ・インスタンスを作成する方法によって、同じ仮想ホスト名とコンテキスト・ルートを使用する複数のアプリケーションが、全く別のPodにあり、互いに全く関係ない場合でも、1つのキャッシュ・インスタンスを共有してしまうことがあります。
++
+この動作は、あるアプリのオブジェクトが、他のアプリがセッションにアクセスしただけでも削除されてしまうという問題を引き起こします。例えば:
++
+[source, xml]
+----
+[ERROR ] SESN0304E: An exception occurred when reading in an object of the application data for a session from the cache. The exception is: java.lang.ClassNotFoundException: com.ibm.gs.houston.payment.ach.ibm.forms.ACHCreditForm
+[ERROR ] SESN0306E: An exception occurred when invalidating a session in the cache. The exception is: java.lang.RuntimeException: Internal Server Error
+[ERROR ] SESN0304E: An exception occurred when reading in an object of the application data for a session from the cache. The exception is: java.lang.ClassNotFoundException: com.ibm.gs.houston.payment.ach.ibm.forms.ACHCreditForm
+----
++
+この問題は、`appInCacheName`プロパティを導入することで解決しました。このプロパティは、`true`に設定すると、対応するキャッシュにアプリケーション名を含めます。
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/24915[トレース指定を有効にすると、起動時にサーバーがハングする: com.ibm.ws.*=all]
++
+com.ibm.ws.*=all のトレース指定でサーバーを起動すると、アプリケーションがまだロードされていないため、サーバーがハングしてしまいます。
++
+この問題は解決され、非常に広いトレース・レベルを設定しても、サーバーがハングアップすることはなくなりました。
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/24804[oauthProvider内のinternalClientSecret の暗号化された値が動作しない]
++
+OpenID Connect Server の `oauthProvider` 要素設定内の `internalClientSecret` と `internalClientId` パラメータ値は https://openliberty.io/docs/latest/oidc-tools.html#personal[パーソナル・トークン管理]とhttps://openliberty.io/docs/latest/oidc-tools.html#users[ユーザー・トークン管理] UI ページでトークンを生成するために使用されます。しかし、https://openliberty.io/docs/latest/reference/command/securityUtility-commands.html[`securityUtility`コマンド]によって`internalClientSecret`値が暗号化されている場合、2つのUIページは動作しなくなります。これは、`ClientId`と`Secret`が無効であるというエラーによって引き起こされます。
++
+この問題は、`internalClientSecret`値の暗号化のサポートを追加することで解決されました。
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/24793[起動時にWeb-Extのjsp属性値を拾うJSPオプション（アプリの起動時間を改善するためにdisableTldSearchに対応します。）]
++
+JSPエンジンは、`ibm-web-ext.xml`または`server.xml`ファイルによって設定されたアプリケーション起動の初期段階では、`jsp-attributes`を検出しません。  しかし、起動の後の段階では `jsp-attributes` を検出するようになりました。
++
+これは、`disableTldSearch`（デフォルトは`true`）を`false`に設定しても登録されないため、JSPエンジンが様々なアプリケーション・ライブラリやその他の場所で時間のかかるTLDの検索を続けるため、アプリケーションの起動が不用意に遅くなるものでした。
++
+
+この問題は解決され、JSPエンジンは `jsp-attributes` が `ibm-web-ext.xml` または `server.xml` ファイルによって設定されている場合、その設定を優先するようになりました。
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/24683[MYFACES-4594ポート]
++
+MYFACES-4594がオープンしたのは、`org.apache.myfaces.LOG_WEB_CONTEXT_PARAMS`のデフォルトが `dev-only` であるためで、これは https://myfaces.apache.org/#/core40[Apache MyFaces Core 4.0] で定義されています。以下のように記載されています。
++
+[source]
+----
+ウェブ・アプリケーションを初期化する前に、すべてのウェブコンフィグ・パラメータをロギングするかどうかを指定します。
+4.0.0では、デフォルトがautoからdev-onlyに変更され、本番のプロジェクトステージではロギングが行われなくなりました（新しいデフォルト動作）。Trueは、本番および開発プロジェクト段階でのロギングを有効にします。False にすると、ロギングが無効になります。
+----
++
+複数のアプリケーションがサーバー上にデプロイされ、すべてのアプリケーションが https://jakarta.ee/specifications/faces/4.0/apidocs/jakarta/faces/application/projectstage#PROJECT_STAGE_PARAM_NAME[プロジェクトステージ] を `Development` に設定していない場合、コンテキスト・パラメータはすべてのアプリケーションに対して正しく機能しない可能性があります。最初に起動するアプリケーションは、ロギングを行うか行わないかを定義します。
++
+ この問題は解決され、各アプリケーションでコンテキストパラメーターをログに記録するかどうかを定義することができるようになりました。
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/24469[Java 11 NoSuchAlgorithmException FIPS 有効時の SHA1PRNG TS012071744]
++
+IBM Semeru JDKとhttps://openliberty.io/docs/latest/reference/feature/openidConnectClient.html[OpenID コネクト・クライアント]機能でFIPS機能を有効にすると、以下のFFDC例外が発生します。
++
+[source, xml]
+----
+------Start of DE processing------ = [2/3/23, 18:08:06:748 CET]
+Exception = java.security.NoSuchAlgorithmException
+Source = com.ibm.ws.security.openidconnect.clients.common.OidcUtil
+probeid = 104
+Stack Dump = java.security.NoSuchAlgorithmException: SHA1PRNG SecureRandom not available
+        at java.base/sun.security.jca.GetInstance.getInstance(GetInstance.java:159)
+        at java.base/java.security.SecureRandom.getInstance(SecureRandom.java:398)
+        at com.ibm.ws.security.openidconnect.clients.common.OidcUtil.getRandom(OidcUtil.java:102)
+        at com.ibm.ws.security.openidconnect.clients.common.OidcUtil.generateRandom(OidcUtil.java:82)
+        at com.ibm.ws.security.openidconnect.client.internal.OidcClientConfigImpl.<clinit>(OidcClientConfigImpl.java:307)
+        at com.ibm.ws.security.openidconnect.client.internal.OidcClientWebappConfigImpl.activate(OidcClientWebappConfigImpl.java:47)
+        at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+----
++
+この問題は解決され、`SHA1PRNG`セキュアランダムアルゴリズムが使用され、FFDC例外が発生しなくなりました。
+
+== 今すぐOpen Liberty 23.0.0.4を入手する
+
+<<run,Maven, Gradle, Docker, ダウンロード可能なアーカイブ>>から利用可能です。
