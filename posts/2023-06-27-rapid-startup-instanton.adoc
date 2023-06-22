@@ -1,0 +1,258 @@
+---
+layout: post
+title: "How to package your cloud-native Java application for rapid startup"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/tjwatson
+author_github: https://github.com/tjwatson
+seo-title: TITLE - OpenLiberty.io
+seo-description: Did you know you can re-package your cloud-native Java applications to start up in milliseconds, without compromising on throughput, memory, development-production parity, or Java language features? And with little to no refactoring of the application code? Here’s how…
+blog_description: "Did you know you can re-package your cloud-native Java applications to start up in milliseconds, without compromising on throughput, memory, development-production parity, or Java language features? And with little to no refactoring of the application code? Here’s how…"
+open-graph-image: https://openliberty.io/img/blog/startup.png
+open-graph-image-alt: InstantOn startup time in ms
+additional_authors: 
+- name: Vijay Sundaresan
+  github: https://github.com/vijaysun-omr
+  image: https://avatars0.githubusercontent.com/vijaysun-omr
+---
+= How to package your cloud-native Java application for rapid startup
+
+Thomas Watson <https://github.com/tjwatson>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+Did you know you can re-package your cloud-native Java applications to start up in milliseconds, without compromising on throughput, memory, development-production parity, or Java language features? And with little to no refactoring of the application code? Here’s how…
+
+== The need for speed at startup
+
+In serverless environments, scale-to-zero can help reduce the overall cloud costs for deployed applications by shutting down un-needed application instances when there are no ongoing requests. When activity picks up for the application, new instances can start up quickly, without introducing noticeable delays for the application end-user.
+
+Despite improvements to JDK technology like class data sharing and AOT compilation that make it start up in less than 1 second, it still cannot start up fast enough to support scale-to-zero. However, the JDK is important for optimizing throughput and memory, ensuring development-production parity, and enabling a full range of Java language features. So how do we improve startup time while also benefiting from running on the full JDK ?
+
+The InstantOn capability in the Open Liberty runtime uses the IBM Semeru JDK and a Linux technology called link:https://criu.org/Main_Page[Checkpoint/Restore in Userspace] (CRIU) to take a checkpoint, or a point-in-time snapshot, of the application process. This checkpoint can then be restored very quickly to bring the application process back into the state it was in when the checkpoint was taken. The application can be restored multiple times because Open Liberty and Semeru JDK preserve the uniqueness of each restored process in containers.  Each restored application process runs without first having to go through the whole startup sequence, saving up to 90% of startup time (depending on your application). InstantOn requires very little modification of your Java application to make this improvement happen.
+
+InstantOn cannot be used outside of a container image build. An application container image provides a consistent environment, which is required to ensure a reliable restore of an Open Liberty application process. Since the InstantOn checkpoint is included in the last layer of the application container image, this configuration ensures that the resources in the underlying layers of the image do not change from the time the checkpoint is taken to the time the image is restored.
+
+The following tutorial walks you through containerizing your application using the Open Liberty Java runtime, InstantOn, IBM Semeru JDK, and Podman container tools running on Linux. For general info about containerizing applications with Open Liberty, see the link:/guides/containerize-podman.html[Containerizing microservices with Podman] guide.
+
+== Prerequisites to checkpoint/restore a containerized application
+
+link:/blog/2023/06/27/23.0.0.6.html[Open Liberty version 23.0.0.6] or later currently supports running with InstantOn only on x86-64/amd64 architectures.
+All our testing was done on RHEL 9.0 and Ubuntu 22.04 but it might also be possible to run on other Linux distributions and versions if they have the following prerequisites:
+
+-	The kernel must support the Linux link:https://man7.org/linux/man-pages/man7/capabilities.7.html[CAP_CHECKPOINT_RESTORE] capability. This capability was introduced in kernel version 5.9.
+-	The latest available version of Podman for the Linux distribution must be installed.
+-	The Linux distribution must allow the execution of privileged container builds by using Podman or Docker.
+See the Open Liberty documentation for more information on the runtime and host build system prerequisites.
+
+For more information about the runtime and host build system prerequisites, see the link:/docs/latest/instanton.html#prereq[Open Liberty InstantOn documentation].
+
+== Create an application WAR file
+
+If you don’t have an application of your own handy, you can follow along with an example application from the link:/guides/getting-started.html[Getting started with Open Liberty guide].
+
+1. Clone the link:https://github.com/openliberty/guide-getting-started[Git repository] for the guide:
++
+[source,console]
+----
+git clone https://github.com/openliberty/guide-getting-started.git
+cd guide-getting-started
+----
+
+2. ild the application, which is in the finish/ directory, and deploy it to Open Liberty:
++
+[source,console]
+----
+cd finish
+mvn liberty:run
+----
++
+When you see the following message, your application server is ready:
++
+[source,console]
+----
+The defaultServer server is ready to run a smarter planet.
+----
++
+Check out the service at the http://localhost:9080/dev/system/properties URL.
+Stop the Open Liberty server by pressing **CTRL+C** in the command-line session where you ran the server.
+
+3. Build the WAR for the application:
++
+[source,console]
+----
+mvn package
+----
++
+This command builds a `target/guide-getting-started.war` archive. We can now include this WAR in a container image that uses the InstantOn feature.
+
+== Testing the startup time of your application
+
+For comparison of how long it takes your Open Liberty application container image to start both with and without InstantOn, we describe how to build the container image without InstantOn first. Then we describe how to build with InstantOn and run the resulting containers.
+
+=== Containerizing the Open Liberty application without InstantOn
+
+1. Build the application container image without InstantOn:
++
+[source,console]
+----
+podman build -t getting-started .
+----
++
+This command creates the getting-started container image without any checkpoint image. 
+
+2. Run this application container:
++
+[source,console]
+----
+podman run --name getting-started --rm -p 9080:9080 getting-started
+----
+
+Note the amount of time Open Liberty takes to report it is started and check out the service running in the container at the http://localhost:9080/dev/system/properties URL. After you finish checking out the application, stop the running container by pressing **CTRL+C** in the command-line session where you ran the `podman run` command.
+
+=== Containerizing the Open Liberty application with InstantOn
+
+The Open Liberty container image contains the prerequisites for building an application container image with a checkpointed server process. Applications can use the Open Liberty image as a base to build their own application container images and from that create their own application container image with a checkpointed process. This process involves the following steps:
+
+1.	Build the application container image
+2.	Checkpoint an application in-container
+3.	Create the application checkpoint image
+
+[#build]
+==== 1. Build the application container image
+
+An InstantOn checkpoint is created by starting the Open Liberty runtime during the application container image build step. During this startup, the runtime processes the configuration, loads all the enabled features, and starts processing the configured application. A couple of predefined points can be used to checkpoint the process.  These are specific phases during Open Liberty startup that you can choose from and configure the Dockerfile needs to specify the phase (as we will show later).
+
+The official link:/docs/latest/container-images.html[Open Liberty images from the IBM Container Registry] (ICR) include all the prerequisites needed for InstantOn to checkpoint an application process. For this example, the getting started application container image is using the  `icr.io/appcafe/open-liberty:full-java11-openj9-ubi` image from ICR as the parent image. Currently, InstantOn is supported only with the Java 11 and Java 17-based UBI images of Open Liberty.
+
+Update the application Dockerfile by adding a `RUN` command for the `checkpoint.sh` script to the end of the file, as shown in the following example:
+
+[source,console]
+----
+FROM icr.io/appcafe/open-liberty:full-java11-openj9-ubi
+ARG VERSION=1.0
+ARG REVISION=SNAPSHOT
+LABEL \
+  org.opencontainers.image.authors="Your Name" \
+  org.opencontainers.image.vendor="IBM" \
+  org.opencontainers.image.url="local" \
+  org.opencontainers.image.source="https://github.com/OpenLiberty/guide-getting-started" \
+  org.opencontainers.image.version="$VERSION" \
+  org.opencontainers.image.revision="$REVISION" \
+  vendor="Open Liberty" \
+  name="system" \
+  version="$VERSION-$REVISION" \
+  summary="The system microservice from the Getting Started guide" \
+  description="This image contains the system microservice running with the Open Liberty runtime."
+
+COPY --chown=1001:0 src/main/liberty/config/ /config/
+COPY --chown=1001:0 target/*.war /config/apps/
+
+RUN configure.sh
+RUN checkpoint.sh afterAppStart
+----
+
+This configuration adds the application process checkpoint as the last layer of the application container image. The checkpoint.sh script allows you to specify either afterAppStart or beforeAppStart to indicate which phase of the startup should perform the process checkpoint.
+
+Two options are available to determine whether the checkpoint occurs before or after the application itself starts:
+
+- `beforeAppStart`: The checkpoint happens after processing the configured application metadata. If the application has any components that get run as part of the application starting, the checkpoint is taken before executing any code from the application. This option is the earliest checkpoint phase that is offered by InstantOn.
+- `afterAppStart`: This option is the latest phase where a checkpoint can happen, so it has the potential to provide the fastest startup time when restoring the application instance. The checkpoint happens after all configured applications are reported as started. This phase happens before opening any ports for listening to incoming requests for the applications.
+
+The `afterAppStart` phase typically provides the quickest startup time for an application, but it also might cause some application code to run before the server process checkpoint happens. Since the `getting-started` application used in this tutorial does not do anything in its startup logic that would cause problems in restoring, we can use the `afterAppStart` phase for it.
+
+For InstantOn to take a checkpoint of and restore a process, the CRIU binary requires additional link:/docs/latest/instanton.html#linux-capabilities[Linux capabilities]. The Open Liberty container image includes the necessary capabilities already granted to the binary. However, the container must also have these capabilities granted when it is launched.
+
+With podman, you can use the `-–cap-add` and `--security-opt` options to grant the container build the necessary capabilities to take a checkpoint during the container build step. The user who launches the Podman container must have the authority to grant it the necessary Linux capabilities, so you must run the following command as root or `sudo`:
+
+[source,console]
+----
+podman build \
+   -t dev.local/getting-started-instanton \
+   --cap-add=CHECKPOINT_RESTORE \
+   --cap-add=SYS_PTRACE\
+   --cap-add=SETPCAP \
+   --security-opt seccomp=unconfined .
+----
+
+The last instruction in the Dockerfile is to run the `checkpoint.sh` script. When you execute the previous Podman build command, it launches Open Liberty to perform the checkpoint at the phase specified in the Dockerfile. After the container process data is persisted, Open Liberty stops and the container image build completes. The produced application container image contains the checkpoint process data as the last layer of the container image. The output looks something like the following example:
+
+[source,console]
+----
+Performing checkpoint --at=afterAppStart
+
+Launching defaultServer (Open Liberty 23.0.0.6/wlp-1.0.78.cl230620230612-1100) on Eclipse OpenJ9 VM, version 11.0.19+7 (en_US)
+[AUDIT   ] CWWKE0001I: The server defaultServer has been launched.
+[AUDIT   ] CWWKG0093A: Processing configuration drop-ins resource: /opt/ol/wlp/usr/servers/defaultServer/configDropins/defaults/keystore.xml
+[AUDIT   ] CWWKG0093A: Processing configuration drop-ins resource: /opt/ol/wlp/usr/servers/defaultServer/configDropins/defaults/open-default-port.xml
+[AUDIT   ] CWWKZ0058I: Monitoring dropins for applications.
+[AUDIT   ] CWWKZ0001I: Application guide-getting-started started in 1.886 seconds.
+[AUDIT   ] CWWKC0451I: A server checkpoint "afterAppStart" was requested. When the checkpoint completes, the server stops.
+----
+
+[#run]
+==== 2. Run the InstantOn application image
+
+Run the `getting-started-instanton` container with the following command:
+
+[source,console]
+----
+podman run \
+  --rm \
+  --cap-add=CHECKPOINT_RESTORE \
+  --cap-add=SETPCAP \
+ --security-opt seccomp=unconfined \
+  -p 9080:9080 \
+  getting-started-instanton
+----
+
+The `--cap-add` options grant the container the two Linux capabilities that CRIU requires to restore the application process. When Open Liberty restores the application process, it logs the following messages:
+
+[source,console]
+----
+[AUDIT   ] Launching defaultServer (Open Liberty 23.0.0.6/wlp-1.0.78.cl230620230612-1100) on Eclipse OpenJ9 VM, version 11.0.19+7 (en_US)
+[AUDIT   ] CWWKZ0001I: Application guide-getting-started started in 0.233 seconds.
+[AUDIT   ] CWWKT0016I: Web application available (default_host): http://850ba43df239:9080/dev/
+[AUDIT   ] CWWKT0016I: Web application available (default_host): http://850ba43df239:9080/metrics/
+[AUDIT   ] CWWKT0016I: Web application available (default_host): http://850ba43df239:9080/health/
+[AUDIT   ] CWWKT0016I: Web application available (default_host): http://850ba43df239:9080/ibm/api/
+[AUDIT   ] CWWKC0452I: The Liberty server process resumed operation from a checkpoint in 0.283 seconds.
+[AUDIT   ] CWWKF0012I: The server installed the following features: [cdi-4.0, distributedMap-1.0, jndi-1.0, json-1.0, jsonb-3.0, jsonp-2.1, monitor-1.0, mpConfig-3.0, mpHealth-4.0, mpMetrics-5.0, restfulWS-3.1, restfulWSClient-3.1, ssl-1.0, transportSecurity-1.0].
+[AUDIT   ] CWWKF0011I: The defaultServer server is ready to run a smarter planet. The defaultServer server started in 0.297 seconds.
+----
+
+If Open Liberty fails to restore the checkpoint process, it recovers by launching without the checkpoint image and logs the following message:
+
+[source,console]
+----
+CWWKE0957I: Restoring the checkpoint server process failed. Check the /logs/checkpoint/restore.log log to determine why the checkpoint process was not restored. Launching the server without using the checkpoint image.
+----
+
+Check how long it took for Open Liberty to start and compare this to the time it took without InstantOn.
+
+== Performance results
+
+InstantOn improves startup time of Open Liberty applications significantly by restoring the process from the checkpointed state. The improvement in the time to first response (i.e. the time taken to serve the first request) is also impressive but obviously more of the application logic runs after the restore in that case. We measured both metrics for multiple applications running in containers and using the `afterAppStart` checkpoint phase.
+
+- link:https://github.com/HotswapProjects/pingperf-quarkus/[Pingperf] is a very simple ping-type application involve a single REST endpoint.
+- link:https://github.com/johnaohara/quarkusRestCrudDemo/[Rest crud] is a bit more complicated, and involves JPA and a remote database.
+- link:https://github.com/blueperf/acmeair-mainservice-java#acme-air-main-service---javaliberty/[AcmeAir Microservice Main] makes use of the MicroProfile features.
+
+image::img/blog/startup.png[Startup time in ms,width=70%,align="center"]
+
+image::img/blog/response.png[First response time time in ms,width=70%,align="center"]
+
+These experiments show a healthy improvement in startup times for all 3 applications and the time to first response is also improved by up to 8.8x when compared with normal JVM mode without InstantOn.footnote:[These experiments were run on a 24-core Linux X86-64 system, and `taskset -c` was used to allocate 4 cores to the Open Liberty process running in containers in each case. Startup time is measured from the time the Open Liberty server startup is initiated to the time the server is ready to accept requests, as denoted by `The <server name> server is ready to run a smarter planet.` message  in the `messages.log`. The time it takes to start the container itself is also included in the results shown. InstantOn versus normal startup times for these applications are shown here in milliseconds. Your results may vary based on your environment, hardware and software installed on your system, and other factors.] 
+
+== Summary
+
+This post describes how to configure your cloud-native application to start up almost immediately by using the Open Liberty InstantOn feature to produce an application container image. The key value proposition of InstantOn is that you can re-package your cloud-native Java applications to start up in milliseconds, without compromising on throughput, memory, development-production parity, or Java language features.
+This feature is now available in link:/blog/2023/06/27/23.0.0.6.html[Open Liberty 23.0.0.6] on the X86-64/AMD64 platforms running in the public cloud AWS EKS and Azure AKS environments.
+
+In the future, we are planning to broaden our platform coverage and expand to be able to run in more managed public and hybrid cloud environments. We also intend to explore supporting InstantOn with an even larger set of Open Liberty features.   For more details about the Open Liberty InstantOn feature, see the link:docs/latest/instanton.html[Fast startup for containerized applications with Open Liberty InstantOn] documentation, which links to more elaborate discussion on known limitations and information on the Semeru JDK support for this feature. 
+
+
+
+
