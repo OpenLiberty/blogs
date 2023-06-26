@@ -32,6 +32,11 @@ Despite improvements to JDK technology that make it start in less than 1 second,
 
 The InstantOn capability in the Open Liberty runtime uses the IBM Semeru JDK and a Linux technology called link:https://criu.org/Main_Page[Checkpoint/Restore in Userspace] (CRIU) to take a checkpoint, or a point-in-time snapshot, of the application process. This checkpoint can then be restored very quickly to bring the application process back into the state it was in when the checkpoint was taken. The application can be restored multiple times because Open Liberty and Semeru JDK preserve the uniqueness of each restored process in containers.  Each restored application process runs without first having to go through the whole startup sequence, saving up to 90% of startup time (depending on your application). InstantOn requires very little modification of your Java application to make this improvement happen.
 
+The following diagram demonstrates how the checkpoint that is taken during the container image build can be used to rapidly start multiple instances of an application in production by restoring them to the checkpointed phase of the application process.
+
+[.img_border_light]
+image::/img/blog/checkpoint4.png[diagram of the checkpoint and restore process,width=70%,align="center"]
+
 InstantOn cannot be used outside of a container image build. An application container image provides a consistent environment, which is required to ensure a reliable restore of an Open Liberty application process. Since the InstantOn checkpoint is included in the last layer of the application container image, the resources in the underlying layers of the image do not change from the time the checkpoint is taken to the time the image is restored.
 
 The following tutorial walks you through containerizing your application using the Open Liberty Java runtime, InstantOn, IBM Semeru JDK, and Podman container tools running on Linux. For general information about containerizing applications with Open Liberty, see the link:/guides/containerize-podman.html[Containerizing microservices with Podman] guide.
@@ -67,7 +72,7 @@ cd finish
 mvn liberty:run
 ----
 
-When you see the following message, your application server is ready:
+When you see the following message, your Open Liberty instance is ready:
 
 [source,console]
 ----
@@ -75,7 +80,7 @@ The defaultServer server is ready to run a smarter planet.
 ----
 
 Check out the service at the http://localhost:9080/dev/system/properties URL.
-Stop the Open Liberty server by pressing **CTRL+C** in the command-line session where you ran the server.
+Stop the running Open Liberty instance by pressing **CTRL+C** in the command-line session where you started Open Liberty.
 
 Lastly, build the WAR for the application:
 
@@ -112,12 +117,12 @@ Note the amount of time Open Liberty takes to report it is started and check out
 
 === Containerizing the Open Liberty application with InstantOn
 
-The Open Liberty container image contains the prerequisites for building an application container image with a checkpointed server process. Applications can use the Open Liberty image as a base to build their own application container images and from that, create their own application container image with a checkpointed process. 
+The Open Liberty container image contains the prerequisites for building an application container image with a checkpointed runtime process. Applications can use the Open Liberty image as a base to build their own application container images and from that, create their own application container image with a checkpointed process. 
 
 [#build]
 ==== Build the application container image and checkpoint the application
 
-An InstantOn checkpoint is created by starting the Open Liberty runtime during the application container image build step. During this startup, the runtime processes the configuration, loads all the enabled features, and starts processing the configured application. A couple of predefined points can be used to checkpoint the process.  These are specific phases during Open Liberty startup that you can choose from and configure the Dockerfile needs to specify the phase (as we show later).
+An InstantOn checkpoint is created by starting the Open Liberty runtime during the application container image build step. During this startup, the runtime processes the configuration, loads all the enabled features, and starts processing the configured application. Depending on the needs of your application, you can choose one of two specific phases during Open Liberty startup at which to checkpoint the process. You must configure the Dockerfile to specify you chosen phase (as we show later).
 
 The official link:/docs/latest/container-images.html[Open Liberty images from the IBM Container Registry] (ICR) include all the prerequisites that are needed for InstantOn to checkpoint an application process. For this example, the `getting-started` application container image is using the `icr.io/appcafe/open-liberty:full-java11-openj9-ubi` image from ICR as the parent image. Currently, InstantOn is supported only with the Java 11 and Java 17-based UBI images of Open Liberty.
 
@@ -148,7 +153,7 @@ RUN configure.sh
 RUN checkpoint.sh afterAppStart
 ----
 
-This configuration adds the application process checkpoint as the last layer of the application container image. The checkpoint.sh script allows you to specify either afterAppStart or beforeAppStart to indicate which phase of the startup performs the process checkpoint.
+This configuration adds the application process checkpoint as the last layer of the application container image. The `checkpoint.sh` script allows you to specify either `afterAppStart` or `beforeAppStart` to indicate which phase of the startup performs the process checkpoint.
 
 Two options are available to determine whether the checkpoint occurs before or after the application itself starts:
 
