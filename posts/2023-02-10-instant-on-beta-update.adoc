@@ -31,10 +31,10 @@ The following sections describe the improvements to Liberty InstantOn that are i
 Initially, the InstantOn beta provided three phases during the startup process where a checkpoint could occur:
 
 1. `features` - This is the earliest phase where a checkpoint can happen.  The checkpoint occurs after all of the configured Open Liberty features are started, but before any processing occurs for the installed applications.
-2. `deployment` - The checkpoint happens after processing the configured application metadata.  If the application has any components that get run as part of the application starting, the checkpoint is taken before executing any code from the application.
-3. `applications` - This is the last phase where a checkpoint can happen, so it has the potential to provide the fastest startup time when restoring the application instance. The checkpoint happens after all configured applications are reported as started.  This phase happens before opening any ports for listening to incoming requests for the applications.
+2. `beforeAppStart` - The checkpoint happens after processing the configured application metadata.  If the application has any components that get run as part of the application starting, the checkpoint is taken before executing any code from the application.
+3. `afterAppStart` - This is the last phase where a checkpoint can happen, so it has the potential to provide the fastest startup time when restoring the application instance. The checkpoint happens after all configured applications are reported as started.  This phase happens before opening any ports for listening to incoming requests for the applications.
 
-Of these three options, the `features` phase offers the least value in terms of improving an application startup time. Scenarios where an application deployment would want to use `features` over `deployment` are very limited and are not good use cases for Liberty InstantOn. For the 23.0.0.2-beta, the `features` checkpoint phase has been removed.  This change leaves only two options to choose from for the checkpoint: `deployment` and `applications`.
+Of these three options, the `features` phase offers the least value in terms of improving an application startup time. Scenarios where an application deployment would want to use `features` over `beforeAppStart` are very limited and are not good use cases for Liberty InstantOn. For the 23.0.0.2-beta, the `features` checkpoint phase has been removed.  This change leaves only two options to choose from for the checkpoint: `beforeAppStart` and `afterAppStart`.
 
 == Reduced set of required Linux capabilities to checkpoint and restore
 
@@ -52,12 +52,12 @@ The Liberty InstantOn beta image contains the prerequisites for building an appl
 
 For the 23.0.0.2-beta, this process is simplified for systems that are running on kernel versions with the `clone3` system call and the `checkpoint_restore` capability. These kernel features, available in kernel version 5.9 or greater, make it possible to perform the process checkpoint during the container build. One additional Linux capability, called `setpcap`, must be granted to `criu` to allow the process checkpoint from a container build to be restored successfully. The `setpcap` grants `criu` the ability to drop capabilities for the restored process. This function is necessary in cases where the checkpoint process running during the build step has fewer Linux capabilities granted to it than the container does when running the application image. When `criu` detects this situation, it drops the Linux capabilities associated with restored process to match the reduced set that is used during the container build.
 
-To do the process checkpoint during the container build step, the `Dockerfile` for the application must be updated with an additional `RUN` instruction at the end to perform the process checkpoint. Using the example application project from the original post, add `RUN checkpoint.sh applications` to the end of the `Dockerfile`:
+To do the process checkpoint during the container build step, the `Dockerfile` for the application must be updated with an additional `RUN` instruction at the end to perform the process checkpoint. Using the example application project from the original post, add `RUN checkpoint.sh afterAppStart` to the end of the `Dockerfile`:
 
 .Dockerfile
 [source]
 ----
-FROM icr.io/appcafe/open-liberty:beta-instanton
+FROM icr.io/appcafe/open-liberty:beta
 ARG VERSION=1.0
 ARG REVISION=SNAPSHOT
 LABEL \
@@ -77,10 +77,10 @@ COPY --chown=1001:0 src/main/liberty/config/ /config/
 COPY --chown=1001:0 target/*.war /config/apps/
 
 RUN configure.sh
-RUN checkpoint.sh applications
+RUN checkpoint.sh afterAppStart
 ----
 
-This configuration adds the application process checkpoint as the last layer of the application container image. The `checkpoint.sh` script allows you to specify either `applications` or `deployment` to indicate what phase of the startup should perform the process checkpoint. With `podman`, you can use the `--add-cap` and `--security-opt` options to grant the container build the necessary capabilities to take a checkpoint during the container build step. This reduces the application container image build to the following step:
+This configuration adds the application process checkpoint as the last layer of the application container image. The `checkpoint.sh` script allows you to specify either `afterAppStart` or `beforeAppStart` to indicate what phase of the startup should perform the process checkpoint. With `podman`, you can use the `--add-cap` and `--security-opt` options to grant the container build the necessary capabilities to take a checkpoint during the container build step. This reduces the application container image build to the following step:
 
 .podman build with required capabilities added
 [source]
