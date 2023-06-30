@@ -23,6 +23,9 @@ Thomas Watson <https://github.com/tjwatson>
 :url-prefix:
 :url-about: /
 
+
+This article was published when Liberty InstantOn was still beta. Liberty InstantOn moved out of beta as of the link:/blog/2023/06/29/rapid-startup-instanton.html[Liberty 23.0.0.6 release]. For the latest information about Liberty InstantOn, see link:https://openliberty.io/docs/latest/instanton.html[Faster startup for containerized applications with Open Liberty InstantOn] in the Open Liberty docs.
+
 Do you want cloud-native Java applications that can start up in milliseconds, without compromising on throughput, memory, development-production parity, or Java language features? The Open Liberty 22.0.0.11-beta brings you InstantOn, an exciting new feature that provides incredibly fast startup times for MicroProfile and Jakarta EE applications. 
 
 In serverless environments, application startup times are important. InstantOn application instances can scale to zero when the application is not in use. Scaling to zero can help reduce the overall cloud costs for deployed applications by reducing the overall number of application instances when there are no ongoing requests. When activity picks up for the application, new instances can start up quickly, without introducing high latency for the user.
@@ -90,14 +93,14 @@ Currently, the beta of Open Liberty InstantOn only supports running on x86-64/am
 
 For the link:/guides/getting-started.html[Getting started with Open Liberty] example, the first step is to create a `Dockerfile` that provides the instructions to create a containerized version of the application. Note that `podman` also supports using the `Containerfile` format for building container images.
 
-For this example, we will use an official image from the IBM Container Registry (ICR), `icr.io/appcafe/open-liberty:beta-instanton`, as the parent image. This image is tagged with the word `beta`, meaning it includes all the Liberty beta features as well as all the Liberty features from the `full` image. The image is tagged with `instanton`, meaning it includes all the prerequisites for producing a checkpoint process image, such as the necessary `criu` binary files.
+For this example, we will use an official image from the IBM Container Registry (ICR), `icr.io/appcafe/open-liberty:beta`, as the parent image. This image is tagged with the word `beta`, meaning it includes all the Liberty beta features as well as all the Liberty features from the `full` image. The image is tagged with `instanton`, meaning it includes all the prerequisites for producing a checkpoint process image, such as the necessary `criu` binary files.
 
-The `Dockerfile` for the getting-started application already exists at `finish/Dockerfile`. Edit the existing `finish/Dockerfile` and change the `FROM` instruction to use the `icr.io/appcafe/open-liberty:beta-instanton` parent image. After you save the `Dockerfile`, it should look something like this:
+The `Dockerfile` for the getting-started application already exists at `finish/Dockerfile`. Edit the existing `finish/Dockerfile` and change the `FROM` instruction to use the `icr.io/appcafe/open-liberty:beta` parent image. After you save the `Dockerfile`, it should look something like this:
 
 .Dockerfile
 [source]
 ----
-FROM icr.io/appcafe/open-liberty:beta-instanton
+FROM icr.io/appcafe/open-liberty:beta
 
 ARG VERSION=1.0
 ARG REVISION=SNAPSHOT
@@ -152,13 +155,13 @@ Note the amount of time Liberty takes to report it has been started and check ou
 
 Open Liberty has three phases during the startup process where a checkpoint can occur:
 
-1. `features` - This is the earliest phase where a checkpoint can happen.  The checkpoint occurs after all of the configured Open Liberty features are started, but before any processing occurs for the installed applications.
-2. `deployment` - The checkpoint happens after processing the configured application metadata.  If the application has any components that get run as part of the application starting, the checkpoint is taken before executing any code from the application.
-3. `applications` - This is the last phase where a checkpoint can happen, so it has the potential to provide the fastest startup time when restoring the application instance. The checkpoint happens after all configured applications are reported as started.  This phase happens before opening any ports for listening to incoming requests for the applications.
+1. `features` - This is the earliest phase where a checkpoint can happen.  The checkpoint occurs after all of the configured Open Liberty features are started, but before any processing occurs for the installed applications. Note that this checkpoint phase has been removed, see link:/blog/2023/02/10/instant-on-beta-update.html[New enhancements for Liberty InstantOn in 23.0.0.2-beta].
+2. `beforeAppStart` - The checkpoint happens after processing the configured application metadata.  If the application has any components that get run as part of the application starting, the checkpoint is taken before executing any code from the application.
+3. `afterAppStart` - This is the last phase where a checkpoint can happen, so it has the potential to provide the fastest startup time when restoring the application instance. The checkpoint happens after all configured applications are reported as started.  This phase happens before opening any ports for listening to incoming requests for the applications.
 
-The `applications` phase typically provides the quickest startup time for an application, but it also might cause some application code to run before the server process checkpoint happens.  This might lead to undesired behavior when restoring the checkpoint process if the application holds on to some state that should not be restored into more than one concurrent instance of the application.  For example, connecting to an outside resource such as a database before the checkpoint is taken results in a failure to restore many instances of such a process since this would try to restore the same connection multiple times. However, If your application initialization does not perform operations such as opening database connections, you might be able to use the `applications` phase for the checkpoint.
+The `afterAppStart` phase typically provides the quickest startup time for an application, but it also might cause some application code to run before the server process checkpoint happens.  This might lead to undesired behavior when restoring the checkpoint process if the application holds on to some state that should not be restored into more than one concurrent instance of the application.  For example, connecting to an outside resource such as a database before the checkpoint is taken results in a failure to restore many instances of such a process since this would try to restore the same connection multiple times. However, If your application initialization does not perform operations such as opening database connections, you might be able to use the `afterAppStart` phase for the checkpoint.
 
-After an application container image is built, it can be used to checkpoint the application process at one of the previously described checkpoint phases (`features`, `deployment`, `applications`). You can specify a phase for your checkpoint by using the `--env` option to `podman run` to set the value for `WLP_CHECKPOINT` to one of the available checkpoint phases. For this example, use the `applications` phase by running the following `podman` command:
+After an application container image is built, it can be used to checkpoint the application process at one of the previously described checkpoint phases (`features`, `beforeAppStart`, `afterAppStart`). You can specify a phase for your checkpoint by using the `--env` option to `podman run` to set the value for `WLP_CHECKPOINT` to one of the available checkpoint phases. For this example, use the `afterAppStart` phase by running the following `podman` command:
 
 .Perform a checkpoint in container
 [source]
@@ -166,18 +169,18 @@ After an application container image is built, it can be used to checkpoint the 
 podman run \
   --name getting-started-checkpoint-container \
   --privileged \
-  --env WLP_CHECKPOINT=applications \
+  --env WLP_CHECKPOINT=afterAppStart \
   getting-started
 ----
 - The `--privileged` option is required to perform the `criu` checkpoint in-container.
-- The `WLP_CHECKPOINT` environment variable is used to specify the checkpoint phase. For the getting-started example the `applications` checkpoint phase will provide the fastest restore time.
+- The `WLP_CHECKPOINT` environment variable is used to specify the checkpoint phase. For the getting-started example the `afterAppStart` checkpoint phase will provide the fastest restore time.
 
 This will start the container with the application running on Open Liberty.  After Open Liberty starts, it performs the checkpoint at the phase specified by the `WLP_CHECKPOINT` environment variable. After the container process data has been persisted, the container will stop, leaving you with a stopped container that contains the checkpoint process data. The output will look something like this:
 
 .Process checkpoint output
 [source]
 ----
-Performing checkpoint --at=applications
+Performing checkpoint --at=afterAppStart
 
 Launching defaultServer (Open Liberty 22.0.0.11-beta/wlp-1.0.69.cl221020220912-1100) on Eclipse OpenJ9 VM, version 17.0.5-ea+2 (en_US)
 CWWKE0953W: This version of Open Liberty is an unsupported early release version.
@@ -1124,7 +1127,7 @@ We tested multiple applications to show how startup time is reduced with Instant
 * link:https://github.com/johnaohara/quarkusRestCrudDemo/[Rest crud] is a bit more complicated, and involves JPA and a remote database. 
 * link:https://github.com/blueperf/acmeair-mainservice-java#acme-air-main-service---javaliberty/[AcmeAir Microservice Main] makes use of the MicroProfile features. 
 
-These experiments were run on a 24 core system. I used `taskset -c` to allocate 4 CPUs to the Liberty process running in container. The InstantOn times were taken using the `applications` checkpoint phase. Startup time is measured from the time the Liberty server startup is initiated to the time the server is ready to accept requests, as denoted by the message **"The <server name> server is ready to run a smarter planet."** in the messages.log. The time it takes to start the container itself up has been filtered out. InstantOn versus normal startup times for these applications are shown here in milliseconds. Your results may vary based on your environment, hardware and software installed on your system, and other factors. Lower is better:
+These experiments were run on a 24 core system. I used `taskset -c` to allocate 4 CPUs to the Liberty process running in container. The InstantOn times were taken using the `afterAppStart` checkpoint phase. Startup time is measured from the time the Liberty server startup is initiated to the time the server is ready to accept requests, as denoted by the message **"The <server name> server is ready to run a smarter planet."** in the messages.log. The time it takes to start the container itself up has been filtered out. InstantOn versus normal startup times for these applications are shown here in milliseconds. Your results may vary based on your environment, hardware and software installed on your system, and other factors. Lower is better:
 
 image::img/blog/instantonperf.png[Startup Performance,width=70%,align="center"]
 
