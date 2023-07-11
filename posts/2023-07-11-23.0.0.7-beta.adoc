@@ -1,0 +1,146 @@
+---
+layout: post
+title: "Jakarta Data beta 2 update in Open Liberty 23.0.0.7-beta"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/mbroz2
+author_github: https://github.com/mbroz2
+seo-title: Jakarta Data beta 2 update in Open Liberty 23.0.0.7-beta - OpenLiberty.io
+seo-description: Open Liberty 23.0.0.7-beta updates the Jakarta Data preview by including the entirety of the Jakarta Data beta 2 release, as well as some additional proposed features that are being considered.
+blog_description: Open Liberty 23.0.0.7-beta updates the Jakarta Data preview by including the entirety of the Jakarta Data beta 2 release, as well as some additional proposed features that are being considered.
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+---
+= Jakarta Data beta 2 update in Open Liberty 23.0.0.7-beta
+Michal Broz <https://github.com/mbroz2>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+Open Liberty 23.0.0.7-beta updates the Jakarta Data preview by including the entirety of the Jakarta Data beta 2 release, as well as some additional proposed features that are being considered.
+
+The link:{url-about}[Open Liberty] 23.0.0.7-beta includes the Jakarta Data feature (along with link:{url-prefix}/docs/latest/reference/feature/feature-overview.html[all GA features]). See also the link:{url-prefix}/blog/?search=beta&key=tag[previous Open Liberty beta blog posts].
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/25520
+// Contact/Reviewer: njr-11,ReeceNana
+// // // // // // // // 
+[#SUB_TAG_0]
+== A Very Early Preview of Jakarta Data (23.0.0.7 beta)
+In link:{url-prefix}/blog/2023/02/21/23.0.0.2-beta.html[Open Liberty 23.0.0.2-beta], we introduced Jakarta Data, a new Jakarta EE specification being developed that aims to standardize the popular Data Repository pattern across a variety of providers. The link:{url-prefix}/blog/2023/02/21/23.0.0.2-beta.html[23.0.0.4-beta release] updated the preview to the beta 2 version, which this beta release expands on to include functionality such as query-by-method name, sorting and pagination, interoperability with entity classes from Jakarta Persistence, interoperability with Jakarta Transactions, and more.  
+
+The Open Liberty beta includes a test implementation of Jakarta Data that we are using to experiment with proposed specification features so that developers can try out these features and provide feedback to influence the specification as it is being developed. The test implementation currently works with relational databases and operates by redirecting repository operations to the built-in Jakarta Persistence provider. In preparation for Jakarta EE 11, which will require a minimum of Java 21 (not yet available), the feature runs on Java 17 and simulates the entirety of the Jakarta Data beta 2 release, plus some additional proposed features that are being considered.
+
+To use Jakarta Data, you start by defining an entity class that corresponds to your data. With relational databases, the entity class corresponds to a database table and the entity properties (public methods and fields of the entity class) generally correspond to the columns of the table. An entity class can be:
+
+- annotated with `jakarta.persistence.Entity` and related annotations from Jakarta Persistence
+- a Java class without entity annotations, in which case the primary key is inferred from an entity property named `id` or ending with `Id`.
+
+You define one or more repository interfaces for an entity, annotate those interfaces as `@Repository` and inject them into components via CDI. The Jakarta Data provider supplies the implementation of the repository interface for you.
+
+Here's a simple entity, repository, and usage of it.
+
+[source,java]
+----
+public class Product { // entity
+    public long id;
+    public String name;
+    public float price;
+}
+
+@Repository
+public interface Products extends CrudRepository<Product, Long> {
+    // query-by-method name pattern:
+    Page<Product> findByNameIgnoreCaseContains(String searchFor, Pageable pageRequest);
+
+    // query via JPQL:
+    @Query("UPDATE Product o SET o.price = o.price - (?2 * o.price) WHERE o.id = ?1")
+    boolean discount(long productId, float discountRate);
+
+    // experimental annotatively-defined query (not part of Jakarta Data 1.0)
+    @Filter(by = "productId")
+    @Update(attr = "price", op = Operation.Add)
+    boolean increasePrice(long prodId, float amount);
+}
+
+public class MyServlet extends HttpServlet {
+    @Inject
+    Products products;
+
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp)
+            throws ServletException, IOException {
+        // Request only the first 20 results on a page, ordered by price, then name, then id:
+        Pageable pageRequest = Pageable.size(20).sortBy(Sort.desc("price"), Sort.asc("name"), Sort.asc("id"));
+        Page<Product> page1 = products.findByNameIgnoreCaseContains(searchFor, pageRequest);
+    }
+}
+----
+
+For more information, refer to the the link:https://github.com/jakartaee/data/blob/main/spec/src/main/asciidoc/repository.asciidoc[draft of the Jakarta Data specification] and the link:https://search.maven.org/remotecontent?filepath=jakarta/data/jakarta-data-api/1.0.0-b2/jakarta-data-api-1.0.0-b2-javadoc.jar[corresponding Javadoc].
+
+
+Your feedback is welcome on all of the Jakarta Data features and will be helpful as the specification develops further. Let us know what you think and/or be involved directly in the specification on link:https://github.com/jakartaee/data[github].
+    
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
+
+[#run]
+=== Try it now 
+
+To try out beta features, update your build tools to pull the Open Liberty All Beta Features package instead of the main release. The beta works with Java SE 20, Java SE 17, Java SE 11, and Java SE 8.
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], you can install the All Beta Features package using:
+
+[source,xml]
+----
+<plugin>
+    <groupId>io.openliberty.tools</groupId>
+    <artifactId>liberty-maven-plugin</artifactId>
+    <version>RELEASE</version>
+    <configuration>
+        <runtimeArtifact>
+          <groupId>io.openliberty.beta</groupId>
+          <artifactId>openliberty-runtime</artifactId>
+          <version>23.0.0.7-beta</version>
+          <type>zip</type>
+        </runtimeArtifact>
+    </configuration>
+</plugin>
+----
+
+You must also add dependencies to your pom.xml file for the beta version of the APIs that are associated with the beta features that you want to try.  For example, for Jakarta Data Beta 2, you would include:
+[source,xml]
+----
+<dependency>
+  <groupId>jakarta.data</groupId>
+  <artifactId>jakarta-data-api</artifactId>
+  <version>1.0.0-b2</version>
+</dependency>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+dependencies {
+    libertyRuntime group: 'io.openliberty.beta', name: 'openliberty-runtime', version: '[23.0.0.7-beta,)'
+}
+----
+
+Or if you're using link:{url-prefix}/docs/latest/container-images.html[container images]:
+
+[source]
+----
+FROM icr.io/appcafe/open-liberty:beta
+----
+
+Or take a look at our link:{url-prefix}/downloads/#runtime_betas[Downloads page].
+
+For more information on using a beta release, refer to the link:{url-prefix}docs/latest/installing-open-liberty-betas.html[Installing Open Liberty beta releases] documentation.
+
+[#feedback]
+== We welcome your feedback
+
+Let us know what you think on link:https://groups.io/g/openliberty[our mailing list]. If you hit a problem, link:https://stackoverflow.com/questions/tagged/open-liberty[post a question on StackOverflow]. If you hit a bug, link:https://github.com/OpenLiberty/open-liberty/issues[please raise an issue].
+
+
