@@ -27,21 +27,23 @@ Thomas Watson <https://github.com/tjwatson>
 
 翻译：王峰 (亚信安慧)
 
-你想让云原生Java应用在几毫秒内启动，而不影响吞吐量、内存、开发和生产等价或Java语言新特性吗？Open Liberty 22.0.0.11-beta带来了InstantOn，一个为MicroProfile和Jakarta EE应用程序提供了快速启动的新功能。InstantOn 于23.0.0.6已经正式发布了。这个link：https://openliberty.io/blog/2023/06/29/rapid-startup-instanton.html[博客]讲述了最新信息。
+本文是在 Liberty InstantOn 仍处于测试阶段时发表的。 Liberty InstantOn 从以下链接开始退出测试版：link:/blog/2023/06/29/rapid-startup-instanton.html[Liberty 23.0.0.6 版本]。有关 Liberty InstantOn 的最新信息，请参阅 Open Liberty 文档中的链接：link:/docs/latest/instanton.html[使用 Open Liberty InstantOn 实现容器化应用程序的更快启动]。
+
+你想让云原生Java应用在几毫秒内启动，而不影响吞吐量、内存、开发和生产等价或Java语言新特性吗？Open Liberty 22.0.0.11-beta带来了InstantOn，一个为MicroProfile和Jakarta EE应用程序提供了快速启动的新功能。InstantOn 于23.0.0.6已经正式发布了。这个link:/blog/2023/06/29/rapid-startup-instanton.html[博客]讲述了最新信息。
 
 在无服务器环境中，应用程序的启动时间很重要。当应用程序不被使用时，InstantOn应用程序实例可以收缩到零。当没有持续的请求时，通过减少应用实例的总体数量，收缩到零有助于降低整体云成本。当应用程序的活动增加时，新的实例可以快速启动，不会给用户体验带来高延迟。
 
 == Open Liberty是如何实现InstantOn的呢？
 
-为了实现InstantOn，Open Liberty使用了link:https://www.eclipse.org/openj9/[OpenJ9] JVM的新特性和一种叫做Checkpoint/Restore In Userspace link:https://criu.org/[CRIU]的Linux技术，在应用进程启动时对其设置``Checkpoint``。这个``Checkpoint``是正在运行的应用程序进程的快照，可以被持久化，也可以快速恢复，使应用程序进程回到``Checkpoint``时的状态。这个过程使Liberty实例，以及任何受保护的应用程序，可以多次恢复为应用程序的不同实例。
+为了实现InstantOn，Open Liberty使用了link:https://www.eclipse.org/openj9/[OpenJ9] JVM的新特性和一种叫做Checkpoint/Restore In Userspace link:https://criu.org/[CRIU]的Linux技术，在应用进程启动时对其设置``checkpoint``。这个``checkpoint``是正在运行的应用程序进程的快照，可以被持久化，也可以快速恢复，使应用程序进程回到``checkpoint``时的状态。这个过程使Liberty实例，以及任何受保护的应用程序，可以多次恢复为应用程序的不同实例。
 
 要了解InstantOn的启动速度有多快，请跳转到链接"<<benchmark, 有多快>>"。关于这种方法优势的更多细节，参考link:https://blog.openj9.org/2022/09/26/fast-jvm-startup-with-openj9-criu-support/[OpenJ9 CRIU下快速JVM启动]博文和早期的link:/blog/2020/02/12/faster-startup-Java-applications-criu.html[Open Liberty博文]，其中我们首次讨论了CRIU对快速启动Java应用程序的能力。
 
-Open Liberty InstantOn功能提供了一个新的``checkpoint``行为，可以针对你现有的Open Liberty服务器有效，你可以很容易地使用它。可以具体指定一个阶段作为``Checkpoint``，让Liberty在这个``Checkpoint``启动、停止、保存这个``Checkpoint``。当Liberty启动时，它将检测到保存的``Checkpoint``进程，并从保存的``Checkpoint``中恢复进程状态。
+Open Liberty InstantOn功能提供了一个新的``checkpoint``行为，可以针对你现有的Open Liberty服务器有效，你可以很容易地使用它。可以具体指定一个阶段作为``checkpoint``，让Liberty在这个``checkpoint``启动、停止、保存这个``checkpoint``。当Liberty启动时，它将检测到保存的``checkpoint``进程，并从保存的``checkpoint``中恢复进程状态。
 
 == 应用程序示例
 
-在我们讨论``Checkpoint``如何工作的细节之前，让我们建立一个实例。对于这个例子，我们将了解一下link:/guides/getting-started.html[Open Liberty入门]指南。从克隆一个样例代码的link:https://github.com/openliberty/guide-getting-started.git[Git仓库]开始：
+在我们讨论``checkpoint``如何工作的细节之前，让我们建立一个实例。对于这个例子，我们将了解一下link:/guides/getting-started.html[Open Liberty入门]指南。从克隆一个样例代码的link:https://github.com/openliberty/guide-getting-started.git[Git仓库]开始：
 [source]
 ----
 
@@ -72,17 +74,17 @@ mvn package
 
 == 使用Open Liberty Beta InstantOn镜像对一个应用程序进行容器化
 
-Liberty InstantOn测试版包含了构建带有``Checkpoint``进程的应用容器镜像功能。应用程序可以使用Liberty InstantOn测试版作为基础来构建自己的应用程序容器镜像。涉及到以下步骤：
+Liberty InstantOn测试版包含了构建带有``checkpoint``进程的应用容器镜像功能。应用程序可以使用Liberty InstantOn测试版作为基础来构建自己的应用程序容器镜像。涉及到以下步骤：
 
 . <<dockerfile, 为应用程序创建Dockerfile>>
 
 . <<app-image, 构建应用程序的容器镜像>>
 
-. <<checkpoint-app, 设置容器镜像中应用程序的``Checkpoint``>>
+. <<checkpoint-app, 设置容器镜像中应用程序的``checkpoint``>>
 
-. <<checkpoint-image, 创建应用程序的``Checkpoint``镜像>>
+. <<checkpoint-image, 创建应用程序的``checkpoint``镜像>>
 
-== ``Checkpoint``/恢复容器化应用程序的先决条件
+== ``checkpoint``/恢复容器化应用程序的先决条件
 
 目前，Open Liberty InstantOn的测试版只支持在x86-64/amd64架构上运行。为了构建和运行使用criu的容器镜像，主机操作系统需要安装一些先决条件。我们所有的测试都是在RHEL 8.6和RHEL 9.0上进行的。其他Linux发行版，如果具备必要的先决条件，也是可以的。需要具备以下条件：
 
@@ -97,16 +99,16 @@ Liberty InstantOn测试版包含了构建带有``Checkpoint``进程的应用容�
 [#dockerfile]
 == 为应用程序创建Dockerfile
 
-对于link:https://openliberty.io/guides/getting-started.html[Open Liberty入门]指南的例子，第一步是创建一个``Dockerfile``，提供创建应用程序的容器化版本的说明。注意，``podman``也支持使用``Containerfile``格式来构建容器镜像。
+对于link:{url-prefix}/guides/getting-started.html[Open Liberty入门]指南的例子，第一步是创建一个``Dockerfile``，提供创建应用程序的容器化版本的说明。注意，``podman``也支持使用``Containerfile``格式来构建容器镜像。
 
-在这个例子中，我们将使用IBM容器注册中心（ICR）的一个特殊镜像，``icr.io/appcafe/open-liberty:beta-instanton``，作为父镜像。这个镜像被标记为``beta``，意味着它包括了所有Liberty beta的功能以及完整镜像中的所有Liberty功能。这个镜像被标记为``instanton``，意思是它包括所有产生``Checkpoint``进程镜像的先决条件，比如必要的``criu``二进制文件。
+在这个例子中，我们将使用IBM容器注册中心（ICR）的一个特殊镜像，``icr.io/appcafe/open-liberty:beta``，作为父镜像。这个镜像被标记为``beta``，意味着它包括了所有Liberty beta的功能以及完整镜像中的所有Liberty功能。这个镜像被标记为``instanton``，意思是它包括所有产生``checkpoint``进程镜像的先决条件，比如必要的``criu``二进制文件。
 
-getting-started应用程序的``Dockerfile``已经存在于``finish/Dockerfile``中。编辑现有的``finish/Dockerfile``并修改``FROM``指令，使用``icr.io/appcafe/open-liberty:beta-instanton``父镜像。``Dockerfile``看起来像这样：
+getting-started应用程序的``Dockerfile``已经存在于``finish/Dockerfile``中。编辑现有的``finish/Dockerfile``并修改``FROM``指令，使用``icr.io/appcafe/open-liberty:beta``父镜像。``Dockerfile``看起来像这样：
 
 .Dockerfile
 [source]
 ----
-FROM icr.io/appcafe/open-liberty:beta-instanton
+FROM icr.io/appcafe/open-liberty:beta
 
 
 ARG VERSION=1.
@@ -134,7 +136,7 @@ RUN configure.sh
 [#app-image]
 == 构建应用容器镜像
 
-为了使 ``criu`` 能够对进程进行``Checkpoint``和恢复，``criu`` 二进制文件必须被授予额外的link:https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux_atomic_host/7/html/container_security_guide/linux_capabilities_and_seccomp[Linux功能]。特别是对于Open Liberty，它需要被授予``cap_checkpoint_restore``、``cap_net_admin``和``cap_sys_ptrace``。Open Liberty InstantOn 测试版镜像包括 ``criu`` 二进制文件，以及``criu`` 二进制文件所需要的功能。为了使``criu``二进制文件在运行时被赋予访问权限，运行``criu``的容器在启动时也必须被授予必要的权限。你可以通过以下两种方式之一授予容器这些权限：
+为了使 ``criu`` 能够对进程进行``checkpoint``和恢复，``criu`` 二进制文件必须被授予额外的link:https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux_atomic_host/7/html/container_security_guide/linux_capabilities_and_seccomp[Linux功能]。特别是对于Open Liberty，它需要被授予``cap_checkpoint_restore``、``cap_net_admin``和``cap_sys_ptrace``。Open Liberty InstantOn 测试版镜像包括 ``criu`` 二进制文件，以及``criu`` 二进制文件所需要的功能。为了使``criu``二进制文件在运行时被赋予访问权限，运行``criu``的容器在启动时也必须被授予必要的权限。你可以通过以下两种方式之一授予容器这些权限：
 
 . 使用``--privileged``选项使用特权容器
 
@@ -150,7 +152,7 @@ RUN configure.sh
 podman build -t getting-started.
 ```
 
-这个命令创建了得到启动的容器镜像。然而，这个容器镜像并不包含任何可用于InstantOn启动的``Checkpoint``镜像文件。你可以用下面的命令来运行这个应用容器镜像。
+这个命令创建了得到启动的容器镜像。然而，这个容器镜像并不包含任何可用于InstantOn启动的``checkpoint``镜像文件。你可以用下面的命令来运行这个应用容器镜像。
 
 运行应用程序容器
 
@@ -161,41 +163,41 @@ podman run --name getting-started --rm -p 9080:9080 getting-started
 注意Liberty显示了应用启动所需的时间，并在 http://localhost:9080/dev/system/properties 上可以查看到容器中运行的服务。在检查完应用程序后，在运行``podman run``的命令行会话中按CTRL+C停止运行中的容器。
 
 [#checkpoint-app]
-== 对容器中的应用程序进行``Checkpoint``
+== 对容器中的应用程序进行``checkpoint``
 
-在启动过程中，Open Liberty有三个阶段可以产生``Checkpoint``：
+在启动过程中，Open Liberty有三个阶段可以产生``checkpoint``：
 
-.``features``: 这是最早可以发生``Checkpoint``的阶段。``Checkpoint``发生在所有配置的Open Liberty功能启动之后，但在对已安装的应用程序进行任何处理之前。
+.``features``: 这是最早可以发生``checkpoint``的阶段。``checkpoint``发生在所有配置的Open Liberty功能启动之后，但在对已安装的应用程序进行任何处理之前。请注意，此检查点阶段已被删除，请参阅链接：/blog/2023/02/10/instant-on-beta-update.html[23.0.0.2-beta 中 Liberty InstantOn 的新增强功能]。
 
-.``deployment``：``Checkpoint``发生在对配置的应用程序元数据处理之后。如果应用程序有任何组件作为应用程序启动的一部分被运行，``Checkpoint``将在执行应用程序任何代码之前进行。
+.``beforeAppStart``：``checkpoint``发生在对配置的应用程序元数据处理之后。如果应用程序有任何组件作为应用程序启动的一部分被运行，``checkpoint``将在执行应用程序任何代码之前进行。
 
-.``applications`` - 这是``Checkpoint``可以发生的最后一个阶段，在这个阶段做``Checkpoint``，可以在恢复应用实例时提供最快的启动时间。``Checkpoint``发生在所有被指导的应用程序状态为启动之后。这个阶段发生在打开任何用于监听应用程序传入请求的端口之前。
+.``afterAppStart`` - 这是``checkpoint``可以发生的最后一个阶段，在这个阶段做``checkpoint``，可以在恢复应用实例时提供最快的启动时间。``checkpoint``发生在所有被指导的应用程序状态为启动之后。这个阶段发生在打开任何用于监听应用程序传入请求的端口之前。
 
-应用程序阶段通常为应用程序提供最快的启动时间，但如果有一些应用程序在进程``Checkpoint``恢复之前运行，就会导致不可知的错误。另外如果``Checkpoint``的应用程序持有不应该被同步到多个应用程序实例的状态或数据，例如，在``Checkpoint``之前连接到外部资源（如数据库）会导致``Checkpoint``恢复到多实例进程时失败，原因是这会多次恢复相同的连接，造成资源冲突。所以，编码时尽量避免在应用程序初始化时执行诸如打开数据库连接的操作。
+这个``afterAppStart``阶段通常为应用程序提供最快的启动时间，但如果有一些应用程序在进程``checkpoint``恢复之前运行，就会导致不可知的错误。另外如果``checkpoint``的应用程序持有不应该被同步到多个应用程序实例的状态或数据，例如，在``checkpoint``之前连接到外部资源（如数据库）会导致``checkpoint``恢复到多实例进程时失败，原因是这会多次恢复相同的连接，造成资源冲突。但是，如果您的应用程序初始化不执行打开数据库连接等操作，您也许可以使用``afterAppStart``阶段作为检查点。
 
-在应用容器镜像构建完成后，它可以被用来在之前描述的``Checkpoint``阶段（功能、部署、应用）之一对应用进程进行``Checkpoint``。你可以通过使用``podman run``的``--env``选项为你的``Checkpoint``指定一个阶段，将``WLP_CHECKPOINT``的值设置为可用的``Checkpoint``。在下面例子中，通过运行``podman``命令，制作一个应用阶段镜像。
+在应用容器镜像构建完成后，它可以被用来在之前描述的``checkpoint``阶段（``features``, ``beforeAppStart``, ``afterAppStart``）之一对应用进程进行``checkpoint``。你可以通过使用``podman run``的``--env``选项为你的``checkpoint``指定一个阶段，将``WLP_CHECKPOINT``的值设置为可用的``checkpoint``。在下面例子中，通过运行``podman``命令，制作一个``afterAppStart``镜像。
 
-在容器中确定一个``Checkpoint``
+在容器中确定一个``checkpoint``
 
 ```
 podman run \
 --name getting-started-checkpoint-container \
 --privileged \
---env WLP_CHECKPOINT=applications \
+--env WLP_CHECKPOINT=afterAppStart \
 getting-started
 ```
 
-. 在容器中确定``criu````Checkpoint``时，需要使用``--privileged``选项。
+. 在容器中确定``criu````checkpoint``时，需要使用``--privileged``选项。
 
-. ``WLP_CHECKPOINT``环境变量用于指定``Checkpoint``阶段。对于需要启动快的场景，应用``Checkpoint``阶段将是最好的选择。
+. ``WLP_CHECKPOINT``环境变量用于指定``checkpoint``阶段。对于需要启动快的场景，``afterAppStart````checkpoint``阶段将是最好的选择。
 
-这将启动在Open Liberty上运行应用程序的容器。在Open Liberty启动后，它会在``WLP_CHECKPOINT``环境变量指定的阶段执行``Checkpoint``。在容器的进程数据被持久化之后，容器将停止，将产生一个包含``Checkpoint``进程数据的容器文件。输出将看起来像这样：
+这将启动在Open Liberty上运行应用程序的容器。在Open Liberty启动后，它会在``WLP_CHECKPOINT``环境变量指定的阶段执行``checkpoint``。在容器的进程数据被持久化之后，容器将停止，将产生一个包含``checkpoint``进程数据的容器文件。输出将看起来像这样：
 
 
-确定``Checkpoint``输出
+确定``checkpoint``输出
 
 ```
-Performing checkpoint --at=applications
+Performing checkpoint --at=afterAppStart
 
 
 Launching defaultServer (Open Liberty 22.0.0.11-beta/wlp-1.0.69.cl221020220912-1100) on Eclipse OpenJ9 VM, version 17.0.5-
@@ -217,14 +219,14 @@ CWWKE0953W: This version of Open Liberty is an unsupported early release version
 [AUDIT ] CWWKC0451I: A server checkpoint was requested. When the checkpoint completes, the server stops.
 ```
 
-这个过程目前不能作为podman构建步骤的一部分，因为Podman（和Docker）没有提供一种方法来授予构建容器镜像必要的Linux权限，以便``criu``确定进程``Checkpoint``。
+这个过程目前不能作为podman构建步骤的一部分，因为Podman（和Docker）没有提供一种方法来授予构建容器镜像必要的Linux权限，以便``criu``确定进程``checkpoint``。
 
 [#checkpoint-image]
-== 创建应用程序``Checkpoint``镜像
+== 创建应用程序``checkpoint``镜像
 
-到目前为止，我们已经为getting-started应用程序创建了``Checkpoint``进程数据，并将其存储在一个名为``getting-started-checkpoint-container``的停止的容器中。最后一步是创建一个包含``Checkpoint``进程数据的新容器镜像。当这个容器镜像被启动时，它将从``Checkpoint``被创建的地方开始恢复应用进程，从而形成一个InstantOn应用。你可以通过运行下面的``podman commit``操作来创建新的镜像：
+到目前为止，我们已经为getting-started应用程序创建了``checkpoint``进程数据，并将其存储在一个名为``getting-started-checkpoint-container``的停止的容器中。最后一步是创建一个包含``checkpoint``进程数据的新容器镜像。当这个容器镜像被启动时，它将从``checkpoint``被创建的地方开始恢复应用进程，从而形成一个InstantOn应用。你可以通过运行下面的``podman commit``操作来创建新的镜像：
 
-将``Checkpoint``提交给一个图像
+将``checkpoint``提交给一个图像
 
 ```
 podman commit getting-started-checkpoint-container getting-started-instanton
@@ -240,7 +242,7 @@ podman commit getting-started-checkpoint-container getting-started-instanton
 podman run --rm -p 9080:9080 getting-started-instanton
 ```
 
-然而，这个命令会失败，因为``criu``需要一些高级权限，以便能够恢复容器中的进程。当Liberty不能恢复``Checkpoint``进程时，它将通过启动没有``Checkpoint``镜像来恢复，并记录以下信息：
+然而，这个命令会失败，因为``criu``需要一些高级权限，以便能够恢复容器中的进程。当Liberty不能恢复``checkpoint``进程时，它将通过启动没有``checkpoint``镜像来恢复，并记录以下信息：
 
 ```
 CWWKE0957I: Restoring the checkpoint server process failed. Check the /logs/checkpoint/restore.log log to determine why
@@ -291,7 +293,7 @@ getting-started-instanton
 
 == 用一个没有特权及安全性受限的容器运行
 
-可以通过减少``--security-opt``选项来进一步简化``Checkpoint``的制作过程。默认情况下，``podman``并没有授予criu所需要权限去做系统调用（默认值在``/usr/share/containers/seccomp.json``文件中）。首先，你需要一个可以设置``criu``做系统调用需要的权限配置文件，授予``criu``所需要的所有系统和容器调用的权限。其次，主机需要挂载``/proc/sys/kernel/ns_last_pid``。可以用下面的命令来完成这两个步骤：
+可以通过减少``--security-opt``选项来进一步简化``checkpoint``的制作过程。默认情况下，``podman``并没有授予criu所需要权限去做系统调用（默认值在``/usr/share/containers/seccomp.json``文件中）。首先，你需要一个可以设置``criu``做系统调用需要的权限配置文件，授予``criu``所需要的所有系统和容器调用的权限。其次，主机需要挂载``/proc/sys/kernel/ns_last_pid``。可以用下面的命令来完成这两个步骤：
 
 podman run with limited --security-opt
 
@@ -1152,7 +1154,7 @@ getting-started-instanton
 
 * link:https://github.com/blueperf/acmeair-mainservice-java#acme-air-main-service---javaliberty/[AcmeAir Microservice Main]使用了MicroProfile的功能。
 
-这些实验是在一个24核的系统上运行的。我使用``taskset -c``为运行在容器中的Liberty进程分配了4个CPU。InstantOn时间是使用应用程序的``Checkpoint``阶段消耗的时间。基础启动是从启动Liberty服务器到服务器准备接受请求的时间，不包括启动容器本身所需的时间，以``messages.log``中信息显示“这个<server name>服务器已准备好运行更智能的星球“为准。这些应用程序的InstantOn与正常启动时间在此以毫秒为单位显示。你的结果可能会根据你的环境、你系统上安装的硬件和软件以及其他因素而有所不同。数据显示越低越好：
+这些实验是在一个24核的系统上运行的。我使用``taskset -c``为运行在容器中的Liberty进程分配了4个CPU。InstantOn时间是使用``afterAppStart````checkpoint``阶段消耗的时间。基础启动是从启动Liberty服务器到服务器准备接受请求的时间，不包括启动容器本身所需的时间，以``messages.log``中信息显示“这个<server name>服务器已准备好运行更智能的星球“为准。这些应用程序的InstantOn与正常启动时间在此以毫秒为单位显示。你的结果可能会根据你的环境、你系统上安装的硬件和软件以及其他因素而有所不同。数据显示越低越好：
 
 image::img/blog/instantonperf.png[Startup Performance,width=70%,align="center"]
 
