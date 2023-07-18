@@ -1,0 +1,1178 @@
+---
+layout: post
+title: 针对云本机 Java 应用程序的 Liberty InstantOn 启动
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/tjwatson
+author_github: https://github.com/tjwatson
+seo-title: 针对云本机 Java 应用程序的 Liberty InstantOn 启动 - OpenLiberty.io
+seo-description: Open Liberty 22.0.0.11-beta 为您带来了一个令人振奋的新功能 InstantOn ，为 Jakarta EE 和 MicroProfile 应用程序提供了令人难以置信的快速启动时间。
+blog_description: "Open Liberty 22.0.0.11-beta 为您带来了一个令人振奋的新功能 InstantOn ，为 Jakarta EE 和 MicroProfile 应用程序提供了令人难以置信的快速启动时间。"
+open-graph-image: https://openliberty.io/img/blog/instantonperf.png
+blog-available-in-languages:
+- lang: ja
+  path: /ja/blog/2022/11/01/instant-on-beta.html
+- lang: en
+  path: /blog/2022/09/29/instant-on-beta.html
+additional_authors:
+- name: Joshua Dettinger
+  github: https://github.com/dettmoney
+  image: https://avatars0.githubusercontent.com/dettmoney
+---
+= 针对云本机 Java 应用程序的 Liberty InstantOn 启动
+Thomas Watson <https://github.com/tjwatson>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+
+翻译：王峰 (亚信安慧)
+
+本文是在 Liberty InstantOn 仍处于测试阶段时发表的。 Liberty InstantOn 从以下链接开始退出测试版：link:/blog/2023/06/29/rapid-startup-instanton.html[Liberty 23.0.0.6 版本]。有关 Liberty InstantOn 的最新信息，请参阅 Open Liberty 文档中的链接：link:/docs/latest/instanton.html[使用 Open Liberty InstantOn 实现容器化应用程序的更快启动]。
+
+你想让云原生Java应用在几毫秒内启动，而不影响吞吐量、内存、开发和生产等价或Java语言新特性吗？Open Liberty 22.0.0.11-beta带来了InstantOn，一个为MicroProfile和Jakarta EE应用程序提供了快速启动的新功能。InstantOn 于23.0.0.6已经正式发布了。这个link:/blog/2023/06/29/rapid-startup-instanton.html[博客]讲述了最新信息。
+
+在无服务器环境中，应用程序的启动时间很重要。当应用程序不被使用时，InstantOn应用程序实例可以收缩到零。当没有持续的请求时，通过减少应用实例的总体数量，收缩到零有助于降低整体云成本。当应用程序的活动增加时，新的实例可以快速启动，不会给用户体验带来高延迟。
+
+== Open Liberty是如何实现InstantOn的呢？
+
+为了实现InstantOn，Open Liberty使用了link:https://www.eclipse.org/openj9/[OpenJ9] JVM的新特性和一种叫做Checkpoint/Restore In Userspace link:https://criu.org/[CRIU]的Linux技术，在应用进程启动时对其设置``checkpoint``。这个``checkpoint``是正在运行的应用程序进程的快照，可以被持久化，也可以快速``restore``，使应用程序进程回到``checkpoint``时的状态。这个过程使Liberty实例，以及任何受保护的应用程序，可以多次``restore``为应用程序的不同实例。
+
+要了解InstantOn的启动速度有多快，请跳转到链接"<<benchmark, 有多快>>"。关于这种方法优势的更多细节，参考link:https://blog.openj9.org/2022/09/26/fast-jvm-startup-with-openj9-criu-support/[OpenJ9 CRIU下快速JVM启动]博文和早期的link:/blog/2020/02/12/faster-startup-Java-applications-criu.html[Open Liberty博文]，其中我们首次讨论了CRIU对快速启动Java应用程序的能力。
+
+Open Liberty InstantOn功能提供了一个新的``checkpoint``行为，可以针对你现有的Open Liberty服务器有效，你可以很容易地使用它。可以具体指定一个阶段作为``checkpoint``，让Liberty在这个``checkpoint``启动、停止、保存这个``checkpoint``。当Liberty启动时，它将检测到保存的``checkpoint``进程，并从保存的``checkpoint``中``restore``进程状态。
+
+== 应用程序示例
+
+在我们讨论``checkpoint``如何工作的细节之前，让我们建立一个实例。对于这个例子，我们将了解一下link:/guides/getting-started.html[Open Liberty入门]指南。从克隆一个样例代码的link:https://github.com/openliberty/guide-getting-started.git[Git仓库]开始：
+[source]
+----
+
+git clone https://github.com/openliberty/guide-getting-started.git
+cd guide-getting-started
+----
+在本演示中，我们将在``finish/``目录下工作。请运行以下Maven goal，构建该应用程序并将其部署到Open Liberty：
+[source]
+----
+cd finish
+mvn liberty:run
+----
+以下信息说明你的应用服务器已经准备好了：
+[source]
+----
+The defaultServer server is ready to run a smarter planet.
+----
+通过浏览器访问 http://localhost:9080/dev/system/properties ，查看服务。在查看完应用程序后，在运行服务器的命令行会话中按CTRL+C停止Open Liberty服务器。下一步为应用程序构建WAR，请运行以下命令：
+[source]
+----
+mvn package
+----
+这个命令建立了一个``target/guide-getting-started.war``文件。我们现在可以把这个WAR包含在使用InstantOn功能的容器镜像中。
+
+== 容器化应用程序
+
+要使用Open Liberty InstantOn支持的应用程序，它必须首先使用Open Liberty beta InstantOn镜像进行容器化。关于如何使用Open Liberty对应用程序进行容器化，请参见link:{url-prefix}/guides/containerize.html[容器化微服务]指南或用link:{url-prefix}/guides/containerize-podman.html[Podman容器化微服务]指南。如果你不熟悉Podman，请先了解一下Podman指南，因为Open Liberty InstantOn目前需要使用到Podman。后期，一旦Docker支持CRIU所需的功能，InstantOn也会对Docker支持。
+
+== 使用Open Liberty Beta InstantOn镜像对一个应用程序进行容器化
+
+Liberty InstantOn测试版包含了构建带有``checkpoint``进程的应用容器镜像功能。应用程序可以使用Liberty InstantOn测试版作为基础来构建自己的应用程序容器镜像。涉及到以下步骤：
+
+. <<dockerfile, 为应用程序创建Dockerfile>>
+
+. <<app-image, 构建应用程序的容器镜像>>
+
+. <<checkpoint-app, 设置容器镜像中应用程序的``checkpoint``>>
+
+. <<checkpoint-image, 创建应用程序的``checkpoint``镜像>>
+
+== ``checkpoint``/``restore``容器化应用程序的先决条件
+
+目前，Open Liberty InstantOn的测试版只支持在x86-64/amd64架构上运行。为了构建和运行使用criu的容器镜像，主机操作系统需要安装一些先决条件。我们所有的测试都是在RHEL 8.6和RHEL 9.0上进行的。其他Linux发行版，如果具备必要的先决条件，也是可以的。需要具备以下条件：
+
+* 内核必须支持Linux link:https://man7.org/linux/man-pages/man7/capabilities.7.html[CAP_CHECKPOINT_RESTORE]功能。该功能是在5.9版本的内核中引入的，但已经传回到RHEL 8.6中使用的RHEL内核版本。
+
+* 必须安装Linux发行版的最新可用版本的Podman。
+
+* 必须对Podman进行配置以使用``crun``或``runc``容器运行时。
+
+* 如果你使用``runc``容器运行时，那么需要1.1.3或更高的版本，以便你有最新的纠错到``runc``。这个x可以使容器中的``/proc/sys/kernel/ns_last_pid``成功挂载。
+
+[#dockerfile]
+== 为应用程序创建Dockerfile
+
+对于link:{url-prefix}/guides/getting-started.html[Open Liberty入门]指南的例子，第一步是创建一个``Dockerfile``，提供创建应用程序的容器化版本的说明。注意，``podman``也支持使用``Containerfile``格式来构建容器镜像。
+
+在这个例子中，我们将使用IBM容器注册中心（ICR）的一个特殊镜像，``icr.io/appcafe/open-liberty:beta``，作为父镜像。这个镜像被标记为``beta``，意味着它包括了所有Liberty beta的功能以及完整镜像中的所有Liberty功能。这个镜像被标记为``instanton``，意思是它包括所有产生``checkpoint``进程镜像的先决条件，比如必要的``criu``二进制文件。
+
+getting-started应用程序的``Dockerfile``已经存在于``finish/Dockerfile``中。编辑现有的``finish/Dockerfile``并修改``FROM``指令，使用``icr.io/appcafe/open-liberty:beta``父镜像。``Dockerfile``看起来像这样：
+
+.Dockerfile
+[source]
+----
+FROM icr.io/appcafe/open-liberty:beta
+
+
+ARG VERSION=1.
+ARG REVISION=SNAPSHOT
+
+LABEL \
+org.opencontainers.image.authors="Your Name" \
+org.opencontainers.image.vendor="IBM" \
+org.opencontainers.image.url="local" \
+org.opencontainers.image.source="https://github.com/OpenLiberty/guide-getting-started" \
+org.opencontainers.image.version="$VERSION" \
+org.opencontainers.image.revision="$REVISION" \
+vendor="Open Liberty" \
+name="system" \
+version="$VERSION-$REVISION" \
+summary="The system microservice from the Getting Started guide" \
+description="This image contains the system microservice running with the Open Liberty runtime."
+
+COPY --chown=1001:0 src/main/liberty/config/ /config/
+COPY --chown=1001:0 target/*.war /config/apps/
+
+RUN configure.sh
+----
+
+[#app-image]
+== 构建应用容器镜像
+
+为了使 ``criu`` 能够对进程进行``checkpoint``和``restore``，``criu`` 二进制文件必须被授予额外的link:https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux_atomic_host/7/html/container_security_guide/linux_capabilities_and_seccomp[Linux功能]。特别是对于Open Liberty，它需要被授予``cap_checkpoint_restore``、``cap_net_admin``和``cap_sys_ptrace``。Open Liberty InstantOn 测试版镜像包括 ``criu`` 二进制文件，以及``criu`` 二进制文件所需要的功能。为了使``criu``二进制文件在运行时被赋予访问权限，运行``criu``的容器在启动时也必须被授予必要的权限。你可以通过以下两种方式之一授予容器这些权限：
+
+. 使用``--privileged``选项使用特权容器
+
+. 使用``--cap-add``选项分配特定的权限
+
+当你使用Docker时，守护程序通常有根权限。这个权限允许它在启动容器时授予任何要求的能力。在Podman中，没有守护程序，所以启动容器的用户必须有必要的Linux权限。当你以root身份运行或使用``sudo``来运行``podman``命令时，就有这个权限。在这个例子中，我们以根用户的身份运行``podman``命令。
+
+有了这样的认识，我们现在可以通过使用``podman build``命令来构建容器镜像。在``finish/``目录下，运行以下命令来构建应用程序的容器镜像：
+
+构建应用程序容器镜像
+
+```
+podman build -t getting-started.
+```
+
+这个命令创建了得到启动的容器镜像。然而，这个容器镜像并不包含任何可用于InstantOn启动的``checkpoint``镜像文件。你可以用下面的命令来运行这个应用容器镜像。
+
+运行应用程序容器
+
+```
+podman run --name getting-started --rm -p 9080:9080 getting-started
+```
+
+注意Liberty显示了应用启动所需的时间，并在 http://localhost:9080/dev/system/properties 上可以查看到容器中运行的服务。在检查完应用程序后，在运行``podman run``的命令行会话中按CTRL+C停止运行中的容器。
+
+[#checkpoint-app]
+== 对容器中的应用程序进行``checkpoint``
+
+在启动过程中，Open Liberty有三个阶段可以产生``checkpoint``：
+
+* ``features``: 这是最早可以发生``checkpoint``的阶段。``checkpoint``发生在所有配置的Open Liberty功能启动之后，但在对已安装的应用程序进行任何处理之前。请注意，此检查点阶段已被删除，请参阅链接：/blog/2023/02/10/instant-on-beta-update.html[23.0.0.2-beta 中 Liberty InstantOn 的新增强功能]。
+
+* ``beforeAppStart``：``checkpoint``发生在对配置的应用程序元数据处理之后。如果应用程序有任何组件作为应用程序启动的一部分被运行，``checkpoint``将在执行应用程序任何代码之前进行。
+
+* ``afterAppStart`` - 这是``checkpoint``可以发生的最后一个阶段，在这个阶段做``checkpoint``，可以在``restore``应用实例时提供最快的启动时间。``checkpoint``发生在所有被指导的应用程序状态为启动之后。这个阶段发生在打开任何用于监听应用程序传入请求的端口之前。
+
+这个``afterAppStart``阶段通常为应用程序提供最快的启动时间，但如果有一些应用程序在进程``checkpoint````restore``之前运行，就会导致不可知的错误。另外如果``checkpoint``的应用程序持有不应该被同步到多个应用程序实例的状态或数据，例如，在``checkpoint``之前连接到外部资源（如数据库）会导致``checkpoint````restore``到多实例进程时失败，原因是这会多次``restore``相同的连接，造成资源冲突。但是，如果您的应用程序初始化不执行打开数据库连接等操作，您也许可以使用``afterAppStart``阶段作为检查点。
+
+在应用容器镜像构建完成后，它可以被用来在之前描述的``checkpoint``阶段（``features``, ``beforeAppStart``, ``afterAppStart``）之一对应用进程进行``checkpoint``。你可以通过使用``podman run``的``--env``选项为你的``checkpoint``指定一个阶段，将``WLP_CHECKPOINT``的值设置为可用的``checkpoint``。在下面例子中，通过运行``podman``命令，制作一个``afterAppStart``镜像。
+
+在容器中确定一个``checkpoint``
+
+```
+podman run \
+--name getting-started-checkpoint-container \
+--privileged \
+--env WLP_CHECKPOINT=afterAppStart \
+getting-started
+```
+
+. 在容器中确定``criu````checkpoint``时，需要使用``--privileged``选项。
+
+. ``WLP_CHECKPOINT``环境变量用于指定``checkpoint``阶段。对于需要启动快的场景，``afterAppStart````checkpoint``阶段将是最好的选择。
+
+这将启动在Open Liberty上运行应用程序的容器。在Open Liberty启动后，它会在``WLP_CHECKPOINT``环境变量指定的阶段执行``checkpoint``。在容器的进程数据被持久化之后，容器将停止，将产生一个包含``checkpoint``进程数据的容器文件。输出将看起来像这样：
+
+
+确定``checkpoint``输出
+
+```
+Performing checkpoint --at=afterAppStart
+
+
+Launching defaultServer (Open Liberty 22.0.0.11-beta/wlp-1.0.69.cl221020220912-1100) on Eclipse OpenJ9 VM, version 17.0.5-
+ea+2 (en_US)
+CWWKE0953W: This version of Open Liberty is an unsupported early release version.
+[AUDIT ] CWWKE0001I: The server defaultServer has been launched.
+[AUDIT ] CWWKG0093A: Processing configuration drop-ins resource:
+/opt/ol/wlp/usr/servers/defaultServer/configDropins/defaults/checkpoint.xml
+[AUDIT ] CWWKG0093A: Processing configuration drop-ins resource:
+/opt/ol/wlp/usr/servers/defaultServer/configDropins/defaults/keystore.xml
+[AUDIT ] CWWKG0093A: Processing configuration drop-ins resource:
+/opt/ol/wlp/usr/servers/defaultServer/configDropins/defaults/open-default-port.xml
+[AUDIT ] CWWKZ0058I: Monitoring dropins for applications.
+[AUDIT ] CWWKT0016I: Web application available (default_host): http://f5edff273d9c:9080/ibm/api/
+[AUDIT ] CWWKT0016I: Web application available (default_host): http://f5edff273d9c:9080/metrics/
+[AUDIT ] CWWKT0016I: Web application available (default_host): http://f5edff273d9c:9080/health/
+[AUDIT ] CWWKT0016I: Web application available (default_host): http://f5edff273d9c:9080/dev/
+[AUDIT ] CWWKZ0001I: Application guide-getting-started started in 0.986 seconds.
+[AUDIT ] CWWKC0451I: A server checkpoint was requested. When the checkpoint completes, the server stops.
+```
+
+这个过程目前不能作为podman构建步骤的一部分，因为Podman（和Docker）没有提供一种方法来授予构建容器镜像必要的Linux权限，以便``criu``确定进程``checkpoint``。
+
+[#checkpoint-image]
+== 创建应用程序``checkpoint``镜像
+
+到目前为止，我们已经为getting-started应用程序创建了``checkpoint``进程数据，并将其存储在一个名为``getting-started-checkpoint-container``的停止的容器中。最后一步是创建一个包含``checkpoint``进程数据的新容器镜像。当这个容器镜像被启动时，它将从``checkpoint``被创建的地方开始``restore``应用进程，从而形成一个InstantOn应用。你可以通过运行下面的``podman commit``操作来创建新的镜像：
+
+将``checkpoint``提交给一个图像
+
+```
+podman commit getting-started-checkpoint-container getting-started-instanton
+```
+
+现在我们有两个应用镜像，分别命名为``getting-started``和``getting-started-instanton``。用``getting-started-instanton``容器镜像启动容器，会显示出比原来的``getting-started``镜像快得多的启动时间。
+
+== 运行InstantOn应用程序图像
+
+通常情况下，一个应用容器可以通过如下命令从一个应用容器镜像中启动：
+
+```
+podman run --rm -p 9080:9080 getting-started-instanton
+```
+
+然而，这个命令会失败，因为``criu``需要一些高级权限，以便能够``restore``容器中的进程。当Liberty不能``restore````checkpoint``进程时，它将通过启动没有``checkpoint``镜像来``restore``，并记录以下信息：
+
+```
+CWWKE0957I: Restoring the checkpoint server process failed. Check the /logs/checkpoint/restore.log log to determine why
+the checkpoint process was not restored. Launching the server without using the checkpoint image.
+```
+
+== 使用-特权选项运行
+
+为了授予所有可用的所需权限，你可以选择用以下命令来启动一个有特权的容器。
+
+```
+podman run --rm --privileged -p 9080:9080 getting-started-instanton
+```
+
+如果成功，你将看到如下输出：
+
+```
+[AUDIT ] CWWKZ0001I: Application guide-getting-started started in 0.059 seconds.
+[AUDIT ] CWWKC0452I: The Liberty server process resumed operation from a checkpoint in 0.088 seconds.
+[AUDIT ] CWWKF0012I: The server installed the following features: [cdi-3.0, checkpoint-1.0, concurrent-2.0,
+distributedMap-1.0, jndi-1.0, json-1.0, jsonb-2.0, jsonp-2.0, monitor-1.0, mpConfig-3.0, mpHealth-4.0, mpMetrics-4.0,
+restfulWS-3.0, restfulWSClient-3.0, servlet-5.0, ssl-1.0, transportSecurity-1.0].
+[AUDIT ] CWWKF0011I: The defaultServer server is ready to run a smarter planet. The defaultServer server started in
+0.098 seconds.
+```
+
+== 使用无特权的容器运行
+
+不建议使用root权限来运行容器。最好的做法是设置只有运行容器所需的权限。可以使用下面的命令来授予容器必要的权限，而不需要运行一个完全-特权的容器：
+
+podman run with unconfined --security-opt options
+
+```
+podman run \
+--rm \
+--cap-add=CHECKPOINT_RESTORE \
+--cap-add=NET_ADMIN \
+--cap-add=SYS_PTRACE \
+--security-opt seccomp=unconfined \
+--security-opt systempaths=unconfined \
+--security-opt apparmor=unconfined \
+-p 9080:9080 \
+getting-started-instanton
+```
+
+``--cap-add`` 选项授予容器 ``criu`` 所需的三种 Linux 权限。``--security-opt`` 选项授予 ``criu`` 访问所需的系统调用和访问主机上的 ``/proc/sys/kernel/ns_last_pid``权限 。
+
+
+== 用一个没有特权及安全性受限的容器运行
+
+可以通过减少``--security-opt``选项来进一步简化``checkpoint``的制作过程。默认情况下，``podman``并没有授予criu所需要权限去做系统调用（默认值在``/usr/share/containers/seccomp.json``文件中）。首先，你需要一个可以设置``criu``做系统调用需要的权限配置文件，授予``criu``所需要的所有系统和容器调用的权限。其次，主机需要挂载``/proc/sys/kernel/ns_last_pid``。可以用下面的命令来完成这两个步骤：
+
+podman run with limited --security-opt
+
+```
+podman run \
+--rm \
+--cap-add=CHECKPOINT_RESTORE \
+--cap-add=NET_ADMIN \
+--cap-add=SYS_PTRACE \
+--security-opt seccomp=criuRequiredSysCalls.json \
+-v /proc/sys/kernel/ns_last_pid:/proc/sys/kernel/ns_last_pid \
+-p 9080:9080 \
+getting-started-instanton
+```
+
+``--security-opt seccomp=`` 选项指的是一个名为 ``criuRequiredSysCalls.json`` 的文件。这个文件是criu所需的系统调用权限。``-v``选项在主机上挂载``/proc/sys/kernel/ns_last_pid``，供容器访问。
+
+根据你的Linux发行版，Podman可能默认使用``runc``或``crun``。要检查你的Podman安装的容器，请运行命令``podman info``，查看``ociRuntime``部分。如果使用的是``runc``，请确保你使用的是1.1.3或更高版本。为了有效，你必须有一个1.1.3或更高版本的``runc``。
+
+根据你的RHEL 8.6或RHEL 9.0安装的最新情况，你可能会发现指定``criuRequiredSysCalls.json``的``--security-opt``是不必要的。在写这篇文章的时候，最新版本的RHEL 8.6和RHEL 9.0包括一个Podman，默认授予所需的系统调用给它启动的容器。这个默认值使得指定 ``--security-opt seccomp=criuRequiredSysCalls.json`` 不在需要了。
+
+[#sys-calls-json]
+[source,json]
+.criuRequiredSysCalls.json
+----
+{
+        "defaultAction": "SCMP_ACT_ERRNO",
+        "defaultErrnoRet": 1,
+        "archMap": [
+                {
+                        "architecture": "SCMP_ARCH_X86_64",
+                        "subArchitectures": [
+                                "SCMP_ARCH_X86",
+                                "SCMP_ARCH_X32"
+                        ]
+                },
+                {
+                        "architecture": "SCMP_ARCH_AARCH64",
+                        "subArchitectures": [
+                                "SCMP_ARCH_ARM"
+                        ]
+                },
+                {
+                        "architecture": "SCMP_ARCH_MIPS64",
+                        "subArchitectures": [
+                                "SCMP_ARCH_MIPS",
+                                "SCMP_ARCH_MIPS64N32"
+                        ]
+                },
+                {
+                        "architecture": "SCMP_ARCH_MIPS64N32",
+                        "subArchitectures": [
+                                "SCMP_ARCH_MIPS",
+                                "SCMP_ARCH_MIPS64"
+                        ]
+                },
+                {
+                        "architecture": "SCMP_ARCH_MIPSEL64",
+                        "subArchitectures": [
+                                "SCMP_ARCH_MIPSEL",
+                                "SCMP_ARCH_MIPSEL64N32"
+                        ]
+                },
+                {
+                        "architecture": "SCMP_ARCH_MIPSEL64N32",
+                        "subArchitectures": [
+                                "SCMP_ARCH_MIPSEL",
+                                "SCMP_ARCH_MIPSEL64"
+                        ]
+                },
+                {
+                        "architecture": "SCMP_ARCH_S390X",
+                        "subArchitectures": [
+                                "SCMP_ARCH_S390"
+                        ]
+                },
+                {
+                        "architecture": "SCMP_ARCH_RISCV64",
+                        "subArchitectures": null
+                }
+        ],
+        "syscalls": [
+                {
+                        "names": [
+                                "accept",
+                                "accept4",
+                                "access",
+                                "adjtimex",
+                                "alarm",
+                                "bind",
+                                "brk",
+                                "capget",
+                                "capset",
+                                "chdir",
+                                "chmod",
+                                "chown",
+                                "chown32",
+                                "clock_adjtime",
+                                "clock_adjtime64",
+                                "clock_getres",
+                                "clock_getres_time64",
+                                "clock_gettime",
+                                "clock_gettime64",
+                                "clock_nanosleep",
+                                "clock_nanosleep_time64",
+                                "close",
+                                "close_range",
+                                "connect",
+                                "copy_file_range",
+                                "creat",
+                                "dup",
+                                "dup2",
+                                "dup3",
+                                "epoll_create",
+                                "epoll_create1",
+                                "epoll_ctl",
+                                "epoll_ctl_old",
+                                "epoll_pwait",
+                                "epoll_pwait2",
+                                "epoll_wait",
+                                "epoll_wait_old",
+                                "eventfd",
+                                "eventfd2",
+                                "execve",
+                                "execveat",
+                                "exit",
+                                "exit_group",
+                                "faccessat",
+                                "faccessat2",
+                                "fadvise64",
+                                "fadvise64_64",
+                                "fallocate",
+                                "fanotify_mark",
+                                "fchdir",
+                                "fchmod",
+                                "fchmodat",
+                                "fchown",
+                                "fchown32",
+                                "fchownat",
+                                "fcntl",
+                                "fcntl64",
+                                "fdatasync",
+                                "fgetxattr",
+                                "flistxattr",
+                                "flock",
+                                "fork",
+                                "fremovexattr",
+                                "fsetxattr",
+                                "fstat",
+                                "fstat64",
+                                "fstatat64",
+                                "fstatfs",
+                                "fstatfs64",
+                                "fsync",
+                                "ftruncate",
+                                "ftruncate64",
+                                "futex",
+                                "futex_time64",
+                                "futex_waitv",
+                                "futimesat",
+                                "getcpu",
+                                "getcwd",
+                                "getdents",
+                                "getdents64",
+                                "getegid",
+                                "getegid32",
+                                "geteuid",
+                                "geteuid32",
+                                "getgid",
+                                "getgid32",
+                                "getgroups",
+                                "getgroups32",
+                                "getitimer",
+                                "getpeername",
+                                "getpgid",
+                                "getpgrp",
+                                "getpid",
+                                "getppid",
+                                "getpriority",
+                                "getrandom",
+                                "getresgid",
+                                "getresgid32",
+                                "getresuid",
+                                "getresuid32",
+                                "getrlimit",
+                                "get_robust_list",
+                                "getrusage",
+                                "getsid",
+                                "getsockname",
+                                "getsockopt",
+                                "get_thread_area",
+                                "gettid",
+                                "gettimeofday",
+                                "getuid",
+                                "getuid32",
+                                "getxattr",
+                                "inotify_add_watch",
+                                "inotify_init",
+                                "inotify_init1",
+                                "inotify_rm_watch",
+                                "io_cancel",
+                                "ioctl",
+                                "io_destroy",
+                                "io_getevents",
+                                "io_pgetevents",
+                                "io_pgetevents_time64",
+                                "ioprio_get",
+                                "ioprio_set",
+                                "io_setup",
+                                "io_submit",
+                                "io_uring_enter",
+                                "io_uring_register",
+                                "io_uring_setup",
+                                "ipc",
+                                "kill",
+                                "landlock_add_rule",
+                                "landlock_create_ruleset",
+                                "landlock_restrict_self",
+                                "lchown",
+                                "lchown32",
+                                "lgetxattr",
+                                "link",
+                                "linkat",
+                                "listen",
+                                "listxattr",
+                                "llistxattr",
+                                "_llseek",
+                                "lremovexattr",
+                                "lseek",
+                                "lsetxattr",
+                                "lstat",
+                                "lstat64",
+                                "madvise",
+                                "membarrier",
+                                "memfd_create",
+                                "memfd_secret",
+                                "mincore",
+                                "mkdir",
+                                "mkdirat",
+                                "mknod",
+                                "mknodat",
+                                "mlock",
+                                "mlock2",
+                                "mlockall",
+                                "mmap",
+                                "mmap2",
+                                "mprotect",
+                                "mq_getsetattr",
+                                "mq_notify",
+                                "mq_open",
+                                "mq_timedreceive",
+                                "mq_timedreceive_time64",
+                                "mq_timedsend",
+                                "mq_timedsend_time64",
+                                "mq_unlink",
+                                "mremap",
+                                "msgctl",
+                                "msgget",
+                                "msgrcv",
+                                "msgsnd",
+                                "msync",
+                                "munlock",
+                                "munlockall",
+                                "munmap",
+                                "nanosleep",
+                                "newfstatat",
+                                "_newselect",
+                                "open",
+                                "openat",
+                                "openat2",
+                                "pause",
+                                "pidfd_open",
+                                "pidfd_send_signal",
+                                "pipe",
+                                "pipe2",
+                                "poll",
+                                "ppoll",
+                                "ppoll_time64",
+                                "prctl",
+                                "pread64",
+                                "preadv",
+                                "preadv2",
+                                "prlimit64",
+                                "process_mrelease",
+                                "pselect6",
+                                "pselect6_time64",
+                                "pwrite64",
+                                "pwritev",
+                                "pwritev2",
+                                "read",
+                                "readahead",
+                                "readlink",
+                                "readlinkat",
+                                "readv",
+                                "recv",
+                                "recvfrom",
+                                "recvmmsg",
+                                "recvmmsg_time64",
+                                "recvmsg",
+                                "remap_file_pages",
+                                "removexattr",
+                                "rename",
+                                "renameat",
+                                "renameat2",
+                                "restart_syscall",
+                                "rmdir",
+                                "rseq",
+                                "rt_sigaction",
+                                "rt_sigpending",
+                                "rt_sigprocmask",
+                                "rt_sigqueueinfo",
+                                "rt_sigreturn",
+                                "rt_sigsuspend",
+                                "rt_sigtimedwait",
+                                "rt_sigtimedwait_time64",
+                                "rt_tgsigqueueinfo",
+                                "sched_getaffinity",
+                                "sched_getattr",
+                                "sched_getparam",
+                                "sched_get_priority_max",
+                                "sched_get_priority_min",
+                                "sched_getscheduler",
+                                "sched_rr_get_interval",
+                                "sched_rr_get_interval_time64",
+                                "sched_setaffinity",
+                                "sched_setattr",
+                                "sched_setparam",
+                                "sched_setscheduler",
+                                "sched_yield",
+                                "seccomp",
+                                "select",
+                                "semctl",
+                                "semget",
+                                "semop",
+                                "semtimedop",
+                                "semtimedop_time64",
+                                "send",
+                                "sendfile",
+                                "sendfile64",
+                                "sendmmsg",
+                                "sendmsg",
+                                "sendto",
+                                "setfsgid",
+                                "setfsgid32",
+                                "setfsuid",
+                                "setfsuid32",
+                                "setgid",
+                                "setgid32",
+                                "setgroups",
+                                "setgroups32",
+                                "setitimer",
+                                "setpgid",
+                                "setpriority",
+                                "setregid",
+                                "setregid32",
+                                "setresgid",
+                                "setresgid32",
+                                "setresuid",
+                                "setresuid32",
+                                "setreuid",
+                                "setreuid32",
+                                "setrlimit",
+                                "set_robust_list",
+                                "setsid",
+                                "setsockopt",
+                                "set_thread_area",
+                                "set_tid_address",
+                                "setuid",
+                                "setuid32",
+                                "setxattr",
+                                "shmat",
+                                "shmctl",
+                                "shmdt",
+                                "shmget",
+                                "shutdown",
+                                "sigaltstack",
+                                "signalfd",
+                                "signalfd4",
+                                "sigprocmask",
+                                "sigreturn",
+                                "socket",
+                                "socketcall",
+                                "socketpair",
+                                "splice",
+                                "stat",
+                                "stat64",
+                                "statfs",
+                                "statfs64",
+                                "statx",
+                                "symlink",
+                                "symlinkat",
+                                "sync",
+                                "sync_file_range",
+                                "syncfs",
+                                "sysinfo",
+                                "tee",
+                                "tgkill",
+                                "time",
+                                "timer_create",
+                                "timer_delete",
+                                "timer_getoverrun",
+                                "timer_gettime",
+                                "timer_gettime64",
+                                "timer_settime",
+                                "timer_settime64",
+                                "timerfd_create",
+                                "timerfd_gettime",
+                                "timerfd_gettime64",
+                                "timerfd_settime",
+                                "timerfd_settime64",
+                                "times",
+                                "tkill",
+                                "truncate",
+                                "truncate64",
+                                "ugetrlimit",
+                                "umask",
+                                "uname",
+                                "unlink",
+                                "unlinkat",
+                                "utime",
+                                "utimensat",
+                                "utimensat_time64",
+                                "utimes",
+                                "vfork",
+                                "vmsplice",
+                                "wait4",
+                                "waitid",
+                                "waitpid",
+                                "write",
+                                "writev",
+                                "arch_prctl",
+                                "chroot",
+                                "clone",
+                                "clone3",
+                                "fallocate",
+                                "fanotify_init",
+                                "fsconfig",
+                                "fsmount",
+                                "fsopen",
+                                "guarded_storage",
+                                "kcmp",
+                                "lseek",
+                                "mmap",
+                                "mount",
+                                "open",
+                                "open_by_handle_at",
+                                "openat",
+                                "pivot_root",
+                                "preadv",
+                                "process_vm_readv",
+                                "ptrace",
+                                "readdir",
+                                "s390_runtime_instr",
+                                "setns",
+                                "sigaction",
+                                "signal",
+                                "syscall",
+                                "umount",
+                                "umount2",
+                                "unshare",
+                                "userfaultfd",
+                                "wait"
+                        ],
+                        "action": "SCMP_ACT_ALLOW"
+                },
+                {
+                        "names": [
+                                "process_vm_readv",
+                                "process_vm_writev",
+                                "ptrace"
+                        ],
+                        "action": "SCMP_ACT_ALLOW",
+                        "includes": {
+                                "minKernel": "4.8"
+                        }
+                },
+                {
+                        "names": [
+                                "personality"
+                        ],
+                        "action": "SCMP_ACT_ALLOW",
+                        "args": [
+                                {
+                                        "index": 0,
+                                        "value": 0,
+                                        "op": "SCMP_CMP_EQ"
+                                }
+                        ]
+                },
+                {
+                        "names": [
+                                "personality"
+                        ],
+                        "action": "SCMP_ACT_ALLOW",
+                        "args": [
+                                {
+                                        "index": 0,
+                                        "value": 8,
+                                        "op": "SCMP_CMP_EQ"
+                                }
+                        ]
+                },
+                {
+                        "names": [
+                                "personality"
+                        ],
+                        "action": "SCMP_ACT_ALLOW",
+                        "args": [
+                                {
+                                        "index": 0,
+                                        "value": 131072,
+                                        "op": "SCMP_CMP_EQ"
+                                }
+                        ]
+                },
+                {
+                        "names": [
+                                "personality"
+                        ],
+                        "action": "SCMP_ACT_ALLOW",
+                        "args": [
+                                {
+                                        "index": 0,
+                                        "value": 131080,
+                                        "op": "SCMP_CMP_EQ"
+                                }
+                        ]
+                },
+                {
+                        "names": [
+                                "personality"
+                        ],
+                        "action": "SCMP_ACT_ALLOW",
+                        "args": [
+                                {
+                                        "index": 0,
+                                        "value": 4294967295,
+                                        "op": "SCMP_CMP_EQ"
+                                }
+                        ]
+                },
+                {
+                        "names": [
+                                "sync_file_range2",
+                                "swapcontext"
+                        ],
+                        "action": "SCMP_ACT_ALLOW",
+                        "includes": {
+                                "arches": [
+                                        "ppc64le"
+                                ]
+                        }
+                },
+                {
+                        "names": [
+                                "arm_fadvise64_64",
+                                "arm_sync_file_range",
+                                "sync_file_range2",
+                                "breakpoint",
+                                "cacheflush",
+                                "set_tls"
+                        ],
+                        "action": "SCMP_ACT_ALLOW",
+                        "includes": {
+                                "arches": [
+                                        "arm",
+                                        "arm64"
+                                ]
+                        }
+                },
+                {
+                        "names": [
+                                "arch_prctl"
+                        ],
+                        "action": "SCMP_ACT_ALLOW",
+                        "includes": {
+                                "arches": [
+                                        "amd64",
+                                        "x32"
+                                ]
+                        }
+                },
+                {
+                        "names": [
+                                "modify_ldt"
+                        ],
+                        "action": "SCMP_ACT_ALLOW",
+                        "includes": {
+                                "arches": [
+                                        "amd64",
+                                        "x32",
+                                        "x86"
+                                ]
+                        }
+                },
+                {
+                        "names": [
+                                "s390_pci_mmio_read",
+                                "s390_pci_mmio_write",
+                                "s390_runtime_instr"
+                        ],
+                        "action": "SCMP_ACT_ALLOW",
+                        "includes": {
+                                "arches": [
+                                        "s390",
+                                        "s390x"
+                                ]
+                        }
+                },
+                {
+                        "names": [
+                                "riscv_flush_icache"
+                        ],
+                        "action": "SCMP_ACT_ALLOW",
+                        "includes": {
+                                "arches": [
+                                        "riscv64"
+                                ]
+                        }
+                },
+                {
+                        "names": [
+                                "open_by_handle_at"
+                        ],
+                        "action": "SCMP_ACT_ALLOW",
+                        "includes": {
+                                "caps": [
+                                        "CAP_DAC_READ_SEARCH"
+                                ]
+                        }
+                },
+                {
+                        "names": [
+                                "bpf",
+                                "clone",
+                                "clone3",
+                                "fanotify_init",
+                                "fsconfig",
+                                "fsmount",
+                                "fsopen",
+                                "fspick",
+                                "lookup_dcookie",
+                                "mount",
+                                "mount_setattr",
+                                "move_mount",
+                                "name_to_handle_at",
+                                "open_tree",
+                                "perf_event_open",
+                                "quotactl",
+                                "quotactl_fd",
+                                "setdomainname",
+                                "sethostname",
+                                "setns",
+                                "syslog",
+                                "umount",
+                                "umount2",
+                                "unshare"
+                        ],
+                        "action": "SCMP_ACT_ALLOW",
+                        "includes": {
+                                "caps": [
+                                        "CAP_SYS_ADMIN"
+                                ]
+                        }
+                },
+                {
+                        "names": [
+                                "clone"
+                        ],
+                        "action": "SCMP_ACT_ALLOW",
+                        "args": [
+                                {
+                                        "index": 0,
+                                        "value": 2114060288,
+                                        "op": "SCMP_CMP_MASKED_EQ"
+                                }
+                        ],
+                        "excludes": {
+                                "caps": [
+                                        "CAP_SYS_ADMIN"
+                                ],
+                                "arches": [
+                                        "s390",
+                                        "s390x"
+                                ]
+                        }
+                },
+                {
+                        "names": [
+                                "clone"
+                        ],
+                        "action": "SCMP_ACT_ALLOW",
+                        "args": [
+                                {
+                                        "index": 1,
+                                        "value": 2114060288,
+                                        "op": "SCMP_CMP_MASKED_EQ"
+                                }
+                        ],
+                        "comment": "s390 parameter ordering for clone is different",
+                        "includes": {
+                                "arches": [
+                                        "s390",
+                                        "s390x"
+                                ]
+                        },
+                        "excludes": {
+                                "caps": [
+                                        "CAP_SYS_ADMIN"
+                                ]
+                        }
+                },
+                {
+                        "names": [
+                                "clone3"
+                        ],
+                        "action": "SCMP_ACT_ERRNO",
+                        "errnoRet": 38,
+                        "excludes": {
+                                "caps": [
+                                        "CAP_SYS_ADMIN"
+                                ]
+                        }
+                },
+                {
+                        "names": [
+                                "reboot"
+                        ],
+                        "action": "SCMP_ACT_ALLOW",
+                        "includes": {
+                                "caps": [
+                                        "CAP_SYS_BOOT"
+                                ]
+                        }
+                },
+                {
+                        "names": [
+                                "chroot"
+                        ],
+                        "action": "SCMP_ACT_ALLOW",
+                        "includes": {
+                                "caps": [
+                                        "CAP_SYS_CHROOT"
+                                ]
+                        }
+                },
+                {
+                        "names": [
+                                "delete_module",
+                                "init_module",
+                                "finit_module"
+                        ],
+                        "action": "SCMP_ACT_ALLOW",
+                        "includes": {
+                                "caps": [
+                                        "CAP_SYS_MODULE"
+                                ]
+                        }
+                },
+                {
+                        "names": [
+                                "acct"
+                        ],
+                        "action": "SCMP_ACT_ALLOW",
+                        "includes": {
+                                "caps": [
+                                        "CAP_SYS_PACCT"
+                                ]
+                        }
+                },
+                {
+                        "names": [
+                                "kcmp",
+                                "pidfd_getfd",
+                                "process_madvise",
+                                "process_vm_readv",
+                                "process_vm_writev",
+                                "ptrace"
+                        ],
+                        "action": "SCMP_ACT_ALLOW",
+                        "includes": {
+                                "caps": [
+                                        "CAP_SYS_PTRACE"
+                                ]
+                        }
+                },
+                {
+                        "names": [
+                                "iopl",
+                                "ioperm"
+                        ],
+                        "action": "SCMP_ACT_ALLOW",
+                        "includes": {
+                                "caps": [
+                                        "CAP_SYS_RAWIO"
+                                ]
+                        }
+                },
+                {
+                        "names": [
+                                "settimeofday",
+                                "stime",
+                                "clock_settime"
+                        ],
+                        "action": "SCMP_ACT_ALLOW",
+                        "includes": {
+                                "caps": [
+                                        "CAP_SYS_TIME"
+                                ]
+                        }
+                },
+                {
+                        "names": [
+                                "vhangup"
+                        ],
+                        "action": "SCMP_ACT_ALLOW",
+                        "includes": {
+                                "caps": [
+                                        "CAP_SYS_TTY_CONFIG"
+                                ]
+                        }
+                },
+                {
+                        "names": [
+                                "get_mempolicy",
+                                "mbind",
+                                "set_mempolicy"
+                        ],
+                        "action": "SCMP_ACT_ALLOW",
+                        "includes": {
+                                "caps": [
+                                        "CAP_SYS_NICE"
+                                ]
+                        }
+                },
+                {
+                        "names": [
+                                "syslog"
+                        ],
+                        "action": "SCMP_ACT_ALLOW",
+                        "includes": {
+                                "caps": [
+                                        "CAP_SYSLOG"
+                                ]
+                        }
+                }
+        ]
+}
+----
+
+[#benchmark]
+== 有多快
+我们测试了多个应用程序，以显示使用InstantOn如何减少启动时间。
+
+* link:https://github.com/HotswapProjects/pingperf-quarkus/[Pingperf]是一个非常简单的ping类型的应用程序，涉及一个单一的REST接口。
+
+* link:https://github.com/johnaohara/quarkusRestCrudDemo/[Rest crud]就比较复杂了，它涉及JPA和一个远程数据库。
+
+* link:https://github.com/blueperf/acmeair-mainservice-java#acme-air-main-service---javaliberty/[AcmeAir Microservice Main]使用了MicroProfile的功能。
+
+这些实验是在一个24核的系统上运行的。我使用``taskset -c``为运行在容器中的Liberty进程分配了4个CPU。InstantOn时间是使用``afterAppStart````checkpoint``阶段消耗的时间。基础启动是从启动Liberty服务器到服务器准备接受请求的时间，不包括启动容器本身所需的时间，以``messages.log``中信息显示“这个<server name>服务器已准备好运行更智能的星球“为准。这些应用程序的InstantOn与正常启动时间在此以毫秒为单位显示。你的结果可能会根据你的环境、你系统上安装的硬件和软件以及其他因素而有所不同。数据显示越低越好：
+
+image::img/blog/instantonperf.png[Startup Performance,width=70%,align="center"]
+
+InstantOn提供了一个快速启动的能力，根据应用的不同，最高可达90%。所有的应用都是不一样的，所以你可能会看到你的应用有不同的结果。
+
+== 接下来将做什么？
+
+这篇帖子描述了使用Open Liberty InstantOn测试版来制作具有InstantOn启动时间的应用程序容器镜像的细节。目前仅在Liberty webProfile-8.0、webProfile-9.1、microProfile-4.1和microProfile-5.0支持该功能。我们希望将其扩展到包括webProfile和microProfile的未来版本，并将支持扩展到Jakarta完整的profile功能（如jakarta-8.0、jakarta-9.1、jakarta-10.0）。
+
+通过InstantOn，你可以建立非常快速的启动应用容器，这些容器可以在部署时选择收缩到零。我们期待着未来的一篇博文，描述如何在红帽OpenShift容器平台（OCP）和Kubernetes（k8s）等云环境中部署Open Liberty InstantOn，并采用Knative等能够自动将应用收缩到零的技术。
+
+// // // // // // // //
+// LINKS
+//
+// OpenLiberty.io site links:
+// link:/guides/microprofile-rest-client.html[Consuming RESTful Java microservices]
+// 
+// Off-site links:
+// link:https://openapi-generator.tech/docs/installation#jar[Download Instructions]
+//
+// // // // // // // //
