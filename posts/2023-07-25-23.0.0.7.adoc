@@ -1,0 +1,141 @@
+---
+layout: post
+title: "API and SPI Javadoc in Open Liberty 23.0.0.7"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/mbroz2
+author_github: https://github.com/mbroz2
+seo-title: API and SPI Javadoc in Open Liberty 23.0.0.7 - OpenLiberty.io
+seo-description: Concurrent with the Open Liberty 23.0.0.7 release, the Javadocs in the Open Liberty Docs are expanded to include the Liberty-specific APIs and SPIs.  This update simplifies developing applications and custom features that use various Liberty capabilities, like OpenID Connect and OAuth. Also, various bugs were fixed as part of this release.
+blog_description: Concurrent with the Open Liberty 23.0.0.7 release, the Javadocs in the Open Liberty Docs are expanded to include the Liberty-specific APIs and SPIs.  This update simplifies developing applications and custom features that use various Liberty capabilities, like OpenID Connect and OAuth. Also, various bugs were fixed as part of this release.
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+---
+= API and SPI Javadoc in Open Liberty 23.0.0.7
+Michal Broz <https://github.com/mbroz2>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+Concurrent with the Open Liberty 23.0.0.7 release, the Javadocs in the Open Liberty docs are expanded to include the Liberty-specific APIs and SPIs.  This update simplifies developing applications and custom features that use various Liberty capabilities, like OpenID Connect and OAuth. Also, various bugs were fixed as part of this release.
+
+In link:{url-about}[Open Liberty] 23.0.0.7:
+
+* <<javadoc, Liberty API and SPI Javadoc>>
+* <<bugs, Notable bug fixes>>
+
+Check out link:{url-prefix}/blog/?search=release&search!=beta[previous Open Liberty GA release blog posts].
+
+
+[#run]
+== Run your apps using 23.0.0.7
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], here are the coordinates:
+
+[source,xml]
+----
+<dependency>
+    <groupId>io.openliberty</groupId>
+    <artifactId>openliberty-runtime</artifactId>
+    <version>23.0.0.7</version>
+    <type>zip</type>
+</dependency>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+dependencies {
+    libertyRuntime group: 'io.openliberty', name: 'openliberty-runtime', version: '[23.0.0.7,)'
+}
+----
+
+Or if you're using link:{url-prefix}/docs/latest/container-images.html[container images]:
+
+[source]
+----
+FROM icr.io/appcafe/open-liberty
+----
+
+Or take a look at our link:{url-prefix}/start/[Downloads page].
+
+[link=https://stackoverflow.com/tags/open-liberty]
+image::img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="center"]
+
+
+
+[#javadoc]
+== Liberty API and SPI Javadoc
+Before the Open Liberty 23.0.0.7 release, developers who were working with Liberty APIs and SPIs had to use the embedded Javadoc that comes packaged with the runtime or build their own Javadocs from source.  Starting with 23.0.0.7, we've added the API and SPI Javadoc to the Open Liberty Docs, alongside the Javadoc for MicroProfile, Jakarta EE, and Java EE.  We've also retroactively added the Javadoc for 23.0.0.6.
+
+To start using the hosted Javadoc, navigate to the **REFERENCE** section of the link:https://openliberty.io/docs/latest/overview.html[Open Liberty Docs]. 
+
+[#bugs]
+== Notable bugs fixed in this release
+
+
+We’ve spent some time fixing bugs. The following sections describe just some of the issues resolved in this release. If you’re interested, here’s the  link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A23007+label%3A%22release+bug%22[full list of bugs fixed in 23.0.0.7].
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/25368[GlobalOpenTelemetry is missing public methods]
++
+Liberty overrides the `GlobalOpenTelemetry` class to return a no-op.  Liberty does not allow users to set the class and, instead, CDI injection should be used to acquire an `OpenTelemetry` object.
++
+However the override is missing public methods, which causes an error to occur if called.  For example:
++
+[source]
+----
+Caused by: java.lang.NoSuchMethodError: io/opentelemetry/api/GlobalOpenTelemetry.getPropagators()Lio/opentelemetry/context/propagation/ContextPropagators; (loaded from file:/home/gb110303/workspaces/open-liberty/dev/build.image/wlp/lib/io.openliberty.io.opentelemetry_1.0.77.jar by org.eclipse.osgi.internal.loader.EquinoxClassLoader@7be84dfc[io.openliberty.io.opentelemetry:1.0.77.202305162152(id=156)]) called from class io.opentelemetry.opentracingshim.OpenTracingPropagatorsBuilder (loaded from file:/home/gb110303/workspaces/open-liberty/dev/build.image/wlp/usr/servers/Telemetry10Shim/workarea/org.eclipse.osgi/52/data/cache/com.ibm.ws.app.manager_0/.cache/WEB-INF/lib/opentelemetry-opentracing-shim-1.19.0-alpha.jar by com.ibm.ws.classloading.internal.AppClassLoader@76e93c4a).
+at OpenTracingPropagatorsBuilder.<init>(OpenTracingPropagatorsBuilder.java:16)
+	at OpenTracingPropagators.builder(OpenTracingPropagators.java:32)
+	at OpenTracingShim.createTracerShim(OpenTracingShim.java:61)
+	at OpenTracingShimServlet.createShim(OpenTracingShimServlet.java:46)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:62)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+----
++
+This issue now resolved and calling a method on `GlobalOpenTelemetry` delegates to the no-op `OpenTelemetry` class.
+
++
+* link:https://github.com/OpenLiberty/open-liberty/issues/19861[Concurrency errors when using same JWT access token for inbound propagation]
++
+For a Liberty server configured with the`openidConnectClient-1.0` feature and using the same JWT access token for inbound propagation for multiple requests, a concurrency error occurs that causes the requests to fail.  This error results in a `ConcurrentModificationException`:
++
+[source]
+----
+Stack Dump = java.util.ConcurrentModificationException
+	at java.util.LinkedList$ListItr.checkForComodification(LinkedList.java:977)
+	at java.util.LinkedList$ListItr.next(LinkedList.java:899)
+	at javax.security.auth.Subject$SecureSet$1.next(Subject.java:1290)
+	at com.ibm.ws.security.openidconnect.client.internal.AccessTokenCacheHelper.recreateSubject(AccessTokenCacheHelper.java:137)
+	at com.ibm.ws.security.openidconnect.client.internal.AccessTokenCacheHelper.getCachedTokenAuthenticationResult(AccessTokenCacheHelper.java:51)
+	at com.ibm.ws.security.openidconnect.client.AccessTokenAuthenticator.authenticate(AccessTokenAuthenticator.java:130)
+	at com.ibm.ws.security.openidconnect.client.internal.OidcClientImpl.authenticate(OidcClientImpl.java:406)
+----
++
+This issue has been resolved. The `ConcurrentModificationException` is not longer thrown and the requests succeed.
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/25354[Update faces-4.0 to MyFaces 4.0.1]
++
+
+The following issues are fixed in the 4.0.1 update: 
+
+** link:https://issues.apache.org/jira/browse/MYFACES-4469[MYFACES-4469] - " `java.lang.IllegalArgumentException`: object is not an instance of declaring class" occurs in `FacesConfigurator.purgeConfiguration`
+** link:https://issues.apache.org/jira/browse/MYFACES-4586[MYFACES-4586] - [perf] Resource bundle not cached
+** link:https://issues.apache.org/jira/browse/MYFACES-4588[MYFACES-4588] - `faces.getClientWindow` does not retrieve client id
+** link:https://issues.apache.org/jira/browse/MYFACES-4590[MYFACES-4590] - `NullPointerException` when `PrimeFaces` `FileUpload` used in composite component
+** link:https://issues.apache.org/jira/browse/MYFACES-4591[MYFACES-4591] - [perf] remove duplicated CDI ELResolver
+** link:https://issues.apache.org/jira/browse/MYFACES-4593[MYFACES-4593] - Wrong Error recovery strategy - See also https://github.com/jakartaee/faces/issues/1800
+** link:https://issues.apache.org/jira/browse/MYFACES-4594[MYFACES-4594] - Web Context Parameter Logging -- Multi Threading Problems
+** link:https://issues.apache.org/jira/browse/MYFACES-4596[MYFACES-4596] - `faces.ts` style tags must retain their original position (and script tags as well)
+** link:https://issues.apache.org/jira/browse/MYFACES-4599[MYFACES-4599] - Remove Javadoc reference to `org.apache.myfaces.SERIALIZE_STATE_IN_SESSION`
+** link:https://issues.apache.org/jira/browse/MYFACES-4584[MYFACES-4584] - `faces.js` `/ts` improvements post 4.0
+
++
+Note that some issues have already been addressed in earlier versions of Liberty, such as MYFACES-4594. 
+
+== Get Open Liberty 23.0.0.7 now
+
+Available through <<run,Maven, Gradle, Docker, and as a downloadable archive>>.
