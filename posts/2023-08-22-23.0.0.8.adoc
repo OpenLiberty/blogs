@@ -1,0 +1,181 @@
+---
+layout: post
+title: "Prevent authorization code interception attacks with PKCE support for OpenID Connect clients in Open Liberty 23.0.0.8"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/mbroz2
+author_github: https://github.com/mbroz2
+seo-title: Prevent authorization code interception attacks with PKCE support for OpenID Connect clients - OpenLiberty.io
+seo-description: PKCE support in OpenID Connect clients to prevent authorization code interception attacks in certain specific contexts. Also, changes to the featureUtility installFeature command, and a new OpenTelemetry and Jaeger guide.
+blog_description: PKCE support in OpenID Connect clients to prevent authorization code interception attacks in certain specific contexts. Also, changes to the featureUtility installFeature command, and a new OpenTelemetry and Jaeger guide.
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+---
+= Prevent authorization code interception attacks with PKCE support for OpenID Connect clients in Open Liberty 23.0.0.8
+Michal Broz <https://github.com/mbroz2>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+
+With Open Liberty's new Proof Key for Code Exchange (PKCE) support in OpenID Connect clients, you can prevent authorization code interception attacks, which can occur in certain very specific scenarios. Also in this release, the `featureUtility installFeature` command is updated to better manage dependencies among the features that it installs. We've also got a new guide on using OpenTelemetry and Jaeger. 
+
+
+In link:{url-about}[Open Liberty] 23.0.0.8:
+
+* <<pkce, Prevent authorization code interception attacks with PKCE support for OpenID Connect clients>>
+* <<featureinstall, Ensure sufficient features are installed when using `featureUtility installFeature` command>>
+* <<CVEs, Security Vulnerability (CVE) fixes>>
+
+Along with the new features and functions added to the runtime, we’ve also made <<guides, updates to our guides>>.
+
+View the list of fixed bugs in link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A23008+label%3A%22release+bug%22[23.0.0.8].
+
+Check out link:{url-prefix}/blog/?search=release&search!=beta[previous Open Liberty GA release blog posts].
+
+
+[#run]
+
+== Run your apps using 23.0.0.8
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], here are the coordinates:
+
+[source,xml]
+----
+<dependency>
+    <groupId>io.openliberty</groupId>
+    <artifactId>openliberty-runtime</artifactId>
+    <version>23.0.0.8</version>
+    <type>zip</type>
+</dependency>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+dependencies {
+    libertyRuntime group: 'io.openliberty', name: 'openliberty-runtime', version: '[23.0.0.8,)'
+}
+----
+
+Or if you're using link:{url-prefix}/docs/latest/container-images.html[container images]:
+
+[source]
+----
+FROM icr.io/appcafe/open-liberty
+----
+
+Or take a look at our link:{url-prefix}/start/[Downloads page].
+
+[link=https://stackoverflow.com/tags/open-liberty]
+image::img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="center"]
+
+
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/25739
+// Contact/Reviewer: ayoho
+// // // // // // // // 
+[#pkce]
+== Prevent authorization code interception attacks with PKCE support for OpenID Connect clients
+OpenID Connect clients in Liberty now support Proof Key for Code Exchange (PKCE) (link:https://datatracker.ietf.org/doc/html/rfc7636[RFC 7636]). PKCE is an extension of the OAuth 2.0 specification and provides protection from authorization code interception attacks for OAuth 2.0 public clients. In very specific scenarios, a malicious application can intercept an authorization code intended for a legitimate OAuth 2.0 public client and use the authorization code to obtain access and ID tokens on behalf of the client. PKCE introduces additional steps and request parameters to prevent such interception attacks.
+
+Enable this functionality using the `pkceCodeChallengeMethod` attribute in either the `<openidConnectClient>` or `<oidcLogin>` elements in the `server.xml`.
+
+For example, when you use the OpenID Connect Client feature, include configuration similar to the following example:
+
+[source,xml]
+----
+    <featureManager>
+        <feature>openidConnectClient-1.0</feature>
+    </featureManager>
+    ...
+    <openidConnectClient pkceCodeChallengeMethod="S256" ... />
+----
+
+If you are using the Social Media Login feature, include configuration similar to the following example:
+
+[source,xml]
+----
+    <featureManager>
+        <feature>socialLogin-1.0</feature>
+    </featureManager>
+    ...
+    <oidcLogin pkceCodeChallengeMethod="S256" ... />
+----
+
+For more information about the configuration options, refer to the docs for the link:{url-prefix}/docs/latest/reference/config/openidConnectClient.html[openidConnectClient element] and the link:{url-prefix}/docs/latest/reference/config/oidcLogin.html[oidcLogin element].
+
+   
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
+
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/25926
+// Contact/Reviewer: Azquelt
+// // // // // // // // 
+[#featureinstall]
+== Ensure sufficient features are installed when using `featureUtility installFeature` command
+When `featureUtility installFeature <featurename>` is used to install a feature on the command line, the feature and all required dependencies are installed.
+
+However, this doesn't guarantee that the feature will start correctly when used with other features in the server, particularly for features that can work with multiple versions of other features. This means that you could list all the features you wanted to use on the command line but find that they didn't all work together because `featureUtility` hadn't installed the right version of every dependency.
+
+To prevent this problem, running `featureUtility installFeature <featurename>` now installs all versions of any dependencies required by the requested feature, which might result in a larger number of features being installed in some circumstances.
+
+The similar command `featureUtility installServerFeatures <servername>` was not affected by this problem and its behaviour is unchanged. Using `installServerFeatures` is the recommended way to install features as it always installs exactly the minimum set of features needed for the given server configuration.
+   
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
+
+
+For more details, see:
+
+* link:{url-prefix}/docs/latest/reference/command/featureUtility-installFeature.html[featureUtility installFeature docs]
+* link:{url-prefix}/docs/latest/reference/command/featureUtility-installServerFeatures.html[featureUtility installServerFeatures docs]
+
+[#CVEs]
+== Security vulnerability (CVE) fixes in this release
+[cols="5*"]
+|===
+|CVE |CVSS Score |Vulnerability Assessment |Versions Affected |Notes
+
+|http://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2023-38737[CVE-2023-38737]
+|5.9
+|Denial of service
+|22.0.0.13 - 23.0.0.7
+|Affects the link:{url-prefix}/docs/latest/reference/feature/restfulWS-3.0.html[restfulWS-3.0] and link:{url-prefix}/docs/latest/reference/feature/restfulWS-3.1.html[restfulWS-3.1] features
+|===
+For a list of past security vulnerability fixes, see the link:{url-prefix}/docs/latest/security-vulnerabilities.html[Security vulnerability (CVE) list].
+
+
+// // // // // // // //
+// If there were updates to guides since last release, keep the following, otherwise remove section.
+// Check with Gilbert Kwan, otherwise Michal Broz or YK Chang
+// // // // // // // //
+[#guides]
+== New and updated guides since the previous release
+
+As Open Liberty features and functionality continue to grow, we continue to add link:https://openliberty.io/guides/?search=new&key=tag[new guides to openliberty.io] on those topics to make their adoption as easy as possible.  We also update existing guides to address any reported bugs/issues, keep their content current, and expand what their topics cover. 
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/25876
+// Contact/Reviewer: gkwan-ibm
+// // // // // // // // 
+* link:https://openliberty.io/guides/microprofile-telemetry-jaeger.html[Enabling distributed tracing in microservices with OpenTelemetry and Jaeger]
++
+In this new guide in the link:https://openliberty.io/guides/#observability[Observability] category,  you'll learn how to enable distributed tracing in microservices with OpenTelemetry and Jaeger. A cloud-hosted version is also available.
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/25964
+// Contact/Reviewer: gkwan-ibm
+// // // // // // // // 
+* link:https://openliberty.io/guides/openshift-codeready-containers.html[Deploying microservices to an OpenShift cluster using OpenShift Local]
++
+This is the new name for the "Deploying microservices to OpenShift using CodeReady Containers" guide. The application has been updated to use MicroProfile 6 and Jakarta EE 10 features. With the guide, you can learn how to deploy microservices to a local OpenShift cluster running with OpenShift Local (formerly known as CodeReady Containers) by using the `oc` and `podman` commands. OpenShift Local includes the `oc` and `podman` binary.
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
+
+  
+== Get Open Liberty 23.0.0.8 now
+
+Available through <<run,Maven, Gradle, Docker, and as a downloadable archive>>.
