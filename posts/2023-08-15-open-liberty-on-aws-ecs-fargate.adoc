@@ -1,0 +1,681 @@
+---
+layout: post
+title: "Running Open Liberty on Amazon Elastic Container Service with AWS Fargate"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/abutch3r
+author_github: https://github.com/abutch3r
+seo-title: Running Open Liberty on Amazon Elastic Container Service with AWS Fargate - OpenLiberty.io
+seo-description: How to run Open Liberty in Amazon Elastic Container Service with AWS Fargate
+blog_description: "How to run Open Liberty in Amazon Elastic Container Service with AWS Fargate"
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+---
+= Running Open Liberty on Amazon Elastic Container Service with AWS Fargate
+Alex Butcher <https://github.com/abutch3r>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+
+Serverless applications continue to be a hot topic in 2023. With MicroProfile being widely adopted by cloud native applications, many developers want to know:
+
+_How to run MicroProfile applications in Amazon Elastic Container Service in a Serverless manner?_
+
+This post demonstrates how to run a MicroProfile application on Open Liberty in Amazon Elastic Container Service with AWS Fargate.
+
+== What is Serverless?
+Serverless is short for serverless computing, which is an execution model in which the cloud provider allocates resources on demand. Serverless enables you to concentrate on your applications without needing to manage servers.
+
+It does not mean no server is running in the background. On the contrary, serverless architecture contains servers, however the cloud provider is responsible for provisioning, maintaining, and scaling the server infrastructure without operator interaction.
+
+Serverless is traditionally seen in the form of functions and is sometimes referred to _Function as a Service_ (FaaS). However, in recent years _Container as a Service_ (CaaS) offerings have become available that have the key characteristics to be called serverless offerings.
+
+Some examples of FaaS and CaaS serverless cloud offerings:
+
+*	IBM: IBM Cloud Functions (FaaS) & IBM Cloud Code Engine (CaaS)
+*	Amazon Web Services(AWS): AWS Lambda (FaaS) & Amazon Elastic Container Service (CaaS) with AWS Fargate
+*	Google Cloud: Google Cloud Functions & Google Cloud Run
+*	Microsoft Azure: Azure Functions & Azure Container Apps
+
+This post uses the following services and framework to create and run a serverless application in Amazon ECS with AWS Fargate.
+
+=== Amazon Elastic Container Service with AWS Fargate
+
+Amazon Elastic Container Service (Amazon ECS) is a fully managed container orchestration service that helps you easily deploy, manage, and scale containerized applications.
+
+Amazon ECS is built on top of Amazon Elastic Compute Cloud(EC2), with the cloud compute offering providing the servers required to run the application. Amazon EC2 also provides a number of related capabilities such as networking that are used by ECS instances. It is possible to provision and manage the Amazon EC2 Servers the run the ECS cluster workload. As the operator can manage the underlying compute resources such as provisioning the servers. Amazon ECS is, by itself not a serverless offering.
+
+AWS Fargate is a technology that can be used with Amazon ECS to run containers without having to manage the underlying Amazon EC2 servers or clusters. By removing server resource management capabilities for Amazon ECS, AWS Fargate reduces the deployment complexities and handles the scaling of the underlying infrastructure. This allows Amazon ECS with AWS Fargate to provide CaaS capabilities in a serverless manner.
+
+=== MicroProfile
+
+Many developers use https://microprofile.io[MicroProfile] specifications for configuring, securing, and observing cloud native applications. MicroProfile offers a set of standard APIs for cloud-native applications that free your applications from vendor lock-in. Open Liberty is the leading implementation for MicroProfile specifications.
+
+As we enter the serverless era, it is very important to get MicroProfile applications running in a serverless environment. Luckily, it is very straightforward to get these applications running in Container as a Service offerings.
+
+== Deploying an Open Liberty Container to Amazon ECS
+
+=== Pre-requisites
+Before you start, at a minimum you will need the following prerequisites:
+
+* An https://aws.amazon.com/[AWS] account
+** Permission to create, edit and delete Amazon ECS clusters, Task Definitions and Services*.
+** Permission to create, edit and delete AWS EC2 Load Balancers, Security groups and Target Groups*.
+** Permission to retrieve Amazon CloudWatch metrics*.
+** Permission to create, retrieve, update and delete Certificates in Amazon Certificate Manager(ACM)* - Required if following the <<_securing_your_service, Securing your service>> steps.
+
+If you are building the MicroProfile application and hosting the image yourself, these are the additional prerequisites required:
+
+* https://www.docker.com/[Docker]
+* https://git-scm.com/book/en/v2/Getting-Started-The-Command-Line[Git CLI]
+* https://maven.apache.org/[Maven]
+* An externally accessible container registry that can host your images such as Amazon Elastic Container Registry(Amazon ECR) or Dockerhub.
+
+&#42; If your AWS account is an Administrator for the organization, you will have all the required permissions. However, if you are not, then the list of permissions required can be found under <<AWS_Permissions, AWS Permissions Mapping>>
+
+=== Getting Started
+
+If you already have experience with Open Liberty and MicroProfile it is recommended you go straight to <<Creating your Amazon ECS Cluster>> as for this blog, there is a publicly accessible image hosted on IBM Cloud Container Registry (ICCR) that can be used.
+
+If you don't have experience with Open Liberty and MicroProfile or wish to understand more about the application used in this blog follow the steps in <<Create your MicroProfile application>> and <<Uploading the container to a registry>>.
+
+=== Create your MicroProfile application
+In this post, we use https://openliberty.io/guides/getting-started.html[Open Liberty Getting Started guide] to get a simple MicroProfile application that is well suited to run in a serverless environment.
+
+Follow the guide up to and including https://openliberty.io/guides/getting-started.html#running-the-application-in-a-docker-container[Running the application in a Docker container]
+
+=== Uploading the container to a registry
+If you wish to use the image created in <<Create your MicroProfile application>> then it needs to be uploaded to a internet accessible container registry.
+
+Amazon ECS supports a range of container registries outlined in their https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_definition_parameters.html#container_definition_image[Image Registry requirements].
+
+Depending on your choice of registry follow the steps provided by it for uploading your image.
+
+As this blog requires an AWS account, you are most likely to have access to Amazon ECR to act as your registry. To upload the image use the https://docs.aws.amazon.com/AmazonECR/latest/userguide/getting-started-console.html[Get Started] instructions for Amazon ECR.
+
+=== Creating your Amazon ECS Cluster
+To create your Amazon ECS cluster follow step 1. in https://docs.aws.amazon.com/AmazonECS/latest/developerguide/getting-started-fargate.html[Getting started with the console using Linux containers on AWS Fargate].
+
+=== Creating your Task Definition
+Amazon ECS runs either Services or Jobs that use https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_definitions.html[Task Definitions] to define the runtime configuration for the task. The task definition includes some of the following properties:
+
+* Container Image URL
+* CPU & Memory
+* Port Mappings
+* Environment variables
+* Compatibilities
+
+The values of these properties cannot be overridden by the service or job definition that execute the task definition. For example, if the same task definition was used in Development and Production deployments, then they would share these properties. As such it is recommended that separate task definitions are defined per environment.
+
+The instructions below will use a publicly accessible Open Liberty getting started guide container image. If you are using your own container, substitute `icr.io/appcafe/open-liberty/samples/getting-started` with the path for your image.
+
+There are two methods to create your task definition, via a UI wizard or via applying a JSON definition.
+
+==== Creating Open Liberty Task Definition via the AWS Console UI
+
+From the Task Definition view under Amazon ECS::
+. Choose Create new Task Definition
+. Supply a task definition family name, for example `ol-getting-started-blog`
+. Under `Container - 1` - `Container details`
+.. Name for the container, for example `open-liberty-getting-started`
+.. supply the Image URI, `icr.io/appcafe/open-liberty/samples/getting-started`
+. under `Container - 1` - `Port Mappings`
+.. Change the existing port mapping from `80` to `9080`&#42;
+.. Add more port Mappings
+... Set port to `9443`&#42;
+... Set protocol to `HTTP`&#42;&#42;
+. Click `Next`
+. Update Task size
+.. Set CPU to `.5 VPC`
+.. Set Memory to `1 GB`
+. Click `Next`
+. Review the Task definition parameters
+. Click `Create`
+
+&#42; Open Liberty uses ports `9080` for HTTP and `9443` for HTTPS as its defaults. These can be changed in `server.xml` to be for example `80` and `443` respectively.
+
+&#42;&#42; The `App protocol` port mapping refers to the network transport protocol that is to be used: `HTTP`/`HTTP2`/`GRPC`, not the application layer protocol, so both `HTTP` and `HTTPS` are available as part of `HTTP` and `HTTP2` protocols.
+
+// [.img_border_light]
+image::/img/blog/amazon-ecs-openliberty-task-definition.png[Amazon ECS Open Liberty Task Definition ,width=90%,align="center"] +
+
+
+// [.img_border_light]
+image::/img/blog/amazon-ecs-openliberty-task-definition-environment.png[Amazon ECS Open Liberty Task Definition environment,width=90%,align="center"]
+
+Once the task definition has been created, it can be updated to change the parameters such as the Image URI or CPU. The update will create a new revision that can be referenced by your Service. If the service already exists it will need to be updated to use the new revision, as Amazon ECS does not rollout new revisions automatically to exist services.
+
+==== Creating Task definition using JSON
+To apply the below example task definition to create a new Task definition follow Step 2. in https://docs.aws.amazon.com/AmazonECS/latest/developerguide/getting-started-fargate.html[Getting started with the console using Linux containers on AWS Fargate].
+
+Before applying, ensure that the `logConfiguration.options.awslogs-region` setting matches the region you are planning on deploying into.
+
+Example Open Liberty Task Definition:
+
+[source]
+----
+{
+    "family": "ol-getting-started-blog",
+    "containerDefinitions": [
+        {
+            "name": "open-liberty-getting-started",
+            "image": "icr.io/appcafe/open-liberty/samples/getting-started",
+            "cpu": 512,
+            "memory": 1024,
+            "portMappings": [
+                {
+                    "name": "liberty-getting-started-9080-tcp",
+                    "containerPort": 9080,
+                    "hostPort": 9080,
+                    "protocol": "tcp",
+                    "appProtocol": "http"
+                },
+                {
+                    "name": "liberty-getting-started-9443-tcp",
+                    "containerPort": 9443,
+                    "hostPort": 9443,
+                    "protocol": "tcp",
+                    "appProtocol": "http"
+                }
+            ],
+            "essential": true,
+            "environment": [],
+            "environmentFiles": [],
+            "mountPoints": [],
+            "volumesFrom": [],
+            "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                    "awslogs-create-group": "true",
+                    "awslogs-group": "/ecs/ol-getting-started-demo",
+                    "awslogs-region": "us-east-1",
+                    "awslogs-stream-prefix": "ecs"
+                }
+            }
+        }
+    ],
+    "executionRoleArn": "",
+    "networkMode": "awsvpc",
+    "requiresCompatibilities": [
+        "FARGATE"
+    ],
+    "cpu": "512",
+    "memory": "1024",
+    "runtimePlatform": {
+        "cpuArchitecture": "X86_64",
+        "operatingSystemFamily": "LINUX"
+    }
+}
+----
+
+A full list of task definition parameters can be found https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_definition_parameters.html[here].
+
+=== Configuring the Network
+While we are using Amazon ECS with AWS Fargate to manage our runtime, networking components come under Amazon EC2 and still require an amount of management.
+
+For this blog, we want to expose our application externally on protocol default ports: `80` for HTTP and `443` for HTTPS, while using non-default protocol ports for our container.
+
+The networking components can be created during the Amazon ECS Service creation steps. However, issues have been encountered when creating everything using the Amazon ECS Service creation wizard. The primary issue is mapping the different port values between the task definition and the exposing load balancer. The wizard contains an assumption that the port that we will publically expose the service by, is the same as the port that the target group will be forwarding to on the running container. As the port mapping cannot be changed once the target group has been created, the networking components will be created first and then referenced by the service later.
+
+For this blog the default Virtual Private Cloud(VPC) is sufficient and for the standard configuration we will use `HTTP` as the chosen protocol. For HTTPS, <<_securing_your_service, Securing your service>> goes through the additional steps to secure your service with certificates.
+
+The following AWS EC2 networking components will be created:
+
+* Security Group
+* Target Group
+* Application Load Balancer(ALB)
+
+==== Security Group
+The Security Group defines the inbound and outbound network rules applied to a Load Balancer and service.
+
+For this blog, only Inbound Rules are required. The group can be applied to multiple services and load balancers, as such the definition can include both `HTTP` and `HTTPS` definitions, for both IPv4 and IPv6 for any port that might be used.
+
+.Create AWS EC2 Security Group
+. In the AWS EC2 Menu - Select `Security Groups` under `Network & Security`
+. Create security group
+. Provide a name for the new security group e.g. ol-security-group
+. Provide a description if needed
+. Click `Add Rule` and for each of following sets, update the following values to match
+.. HTTP - IPv4
+... Type = `HTTP`
+... Source = `Anywhere-IPv4`
+.. HTTP - IPv6
+... Type = `HTTP`
+... Source = `Anywhere-IPv6`
+. `Create security group`
+
+.For HTTPs traffic the following rules would be applied
+.. HTTPS - IPv4
+... Type = `HTTPS`
+... Source = `Anywhere-IPv4`
+.. HTTPS - IPv6
+... Type = `HTTPS`
+... Source = `Anywhere-IPv6`
+. `Create security group`
+
+.If you want to expose Open Liberty on all its its default Ports
+.. HTTP - IPv4
+... Type = `Custom TCP`
+... Port = `9080`
+... Source = `Anywhere-IPv4`
+.. HTTP - IPv6
+... Type = `Custom TCP`
+... Port = `9080`
+... Source = `Anywhere-IPv6`
+.. HTTPS - IPv4
+... Type = `Custom TCP`
+... Port = `9443`
+... Source = `Anywhere-IPv4`
+.. HTTPS - IPv6
+... Type = `Custom TCP`
+... Port = `9443`
+... Source = `Anywhere-IPv6`
+. `Create security group`
+
+image::/img/blog/amazon-ec2-security-group-port-mapping.png[Amazon EC2 Security Group Port Mapping ,width=90% ,align="center"]
+
+==== Target Group
+Target Groups can be viewed as being similar to a Kubernetes Service, in that defines a mapping between the incoming source such as a Load Balancer and the task instance. However unlike a Kubernetes Service you only define the target port, not the source port. The source port is provided by the ALB via its Listeners.
+
+Each Target Group can only be used by one ALB. However, an ALB can have multiple listeners which reference different target groups.
+
+.To create the Target Group
+. In the AWS EC2 Menu - Select `Target Groups` under `Load Balancing`
+. Create target group
+. For `target type`, select `IP addresses`*
+. Provide a name for the target group e.g. `ol-http-target-group`
+. Change the protocol to `HTTP`
+. Change the port to `9080`
+. Set the VPC, unless your organization has one that needs to be used, use the default
+. Update the Health check path to `/health` - Open Liberty provides this endpoint via the MicroProfile Health feature and is a suitable check for health and readiness of the container.
+. Expand `Advanced health check settings`
+.. Increase the `Unhealthy threshold` to `5`**
+. Click `Next`
+. Select `Add an Application Load Balancer later`
+. Click `Create`
+
+&#42; As the service is to be exposed via HTTP, `IP address` is the best option due to the available protocols and what the default vpc supports.
+
+&#42;&#42; Given the limited amount of compute resources we provide to the container at runtime, in particular CPU resource (.5 CPU). It can take some time for Java and Open Liberty to reach a healthy state and while it can start to process traffic, it is possible that the Target group health checks will fail ahead of a ready state and cause the container to enter a restart loop as it is effectively starved of resources.
+
+image::/img/blog/amazon-ec2-target-group-creation.png[Amazon EC2 Target Group creation, width=90%, align="center"]
+
+==== Application Load Balancer
+For our application the best type of load balancer to use is an Application Load Balancer(ALB) as it will be only handling HTTP traffic.
+
+.To create the Application Load Balancer
+. In the AWS EC2 Menu - Select `Load Balancers` under `Load Balancing`
+. Click `Create Load Balancer`
+. Under `Application Load Balancer`, click `Create`
+. Provide a name for the Load Balancer e.g. ol-app-load-balancer`
+. Leave scheme as `Internet-facing` as this will allow us to access to application
+. For Network settings
+.. Set VPC to the default
+.. Select the Availability zone mappings - at least two should be selected
+. Under Security Groups
+.. Remove the default Security Group
+.. Select the one you created earlier
+. Under Listeners
+.. Set the Target Group to one you created earlier
+. Click `Create load balancer`
+
+We have now created all the required supporting AWS artifacts so we can now create the Amazon ECS Service
+
+You can see more creation options in https://docs.aws.amazon.com/AmazonECS/latest/developerguide/create-application-load-balancer.html[Amazon ECS Load Balancer documentation]
+
+=== Create your Amazon ECS Service
+The Amazon ECS supports two types of runtime definitions, Service and Tasks. Tasks define batch type workloads and typically don't have any external input while running, while Services are suited to web applications. As such Services are used for this blog.
+
+.To Create the Service
+. Go to the Amazon ECS Service
+. Go to `Clusters`
+. Select the Cluster you created earlier
+. Under the Services Tab, click `Create`
+. Under `Environment`
+.. Update Compute Options from `Capacity provider strategy` to `Launch Type`
+.. Ensure Launch type is `Fargate`
+. Under `Deployment Configuration`
+.. For Family, set to the Task Definition created earlier
+.. Ensure Revision is latest
+.. Provide the service a name e.g. ol-getting-started-service-1
+.. Set the desired count to `0`*
+. Under `Networking`
+. Under `Load Balancing`
+.. Set `Load balancer type` to `Application Load Balancer`
+.. Select `Use an existing load balancer`
+.. Select the ALB created earlier
+.. Ensure the mapping is to the HTTP port for the Task Definition
+.. Select use an existing Listener
+... Select the Listener for Port 80
+.. Select `Use an existing target group`
+.. Select the Target group created earlier
+. Click `Create`
+
+&#42; To reduce cost, by setting count to 0, we will not start a container as part of the creation stage. when we are ready, then will be put back to `1` to start the container
+
+=== Manually Scaling the service
+Having created the service with 0 running tasks, it is now time to start running it.
+
+.Scaling the service
+. Within the ECS Service, go to your Cluster
+. Select your service
+. Click `Update service`
+. Update the `Desired task` number to `1`
+
+=== Making requests to our service
+With the service started we can now start to use it.
+
+The first step is to get the DNS name for the Load Balancer. We can get the DNS name for the load balancer either from the load balancer itself or from the target Service.
+
+.Obtaining the DNS name from your Load Balancer
+. Go to the EC2 Service
+. Select `Load Balancers` under `Load Balancing`
+` Copy the address from the `DNS name` column
+
+.Obtaining the DNS name of your Load Balancer from the Service
+. Go to your cluster
+. Select your Service
+. Go to the Networking tab
+. Either copy or click `open address`
+
+As we used the Open Liberty `getting-started` image, the application and in particular the web front end is hosted on the root (`/`) of the server. So we can take the copied URL and insert in our browser's address bar to get the application page. The application page will then call the RESTful endpoints in the application to get us the server details, such as its health, config and metrics.
+
+image::/img/blog/amazon_ecs_hosted_page.png[Amazon ECS Open Liberty Application Web Page, width=90%,align="center"]
+
+=== Monitoring our service
+
+With the Service started, we can start to monitor it using the Amazon ECS tooling and Amazon CloudWatch. The ECS tooling
+
+==== CPU and Memory usage
+
+Within the service definition we can see a level of CPU and memory usage
+
+image::/img/blog/amazon_ecs_service_health.png[Amazon ECS Service health ,width=90%,align="center"]
+
+==== Logs
+
+Amazon ECS captures the `STDOUT` and `STDERR` output from the instances and provides them in the `Logs` tab within the Service. If logs are written to file, then you would need to log in to the running container to retrieve them.
+
+Each log line is an individual row within the list that is produced within the tab allowing for easier filtering and searching of events and are recoverable post pod termination.
+
+If you have multiple instances of the container running then all of the messages will appear in the table together, though will state which instance they came from. You can review logs of individual instances by clicking on the links.
+
+=== Scaling your application via auto-scaling policies
+Manually scaling is ok for testing, but in production we want the environment to use performance indicators to make scaling decisions for us.
+
+Scaling policies can be applied and adjusted after the Service has been created. The policy that you use should best reflect the expected bottlenecks of your application. If your application handles complex workloads the CPU or Memory. It is possible to define more than one scaling policy per service
+
+The policy allows you to define:
+
+* Number of tasks (instances of your application)
+    * Minimum number (>=0 &amp; \<= desired tasks)
+    * Maximum number (>=0)
+* Scaling metric
+** Percentage of CPU
+** Percentage of Memory
+** Number of ALB Requests over a period of time
+* Threshold relative to the metric
+* Scale in and out periods
+
+The metrics use CloudWatch data and associated "alarms" to trigger automated scale out actions and reviews them based on the periods set to.
+
+The minimum number of tasks can be set to 0, however as Amazon ECS cannot scale up from 0, then the value in setting the minimum to 0 is limited unless you are completely stopping the service.
+
+For Open Liberty, all 3 scaling metrics can be used. The decision as to which as metric to use relates to the nature of the application that has been deployed on to Open Liberty. If you have requests that are CPU heavy, then CPU based alarms would be the recommendation, however if you have high volume, but low CPU requests then ALB requests* might be a better fit.
+
+ECS Scaling policies are split into 2 alarms:
+
+* Scaling out
+* Scaling in
+
+The first alarm is the primary one that we set and AWS will provide a metric definition for scaling in that is matched to the scaling out definition, Though both can be adjusted independently of the Service definition.
+
+The alarms gather CloudWatch data based on their metric over time, this is to try and prevent accidental scaling events of both out and in. If an instance were to experience a short high load period, then when compared to corresponding data points, where we are at typical workload then the alarm is not triggered and we don't spin up unneeded instances. For scaling in, this is the reverse in that we don't ideally want to terminate instances that might be handling workload
+
+Given for this blog, we have given our instances a very small amount of memory and CPU, it is best that we use ALB as our scaling metric as it is either to easy to scale on CPU given we can easily hit high CPU values without any significant workload or to hard to do so based on memory.
+
+To create an ALB request Scaling policy, we shall edit our instance:
+
+. Go to your cluster
+. Select your Service
+. Select `Update service`
+. Set the `Desired tasks` to `1`
+. Expand `Service auto scaling`
+. Set the minimum to `1`
+. Set the maximum to `2`
+. Click `+ Add scaling policy`
+. Give your policy a name e.g. `mp-sp`
+. Set the `ECS service metric` to `ALBRequestCountPerTarget`
+. Set the Target value to `2`
+. Set `Scale out cooldown period` to `30`
+. Set `Scale in cooldown period` to `30`
+. Click Update
+
+The target value is set to a very low value so that it is easier to cause a scaling out alarm to trigger and create new instances. This value should be scoped to the requirements of the application and also that the amount of other resources provided are capable of handling that type of workload.
+
+image::../img/blog/amazon_ecs_scaling_policy.png[Amazon ECS scaling policy, width=70%,align="center"]
+
+Having created our policy we can now try to cause the alarm to trigger and cause our service to increase the number of instances available.
+As we are looking at requests against the ALB, we just need to invoke our applications URL to generate some traffic.
+
+Given that it requires 3 datapoints above our target in a given period, we just need to invoke
+
+image::/img/blog/amazon_ecs_scaled_instances.png[Amazon ECS scaled out service,width=90%,align="center"]
+
+==== Using CloudWatch Metrics
+
+For further information about Amazon ECS scaling policies you can find additional information https://docs.aws.amazon.com/AmazonECS/latest/developerguide/service-autoscaling-targettracking.html?icmpid=docs_ecs_hp-deploy-failure-detection[here].
+
+[#_securing_your_service]
+=== Securing your service
+
+Throughout this blog we have used HTTP as our application layer protocol. However, typically we would want any client connections to be made over HTTPS. For this section we will publicly expose the service on port `443` while communicating with the default Open Liberty secure port `9443`.
+
+We have already exposed our task on the HTTPS port of `9443`. As such we need to create target group that will allow for the HTTPS connection between the ALB and the running service and create an ALB that provides a certificate on port `443`.
+
+When handling connections via HTTPS.The ALB performs a termination of the client HTTPS connection.It then creates a new HTTPS connection to the running service to pass on the contents of the original request.The ALB implicitly trusts the certificate served up by Liberty, regardless of state of the liberty certificate.
+
+==== Creating a HTTPS Target Group
+As the Target group defines the ports that the service will use and effectively map our routing from inbound port `:443` to the server port `:9443` a new one needs to be defined for HTTPS connections.
+
+.To create the Target Group
+. In the AWS EC2 Menu - Select `Target Groups` under `Load Balancing`
+. Create target group
+. Select `IP Address`*
+. Provide a name for the target group e.g. `ol-https-target-group`
+. Change the protocol to `HTTPS`
+. Change the port to `9443`
+. Set the VPC to the default, unless your organization has one that needs to be used
+. Change the Health check protocol to `HTTPS`
+. Update the Health check path to `/health`
+. Expand `Advanced health check settings`
+.. Increase the `Unhealthy threshold` to `5`
+. Click `Next`
+. Select `Add an Application Load Balancer later`
+. Click `Create`
+
+==== Creating SSL Certificates
+AWS provides many ways to create, upload and store your certificates. For this blog AWS Certificate Manager(ACM) will be used for storing our certificate.
+
+Within ACM there are two ways to create a certificate:
+
+. Requesting one from Amazon which is signed with a trusted CA - this can be done within or ACM or via the ALB creation process - however this does require a significant amount of priveleges if you are not an admin
+. Create one somewhere else and import it into ACM.
+
+Various permissions are required for the options within ACM to get a certificate in to the store. However requesting a certificate does come with checks that you have control over the domain so only use this if you actually have a domain that can be provided.
+
+However there are not the same checks done on certificates that are imported into ACM that can be generated by a third party or created locally.
+
+To create your certificate it is recommended that you either use a third-party provider such as Let's Encrypt or create locally with tools like `openssl`. For all of these there are plenty of suitable guides and sets of instructions to generate everything you need. The key part is that you need to supply both the public and private key contents.
+
+When generating the certificate here are some considerations:
+
+. Must be in `pem` format
+. Private key must be in decrypted form
+. As the default host that amazon provides to our ALB will be being used to access the server. To make it easier wildcards can be used as part of the common name of the host, for example `&#42;.amazonaws.com` or if you want to limit by AWS region `&#42;.us-east-1.elb.amazonaws.com` will match any default URL in any region or any default url in the US-east-1 region.
+
+
+.To Import a certificate into ACM
+. Within ACM
+. Click `Import certificate`
+. Copy and Paste your Public certificate and Private key
+. Click `Next`
+. Click `Next`
+. Validate the values
+. Click `Import`
+
+
+==== Creating a HTTPS Application Load Balancer
+Having created the HTTPS Target group, we now need to expose this external and for that a new ALB should be created to utilize the new target group.
+
+.To create the HTTPs  enabled ALB
+. In the AWS EC2 Menu - Select `Load Balancers` under `Load Balancing`
+. Click `Create Load Balancer`
+. Under `Application Load Balancer`, click `Create`
+. Provide a name for the Load Balancer e.g. ol-app-load-balancer`
+. Leave scheme as `Internet-facing` as this will allow us to access to application
+. Under `Network settings`
+.. Set VPC to the default
+.. Select the Availability zone mappings - at least two should be selected
+. Under `Security Groups`
+.. Remove the default Security Group
+.. Select the one you created earlier
+. Under `Listeners`
+.. Set the protocol to `HTTPS` - this should automatically update the port to `443`
+.. Set the Target Group to one you created earlier which uses the `HTTPS` protocol
+. Under `Secure listener settings`
+.. Set the Security policy - the default is will be the recommended option
+.. Under `Default SSL/TLS certificate` select the certificate you imported earlier
+. Click `Create load balancer`
+
+==== Creating a Secure service
+Having created the HTTPS target group and ALB, a new Amazon ECS service is needed to connect with the load balancer and target group
+
+It is not possible to edit an existing service to use a new target group. So a new one needs to be created. Given the task definition supports both HTTP and HTTPS already the same definition can be used
+
+Following the steps in <<Create your Amazon ECS Service>> selecting the secure load balancer and associated target group will create a new service definition which will use HTTPS instead of HTTP.
+
+==== Making requests to our secure service
+The steps for making requests against our new secure service are the same as in <<Making requests to our service>> obtaining the url for our secure ALB. The only difference is specifying access via `https://` as the copied url will not include the protocol.
+
+The ALB will do a redirect if you attempt to access it using the `http://` protocol to the `HTTPS` protocol and port
+
+=== Clean up
+As a number of key components such as the ALB or Service were created separately from the main Amazon ECS service. Then the deletion of the Amazon ECS service will not delete all of these associated components. As such they will need to be individually deleted.
+
+As a reminder of what we have created that will need to be deleted if not going to be used again:
+
+.Amazon EC2
+* Application Load Balancer
+* Target Group
+* Security Group
+
+.Amazon Certificate Manager
+* Certificate used by the ALB
+
+.Amazon ECS
+* Service
+* Cluster
+* Task Definition
+
+.Amazon ECR
+* Container Image
+
+As the default VPC was used, then it cannot be deleted. If one was created for the purposes of following this blog, then it should be deleted.
+
+=== Key Considerations when using Amazon ECS with Fargate
+Amazon ECS with Fargate does provide arguably the most configurable Container as a Service offering from any of the major cloud providers. However, It has also been a challenge to configure all the necessary pieces given a very significant number of assumptions that AWS makes about our container that become apparent during wizard based deployments such as use of non-default ports.
+
+If it had not been for non-default ports, a significant number of the permissions that were required as a non-admin in the end would not have been needed as the ECS Wizard does cover basic creation of target groups and ALBs, however once you are off the golden path or needing to do something above what the wizard is capable of
+
+Compared to AWS Lambda, it is easier to lift an existing containerized application into Amazon ECS given that there is no need to use the Amazon SDK or Runtime API to send and receive work and for web applications it is a much better fit.
+
+There are a number of benefits over other CaaS offerings
+
+* More control over the deployment as you do have access to the various resources that you create
+* More flexibility in the configuration at multiple levels
+* More granular access control such that it is possible to create better divisions of responsibility
+* Can define related microservices in a single task definition and scale all together. The scaling is at a ratio of 1:1, so you cannot scale one container independently of another. Competitors typically only allow the deployment of a single container per definition.
+* Can scale on CPU or Memory metrics as well as HTTP requests, which might better fit an application's  profile.
+
+While Amazon ECS with Fargate running services does provide a highly scalable serverless architecture it does have some limitations compared to its competitors such as IBM Cloud Code Engine(ICCE) or Azure Container Apps(ACS) for running Web Applications:
+
+* No scale to 0. To be able to handle requests you need at least 1 running instance. Both ICCE and ACS support scale from 0 for HTTP workloads.
+* Networking management. Even basic networking needs the deployer to configure and manage their network resources.
+* Harder to manage given mix of Amazon ECS and Amazon EC2 resources needed for a single application.
+* Harder to get typical real world examples working quickly
+* Scaling can take some time to start to scale out as it requires 3 readings above the set threshold before it will act.
+* No auto-generation of trusted certificate for new HTTPS ALBs, especially if using the `amazonaws` domain
+* Integration with other AWS services is not well documented with the focus being on AWS Lambda instead of Amazon ECS
+* Large number of permissions required for a single person to deploy all resources needed by an application as a non-admin.
+
+== Appendices
+
+=== AWS Permission Mapping [[AWS_Permissions]]
+If you are not the owner or an administrator of the Account you will find that to complete the above a significant number of permissions are required.
+
+Some of these are not directly used, however if not granted can cause in particular UI errors at key stages preventing the completing of certain steps. In particular `LIST` permissions for IAM and ACM certificates are needed for HTTPS.
+
+.Amazon ECS & AWS EC2
+https://docs.aws.amazon.com/AmazonECS/latest/developerguide/security-iam-awsmanpol.html#security-iam-awsmanpol-AmazonECS_FullAccess[Amazon ECS & AWS EC2 Full Access Permissions] cover the majority of permissions for standard creation and deletion and also includes Amazon CloudWatch.
+
+.Amazon CloudWatch
+To get Metrics data for use with alarms
+[source]
+----
+CloudWatch:getMetricsdata
+----
+
+To view logs for individual instances - this is only required if looking at individual task instances
+[source]
+----
+logs:GetLogEvents
+----
+
+.Amazon Certificate Manager
+https://docs.aws.amazon.com/acm/latest/userguide/authen-apipermissions.html[Amazon Certificate Manager Permissions]
+
+Neither of the standard ACM policies generally meet our requirements, however if you do have certs provided for you, the Read Only policy should be sufficient, but if uploading your own certificates or looking to request certificates then the following list should provide the needed permissions.
+
+[source]
+----
+"acm-pca:ListCertificateAuthorities",
+"acm:DescribeCertificate",
+"acm:ListCertificates",
+"acm:GetCertificate",
+"acm:ListTagsForCertificate",
+"acm:GetAccountConfiguration",
+"acm:ImportCertificate",
+"acm:RequestCertificate",
+"acm:DeleteCertificate",
+----
+
+Identity Access Management
+The following permission is required when dealing with assigning Application Load Balancer certificates within the AWS Console. Without it, the list of certificates will not be populated even if you have the right ACM permissions.
+
+[source]
+----
+iam:ListServerCertificates
+----
+
+.Amazon Elastic Container Registry
+https://docs.aws.amazon.com/AmazonECR/latest/userguide/security-iam-awsmanpol.html[Amazon ECR permission guide] covers a range of possibilities. Our requirement is the abilitity to push and retrieve images, as such the `AmazonEC2ContainerRegistryPowerUser` policy provides almost all the required permissions.
+
+The only missing permission is the ability to delete images which is provided under the following action:
+
+[source]
+----
+ecr:BatchDeleteImage
+----
+
+If you are not using Amazon ECR then the related permissions are not required.
+
+== Additional Resources
+ * https://aws.amazon.com/ecs/[Amazon Elastic Container Service]
+ * https://aws.amazon.com/fargate/[AWS Fargate]
+
+ * https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_definitions.html[Amazon ECS Task Definitions]
+ * https://docs.aws.amazon.com/AmazonECS/latest/bestpracticesguide/intro.html[Amazon ECS Best Practices]
+ * https://docs.aws.amazon.com/elasticloadbalancing/latest/application/introduction.html
+ * https://docs.aws.amazon.com/elasticloadbalancing/latest/application/create-https-listener.html#https-listener-certificates[Create an HTTPS listener for your Application Load Balancer]
+ * https://aws.permissions.cloud/[AWS Permissions]
