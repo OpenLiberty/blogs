@@ -1,0 +1,267 @@
+---
+layout: post
+title: "迅速にスタートアップするためのクラウド・ネイティブJavaアプリケーションのパッケージング方法"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/tjwatson
+author_github: https://github.com/tjwatson
+seo-title: 迅速にスタートアップするためのクラウド・ネイティブJavaアプリケーションのパッケージング方法 - OpenLiberty.io
+seo-description: クラウド・ネイティブのJavaアプリケーションを、スループット、メモリ、開発・本番の同等性、Java言語機能を損なうことなく、ミリ秒単位で起動できるように再パッケージ化できることをご存じでしょうか。しかも、アプリケーション・コードをほとんどリファクタリングせずに？その方法をご紹介します。
+blog_description: "クラウド・ネイティブのJavaアプリケーションを、スループット、メモリ、開発・本番の同等性、Java言語機能を損なうことなく、ミリ秒単位で起動できるように再パッケージ化できることをご存じでしょうか。しかも、アプリケーション・コードをほとんどリファクタリングせずに？その方法をご紹介します。"
+open-graph-image: https://openliberty.io/img/blog/checkpoint4.png
+open-graph-image-alt: InstantOnチェックポイントとリストア処理
+additional_authors:
+- name: Vijay Sundaresan
+  github: https://github.com/vijaysun-omr
+  image: https://avatars0.githubusercontent.com/vijaysun-omr
+
+- name: Laura Cowen
+  github: https://github.com/lauracowen
+  image: https://avatars0.githubusercontent.com/lauracowen
+
+- name: 浅田 かおり (翻訳)
+  github: https://github.com/kaori-asa
+  image: https://avatars0.githubusercontent.com/kaori-asa
+blog-available-in-languages:
+- lang: en
+  path: /blog/2023/06/29/rapid-startup-instanton.html
+---
+= 迅速にスタートアップするためのクラウド・ネイティブJavaアプリケーションのパッケージング方法
+Thomas Watson <https://github.com/tjwatson>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+クラウド・ネイティブのJavaアプリケーションを、スループット、メモリ、開発・本番の同等性、Java言語機能を損なうことなく、ミリ秒単位で起動できるように再パッケージ化できることをご存じでしょうか。しかも、アプリケーション・コードをほとんどリファクタリングせずに？その方法をご紹介します。
+
+== スタートアップ時のスピードの必要性
+
+サーバーレス環境では、継続的なリクエストがないときに不要なアプリケーション・インスタンスをシャットダウンすることで、デプロイされたアプリケーションのクラウド・コスト全体を削減することができます。アプリケーションの活動が活発化すると、アプリケーションのエンドユーザーに著しい遅延をもたらすことなく、新しいインスタンスを迅速に開始することができます。
+
+クラス・データ共有や動的AOTコンパイルなど、JDKの技術を改良して1秒未満で起動できるようになったとはいえ、Scale-to-zeroをサポートできるほど高速に起動することはできません。しかし、JDKは、スループットとメモリを最適化し、開発と本番の同等性を確保し、Java言語のあらゆる機能を可能にするために重要です。では、完全なJDKで実行することで恩恵を受けながら、起動時間を改善するにはどうすればいいのでしょうか？
+
+Open LibertyランタイムのInstantOn機能は、IBM Semeru JDKとlink:https://criu.org/Main_Page[Checkpoint/Restore in Userspace](CRIU)と呼ばれるLinux技術を使用して、アプリケーション・プロセスのチェックポイント（ポイント・イン・タイム・スナップショット）を取ります。このチェックポイントは、アプリケーション・プロセスをチェックポイントを取得したときの状態に戻すために、非常に迅速にリストアすることができます。Open LibertyとSemeru JDKは、コンテナ内でリストアされた各プロセスの一意性を保持するため、アプリケーションを複数回リストアできます。 リストアされた各アプリケーション・プロセスは、最初に起動シーケンス全体を実行することなく実行されるため、起動時間を最大90%節約できます（アプリケーションの依存関係による）。InstantOnでは、この改善を実現するためにJavaアプリケーションをほとんど変更する必要はありません。
+
+以下の図は、コンテナ・イメージの構築時に取得されるチェックポイントを使用して、アプリケーション・ プロセスのチェックポイント済みフェーズにアプリケーションをリストアすることで、本番環境で複数の アプリケーション・インスタンスを迅速に起動する方法を示しています。
+
+[.img_border_light]
+image::/img/blog/checkpoint4.jpg[チェックポイントとリストアのプロセス図,width=70%,align="center"]
+
+InstantOn は、コンテナ・イメージのビルド以外では使用できません。アプリケーション・コンテナ・イメージは、Open Liberty アプリケーション・プロセスを確実にリストアするために必要な、常に一貫した環境を提供します。InstantOn チェックポイントは、アプリケーション・コンテナ・イメージの最後のレイヤーに含まれる以降、イメージの基礎となるレイヤーのリソースは、チェックポイントを取得した時点からイメージをリストアする時点まで変更されません。
+
+以下のチュートリアルでは、Linux上で動作するOpen Liberty Javaランタイム、InstantOn、IBM Semeru JDK、およびPodmanコンテナ・ツールを使用して、アプリケーションをコンテナ化する手順を説明します。Open Libertyでアプリケーションをコンテナ化する一般的な情報については、link:/guides/containerize-podman.html[Podmanでmicroservicesをコンテナ化する] ガイドをご参照ください。
+
+== コンテナ化されたアプリケーションをチェックポイント／リストアするための前提条件
+
+現在、link:/blog/2023/06/27/23.0.0.6.html[Open Liberty v23.0.0.6]以降では、x86-64/amd64アーキテクチャ上でのみInstantOnでの実行をサポートしています。
+すべてのテストはRHEL 9.0とUbuntu 22.04で行われましたが、以下の前提条件があれば、他のLinuxディストリビューションやバージョンでも実行できるかもしれません。s
+
+-	カーネルはlink:https://man7.org/linux/man-pages/man7/capabilities.7.html[CAP_CHECKPOINT_RESTORE] ケイパビリティを サポートする必要があります。このケイパビリティはカーネルバージョン5.9で導入されました。
+-	Linuxディストリビューションで利用可能な最新バージョンのPodmanをインストールする必要があります。
+-	Linuxディストリビューションは、PodmanまたはDockerを使用した特権コンテナビルドの実行を許容する必要があります。
+
+ランタイムとホスト・ビルド・システムの前提条件の詳細については、link:/docs/latest/instanton.html#prereq[Liberty InstantOnドキュメント]をご参照ください。
+
+== アプリケーションWARファイルの作成
+
+もし自分のアプリケーションが手元にない場合は、link:/guides/getting-started.html[Getting started with Open Libertyガイド]から、アプリケーションの例を見ながら進めることができます。
+
+まず、link:https://github.com/openliberty/guide-getting-started[Git repository]にあるガイドをクローンしてください。
+
+[source,console]
+----
+git clone https://github.com/openliberty/guide-getting-started.git
+cd guide-getting-started
+----
+
+次に、`finish/`ディレクトリにあるアプリケーションをビルドし、Open Libertyにデプロイします
+
+[source,console]
+----
+cd finish
+mvn liberty:run
+----
+
+次のメッセージが表示されたら、Open Liberty インスタンスの準備は完了です。
+
+[source,console]
+----
+defaultServerサーバーは、よりスマートなPlanetを実行する準備ができています。
+----
+
+http://localhost:9080/dev/system/properties URLでサービスを確認します。
+Open Liberty を起動したコマンドラインセッションで **CTRL+C** にて、実行中の Open Liberty インスタンスを停止します。
+
+最後に、アプリケーション用のWARをビルドします。
+
+[source,console]
+----
+mvn package
+----
+
+このコマンドは `target/guide-getting-started.war` アーカイブをビルドします。これで、InstantOn 機能を使用するコンテナイメージにこの WAR を含めることができるようになります。
+
+== アプリケーションの起動時間のテスト
+
+InstantOn を使用した場合と使用しなかった場合の、Open Liberty アプリケーション・コンテナ・イメージの起動にかかる時間を比較するために、まず InstantOn を使用せずにコンテナ・イメージを構築する方法を説明します。次に、InstantOn を使用してビルドし、そのコンテナを実行する方法を説明します。
+
+=== InstantOnを使用しないOpen Libertyアプリケーションのコンテナ化
+
+InstantOn なしでアプリケーション・コンテナ・イメージを構築する。
+
+[source,console]
+----
+podman build -t getting-started .
+----
+
+このコマンドは、チェックポイント・イメージなしで起動コンテナ・イメージを作成します。
+
+このアプリケーション・コンテナを実行します。
+
+[source,console]
+----
+podman run --name getting-started --rm -p 9080:9080 getting-started
+----
+
+Open Liberty が開始されたことをレポートするまでにかかる時間に注意し、http://localhost:9080/dev/system/properties URL でコンテナ内で実行されているサービスを確認します。アプリケーションの確認が終わったら、`podman run` コマンドを実行したコマンドラインセッションで **CTRL+C** と入力して、実行中のコンテナを停止します。
+
+=== InstantOnによるOpen Libertyアプリケーションのコンテナ化
+
+Open Liberty コンテナイメージには、チェックポイントされたランタイムプロセスを持つアプリケーションコンテナイメージを構築するための前提条件が含まれています。アプリケーションは、Open Liberty イメージをベースとして独自のアプリケーション・コンテナ・イメージを構築し、そこからチェックポイントされたプロセスを持つ独自のアプリケーション・コンテナ・イメージを作成することができます。
+
+[#build]
+==== アプリケーション・コンテナ・イメージを構築し、アプリケーションをチェックポイントします。
+
+InstantOn チェックポイントは、アプリケーション・コンテナ・イメージのビルド・ステッ プで Open Liberty ランタイムを起動することによって作成されます。この起動中に、ランタイムは構成を処理し、有効化されたすべての機能をロードし、構成されたアプリケーションの処理を開始します。アプリケーションのニーズに応じて、Open Libertyの起動中に、プロセスをチェックポイントする2つのフェーズを選択できます。選択したフェーズを指定するために、Dockerfileを設定する必要があります（後で説明します）。
+
+公式リンクlink:/docs/latest/container-images.html[Open Liberty images from the IBM Container Registry] (ICR) には、InstantOn がアプリケーションプロセスをチェックポイントするために必要なすべての前提条件が含まれています。この例では、`getting-started` アプリケーションコンテナイメージは、ICR からの `icr.io/appcafe/open-liberty:full-java11-openj9-ubi` イメージを親イメージとして使用しています。現在、InstantOn は、Open Liberty の Java 11 および Java 17 ベースの UBI イメージでのみサポートされています。
+
+次の例のように、`checkpoint.sh`スクリプトの`RUN`コマンドをファイルの最後に追加して、アプリケーションのDockerfileを更新します。
+
+[source,console]
+----
+FROM icr.io/appcafe/open-liberty:full-java11-openj9-ubi
+ARG VERSION=1.0
+ARG REVISION=SNAPSHOT
+LABEL \
+  org.opencontainers.image.authors="Your Name" \
+  org.opencontainers.image.vendor="IBM" \
+  org.opencontainers.image.url="local" \
+  org.opencontainers.image.source="https://github.com/OpenLiberty/guide-getting-started" \
+  org.opencontainers.image.version="$VERSION" \
+  org.opencontainers.image.revision="$REVISION" \
+  vendor="Open Liberty" \
+  name="system" \
+  version="$VERSION-$REVISION" \
+  summary="The system microservice from the Getting Started guide" \
+  description="This image contains the system microservice running with the Open Liberty runtime."
+
+COPY --chown=1001:0 src/main/liberty/config/ /config/
+COPY --chown=1001:0 target/*.war /config/apps/
+
+RUN configure.sh
+RUN checkpoint.sh afterAppStart
+----
+
+この構成では、アプリケーション・コンテナ・イメージの最後のレイヤーとしてアプリケーション・プロセスのチェックポイントを追加します。checkpoint.sh`スクリプトでは、`afterAppStart` または `beforeAppStart` のどちらかを指定して、スタートアップのどのフェーズでプロセスのチェックポイントを実行するかを指定できます。
+
+チェックポイントをアプリケーションの起動前に行うか、起動後に行うかについては、2つのオプションが用意されています。
+
+- `beforeAppStart`:  チェックポイントは設定されたアプリケーションのメタデータを処理した後に行われます。アプリケーションの開始時に実行されるコンポーネントがある場合、チェックポイントはアプリケーションのコードを実行する前に行われます。このオプションは、InstantOn が提供する最も早いチェックポイントフェーズです。
+- `afterAppStart`: このオプションは、チェックポイントが発生する最新のフェーズであるため、アプリケーションインスタンスのリストア時に最速の起動時間を提供する可能性があります。チェックポイントは、構成されたすべてのアプリケーションが開始されたとレポートされた後に行われます。このフェーズは、アプリケーションの着信要求を受け付けるポートを開く前に行われます。
+
+`afterAppStart`フェーズは通常、アプリケーションに最も早い起動時間を提供しますが、サーバープロセスのチェックポイントが行われる前にアプリケーションコードが実行される可能性もあります。このチュートリアルで使用する `getting-started` アプリケーションは起動ロジックでリストア時に問題を起こすようなことは何もしないので、`afterAppStart` フェーズを使用することができます。
+
+InstantOn がプロセスのチェックポイントを取得してリストアするには、CRIU バイナリに追加の link:/docs/latest/instanton.html#linux-capabilities[Linux機能]が必要です。Open Libertyコンテナイメージには、バイナリに必要な機能がすでに付与されています。ただし、コンテナの起動時に、これらの機能が付与されている必要があります。
+
+podman では、`--cap-add` と `--security-opt` オプションを使って、コンテナのビルドステップ中にチェックポイントを取るために必要な機能をコンテナのビルドに付与することができます。Podman コンテナを起動するユーザーは、必要な Linux 機能を付与する権限を持っている必要があるので、root または `sudo` として次のコマンドを実行する必要があります。:
+
+[source,console]
+----
+podman build \
+   -t dev.local/getting-started-instanton \
+   --cap-add=CHECKPOINT_RESTORE \
+   --cap-add=SYS_PTRACE\
+   --cap-add=SETPCAP \
+   --security-opt seccomp=unconfined .
+----
+
+Dockerfileの最後の命令は`checkpoint.sh`スクリプトを実行することです。前のPodmanビルドコマンドを実行すると、Dockerfileで指定したフェーズでチェックポイントを実行するためにOpen Libertyが起動します。コンテナプロセスのデータが永続化された後、Open Libertyは停止し、コンテナイメージのビルドが完了します。作成されたアプリケーション・コンテナ・イメージには、コンテナ・イメージの最後のレイヤーとしてチェックポイント・プロセス・データが含まれています。アウトプットは以下の例のようになります。
+
+[source,console]
+----
+Performing checkpoint --at=afterAppStart
+
+Launching defaultServer (Open Liberty 23.0.0.6/wlp-1.0.78.cl230620230612-1100) on Eclipse OpenJ9 VM, version 11.0.19+7 (en_US)
+[AUDIT   ] CWWKE0001I: The server defaultServer has been launched.
+[AUDIT   ] CWWKG0093A: Processing configuration drop-ins resource: /opt/ol/wlp/usr/servers/defaultServer/configDropins/defaults/keystore.xml
+[AUDIT   ] CWWKG0093A: Processing configuration drop-ins resource: /opt/ol/wlp/usr/servers/defaultServer/configDropins/defaults/open-default-port.xml
+[AUDIT   ] CWWKZ0058I: Monitoring dropins for applications.
+[AUDIT   ] CWWKZ0001I: Application guide-getting-started started in 1.886 seconds.
+[AUDIT   ] CWWKC0451I: A server checkpoint "afterAppStart" was requested. When the checkpoint completes, the server stops.
+----
+
+[#run]
+==== InstantOnアプリケーション・イメージを実行する
+
+以下のコマンドで `getting-started-instanton` コンテナを実行する。
+
+[source,console]
+----
+podman run \
+  --rm \
+  --cap-add=CHECKPOINT_RESTORE \
+  --cap-add=SETPCAP \
+  --security-opt seccomp=unconfined \
+  -p 9080:9080 \
+  getting-started-instanton
+----
+
+cap-add` オプションは、CRIU がアプリケーションプロセスをリストアするために必要な 2 つの Linux 機能をコンテナに付与します。Open Liberty がアプリケーションプロセスをリストアすると、以下のメッセージがログに記録されます。
+
+[source,console]
+----
+[AUDIT   ] Launching defaultServer (Open Liberty 23.0.0.6/wlp-1.0.78.cl230620230612-1100) on Eclipse OpenJ9 VM, version 11.0.19+7 (en_US)
+[AUDIT   ] CWWKZ0001I: Application guide-getting-started started in 0.233 seconds.
+[AUDIT   ] CWWKT0016I: Web application available (default_host): http://850ba43df239:9080/dev/
+[AUDIT   ] CWWKT0016I: Web application available (default_host): http://850ba43df239:9080/metrics/
+[AUDIT   ] CWWKT0016I: Web application available (default_host): http://850ba43df239:9080/health/
+[AUDIT   ] CWWKT0016I: Web application available (default_host): http://850ba43df239:9080/ibm/api/
+[AUDIT   ] CWWKC0452I: The Liberty server process resumed operation from a checkpoint in 0.283 seconds.
+[AUDIT   ] CWWKF0012I: The server installed the following features: [cdi-4.0, distributedMap-1.0, jndi-1.0, json-1.0, jsonb-3.0, jsonp-2.1, monitor-1.0, mpConfig-3.0, mpHealth-4.0, mpMetrics-5.0, restfulWS-3.1, restfulWSClient-3.1, ssl-1.0, transportSecurity-1.0].
+[AUDIT   ] CWWKF0011I: The defaultServer server is ready to run a smarter planet. The defaultServer server started in 0.297 seconds.
+----
+
+Open Libertyがチェックポイント・プロセスの復元に失敗した場合、チェックポイント・イメージなしで起動することで回復し、以下のメッセージが記録されます。
+
+[source,console]
+----
+CWWKE0957I: Restoring the checkpoint server process failed. Check the /logs/checkpoint/restore.log log to determine why the checkpoint process was not restored. Launching the server without using the checkpoint image.
+----
+
+Liberty の起動にかかった時間を確認し、InstantOn を使用しない場合と比較してください。
+
+== パフォーマンス結果
+
+InstantOnは、チェックポイント状態からプロセスをリストアすることで、Open Libertyアプリケーションの起動時間を大幅に改善します。最初のレスポンスにかかる時間（つまり、最初のリクエストに応答するのにかかる時間）の改善も印象的ですが、この場合、リストア後に実行されるアプリケーションロジックが明らかに多くなります。私たちは、コンテナで実行され、`afterAppStart`チェックポイントフェーズを使用する複数のアプリケーションについて、両方のメトリクスを測定しました。
+
+- link:https://github.com/HotswapProjects/pingperf-quarkus/[Pingperf]は、単一のRESTエンドポイントを含む非常にシンプルなPingタイプのアプリケーションです。
+- link:https://github.com/johnaohara/quarkusRestCrudDemo/[Rest crud] はもう少し複雑で、JPAとリモートデータベースが関係しています。
+- link:https://github.com/blueperf/acmeair-mainservice-java#acme-air-main-service---javaliberty/[AcmeAir Microservice Main] はMicroservicesの機能を使用しています。
+
+image::/img/blog/startup.png[Startup time in ms,width=70%,align="center"]
+
+{empty} +
+{empty} +
+
+image::/img/blog/response.png[First response time in ms,width=70%,align="center"]
+
+これらの実験では、InstantOnを使用しない通常のJVMモードと比較した場合、3つのアプリケーションすべてで起動時間が健全に改善され、最初の応答までの時間も最大8.8倍改善されました。脚注:[これらの実験は24コアのLinux X86-64システムで実行され、`taskset -c`を使用して、それぞれのケースでコンテナで実行されているOpen Libertyプロセスに4コアを割り当てました。起動時間は、Open Liberty サーバの起動が開始されてから、サーバがリクエストを受け付ける準備ができるまでの時間で、`messages.log` の `The <server name> server is ready to run a smarter planet.` メッセージで示されます。コンテナ自体の起動にかかる時間も結果に含まれている。これらのアプリケーションの InstantOn と通常の起動時間は、ミリ秒単位で示されています。成果は、お使いの環境、システムにインストールされているハードウェアやソフトウェア、その他の要因によって異なる可能性があります。
+
+== サマリー
+
+この投稿では、Open LibertyのInstantOn機能を使ってアプリケーション・コンテナ・イメージを生成し、クラウド・ネイティブ・アプリケーションをほぼ即座に起動できるように構成する方法について説明しました。InstantOnの主な価値提案は、スループット、メモリ、開発と本番の同等性、Java言語機能で妥協することなく、クラウド・ネイティブJavaアプリケーションをミリ秒単位で開始できるように再パッケージできることです。
+この機能は、パブリッククラウドのAWS EKSおよびAzure AKS環境で動作するX86-64/AMD64プラットフォーム上のlink:/blog/2023/06/27/23.0.0.6.html[Open Liberty 23.0.0.6]で利用できるようになりました。
+
+将来的には、プラットフォームの適用範囲を広げ、より多くの管理されたパブリッククラウドやハイブリッドクラウド環境で実行できるように拡張する予定です。また、より多くのOpen Libertyの機能でInstantOnをサポートすることも検討しています。Open Liberty InstantOnの詳細については、link:docs/latest/instanton.html[Open Liberty InstantOnによるコンテナ化アプリケーションの高速起動]ドキュメントを参照してください。このドキュメントには、既知の制限に関するより詳細なディスカッションと、この機能のSemeru JDKサポートに関する情報がリンクされています。
