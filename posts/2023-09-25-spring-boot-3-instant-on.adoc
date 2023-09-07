@@ -1,0 +1,172 @@
+---
+layout: post
+title: "Liberty InstantOn 23.0.0.10-beta provides rapid startup of Spring Boot 3.2 applications"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/tjwatson
+author_github: https://github.com/tjwatson
+seo-title: Liberty InstantOn 23.0.0.10-beta provides rapid startup of Spring Boot 3.2 applications
+seo-description: Did you know you can containerize your Spring Boot applications to start up in milliseconds, without compromising on throughput, memory, development-production parity, or Java language features? And with little to no refactoring of the application code? Here’s how with Liberty 23.0.0.10-beta…
+blog_description: "Did you know you can containerize your Spring Boot applications to start up in milliseconds, without compromising on throughput, memory, development-production parity, or Java language features? And with little to no refactoring of the application code? Here’s how with Liberty 23.0.0.10-beta…"
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+---
+= How to containerize your Spring Boot application for rapid startup
+Thomas Watson <https://github.com/tjwatson>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+
+Did you know you can containerize your Spring Boot applications to start up in milliseconds, without compromising on throughput, memory, development-production parity, or Java language features? And with little to no refactoring of the application code? Here’s how with Liberty 23.0.0.10-beta…
+
+== Liberty InstantOn
+
+The InstantOn capability in the Open Liberty runtime uses the IBM Semeru JDK and a Linux technology called link:https://criu.org/Main_Page[Checkpoint/Restore in Userspace] (CRIU) to take a checkpoint, or a point-in-time snapshot, of the application process. This checkpoint can then be restored very quickly to bring the application process back into the state it was in when the checkpoint was taken. The application can be restored multiple times because Open Liberty and the Semeru JDK preserve the uniqueness of each restored process in containers.  Each restored application process runs without first having to go through the whole startup sequence, saving up to 90% of startup time (depending on your application). InstantOn requires very little modification of your Java application to make this improvement happen.
+
+For more information about Liberty InstantOn see the link:/blog/2023/06/29/rapid-startup-instanton.html[Liberty 23.0.0.6 release] blog and link:https://openliberty.io/docs/latest/instanton.html[Faster startup for containerized applications with Open Liberty InstantOn] in the Open Liberty docs.
+
+== Spring Boot support for Checkpoint and Restore
+
+The Spring Framework version 6.1 release will integrate with link:https://docs.spring.io/spring-framework/reference/6.1/integration/checkpoint-restore.html[JVM checkpoint/restore] by using the link:https://github.com/CRaC/org.crac[org.crac] project in order to allow capable systems to reduce the startup times of Spring-based Java applications. With the Liberty InstantOn 23.0.0.10-beta version a new `crac-1.3` feature can be configured to provide an implementation of the link:https://javadoc.io/doc/org.crac/crac/latest/index.html[org.crac API] that integrates with Liberty Instanton. This allows Spring-based applications, including Spring Boot applications, to be deployed with Liberty InstantOn in order to achieve rapid startup times.
+
+== Production ready Liberty container images
+
+For each new release of Liberty, new link:https://www.redhat.com/en/blog/introducing-red-hat-universal-base-image[Universal Base Image] container images are uploaded to the link:https://github.com/OpenLiberty/ci.docker/blob/main/docs/icr-images.md[IBM Container Registry]. Starting with the 23.0.0.6 Liberty release the UBI container images include the necessary prerequisites to checkpoint your applications with Liberty InstantOn. Now, starting with the 23.0.0.10-beta release, the UBI beta container image includes the prerequisites to checkpoint your Spring Boot 3.2 based applications.
+
+The Liberty container images make it easy to produce InstantOn applications that are ready to deploy into production. An important benefits of using Liberty InstantOn is the ability to do a checkpoint of the application process inside the container without requiring the root user to be running the application process in the container. It is important, from a security perspective, to not run the application process in the container as the root user.
+
+== Spring Boot 3.2.0 example using Liberty InstantOn
+
+This example uses the link:https://openliberty.io/guides/spring-boot.html[Containerizing, packaging, and running a Spring Boot application] Open Liberty guide to demonstrate using Liberty InstantOn with a Spring Boot 3.2.0 based application. The fastest way to get up and running is to clone the `cracSpringBoot` branch for the guide's github repository:
+
+[source,console]
+----
+git clone --branch cracSpringBoot https://github.com/openliberty/guide-spring-boot.git
+cd guide-spring-boot/finish
+----
+
+The `cracSpringBoot` branch updates the guide to use the Open Liberty beta and Spring Boot version 3.2.0-M1 which contains the initial support of `orc.crac` for Spring Boot applications. In order to build and run the example Spring Boot application you must be using Java 17 or higher.
+
+After cloning the `cracSpringBoot` branch of the guide's repository, the first step is to build the Spring Boot application. Building the application is done by running the `mvnw` command provided with the project `finish/` folder:
+
+[source,console]
+----
+./mvnw package
+----
+
+After building the Spring Boot application, the next step is to containerize the Spring Boot application. We will focus on changes to containerize the Spring Boot application with Liberty InstantOn. If you want more information about how to best containerize Spring Boot applications with Open Liberty then you can read through the 
+link:https://openliberty.io/guides/spring-boot.html[Containerizing, packaging, and running a Spring Boot application] guide.
+
+In order to build the application container image with InstantOn you must be able to either run a privileged container or grant the container image build engine the necessary link:https://openliberty.io/docs/latest/instanton.html#linux-capabilities[Linux capabilities] to do the checkpoint. At this time Docker does not allow you to grant the container image build engine additional Linux capabilities necessary to perform an application checkpoint. This restriction in Docker requires an additional steps to create an InstantOn application container image.
+
+=== Building with Podman
+
+With Podman the container image build engine can be granted the necessary Linux capabilities in order to perform the application checkpoint during the container image build. This allows you to run the `checkpoint.sh` script as a `RUN` instruction as specified in the `Dockerfile.podman` file. This is done as the last instruction of the `Dockerfile.podman` file like this:
+
+[source,console]
+----
+...
+RUN configure.sh
+RUN checkpoint.sh afterAppStart
+----
+
+In order to grant the necessary capabilities to the Podman container image build engine, the following command must be executed as root or with `sudo`:
+
+[source,console]
+----
+sudo podman build \
+  -f Dockerfile.podman \
+  -t springboot \
+  --cap-add=CHECKPOINT_RESTORE \
+  --cap-add=SYS_PTRACE\
+  --cap-add=SETPCAP \
+  --security-opt seccomp=unconfined .
+----
+
+You can execute the above command or execute the provided script `scripts/build-instanton-podman.sh` to build the application container image.
+
+During the build the last thing done is to run the `checkpoint.sh` using the `afterAppStart` option. This causes the checkpoint to happen after the application has been started.  See link:https://openliberty.io/docs/latest/instanton.html#beforeAppStart[when to make a checkpoint] for more information on the checkpoint options.
+
+You will see output like the following after the application has been started:
+
+[source,console]
+----
+[AUDIT   ] CWWKZ0001I: Application thin-guide-spring-boot-0.1.0 started in 3.880 seconds.
+[AUDIT   ] CWWKC0451I: A server checkpoint "afterAppStart" was requested. When the checkpoint completes, the server stops.
+2023-09-06T21:06:18.763Z DEBUG 118 --- [ecutor-thread-1] o.s.c.support.DefaultLifecycleProcessor  : Stopping Spring-managed lifecycle beans before JVM checkpoint
+2023-09-06T21:06:18.767Z DEBUG 118 --- [ecutor-thread-1] o.s.c.support.DefaultLifecycleProcessor  : Stopping beans in phase 2147483647
+2023-09-06T21:06:18.768Z DEBUG 118 --- [ecutor-thread-1] o.s.c.support.DefaultLifecycleProcessor  : Bean 'applicationTaskExecutor' completed its stop procedure
+2023-09-06T21:06:18.769Z DEBUG 118 --- [ecutor-thread-1] o.s.c.support.DefaultLifecycleProcessor  : Stopping beans in phase 2147482623
+2023-09-06T21:06:18.771Z DEBUG 118 --- [ecutor-thread-1] o.s.c.support.DefaultLifecycleProcessor  : Bean 'webServerGracefulShutdown' completed its stop procedure
+2023-09-06T21:06:18.771Z DEBUG 118 --- [ecutor-thread-1] o.s.c.support.DefaultLifecycleProcessor  : Stopping beans in phase 2147481599
+2023-09-06T21:06:18.796Z DEBUG 118 --- [ecutor-thread-1] o.s.c.support.DefaultLifecycleProcessor  : Bean 'webServerStartStop' completed its stop procedure
+2023-09-06T21:06:18.796Z DEBUG 118 --- [ecutor-thread-1] o.s.c.support.DefaultLifecycleProcessor  : Stopping beans in phase -2147483647
+2023-09-06T21:06:18.797Z DEBUG 118 --- [ecutor-thread-1] o.s.c.support.DefaultLifecycleProcessor  : Bean 'springBootLoggingLifecycle' completed its stop procedure
+[2/2] COMMIT springboot
+----
+
+The debug output from the Spring Framework shows the `Lifecycle` beans in the application have been stopped in order to prepare for the checkpoint. At this point you have an application container image called `springboot` that can be run to restore the application process.
+
+=== Build with Docker
+
+Unlike Podman, Docker currently does not allow options during the `build` command to grant the container build engine the necessary Linux capabilities when building the container image. When building with Docker you are not allowed to run the `checkpoint.sh` script during the `docker build` command. Instead you need to use a three step approach:
+
+1. Build the application container image without the InstantOn layer
+2. Run the application container to perform a checkpoint of the application.
+3. Commit the stopped container with the checkpoint process data into an InstantOn applicaton container image.
+
+The three build steps can be done by running the script `scripts/build-instanton-podman.sh`. The resulting output is similar to the checkpoint during the Podman build. You will notice some debug output from the Spring Framework for the lifecycle beans. At this point you have an application container image called `springboot` that can be run to restore the application process.
+
+=== Run the InstantOn Spring Boot application
+
+Both Podman and Docker can use the same options to run the `springboot` InstantOn application:
+
+[source,console]
+----
+[sudo podman or docker] run \
+  --rm \
+  -p 9080:9080 \
+  --cap-add=CHECKPOINT_RESTORE \
+  --cap-add=SETPCAP \
+  --security-opt seccomp=unconfined \
+  springboot
+----
+
+You can run the above command or run the provided `scripts/run-instanton-podman.sh` or `scripts/run-instanton-docker.sh` script to run the application container image.
+
+You will see output like the following when the application process is restored:
+
+[source,console]
+----
+[AUDIT   ] Launching defaultServer (Open Liberty 23.0.0.10-beta/wlp-1.0.81.cl230920230904-1158) on Eclipse OpenJ9 VM, version 17.0.7+7 (en_US)
+2023-09-07T15:22:52.683Z  INFO 118 --- [ecutor-thread-1] o.s.c.support.DefaultLifecycleProcessor  : Restarting Spring-managed lifecycle beans after JVM restore
+2023-09-07T15:22:52.684Z DEBUG 118 --- [ecutor-thread-1] o.s.c.support.DefaultLifecycleProcessor  : Starting beans in phase -2147483647
+2023-09-07T15:22:52.684Z DEBUG 118 --- [ecutor-thread-1] o.s.c.support.DefaultLifecycleProcessor  : Successfully started bean 'springBootLoggingLifecycle'
+2023-09-07T15:22:52.685Z DEBUG 118 --- [ecutor-thread-1] o.s.c.support.DefaultLifecycleProcessor  : Starting beans in phase 2147481599
+[AUDIT   ] CWWKT0016I: Web application available (default_host): http://e93ebe585ce3:9080/
+2023-09-07T15:22:52.759Z  INFO 118 --- [ecutor-thread-1] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 106109 ms
+2023-09-07T15:22:52.762Z DEBUG 118 --- [ecutor-thread-1] o.s.c.support.DefaultLifecycleProcessor  : Successfully started bean 'webServerStartStop'
+2023-09-07T15:22:52.763Z DEBUG 118 --- [ecutor-thread-1] o.s.c.support.DefaultLifecycleProcessor  : Starting beans in phase 2147482623
+2023-09-07T15:22:52.763Z DEBUG 118 --- [ecutor-thread-1] o.s.c.support.DefaultLifecycleProcessor  : Successfully started bean 'webServerGracefulShutdown'
+2023-09-07T15:22:52.763Z DEBUG 118 --- [ecutor-thread-1] o.s.c.support.DefaultLifecycleProcessor  : Starting beans in phase 2147483647
+2023-09-07T15:22:52.763Z DEBUG 118 --- [ecutor-thread-1] o.s.c.support.DefaultLifecycleProcessor  : Successfully started bean 'applicationTaskExecutor'
+2023-09-07T15:22:52.764Z  INFO 118 --- [ecutor-thread-1] o.s.c.support.DefaultLifecycleProcessor  : Spring-managed lifecycle restart completed in 80 ms
+[AUDIT   ] CWWKC0452I: The Liberty server process resumed operation from a checkpoint in 0.263 seconds.
+[AUDIT   ] CWWKZ0001I: Application thin-guide-spring-boot-0.1.0 started in 0.265 seconds.
+[AUDIT   ] CWWKF0012I: The server installed the following features: [crac-1.3, expressionLanguage-5.0, pages-3.1, servlet-6.0, springBoot-3.0, ssl-1.0, transportSecurity-1.0, websocket-2.1].
+[AUDIT   ] CWWKF0011I: The defaultServer server is ready to run a smarter planet. The defaultServer server started in 0.277 seconds.
+----
+
+== Summary
+
+
+// // // // // // // //
+// LINKS
+//
+// OpenLiberty.io site links:
+// link:/guides/microprofile-rest-client.html[Consuming RESTful Java microservices]
+// 
+// Off-site links:
+// link:https://openapi-generator.tech/docs/installation#jar[Download Instructions]
+//
+// // // // // // // //
