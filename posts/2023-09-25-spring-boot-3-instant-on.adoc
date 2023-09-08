@@ -31,13 +31,15 @@ The Spring Framework version 6.1 release will integrate with link:https://docs.s
 
 == Production ready Liberty container images
 
-For each new release of Liberty, new link:https://www.redhat.com/en/blog/introducing-red-hat-universal-base-image[Universal Base Image] container images are uploaded to the link:https://github.com/OpenLiberty/ci.docker/blob/main/docs/icr-images.md[IBM Container Registry]. Starting with the 23.0.0.6 Liberty release the UBI container images include the necessary prerequisites to checkpoint your applications with Liberty InstantOn. Now, starting with the 23.0.0.10-beta release, the UBI beta container image includes the prerequisites to checkpoint your Spring Boot 3.2 based applications.
+For each new release of Liberty, new link:https://www.redhat.com/en/blog/introducing-red-hat-universal-base-image[Universal Base Image] container images are uploaded to the link:https://github.com/OpenLiberty/ci.docker/blob/main/docs/icr-images.md[IBM Container Registry]. Starting with the 23.0.0.6 Liberty release, the Liberty UBI container images include the necessary prerequisites to checkpoint your applications with Liberty InstantOn. Now, starting with the 23.0.0.10-beta release, the UBI beta container image also include the prerequisites to checkpoint your Spring Boot 3.2 based applications.
 
-The Liberty container images make it easy to produce InstantOn applications that are ready to deploy into production. An important benefits of using Liberty InstantOn is the ability to do a checkpoint of the application process inside the container without requiring the root user to be running the application process in the container. It is important, from a security perspective, to not run the application process in the container as the root user.
+This includes an implementation of the link:https://javadoc.io/doc/org.crac/crac/latest/index.html[`org.crac`] APIs with the Liberty beta feature `crac-1.3`. The `crac-1.3` feature along with the Spring Framework version 6.1 support for `org.crac` will allow you to checkpoint your Spring based applications with Liberty InstantOn in order to achieve rapid startup times.
+
+The Liberty container images make it easy to produce InstantOn applications that are ready to deploy into production. An important benefits of using Liberty InstantOn is the ability to do a checkpoint of the application process inside the container without requiring the root user to be running the application process in the container. It is important, from a security perspective, to not run the application process in the container as the root user. This allows you to link:https://openliberty.io/docs/latest/instanton.html#_deploying_an_instanton_application_to_kubernetes_services[deploy your InstantOn container images] to existing Kubernetes services like AWS EKS and Azure EKS.
 
 == Spring Boot 3.2.0 example using Liberty InstantOn
 
-This example uses the link:https://openliberty.io/guides/spring-boot.html[Containerizing, packaging, and running a Spring Boot application] Open Liberty guide to demonstrate using Liberty InstantOn with a Spring Boot 3.2.0 based application. The fastest way to get up and running is to clone the `cracSpringBoot` branch for the guide's github repository:
+This example uses the link:https://openliberty.io/guides/spring-boot.html[Containerizing, packaging, and running a Spring Boot application] Open Liberty guide to demonstrate using Liberty InstantOn with a Spring Boot 3.2.0 based application. The fastest way to get up and running is to clone the `cracSpringBoot` branch from the guide's github repository:
 
 [source,console]
 ----
@@ -57,13 +59,40 @@ After cloning the `cracSpringBoot` branch of the guide's repository, the first s
 After building the Spring Boot application, the next step is to containerize the Spring Boot application. We will focus on changes to containerize the Spring Boot application with Liberty InstantOn. If you want more information about how to best containerize Spring Boot applications with Open Liberty then you can read through the 
 link:https://openliberty.io/guides/spring-boot.html[Containerizing, packaging, and running a Spring Boot application] guide.
 
-In order to build the application container image with InstantOn you must be able to either run a privileged container or grant the container image build engine the necessary link:https://openliberty.io/docs/latest/instanton.html#linux-capabilities[Linux capabilities] to do the checkpoint. At this time Docker does not allow you to grant the container image build engine additional Linux capabilities necessary to perform an application checkpoint. This restriction in Docker requires an additional steps to create an InstantOn application container image.
+In order to build the application container image with InstantOn you must be able to either run a privileged container or grant the container image build engine the necessary link:https://openliberty.io/docs/latest/instanton.html#linux-capabilities[Linux capabilities] to do the checkpoint.
+
+=== Enabling the crac-1.3 Liberty feature
+
+Liberty is composed of features that you enabled depending on the requirements of your application. In order to enable Liberty's implementation of `org.crac` the Liberty feature `crac-1.3` must be enabled in the Liberty configuration. For this example, we do that by copying in the `src/main/liberty/config/crac.xml` file into the container image with the following Dockerfile command:
+
+.Dockerfile
+[source]
+----
+COPY src/main/liberty/config/crac.xml /config/configDropins/defaults
+----
+
+The `crac.xml` Liberty configuration file enables the `crac-1.3` feature with the following content:
+
+.crac.xml
+[source,xml]
+----
+<?xml version="1.0" encoding="UTF-8"?>
+<server description="Enable the org.crac API">
+
+    <featureManager>
+        <feature>crac-1.3</feature>
+    </featureManager>
+
+</server>
+
+----
 
 === Building with Podman
 
 With Podman the container image build engine can be granted the necessary Linux capabilities in order to perform the application checkpoint during the container image build. This allows you to run the `checkpoint.sh` script as a `RUN` instruction as specified in the `Dockerfile.podman` file. This is done as the last instruction of the `Dockerfile.podman` file like this:
 
-[source,console]
+.Dockerfile.podman
+[source]
 ----
 ...
 RUN configure.sh
@@ -72,6 +101,7 @@ RUN checkpoint.sh afterAppStart
 
 In order to grant the necessary capabilities to the Podman container image build engine, the following command must be executed as root or with `sudo`:
 
+.build-instanton-podman.sh
 [source,console]
 ----
 sudo podman build \
@@ -89,6 +119,7 @@ During the build the last thing done is to run the `checkpoint.sh` using the `af
 
 You will see output like the following after the application has been started:
 
+.InstantOn checkpoint output
 [source,console]
 ----
 [AUDIT   ] CWWKZ0001I: Application thin-guide-spring-boot-0.1.0 started in 3.880 seconds.
@@ -109,18 +140,19 @@ The debug output from the Spring Framework shows the `Lifecycle` beans in the ap
 
 === Build with Docker
 
-Unlike Podman, Docker currently does not allow options during the `build` command to grant the container build engine the necessary Linux capabilities when building the container image. When building with Docker you are not allowed to run the `checkpoint.sh` script during the `docker build` command. Instead you need to use a three step approach:
+At this time, Docker does not allow you to grant the container image build engine the Linux capabilities necessary to perform an application checkpoint.  This prevents you from running the `checkpoint.sh` script doing the `docker build` command. Instead, you need to use a link:https://openliberty.io/docs/latest/instanton.html#three_step_process[three step approach]:
 
 1. Build the application container image without the InstantOn layer
 2. Run the application container to perform a checkpoint of the application.
 3. Commit the stopped container with the checkpoint process data into an InstantOn applicaton container image.
 
-The three build steps can be done by running the script `scripts/build-instanton-podman.sh`. The resulting output is similar to the checkpoint during the Podman build. You will notice some debug output from the Spring Framework for the lifecycle beans. At this point you have an application container image called `springboot` that can be run to restore the application process.
+The three build steps can be done by running the script link:https://raw.githubusercontent.com/OpenLiberty/guide-spring-boot/cracSpringBoot/finish/scripts/build-instanton-docker.sh[`scripts/build-instanton-podman.sh`]. The resulting output is similar to the checkpoint during the Podman build. You will notice some debug output from the Spring Framework for the lifecycle beans. At this point you have an application container image called `springboot` that can be run to restore the application process.
 
 === Run the InstantOn Spring Boot application
 
 Both Podman and Docker can use the same options to run the `springboot` InstantOn application:
 
+.run-instanton-podman.sh or run-instanton-docker.sh
 [source,console]
 ----
 [sudo podman or docker] run \
@@ -136,6 +168,7 @@ You can run the above command or run the provided `scripts/run-instanton-podman.
 
 You will see output like the following when the application process is restored:
 
+.InstantOn restore output
 [source,console]
 ----
 [AUDIT   ] Launching defaultServer (Open Liberty 23.0.0.10-beta/wlp-1.0.81.cl230920230904-1158) on Eclipse OpenJ9 VM, version 17.0.7+7 (en_US)
