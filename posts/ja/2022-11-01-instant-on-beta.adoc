@@ -12,7 +12,9 @@ open-graph-image: https://openliberty.io/img/blog/instantonperf.png
 blog-available-in-languages:
 - lang: en
   path: /blog/2022/09/29/instant-on-beta.html
-additional_authors: 
+- lang: zh-Hans
+  path: /zh-Hans/blog/2022/12/06/instant-on-beta.html
+additional_authors:
 - name: Joshua Dettinger
   github: https://github.com/dettmoney
   image: https://avatars0.githubusercontent.com/dettmoney
@@ -25,6 +27,8 @@ Thomas Watson <https://github.com/tjwatson>
 :imagesdir: /
 :url-prefix:
 :url-about: /
+
+この記事は、Liberty InstantOnがまだベータ版だったときに公開されました。Liberty InstantOnは、link:/blog/2023/06/29/rapid-startup-instanton.html[Liberty 23.0.0.6リリース]の時点でベータ版から移行しました。Liberty InstantOnに関する最新情報は、Open Libertyドキュメントのlink:https://openliberty.io/docs/latest/instanton.html[Open Liberty InstantOnによるコンテナ型アプリケーションの高速起動]を参照してください。
 
 ほんの数ミリ秒で起動するクラウドネイティブ Java アプリケーションがあったらいいな、と思いませんか？ それも、スループット、メモリ、環境設定、Javaの機能などの妥協をせずに実現できたら。Open Liberty 22.0.0.11-beta は、MicroProfile および Jakarta EE アプリケーションの起動時間を高速化するエキサイティングな新機能 InstantOn を提供します！
 
@@ -100,14 +104,14 @@ Liberty InstantOn ベータ・バージョンには、チェックポイント�
 
 link:/guides/getting-started.html[Open Liberty の使用を開始する] の例では、最初のステップは、アプリケーションをコンテナー化するために `Dockerfile` を作成することです。 `podman` では、コンテナ イメージを作るための `Containerfile` 形式もサポートしています。
 
-この例では、IBM Container Registry (ICR) の公式イメージ `icr.io/appcafe/open-liberty:beta-instanton` を親イメージとして使用します。このイメージには、`beta` という単語がタグ付けされています。これは、Liberty のすべてのベータ機能と、`full` イメージのすべての Liberty 機能が含まれていることを意味します。イメージには `instanton` のタグが付けられています。これは、必要な `criu` バイナリ ファイルなど、チェックポイント プロセス イメージを生成するためのすべての前提条件が含まれていることを意味します。
+この例では、IBM Container Registry (ICR) の公式イメージ `icr.io/appcafe/open-liberty:beta` を親イメージとして使用します。このイメージには `beta` というタグが付けられており、`full` イメージの Liberty 機能だけでなく、Liberty のベータ版機能もすべて含まれています。このイメージには `instanton` というタグが付いており、必要な `criu` バイナリファイルなど、チェックポイントプロセスのイメージを作成するためのすべての前提条件が含まれています。
 
-link:/guides/getting-started.html[Open Liberty の開始] のアプリケーションの  `Dockerfile` は、既に `finish/Dockerfile` にあります。既存の `finish/Dockerfile` を編集し、`FROM` 命令を変更して `icr.io/appcafe/open-liberty:beta-instanton` 親イメージを使用します。 `Dockerfile` を保存すると、次のようになります。
+起動中のアプリケーションの `Dockerfile` は既に `finish/Dockerfile` に存在しています。既存の `finish/Dockerfile` を編集し、`FROM` 命令を変更して `icr.io/appcafe/open-liberty:beta` の親イメージを使用するようにします。Dockerfile`を保存すると、以下のようになります。
 
 .Dockerfile
 [source]
 ----
-FROM icr.io/appcafe/open-liberty:beta-instanton
+FROM icr.io/appcafe/open-liberty:beta
 
 ARG VERSION=1.0
 ARG REVISION=SNAPSHOT
@@ -165,13 +169,13 @@ Liberty が開始されたことを示すメッセージが表示されるまで
 
 Open Liberty には、始動プロセス中にチェックポイントが発生する可能性のある 3 つのフェーズがあります。
 
-1. `features` - これは、チェックポイントが発生する可能性がある最も初期のフェーズです。チェックポイントは、構成済みの Open Liberty フィーチャーがすべて開始された後、インストール済みアプリケーションの処理が発生する前に発生します。
-2. `deployment` - チェックポイントは、構成されたアプリケーション メタデータの処理後に発生します。アプリケーションに、アプリケーションの起動の一部として実行されるコンポーネントがある場合、アプリケーションからコードを実行する前にチェックポイントが取得されます。
-3. `applications` - これは、チェックポイントが発生する可能性がある最後のフェーズであるため、アプリケーション インスタンスを復元する際の起動時間が最速になる可能性があります。チェックポイントは、構成済みのすべてのアプリケーションが開始済みとして報告された後に発生します。このフェーズは、アプリケーションの着信要求をリッスンするためにポートを開く前に発生します。
+1. `features` - これはチェックポイントが発生する最も早いフェーズです。 チェックポイントは、設定されたすべてのOpen Liberty機能が開始された後に発生しますが、インストールされたアプリケーションの処理が発生する前に発生します。link:/blog/2023/02/10/instant-on-beta-update.html[New enhancements for Liberty InstantOn in 23.0.0.2-beta]を参照してください。
+2. `beforeAppStart` - チェックポイントは設定されたアプリケーションのメタデータを処理した後に行われます。 アプリケーションの開始時に実行されるコンポーネントがある場合、チェックポイントはアプリケーションのコードを実行する前に行われます。
+3. `afterAppStart` - これはチェックポイントが発生する最後のフェーズであるため、アプリケーションインスタンスのリストア時に最速の起動時間を提供する可能性があります。チェックポイントは、設定されたすべてのアプリケーションが開始されたとレポートされた後に行われます。 このフェーズは、アプリケーションの着信要求を受け付けるポートを開く前に行われます。
 
-通常、`applications` フェーズでは、アプリケーションの起動時間が最も短くなりますが、サーバー プロセスのチェックポイントが発生する前に一部のアプリケーション コードが実行される可能性もあります。これは、アプリケーションの複数の同時インスタンスに復元されるべきではない状態をアプリケーションが保持している場合、チェックポイント プロセスを復元するときに望ましくない動作を引き起こす可能性があります。たとえば、チェックポイントが取得される前にデータベースなどの外部リソースに接続すると、同じ接続を複数回復元しようとするため、そのようなプロセスの多くのインスタンスの復元に失敗します。ただし、アプリケーションの初期化でデータベース接続を開くなどの操作が実行されない場合は、チェックポイントに `applications` フェーズを使用できる場合があります。
+`afterAppStart`フェーズは通常、アプリケーションに最も早い起動時間を提供しますが、サーバプロセスのチェックポイントが行われる前にアプリケーションコードが実行される可能性もあります。 このため、チェックポイントプロセスのリストア時に、アプリケーションが複数の同時実行インスタンスにリストアされるべきでない状態を保持していると、望ましくない動作が発生する可能性があります。 例えば、チェックポイントが行われる前にデータベースなどの外部リソースに接続すると、以降、同じ接続を複数回リストアしようとするため、そのようなプロセスの多くのインスタンスのリストアに不具合が生じます。しかし、アプリケーションの初期化でデータベース接続を開くなどの操作を行わない場合は、チェックポイントに `afterAppStart` フェーズを使用することができます。
 
-アプリケーション コンテナー イメージをビルドしたら、それを使用して、前述のチェックポイント フェーズ (`features` , `deployment` , `applications` ) のいずれかでアプリケーション プロセスをチェックポイントできます。 `podman run` に `--env` オプションを使用して、`WLP_CHECKPOINT` の値を使用可能なチェックポイント フェーズの 1 つに設定することで、チェックポイントのフェーズを指定できます。この例では、次の `podman` コマンドを実行して `applications` フェーズを使用します。
+アプリケーションコンテナイメージがビルトインされた後、先に説明したチェックポイントフェーズ (`features`、`beforeAppStart`、`afterAppStart`) のいずれかでアプリケーションプロセスをチェックポイントするために使用できます。podman run` の `--env` オプションで `WLP_CHECKPOINT` の値を利用可能なチェックポイントフェーズのいずれかに設定することで、チェックポイントのフェーズを指定することができます。この例では、次の `podman` コマンドを実行して `afterAppStart` フェーズを使用します
 
 .コンテナーでチェックポイントを実行する
 [source]
@@ -179,19 +183,19 @@ Open Liberty には、始動プロセス中にチェックポイントが発生�
 podman run \
   --name getting-started-checkpoint-container \
   --privileged \
-  --env WLP_CHECKPOINT=applications \
+  --env WLP_CHECKPOINT=afterAppStart \
   getting-started
 ----
 
 - コンテナー内で `criu` チェックポイントを実行するには、`--privileged` オプションが必要です。
-- `WLP_CHECKPOINT` 環境変数は、チェックポイント フェーズを指定するために使用されます。開始例の場合、`applications` チェックポイント フェーズが最速の復元時間を提供します。
+- `WLP_CHECKPOINT` 環境変数はチェックポイントフェーズを指定するために使用されます。get-started の例では、`afterAppStart` チェックポイントフェーズが最も早いリストア時間を提供します。
 
 これにより、Open Liberty で実行されているアプリケーションでコンテナーが開始されます。 Open Liberty の開始後、`WLP_CHECKPOINT` 環境変数で指定されたフェーズでチェックポイントが実行されます。コンテナ プロセス データが永続化された後、コンテナは停止し、チェックポイント プロセス データを含む停止中のコンテナが残ります。出力は次のようになります。
 
 .Process checkpoint output
 [source]
 ----
-Performing checkpoint --at=applications
+Performing checkpoint --at=afterAppStart
 
 Launching defaultServer (Open Liberty 22.0.0.11-beta/wlp-1.0.69.cl221020220912-1100) on Eclipse OpenJ9 VM, version 17.0.5-ea+2 (en_US)
 CWWKE0953W: This version of Open Liberty is an unsupported early release version.
@@ -1140,13 +1144,13 @@ RHEL 8.6 または RHEL 9.0 インストールがどの程度最新のもので�
 
 InstantOnで起動時間がどのように短縮されるかを示すために、複数のアプリケーションをテストしましたか?
 
-* link:https://github.com/HotswapProjects/pingperf-quarkus/[Pingperf] 
+* link:https://github.com/HotswapProjects/pingperf-quarkus/[Pingperf]
 は、一つのREST エンドポイントをもつ非常に単純な ping タイプのアプリケーションです。
 * link:https://github.com/johnaohara/quarkusRestCrudDemo/[Rest crud] は、
 もう少し複雑なアプリで、JPA とリモート データベースを扱います。
-* link:https://github.com/blueperf/acmeair-mainservice-java#acme-air-main-service---javaliberty/[AcmeAir Microservice Main] は、MicroProfile 機能を利用します。 
+* link:https://github.com/blueperf/acmeair-mainservice-java#acme-air-main-service---javaliberty/[AcmeAir Microservice Main] は、MicroProfile 機能を利用します。
 
-この実験は、24 コアの システムで実行されました。 「taskset -c」を使用して、コンテナーで実行されている Liberty プロセスに 4 つの CPU を割り当てました。 InstantOn の時間は、「アプリケーション」チェックポイント フェーズを使用して取得されました。起動時間は、Liberty サーバーの起動が開始されてから、messages.logの中の、**"The <server name> server is ready to run a smarter planet."**が表示されるまでの「サーバーが要求を受け入れる準備ができるまでの時間」を測定します。コンテナ自体の起動にかかる時間は除外されています。下記の図では、上記のアプリケーションで、InstantOnを使ったときと、使わなかったときの起動時間の比較をミリ秒単位で示しています。これらの結果は、環境や、システムに導入されているハードウェアとソフトウェアなど、様々な要因に依って異なりますが、低い数値（短い時間で立ち上がる）ほうが、良いパフォーマンスだと評価できます。
+これらの実験は、24コアのシステムで実行されました。`taskset -c` を使用して、コンテナ内で実行されている Liberty プロセスに 4 CPU を割り当てました。InstantOnの時間は、`afterAppStart`チェックポイントフェーズを使用して計測しました。起動時間は、Libertyサーバーの起動が開始されてから、サーバーがリクエストを受け付ける準備が整うまでの時間を計測したもので、messages.logに**"The <server name> server is ready to run a smarter planet. "**というメッセージが表示さ れます。コンテナ自体の起動にかかる時間はフィルタリングされていません。これらのアプリケーションの InstantOn と通常の起動時間をミリ秒単位で示します。成果は、お使いの環境、システムにインストールされているハードウェアとソフトウェア、およびその他の要因によって異なる場合があります。低い数値（短い時間で立ち上がる）ほうが、良いパフォーマンスだと評価できます。
 
 image::img/blog/instantonperf.png[Startup Performance,width=70%,align="center"]
 
@@ -1162,7 +1166,7 @@ InstantOn を使用すると、オプションとして scale-to-zero を使用�
 //
 // OpenLiberty.io site links:
 // link:/guides/microprofile-rest-client.html[Consuming RESTful Java microservices]
-// 
+//
 // Off-site links:
 // link:https://openapi-generator.tech/docs/installation#jar[Download Instructions]
 //

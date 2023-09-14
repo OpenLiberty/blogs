@@ -1,0 +1,199 @@
+---
+layout: post
+title: "Open Liberty 23.0.0.6 InstantOnスタートアップとLiberty Tools "
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/mbroz2
+author_github: https://github.com/mbroz2
+seo-title: Open Liberty 23.0.0.6 InstantOnスタートアップとLiberty Tools - OpenLiberty.io
+seo-description: Open Liberty 23.0.0.6では、InstantOn機能が正式に導入され、スループット、メモリ、開発-本番環境の同等性、Java言語機能に妥協することなく、ミリ秒単位でアプリケーションを起動できるようになりました。 また、Liberty Tools v23.0.6のリリースを発表し、Hover-Over、迅速な修正、診断サポートなど、さまざまな開発上の利便性を提供することで、Libertyの開発をさらに高速化します。
+blog_description: Open Liberty 23.0.0.6 InstantOnスタートアップとLiberty Tools - OpenLiberty.io
+seo-description: Open Liberty 23.0.0.6では、InstantOn機能が正式に導入され、スループット、メモリ、開発-本番環境の同等性、Java言語機能に妥協することなく、ミリ秒単位でアプリケーションを起動できるようになりました。 また、Liberty Tools v23.0.6のリリースを発表し、Hover-Over、迅速な修正、診断サポートなど、さまざまな開発上の利便性を提供することで、Libertyの開発をさらに高速化します。
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+additional_authors:
+- name: 浅田 かおり (翻訳)
+  github: https://github.com/kaori-asa
+  image: https://avatars0.githubusercontent.com/kaori-asa
+blog-available-in-languages:
+- lang: en
+  path: /blog/2023/06/27/23.0.0.6.html
+---
+= Open Liberty 23.0.0.6 InstantOnスタートアップとLiberty Tools
+Michal Broz <https://github.com/mbroz2>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+Open Liberty 23.0.0.6では、素晴らしいLiberty InstantOn機能を追加します！InstantOnを使用すると、スループット、メモリ、開発と本番の同等性、またはJava言語機能を損なうことなく、ミリ秒単位でアプリケーションを開始できます。 また、Liberty Tools v23.0.6のリリースも発表し、Hover-Over、迅速な修正、診断サポートなど、様々な開発上の利便性を提供することで、Libertyの開発をさらに高速化します。 このリリースでは、MicroProfile GraphQL機能のCVEに対応したバグ修正など、多くの重要なバグ修正も提供しています。
+
+In link:{url-about}[Open Liberty] 23.0.0.6:
+
+* <<InstantOn, Liberty InstantOnによる迅速なスタートアップ>>
+* <<devTools, Liberty Tools>>
+* <<CVEs, セキュリティ脆弱性（CVE）の修正>>
+* <<bugs, 主なバグ修正>>
+
+link:{url-prefix}/blog/?search=release&search!=beta[過去のOpen Liberty GAリリースのブログ記事]もご参照ください。
+
+[#run]
+
+== 23.0.0.6を使用してアプリを実行する
+
+link:{url-prefix}/guides/maven-intro.html[Maven]を使うときは下記の設定をお使いください。
+
+[source,xml]
+----
+<dependency>
+    <groupId>io.openliberty</groupId>
+    <artifactId>openliberty-runtime</artifactId>
+    <version>23.0.0.6</version>
+    <type>zip</type>
+</dependency>
+----
+
+link:{url-prefix}/guides/gradle-intro.html[Gradle]の場合はこちらです。
+
+[source,gradle]
+----
+dependencies {
+    libertyRuntime group: 'io.openliberty', name: 'openliberty-runtime', version: '[23.0.0.6,)'
+}
+----
+
+link:{url-prefix}/docs/latest/container-images.html[コンテナ・イメージ]の場合はこちらです。
+
+[source]
+----
+FROM icr.io/appcafe/open-liberty
+----
+
+またはlink:{url-prefix}/start/[ダウンロード・ページ]をご参照ください。
+
+[link=https://stackoverflow.com/tags/open-liberty]
+image::img/blog/blog_btn_stack_ja.svg[Stack Overflowで質問する, align="center"]
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/25499
+// Contact/Reviewer: ReeceNana,tjwatson
+// // // // // // // //
+[#InstantOn]
+== Liberty InstantOnによる迅速なスタートアップ
+
+パフォーマンスは、Libertyランタイムのコア・フォーカスのひとつであり、差別化要因でもあります。link:{url-prefix}/blog/2019/10/30/faster-startup-open-liberty.html[2019年まで遡る], Libertyは1秒で起動できるようになりました。これ以降、Libertyはさらに高速な起動を追求し続け、このパフォーマンスへのこだわりがInstantOn機能に結びつきました。 Liberty InstantOnは、スループット、メモリ、開発と本番の同等性、Java言語機能を犠牲にすることなく、ミリ秒単位でのアプリケーションの起動を可能にします。
+
+クラウドでアプリケーションを実行するコストを削減するには、必要なときだけアプリケーションを実行するのが理想的です。不要なアプリケーション・インスタンスは停止すべきです。 アクティビティが再び増えるとすぐに、新しいアプリケーション・インスタンスを素早く立ち上げ、送られてくるリクエストに効率的に対応する必要があります。これは scale-to-zero として知られて います。 起動に数秒かかるようなアプリケーションは、アプリケーション・ユーザーに高いレイテンシーをもたらすことなく、 scale-to-zero することはできません。
+
+InstantOnは、Linuxカーネルのユーザースペースのチェックポイント/リストア（link:https://criu.org/[CRIU]）機能を使用して、後でリストアできるJVMのチェックポイントを記録します。InstantOnを使用すると、アプリケーションは通常どおりに開発され、アプリケーション・コンテナ・イメージがビルトインされたときに、InstantOnがアプリケーション・プロセスのチェックポイントを作成します。アプリケーションがリストアされると、同じ JVM で実行されるため、開発と本番の間で完全な同等性が提供されます。チェックポイント・プロセスは数秒しかかからないため、CI/CDプロセスにはほとんど影響がありません。 イメージの復元にはミリ秒しかかからないため、アプリケーションの迅速なスケールアップとスケールダウンが可能になり、エンドユーザーに影響を与えることなくコストメリットを提供します。
+
+InstantOnは、Jakarta EE Web Profileバージョン8.0以降、MicroProfileバージョン4.1以降、その他いくつかのLiberty機能をサポートしています。詳細についてはlink:{url-prefix}/blog/2023/06/29/rapid-startup-instanton.html[クラウド・ネイティブJavaアプリケーションをパッケージ化し、迅速にスタートアップする方法]ブログとlink:{url-prefix}/docs/latest/instanton.html[InstantOnによる起動の高速化] ドキュメントをご参照ください。
+
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+[#devTools]
+== Liberty Tools
+Liberty Tools v23.0.6がリリースされました！MicroProfile (3.x以降)とJakarta EE Web Profile (9.x以降)のAPIの診断とHoverのサポート、およびさまざまなLiberty設定ファイルが含まれます。 Liberty Toolsは、Visual Studio Code、IntelliJ IDEA、Eclipse IDEで利用できます。
+
+Liberty Toolsを使い始めるために、お好きなIDE用のツールをインストールするためのリンクは、link:{url-prefix}/start/[Get started with Open Liberty]ページから入手できます。
+
+詳細はlink:{url-prefix}/docs/latest/develop-liberty-tools.html[Develop with Liberty Tools] ドキュメントをご確認ください。
+
+[#CVEs]
+== 本リリースにおけるセキュリティ脆弱性 (CVE) の修正
+[cols="5*"]
+|===
+|CVE |CVSSスコア |脆弱性評価 |影響を受けるバージョン |ノート
+
+|http://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2023-28867[CVE-2023-28867]
+|7.5
+|Denial of service
+|17.0.0.3 - 23.0.0.5
+|link:{url-prefix}/docs/latest/reference/feature/mpGraphQL-1.0.html[mpGraphQL-1.0]とlink:{url-prefix}/docs/latest/reference/feature/mpGraphQL-2.0.html[mpGraphQL-2.0]フィーチャーに影響あり。
+|===
+
+過去のセキュリティ脆弱性の修正のリストについては、link:{url-prefix}/docs/latest/security-vulnerabilities.html[Security vulnerability (CVE) list]をご参照ください。
+
+
+[#bugs]
+== 主なバグ修正
+
+以下のセクションでは、このリリースで修正したバグの一部について説明します。興味がある場合は、link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A23006+label%3A%22release+bug%22[full list of bugs fixed in 23.0.0.6]をご参照ください。
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/25283[JSFコンテナのApplication.getWrappedがNULLを返す]
++
+JSF コンテナの機能は、`javax.faces.application.getWrapped` メソッドが呼び出されると `null` を返します。
++
+この問題は解決され、正しいラップオブジェクトが返されるようになりました。
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/25168[ストリームがクローズし、close/goawayフレームが入力される際のトランスポート・クローズ・タイミングの問題]
++
+Http/2とwebSocketは全二重接続以降、複数のスレッドが同じ接続で同時に動作する可能性がありました。 あるスレッドがコネクションを閉じようとしているときに中断され、別のスレッドがコネクションを閉じるというタイミングが存在します。 その後、最初のスレッドが起動すると、すでに解放されたリソースが残っていました。
++
+このエラーは、以下のような例外を発生させる可能性があります。
++
+[source]
+----
+java.io.IOException: Request not read yet
+> at com.ibm.ws.http.channel.internal.inbound.HttpInboundServiceContextImpl.finishResponseMessage(HttpInboundServiceContextImpl.java:907)
+> at com.ibm.ws.http.channel.internal.inbound.HttpInboundServiceContextImpl.finishResponseMessage(HttpInboundServiceContextImpl.java:989)
+> at com.ibm.ws.http.channel.internal.inbound.HttpInboundLink.close(HttpInboundLink.java:678)
+> at com.ibm.wsspi.channelfw.base.InboundApplicationLink.close(InboundApplicationLink.java:105)
+> at com.ibm.ws.http.dispatcher.internal.channel.HttpDispatcherLink.close(HttpDispatcherLink.java:244)
+> at com.ibm.ws.http.dispatcher.internal.channel.HttpDispatcherLink.finish(HttpDispatcherLink.java:1022)
+> at com.ibm.ws.webcontainer.osgi.DynamicVirtualHost$2.run(DynamicVirtualHost.java:293)
+> at com.ibm.ws.http.dispatcher.internal.channel.HttpDispatcherLink$TaskWrapper.run(HttpDispatcherLink.java:1159)
+> at com.ibm.ws.http.dispatcher.internal.channel.HttpDispatcherLink.wrapHandlerAndExecute(HttpDispatcherLink.java:428)
+> at com.ibm.ws.http.dispatcher.internal.channel.HttpDispatcherLink.ready(HttpDispatcherLink.java:387)
+> at com.ibm.ws.http.channel.internal.inbound.HttpInboundLink.handleDiscrimination(HttpInboundLink.java:566)
+> at com.ibm.ws.http.channel.internal.inbound.HttpInboundLink.handleNewRequest(HttpInboundLink.java:500)
+> at com.ibm.ws.http.channel.internal.inbound.HttpInboundLink.processRequest(HttpInboundLink.java:360)
+> at com.ibm.ws.http.channel.internal.inbound.HttpInboundLink.ready(HttpInboundLink.java:327)
+> at com.ibm.ws.tcpchannel.internal.NewConnectionInitialReadCallback.sendToDiscriminators(NewConnectionInitialReadCallback.java:167)
+> at com.ibm.ws.tcpchannel.internal.NewConnectionInitialReadCallback.complete(NewConnectionInitialReadCallback.java:75)
+> at com.ibm.ws.tcpchannel.internal.WorkQueueManager.requestComplete(WorkQueueManager.java:504)
+> at com.ibm.ws.tcpchannel.internal.WorkQueueManager.attemptIO(WorkQueueManager.java:574)
+> at com.ibm.ws.tcpchannel.internal.WorkQueueManager.workerRun(WorkQueueManager.java:958)
+> at com.ibm.ws.tcpchannel.internal.WorkQueueManager$Worker.run(WorkQueueManager.java:1047)
+> at com.ibm.ws.threading.internal.ExecutorServiceImpl$RunnableWrapper.run(ExecutorServiceImpl.java:238)
+> at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1128)
+> at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:628)
+> at java.base/java.lang.Thread.run(Thread.java:834)
+----
++
+この問題は、スレッドが他のスレッドによってすでにクローズされたコネクションをクローズしようとしないようにすることで解決さ れました。
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/25017[Jakarta EE 10の新しいマルチパート・サポートでフォーム・データをポストすると失敗する]
++
+EntityPart` または `InputStream` パラメータに `@FormParam` アノテーションを使用して multipart/form-data を REST エンドポイントにポストすると、リクエストは `400 Bad Request` 応答で失敗し、次の例外が出力されます。
++
+[source]
+----
+jakarta.ws.rs.BadRequestException: RESTEASY003320: Failed processing arguments of public java.lang.String com.demo.rest.TestResource.upload(java.lang.String,jakarta.ws.rs.core.EntityPart) throws java.io.IOException
+at org.jboss.resteasy.core.MethodInjectorImpl.injectArguments(MethodInjectorImpl.java:120)
+Caused by: java.lang.UnsupportedOperationException: SRVE8020E: Servlet does not accept multipart requests
+at com.ibm.ws.webcontainer.srt.SRTServletRequest.prepareMultipart(SRTServletRequest.java:3838)
+----
++
+デプロイ中に `EntityPart` パラメータを使用すると、以下の警告が記録されます。
++
+[source]
+----
+SROAP04005: Could not find schema class in index: jakarta.ws.rs.core.EntityPart
+----
++
+この問題は解決され、`@FormParam`アノテーションをEntityPartsで使用できるようになりました。
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/24981[サーバー・バージョン・コマンドが、サーバーのserver.envで設定されたJAVA_HOMEを無視する]
++
+サーバーバージョン <serverName>` コマンドは、サーバーの `server.env` ファイルに設定されている `JAVA_HOME` 変数を無視します。
+代わりに、シェル環境(bash)の `JAVA_HOME` 変数で設定されているJavaのバージョン情報を表示します。
++
+この問題は解決され、`server version` コマンドは `server.env` ファイルで指定された Java バージョンを正しく識別するようになりました。
+
+
+
+== 今すぐOpen Liberty 23.0.0.6を入手する
+
+<<run,Maven,Gradle,Docker,ダウンロード可能なアーカイブ>>からも入手可能です。
