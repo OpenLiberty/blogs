@@ -104,8 +104,8 @@ def make_blog(issues, is_beta):
         linked_issue = get_linked_issue(issue['body'])
         # Try to find corresponding beta issue.  First use the new GHA tags, otherwise try and find embedded link.
         if not is_beta:
-            # Get the link from in between the last ocurrence <GHA-BLOG-BETA-LINK> and </GHA-BLOG-BETA-LINK> in the issue body
-            beta_issue_link = issue['body'][issue['body'].rindex("<GHA-BLOG-BETA-LINK>")].partition("<GHA-BLOG-BETA-LINK>")[2].partition("</GHA-BLOG-BETA-LINK>")[0]
+            # Get the link from in between the last ocurrence of <GHA-BLOG-BETA-LINK> and (the following first occurance of) </GHA-BLOG-BETA-LINK> in the issue body
+            beta_issue_link = issue['body'].rpartition("<GHA-BLOG-BETA-LINK>")[2].partition("</GHA-BLOG-BETA-LINK>")[0]
             print("Beta issue URL from TAG: " + beta_issue_link)
             
             if beta_issue_link == "" and linked_issue != None:
