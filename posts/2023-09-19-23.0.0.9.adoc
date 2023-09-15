@@ -1,0 +1,208 @@
+---
+layout: post
+title: "Spring Boot 3.0 support and new security capabilities in Open Liberty 23.0.0.9"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/lauracowen
+author_github: https://github.com/lauracowen
+seo-title: Spring Boot 3.0 support and new security capabilities in Open Liberty 23.0.0.9 - OpenLiberty.io
+seo-description: Use Spring Boot 3.0 capabilities in your Liberty applications. Authenticate OpenID Connect clients with Private Key, and use different LTPA/JWT cookies for different applications.
+blog_description: Use Spring Boot 3.0 capabilities in your Liberty applications. Authenticate OpenID Connect clients with Private Key, and use different LTPA/JWT cookies for different applications.
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+---
+= Spring Boot 3.0 support and new security capabilities in Open Liberty 23.0.0.9
+Laura Cowen <https://github.com/lauracowen>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+You can use Spring Boot 3.x capabilities in your Liberty applications with the new Spring Boot Support 3.0 feature. You can also now authenticate your OpenID Connect clients using the Private Key method, which is more secure than using client secrets, and if you use LTPA or JWT cookies, you can now use different cookies for different applications, according to their context root.
+
+And finally, happy birthday! Open Liberty is now 6 years old. See link:{url-prefix}/blog/2022/09/21/history-maker-projects.html[our history in maker projects].
+
+In link:{url-about}[Open Liberty] 23.0.0.9:
+
+* <<sb3, Spring Boot 3.0 support>>
+* <<jwt, Private Key JWT authentication support for OIDC clients>>
+* <<cookie, Use different LTPA/JWT cookies for different applications>>
+
+View the list of fixed bugs in link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A23009+label%3A%22release+bug%22[23.0.0.9].
+
+Check out link:{url-prefix}/blog/?search=release&search!=beta[previous Open Liberty GA release blog posts].
+
+
+[#run]
+== Run your apps using 23.0.0.9
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], include the following in your `pom.xml` file:
+
+[source,xml]
+----
+<plugin>
+    <groupId>io.openliberty.tools</groupId>
+    <artifactId>liberty-maven-plugin</artifactId>
+    <version>3.8.2</version>
+</plugin>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle], include the following in your `build.gradle` file:
+
+[source,gradle]
+----
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'io.openliberty.tools:liberty-gradle-plugin:3.6.2'
+    }
+}
+apply plugin: 'liberty'
+----
+
+Or if you're using link:{url-prefix}/docs/latest/container-images.html[container images]:
+
+[source]
+----
+FROM icr.io/appcafe/open-liberty
+----
+
+Or take a look at our link:{url-prefix}/start/[Downloads page].
+
+[link=https://stackoverflow.com/tags/open-liberty]
+image::img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="center"]
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/25973
+// Contact/Reviewer: hlhoots
+// // // // // // // //
+[#sb3]
+== Spring Boot 3.0 support
+
+The Liberty Spring Boot Support 3.0 feature provides a more complete support for running Spring Boot 3.0 applications on Liberty. It also provides the capability to link:{url-prefix}/docs/latest/deploy-spring-boot.html#thin[thin the application] when you create applications in containers.
+
+Prior releases of Liberty provided support for Spring Boot 1.5 and Spring Boot 2.0 applications.  Liberty also supported Spring Boot applications packaged as a WAR file, as demonstrated in link:https://openliberty.io/blog/2023/06/15/running-spring-boot-3.html[this recent blog post].  With Open Liberty 23.0.0.9, you can deploy Spring Boot 3.x applications by enabling the `springboot-3.0` feature, with support for both JAR and WAR file types.
+
+To run a Spring Boot 3.x application on Liberty, you must be running with Java 17 or higher.  Additionally, if your application uses the link:{url-prefix}/docs/latest/reference/feature/servlet.html[Jakarta Servlet] feature, it must be Jakarta Servet 6.0. Configure these features in the `server.xml` file, as shown in the following example:
+
+[source,xml]
+----
+<features>
+   <feature>springboot-3.0</feature>
+   <feature>servlet-6.0</feature>
+</features>
+----
+
+As with previous versions of the Spring Boot Support feature, you can put Spring Boot application JAR files in the `/dropins/spring/` directory.  Alternatively, specify the link:{url-prefix}/docs/latest/reference/config/springBootApplication.html[Spring Boot configuration elements] in the `server.xml` file. For example:
+
+[source,xml]
+----
+ <springBootApplication id="spring-boot-app" location="spring-boot-app-0.1.0.jar" name="spring-boot-app" />
+----
+
+For more information, see link:{url-prefix}/docs/latest/deploy-spring-boot.html[Configure and deploy Spring Boot applications].
+
+If you have used previous versions of the Spring Boot Support feature and are now migrating your application to use Spring Boot 3, note the following requirements:
+
+* link:{url-prefix}/docs/latest/reference/feature/webProfile-10.0.html[Jakarta EE 10 features] must be used.
+
+* Security configuration requires in-application modifications. 
+  - link:https://spring.io/blog/2022/02/21/spring-security-without-the-websecurityconfigureradapter[Spring Security without the WebSecurityConfigurerAdapter]
+
+  - link:https://docs.spring.io/spring-security/reference/servlet/authorization/authorize-http-requests.html[Authorize HttpServletRequests]
+
+* A new link:{url-prefix}/docs/latest/reference/command/server-create.html#_options[server template] (`springBoot3`) is available.
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/25749
+// Contact/Reviewer: ayoho
+// // // // // // // //
+[#jwt]
+== Private Key JWT authentication support for OIDC clients
+
+OpenID Connect clients in Liberty now support the `private_key_jwt` client authentication method with OpenID Connect token endpoints.
+
+OpenID Connect clients are required to provide authentication data to the OpenID Connect provider when they invoke the provider’s token endpoint.
+Clients can authenticate using several different methods, but most of those methods require a client secret.
+The `private_key_jwt` authentication method enables clients to use asymmetric keys to create signed JSON Web Tokens (JWTs) to authenticate instead of client secrets.
+OpenID Connect clients that use this authentication method are no longer required to have a client secret.
+
+Enable this capability in your client application using the `private_key_jwt` option for the `tokenEndpointAuthMethod` attribute, and the `tokenEndpointAuthSigningAlgorithm` and `keyAliasName` attributes in either the `openidConnectClient` or `oidcLogin` elements in the client's `server.xml` file.
+
+For example, when you use the OpenID Connect Client feature, include the following configuration:
+
+[source,xml]
+----
+<featureManager>
+   <feature>openidConnectClient-1.0</feature>
+</featureManager>
+    ...
+<openidConnectClient tokenEndpointAuthMethod="private_key_jwt" keyAliasName="privateKeyJwtAliasRS512" ... />
+----
+
+If you are using the Social Media Login feature, include the following configuration:
+
+[source,xml]
+----
+<featureManager>
+    <feature>socialLogin-1.0</feature>
+</featureManager>
+...
+<oidcLogin tokenEndpointAuthMethod="private_key_jwt" tokenEndpointAuthSigningAlgorithm="E512" keyAliasName="privateKeyJwtAliasES512" ... />
+----
+
+The `tokenEndpointAuthSigningAlgorithm` attribute specifies the signing algorithm to sign the JWT that is used for client authentication. The `keyAliasName` attribute points to the key to use to sign the JWT, and must also be the alias for the public key that corresponds to the private key. The private key must be in the keystore that is specified by the SSL configuration that is referenced by `sslRef` in the OIDC client configuration. The public key must be in one of the following locations:
+
+* The truststore that is specified by the `trustStoreRef` attribute
+* The truststore that is specified by the SSL configuration that is referenced by `sslRef`
+* The keystore that is specified by the SSL configuration that is referenced by `sslRef`
+
+For more information about the configuration options, see the docs:
+
+* link:{url-prefix}/docs/latest/reference/config/openidConnectClient.html[openidConnectClient element]
+* link:{url-prefix}/docs/latest/reference/config/oidcLogin.html[oidcLogin element]
+
+For more information about JWT authentication, see:
+
+* link:https://openid.net/specs/openid-connect-core-1_0.html#ClientAuthentication[OpenID Connect core specification]
+* link:https://datatracker.ietf.org/doc/html/rfc7523[RFC 7523]
+
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/26110
+// Contact/Reviewer: arkarkala
+// // // // // // // //
+[#cookie]
+== Use different LTPA/JWT cookies for different applications
+
+In previous releases, LTPA and JWT cookies always had the cookie path set to `/`, so that any request made to any path on the domain included the cookie. You can now set the LTPA or JWT cookie path to the application context root. With this configuration, you can use different LTPA and JWT tokens for different applications.
+
+Enable the `useContextRootForSSOCookiePath` attribute in the `webAppSecurity` element. For example, add the following line to the `server.xml`:
+
+[source,xml]
+----
+<webAppSecurity useContextRootForSSOCookiePath="true"/>
+----
+
+
+For more information about LTPA in Open Liberty, see the docs:
+
+* link:{url-prefix}/docs/latest/single-sign-on.html#_ltpa[Single sign-on (SSO)]
+* link:{url-prefix}/docs/latest/reference/feature/appSecurity-5.0.html[Application Security (Jakarta Security) feature]
+
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+
+
+== Get Open Liberty 23.0.0.9 now
+
+Available through <<run,Maven, Gradle, Docker, and as a downloadable archive>>.
