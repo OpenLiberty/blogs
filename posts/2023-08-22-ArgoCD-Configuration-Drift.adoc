@@ -92,22 +92,15 @@ Typical Continuous Deployment (CD) systems adhere to the first two GitOps princi
 * 		Automated Delivery: ArgoCD continuously and automatically syncs applications when changes are committed to the Git repository. This ensures deployments are consistent with the repository, bridging the gap between development commits and operational deployments.
 
 * 		Closed-Loop Feedback & Control: ArgoCD's real-time monitoring of application performance ensures that the live state is always aligned with the Git repository's state. If a discrepancy is detected, ArgoCD offers visual representations of the divergence and provides mechanisms to reconcile those differences, ensuring constant alignment with the intended state.
-== SVT GitOps Pipeline ==
 
-== Our SVT Pipeline ==
+== Example CI/CD Pipeline ==
 
 [.img_border_light]
 image::/img/blog/configuration-drift-chart.png[SVT DevOps pipeline,width=70%,align="center"]
 
-This blog will focus more on the CD aspect of GitOps, however, in order to effectively deploy with GitOps it is crucial to have a solid CI pipeline in place to build your Open Liberty Applications.  In our experience we found it more effective to separate the CI/CD pipelines into two smaller, less complex pipelines.  This also allowed us to reuse our existing pipeline and use tools we were already familiar with.  If you have no existing CI pipeline there are many great tools out there that can be used to build a pipeline, including open source options of Jenkins and Tekton.  Our CI pipeline consists of compiling the code upon commit, running tests, running security scans, and finally building a Docker image to be deployed with our CD pipeline.  Each of these tools used is interchangable with whichever tool is preferred, but as an example these are the ones we used.
+This blog will focus more on the CD aspect of GitOps, however, in order to effectively deploy with GitOps it is crucial to have a solid CI pipeline in place to build your Open Liberty Applications.  In our experience, we found it more effective to separate the CI/CD pipelines into two smaller, less complex pipelines. If you have no existing CI pipeline there are many great tools out there that can be used to build a pipeline, including open source options of Jenkins and Tekton.  Our CI pipeline consists of compiling the code upon commit, running tests, running security scans, and finally building a container image to be deployed with our CD pipeline. Each of these tools used is interchangable with whichever tool is preferred, but as an example these are the ones we used.
 
-== Install ArgoCD ==
-To install ArgoCD simply run these commands from the Quickstart section of the docs:
-```
-kubectl create namespace argocd
-kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
-```
-This will create a new namespace named argocd as well as apply the install manifests to that namespace.  It alternatively can be installed via OLM.
+In the next section, we will setup our Kubernets/OpenShift cluster to use GitOps with ArgoCD using a sample Open Liberty application.
 
 == Install the Open Liberty Operator ==
 The Open Liberty Operator aids in deploying and managing Open Liberty Applications on Kubernetes. Our example deployment makes use of the Open Liberty Operator to deploy the sample application. If you prefer to deploy using pure Kubernetes deployment files, this step is optional.
@@ -118,6 +111,15 @@ git clone https://github.com/OpenLiberty/open-liberty-operator.git
 kubectl create namespace open-liberty
 kubectl apply --server-side -k open-liberty-operator/deploy/releases/1.2.2/kustomize/overlays/watch-all-namespaces
 ```
+
+== Install ArgoCD ==
+To install ArgoCD simply run these commands from the Quickstart section of the docs:
+```
+kubectl create namespace argocd
+kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+```
+This will create a new namespace named argocd as well as apply the install manifests to that namespace.  It alternatively can be installed via OLM.
+
 
 == Using ArgoCD ==
 Get the default Admin password using the following command:
@@ -132,14 +134,7 @@ Once logged, in you should see this page:
 [.img_border_light]
 image::/img/blog/configuration-drift-2.png[Argo Home,width=70%,align="center"]
 
-== Creating a repo to be used for GitOps ==
-Now that ArgoCD is installed and we have access to the console, it’s time to create a repository on GitHub for Argo CD to sync to.
-
-We will use the Daytrader7 sample application, which is an application built around the paradigm of an online stock trading system. For more information about the Daytrader7 sample app and its usage, check out the Daytrader7 README. The repo being tracked can also be entirely separate from the code as well.
-
-On GitHub, create a fork of https://github.com/WASdev/sample.daytrader7
-
-<mst> updated version: 
+== Creating a repository to be used for GitOps ==
 Now that you've successfully installed ArgoCD and gained access to its console, the next step is to set up a GitHub repository for Argo CD to synchronize with.
 
 For the purposes of this blog, we'll use the Daytrader7 sample application. This application is built around the concept of an online stock trading system, and the Daytrader7 README provides a comprehensive overview.
@@ -148,21 +143,10 @@ It's a recommended best practice to maintain separation between configuration re
 
 To begin, navigate to GitHub and fork this repository: https://github.com/WASdev/sample.daytrader7. Use your forked repository when configuring ArgoCD in the following steps
 
-
-== Building the Application (optional) ==
-<mst>We assume that your CI pipleline has a way to build contianer image for your application. For this example, we can either build the application or use the pre-built cotnainer image used in the deployment files.
-
-<mst> Are the below commands in the README? Can we remove them?
-
-Run `mvn clean package` to package the source.
-Build the container image with docker build -t sample-daytrader7 -f Containerfile_db2.
-Upload the image to an image repository that OpenShift can access (Docker Hub or Quay, for example)
-In your forked repo, update the ApplicationImage field in deploy/daytrader7-deploy.yaml with your newly uploaded image.
+We assume that your CI pipleline has a way to build contianer image for your application. For this example, we have a pre-built cotnainer image used in the deployment files `deploy/daytrader7-deploy.yaml`.
 
 == Deploying DayTrader 7 via GitOps ==
-Now that we have the Git source and image repository ready for deployment, it’s time to use GitOps to deploy the application.
 
-<mst> /replace above with this 
 Now that we have the Git configuration repository ready for deployment, it’s time to configure ArgoCD to deploy the application.
 
 Go to the Argo CD console and ensure that you are logged in.
@@ -174,11 +158,6 @@ Scroll down to the Source and change the Repository URL to your newly forked rep
 Click Create in the top left.
 [.img_border_light]
 image::/img/blog/configuration-drift-4.png[Setting the Repo,width=70%,align="center"]
-
-== Demo Configuration Drift ==
-Now that we have the app deployed let's show a scenario where configuration drift occurs and how we can easily correct it.  Let's say a developer changes the memory settings in the configuration file for a quick test.  With the Kubernetes CLI or console change the memory requests from `1024Mi` to `2048Mi` if this resource: `deploy/daytrader7-deploy.yaml`.  In a few moments the argo console should show it is out of sync:
-(PIC)
-Since we have Auto Sync disabled we have to manually tell Argo to update our deployments.  Click on `Sync` button to return the configuration to match what it git says it should be.
 
 == Syncing DayTrader ==
 On the main page of the Argo CD console, you should see a new tile that looks like this:
@@ -193,6 +172,11 @@ Now the app is deployed and can be reached in a route created under the daytrade
 And there we go! The app is fully deployed and ready to be used.
 [.img_border_light]
 image::/img/blog/configuration-drift-7.png[Daytrader Home,width=70%,align="center"]
+== Demo Configuration Drift ==
+Now that we have the app deployed let's show a scenario where configuration drift occurs and how we can easily correct it.  Let's say a developer changes the memory settings in the configuration file for a quick test.  With the Kubernetes CLI or console change the memory requests from `1024Mi` to `2048Mi` if this resource: `deploy/daytrader7-deploy.yaml`.  In a few moments the argo console should show it is out of sync:
+(PIC)
+Since we have Auto Sync disabled we have to manually tell Argo to update our deployments.  Click on `Sync` button to return the configuration to match what it git says it should be.
+
 // // // // // // // //
 // LINKS
 //
