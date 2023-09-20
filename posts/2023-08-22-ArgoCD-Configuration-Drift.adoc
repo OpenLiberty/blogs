@@ -1,0 +1,204 @@
+---
+layout: post
+title: "A Solution to Configuration Drift - Deploying Open Liberty with GitOps"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/danielguinan1
+author_github: https://github.com/danielguinan1
+seo-title: TITLE - OpenLiberty.io
+seo-description: DESCRIPTION
+blog_description: "DESCRIPTION"
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+additional_authors: 
+- name: Monica Tamboli
+  github: https://github.com/mtamboli
+  image: https://avatars0.githubusercontent.com/mtamboli
+---
+= A Solution to Configuration Drift - Deploying Open Liberty with GitOps 
+Daniel Guinan <https://github.com/danielguinan1>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+// // // // // // // //
+// In the preceding section:
+// Do not insert any blank lines between any of the lines.
+//
+// "open-graph-image" is set to OL logo. Whenever possible update this to a more appropriate/specific image (for example if present an image that is being used in the post). 
+// However, it can be left empty which will set it to the default
+//
+// "open-graph-image-alt" is a description of what is in the image (not a caption). When changing "open-graph-image" to
+// a custom picture, you must provide a custom string for "open-graph-image-alt".
+//
+// Replace TITLE with the blog post title
+//
+// Replace SECOND_AUTHOR_NAME with the name of the second author.
+// Replace SECOND_GITHUB_USERNAME with the GitHub user name of the second author.
+// Replace THIRD_AUTHOR_NAME with the name of the third author. And so on for fourth, fifth, etc authors.
+// Replace THIRD_GITHUB_USERNAME with the GitHub user name of the third author. And so on for fourth, fifth, etc authors.
+//
+// Replace AUTHOR_NAME with your name as first author.
+// Replace GITHUB_USERNAME with your GitHub username eg: lauracowen
+// Replace DESCRIPTION with a short summary (~60 words) of the release (a more succinct version of the first paragraph of the post).
+//
+// Replace AUTHOR_NAME with your name as you'd like it to be displayed, eg: Laura Cowen
+//
+// Example post: 2020-02-12-faster-startup-Java-applications-criu.adoc
+//
+// If adding image into the post add :
+// -------------------------
+// [.img_border_light]
+// image::img/blog/FILE_NAME[IMAGE CAPTION ,width=70%,align="center"]
+// -------------------------
+// "[.img_border_light]" = This adds a faint grey border around the image to make its edges sharper. Use it around
+// screenshots but not around diagrams. Then double check how it looks.
+// There is also a "[.img_border_dark]" class which tends to work best with screenshots that are taken on dark backgrounds.
+// Once again make sure to double check how it looks
+// Change "FILE_NAME" to the name of the image file. Also make sure to put the image into the right folder which is: img/blog
+// change the "IMAGE CAPTION" to a couple words of what the image is
+// // // // // // // //
+In today's modern software ecosystem, while many organizations have embraced Continuous Integration and Continuous Deployment (CI/CD) methodologies, they still grapple with the persistent issue of configuration drift. This refers to the disparity between configurations as coded in repositories like Git and what's actively deployed. This drift not only complicates deployments but can also jeopardize the stability of production environments. So, how can we reconcile this gap and ensure consistency across our deployments?
+
+The answer lies in GitOps — a principle that revolves around using Git as the single source of truth for declarative infrastructure and applications. In this blog, we delve into harnessing the power of the GitOps framework and the deployment tool ArgoCD, to combat configuration drift. As a practical example, we'll spotlight the deployment of Open Liberty applications—a lightweight cloud-native Java runtime—onto Kubernetes/OpenShift clusters. And while our demonstration leans on specific tools; you can seamlessly integrate the CI/CD tools of your preference.
+
+== What is Configuration Drift? ==
+Configuration drift is defined as the divergence of a system’s active configuration from its intended or expected state. While there can be different reasons for this drift, the most common cause is manual untracked changes made to a system. If unaddressed, drift can be time-consuming to rectify especially when scale of the system increases. Configuration drift can also pose security risks, such as unpatched vulnerabilities or absent security protocols.
+
+As an example, imagine a scenario where a Continuous Deployment (CD) pipeline deploys an application to a Kubernetes cluster, with all configurations codified in a Git repository. Everything operates seamlessly. However, a team member identifies a performance issue and, aiming for a quick fix, uses a kubectl command to directly tweak the resource allocations for a specific deployment. Although this might resolve the immediate problem, the cluster's state now diverges from what's documented in Git. The next time a deployment occurs, unexpected behaviors might arise because the CD pipeline assumes the cluster matches the Git state. Additionally, other team members might remain unaware of this change, leading to potential troubleshooting challenges and operational inefficiencies down the line.
+
+== What is GitOps ==   
+GitOps is a framework designed to streamline and optimize how operations and infrastructure are handled in the modern cloud-native landscape. GitOps revolves around four core principles:
+
+* 		Declarative Configuration: In GitOps, all resources and infrastructure are defined declaratively. This means the entire system – from infrastructure, networking, and even application deployments – is described in a manner where you state "what" you want, not "how" to achieve it. These declarations are usually made through config files or manifests.
+
+* 		Versioned and Immutable Source of Truth: Every declared configuration is stored in a version-controlled Git repository. This repository acts as the immutable source of truth for both infrastructure and application. Any change, be it a minor configuration tweak or a major system overhaul, is recorded as a commit, ensuring full traceability and history.
+
+* 		Automated Delivery: Once a change is committed to the Git repository, automated processes handle the deployment. This ensures that the live system is always in sync with the repository's declared state. If any difference arises – whether due to manual interventions, system failures, or other reasons – the GitOps process can either flag it or work to reconcile the live state to match the repository.
+
+* 		Closed-Loop Feedback & Control: Continuous feedback is integral to GitOps. Monitoring and alerting tools keep a watchful eye on the live environment, comparing its state to the repository. If discrepancies are detected, these tools alert operations teams or even trigger auto-correction processes, making sure the desired state, as defined in Git, is consistently maintained.
+
+In essence, GitOps is more than just a set of tools or practices. It's a cultural shift in how infrastructure and applications are managed, drawing from proven development practices and extending them to operations. By tightly integrating Git at the center of the operational framework, GitOps ensures reliability, transparency, and efficiency in modern deployment pipelines.
+
+== What is GitOps/ArgoCD == 
+
+After understanding the principles of GitOps, it becomes evident that achieving its full potential requires tools designed with these principles in mind. ArgoCD is a declarative, GitOps continuous delivery tool for Kubernetes.
+
+ArgoCD works by ensuring that a Kubernetes cluster's state matches the configurations defined in a Git repository. It facilitates the automatic deployment and synchronization of applications to the desired environments. 
+
+Typical Continuous Deployment (CD) systems adhere to the first two GitOps principles: using declarative configurations and maintaining a versioned, immutable source of truth. They ensure that every piece of infrastructure or application change is defined declaratively and then stored in a version-controlled system like Git. However, when it comes to the latter two principles, ensuring automated delivery and maintaining closed-loop feedback & control, this is where many CD systems fall short, and tools like ArgoCD shine.
+
+* 		Automated Delivery: ArgoCD continuously and automatically syncs applications when changes are committed to the Git repository. This ensures deployments are consistent with the repository, bridging the gap between development commits and operational deployments.
+
+* 		Closed-Loop Feedback & Control: ArgoCD's real-time monitoring of application performance ensures that the live state is always aligned with the Git repository's state. If a discrepancy is detected, ArgoCD offers visual representations of the divergence and provides mechanisms to reconcile those differences, ensuring constant alignment with the intended state.
+
+== Example CI/CD Pipeline ==
+
+[.img_border_light]
+image::/img/blog/configuration-drift-chart.png[SVT DevOps pipeline,width=70%,align="center"]
+
+While the focus of this blog is on continuous deployment using GitOps, it's important to note that before you can use GitOps to deploy applications, you need a robust CI pipeline to build secure container images for your application. As shown above, our CI pipeline activates upon a new commit, compiling the code, running tests, assessing security, and constructing a container image. This image is subsequently employed in our CD pipeline.
+
+If you're starting without a CI pipeline, there's an array of tools available. Jenkins and Tekton stand out as two open source options. We're highlighting a few of the most commonly used tools in the above picture, but you can use any tools you like.
+
+Up next, we'll guide you through setting up a Kubernetes/OpenShift cluster with GitOps using ArgoCD, using an Open Liberty application as our demonstration
+
+
+
+In the next section, we will setup our Kubernetes/OpenShift cluster to use GitOps with ArgoCD using a sample Open Liberty application.
+
+== Install the Open Liberty Operator ==
+The Open Liberty Operator aids in deploying and managing Open Liberty Applications on Kubernetes. Our example deployment makes use of the Open Liberty Operator to deploy the sample application. If you prefer to deploy using pure Kubernetes deployment files, this step is optional.
+
+To install it with the default configuration of watching all namespaces, clone the repository and run the following commands:
+```
+git clone https://github.com/OpenLiberty/open-liberty-operator.git
+kubectl create namespace open-liberty
+kubectl apply --server-side -k open-liberty-operator/deploy/releases/1.2.2/kustomize/overlays/watch-all-namespaces
+```
+
+== Install ArgoCD ==
+To install ArgoCD simply run these commands from the Quickstart section of the docs:
+```
+kubectl create namespace argocd
+kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+```
+This will create a new namespace named argocd as well as apply the install manifests to that namespace.  It alternatively can be installed via OLM.
+
+
+== Using ArgoCD ==
+Get the default Admin password using the following command:
+```
+kubectl get secret argocd-initial-admin-secret -n argocd -o jsonpath='{.data.password}' | base64 -d
+```
+Next, go to the route of the `argocd-server` and log with the `admin` user and password.
+[.img_border_light]
+image::/img/blog/configuration-drift-1.png[Argo Login,width=70%,align="center"]
+
+Once logged, in you should see this page:
+[.img_border_light]
+image::/img/blog/configuration-drift-2.png[Argo Home,width=70%,align="center"]
+
+== Creating a repository to be used for GitOps ==
+Now that you've successfully installed ArgoCD and gained access to its console, the next step is to set up a GitHub repository for Argo CD to synchronize with.
+
+For the purposes of this blog, we'll use the Daytrader7 sample application. This application is built around the concept of an online stock trading system, and the Daytrader7 README provides a comprehensive overview.
+
+It's a recommended best practice to maintain separation between configuration repositories and code repositories. Keeping these separate ensures that infrastructure changes are decoupled from application changes, allowing for more granular control, better audit trails, and reduced risk of unintended side-effects. For this example, we'll create a deploy directory within our existing repository to house the deployment configuration.
+
+To begin, navigate to GitHub and fork this repository: https://github.com/WASdev/sample.daytrader7. Use your forked repository when configuring ArgoCD in the following steps
+
+We assume that your CI pipleline has a way to build contianer image for your application. For this example, we have a pre-built cotnainer image used in the deployment files `deploy/daytrader7-deploy.yaml`.
+
+== Deploying DayTrader 7 via GitOps ==
+
+Now that we have the Git configuration repository ready for deployment, it’s time to configure ArgoCD to deploy the application.
+
+Go to the Argo CD console and ensure that you are logged in.
+Click the New App button near the top left of the console.
+For Application name, let’s call this one daytrader7, keeping it in the default Argo project and setting the sync policy to Manual. Check the Auto-Create Namespace box as well.
+[.img_border_light]
+image::/img/blog/configuration-drift-3.png[Creating the App,width=70%,align="center"]
+Scroll down to the Source and change the Repository URL to your newly forked repo. Change the path, which is the path where Argo CD is looking for deployment files, to deploy. Set the Cluster URL to https://kubernetes.default.svc, which is the local cluster URL. Then set the namespace to daytrader7
+Click Create in the top left.
+[.img_border_light]
+image::/img/blog/configuration-drift-4.png[Setting the Repo,width=70%,align="center"]
+
+== Syncing DayTrader ==
+On the main page of the Argo CD console, you should see a new tile that looks like this:
+[.img_border_light]
+image::/img/blog/configuration-drift-5.png[Argo Dashboard,width=70%,align="center"]
+Click the Sync button, then on the window that appears and click Sync again.
+Click on the daytrader7 tile to view the app dashboard and sync progress.
+Over the course of a few minutes, you should see resources being created and the app dashboard looking like this:
+[.img_border_light]
+image::/img/blog/configuration-drift-6.png[App deploying,width=70%,align="center"]
+Now the app is deployed and can be reached in a route created under the daytrader7 namespace. Find the URL via oc get routes –n daytrader7, then paste the URL in a browser.
+And there we go! The app is fully deployed and ready to be used.
+[.img_border_light]
+image::/img/blog/configuration-drift-7.png[Daytrader Home,width=70%,align="center"]
+== Demo Configuration Drift ==
+Now that we have the app deployed let's show a scenario where configuration drift occurs and how we can easily correct it.  Let's say a developer changes the memory settings in the configuration file for a quick test.  With the Kubernetes CLI or console change the memory requests from `1024Mi` to `2048Mi` if this resource: `deploy/daytrader7-deploy.yaml`.  In a few moments the argo console should show it is out of sync:
+[.img_border_light]
+image::/img/blog/configuration-drift-outofsync.png[Daytrader Home,width=70%,align="center"]
+Since we have Auto Sync disabled we have to manually tell Argo to update our deployments.  Click on `Sync` button to return the configuration to match what it git says it should be.
+
+[.img_border_light]
+image::/img/blog/configuration-drift-synced.png[Daytrader Home,width=70%,align="center"]
+
+// // // // // // // //
+// LINKS
+//
+// OpenLiberty.io site links:
+// link:/guides/microprofile-rest-client.html[Consuming RESTful Java microservices]
+// 
+// Off-site links:
+// link:https://openapi-generator.tech/docs/installation#jar[Download Instructions]
+//
+// // // // // // // //
+
+== Next Steps ==
+In this blog, we've walked through the practical application of GitOps, showcasing its potential in preventing configuration drift. Its benefits, particularly in maintaining deployment consistency, are evident. If you're considering enhancing your deployment approach or starting a new project, we recommend trying out GitOps for your application. You can extend this approach to deploy operators and other dependencies for you applications.
+
+And for those looking to create or update applications, the open liberty guides available at openliberty.io offer helpful insights and steps.
