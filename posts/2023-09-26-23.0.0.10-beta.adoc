@@ -1,0 +1,684 @@
+---
+layout: post
+title: "MicroProfile 6.1, Java 21, and fast startup times for Spring Boot apps on Open Liberty 23.0.0.10-beta"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/lauracowen
+author_github: https://github.com/lauracowen
+seo-title: MicroProfile 6.1, Java 21, and fast startup times for Spring Boot apps on Open Liberty 23.0.0.10-beta - OpenLiberty.io
+seo-description: Previews of MicroProfile 6.1, Java 21, faster startup for Spring Boot apps, Jakarta Data beta 3.
+blog_description: Previews of MicroProfile 6.1, Java 21, faster startup for Spring Boot apps, Jakarta Data beta 3.
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+---
+= MicroProfile 6.1, Java 21, and fast startup times for Spring Boot apps on Open Liberty 23.0.0.10-beta
+Laura Cowen <https://github.com/lauracowen>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+This Open Liberty beta is packed full of the team's latest standards implementation work with previews of MicroProfile 6.1 (Metrics, Telemetry, and OpenAPI), Java 21, and Jakarta Data (Beta 3) on Open Liberty. It also introduces faster startup times for your Spring Boot applications with little or no extra effort by using Liberty InstantOn; if you have any Spring apps to hand, give it a try. And there are a couple of updates that make it easier to manage security configurations in containerized environments.
+
+
+The link:{url-about}[Open Liberty] 23.0.0.10-beta includes the following beta features (along with link:{url-prefix}/docs/latest/reference/feature/feature-overview.html[all GA features]):
+
+* <<sbcrac, Faster startup of Spring Boot apps (Spring Boot 3.0 InstantOn with CRaC)>>
+* <<java21, Java 21 support>>
+* <<mp61, MicroProfile 6.1 support>>
+** <<mpmetrics, MicroProfile Metrics 5.1: configure statistics tracked by Histogram and Timer metrics>>
+** <<mptel, MicroProfile Telemetry 1.1: updated OpenTelemetry implementation>>
+* <<mpapi, MicroProfile OpenAPI 3.1: OpenAPI doc endpoint path configuration>>
+* <<data, Jakarta Data beta 3: configure the data source used to query and persist data>>
+* <<ltpa, Support LTPA keys rotation without a planned outage>>
+* <<include, Include all files in a specified directory in your server configuration>>
+
+See also link:{url-prefix}/blog/?search=beta&key=tag[previous Open Liberty beta blog posts].
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/26059
+// Contact/Reviewer: sebratton,tjwatson
+// // // // // // // // 
+[#sbcrac]
+== Faster startup of Spring Boot apps (Spring Boot 3.0 InstantOn with CRaC)
+    
+Open Liberty InstantOn provides fast startup times for MicroProfile and Jakarta EE applications. With link:{url-prefix}/blog/2023/06/29/rapid-startup-instanton.html[InstantOn], your applications can start in milliseconds, without compromising on throughput, memory, development-production parity, or Java language features. InstantOn uses the Checkpoint/Restore In Userspace (link:https://criu.org/[CRIU]) feature of the Linux kernel to take a checkpoint of the JVM that can be restored later. 
+
+The Spring Framework (version 6.1) is adding link:https://docs.spring.io/spring-framework/reference/6.1/integration/checkpoint-restore.html[support for Coordinated Restore at Checkpoint (CRaC)], which also uses CRIU to provide Checkpoint and Restore for Java applications.  The Spring Boot version 3.2 will use Spring Framework version 6.1, enabling Spring Boot applications to also use CRaC to achieve rapid startup times.
+
+
+The link:/blog/2023/09/19/23.0.0.9.html#sb3[recent addition of the Open Liberty `springBoot-3.0` feature] allows Spring Boot 3.x-based applications to be deployed with Open Liberty.  And now, with the new Open Liberty `crac-1.3` beta feature, a Spring Boot 3.2-based application can be deployed with Liberty InstantOn to achieve rapid startup times for your Spring Boot application.
+
+
+
+To use the CRaC 1.3 functionality with the `springBoot-3.0` feature, you must be running with Java 17 or higher and use the `crac-1.3` feature.  Additionally, if your application uses Servlet, it  needs to use the `servlet-6.0` feature.  These features are configured in the `server.xml` file as follows:
+
+[source,xml]
+----
+<features>
+   <feature>springBoot-3.0</feature>
+   <feature>servlet-6.0</feature>
+   <feature>crac-1.3</feature>
+</features>
+----
+
+With these features enabled you can containerize your Spring Boot 3.2 application with Liberty InstantOn support by following the link:{url-prefix}/docs/latest/instanton.html[Liberty InstantOn documentation] along with following the Liberty recommendations for containerizing Spring Boot applications with the link:{url-prefix}/guides/spring-boot.html[Liberty Spring Boot guide].
+
+For more information and an example Spring Boot application using the Liberty InstantOn `crac-1.3` feature, see the link:/blog/2023/09/26/spring-boot-3-instant-on.html[How to containerize your Spring Boot application for rapid startup] blog post.
+
+
+You can also use the `crac-1.3` feature with other applications, such as applications using Jakarta EE or MicroProfile. Such applications can register resources with CRaC to get notifications for checkpoint and restore. This allows applications to perform actions necessary to prepare for a checkpoint as well as perform necessary actions when the application is restored.  For more information on the `org.crac` APIs, see the link:https://javadoc.io/doc/org.crac/crac/latest/index.html[org.crac] Javadoc.
+
+
+    
+    
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/26192
+// Contact/Reviewer: gjwatts
+// // // // // // // // 
+[#java21]
+== Java 21 support
+
+Java 21 is finally here, the first long term support (LTS) release since Java 17 was released two years ago. It offers some new functionality and changes that you'll want to check out for yourself.
+
+As it is a milestone release of Java, we thought you might like to try it out a little early (we have been testing against Java 21 build 35 ourselves).  Take advantage of trying out the new changes in Java 21 now and get more time to review your applications, microservices, and runtime environments.
+
+Just:
+
+1. link:https://jdk.java.net/21/[Download the latest release of Java 21].
+2. Get the link:https://openliberty.io/downloads/#runtime_betas[23.0.0.10-beta] version of Open Liberty.
+3. Edit your Liberty server's link:https://openliberty.io/docs/latest/reference/config/server-configuration-overview.html#server-env[server.env file] to point JAVA_HOME to your Java 21 installation.
+4. Start testing!
+
+Here are some highlights from new JEP changes in Java 18-21:
+
+* 400: link:https://openjdk.java.net/jeps/400[UTF-8 by Default]
+* 408: link:https://openjdk.java.net/jeps/408[Simple Web Server]
+* 413: link:https://openjdk.java.net/jeps/413[Code Snippets in Java API Documentation]
+* 416: link:https://openjdk.java.net/jeps/416[Reimplement Core Reflection with Method Handles]
+* 418: link:https://openjdk.java.net/jeps/418[Internet-Address Resolution SPI]
+* 421: link:https://openjdk.java.net/jeps/421[Deprecate Finalization for Removal]
+* 422: link:https://openjdk.org/jeps/422[Linux/RISC-V Port]
+* 431: link:https://openjdk.org/jeps/431[Sequenced Collections]
+* 439: link:https://openjdk.org/jeps/439[Generational ZGC]
+* 440: link:https://openjdk.org/jeps/440[Record Patterns]
+* 441: link:https://openjdk.org/jeps/441[Pattern Matching for switch]
+* 449: link:https://openjdk.org/jeps/449[Deprecate the Windows 32-bit x86 Port for Removal]
+* 451: link:https://openjdk.org/jeps/451[Prepare to Disallow the Dynamic Loading of Agents]
+* 452: link:https://openjdk.org/jeps/452[Key Encapsulation Mechanism API]
+
+But perhaps the most anticipated one of all is the introduction of Virtual Threads in Java 21:
+
+* 444: link:https://openjdk.org/jeps/444[Virtual Threads]
+
+Will the impact of Virtual Threads live up to the anticipation?  Find out for yourself by experimenting with them, or with any of the other new features in Java 21, by trying them out in your applications run on the best Java runtime, Open Liberty!
+
+
+For more information on Java 21, see:
+
+* link:https://jdk.java.net/21/release-notes[Java 21 release notes page]
+* link:https://download.java.net/java/early_access/jdk21/docs/api/[API Javadoc page]
+* link:https://jdk.java.net/21/[Java 21 download page].
+
+As we work toward full Java 21 support, please bear with any of our functionality that might not be 100% ready yet.
+    
+    
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
+
+
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/26170
+// Contact/Reviewer: Emily-Jiang
+// // // // // // // // 
+[#mp61]
+== MicroProfile 6.1 support
+
+MicroProfile 6.1 is a minor release and is backwards-compatible with MicroProfile 6.0. It brings in Jakarta EE 10 Core Profile APIs and the following MicroProfile component specifications:
+
+* link:https://jakarta.ee/specifications/coreprofile/10/[Jakarta EE 10 Core Profile]
+* link:https://github.com/eclipse/microprofile-config/releases/tag/3.1-RC1[MicroProfile Config 3.1]
+* link:https://github.com/eclipse/microprofile-fault-tolerance/releases/tag/4.0.2[MicroProfile Fault Tolerance 4.0]
+* link:https://github.com/eclipse/microprofile-metrics/releases/tag/5.1.0-RC1[MicroProfile Metrics 5.1]
+* link:https://github.com/eclipse/microprofile-health/releases/tag/4.0.1[MicroProfile Health 4.0]
+* link:https://github.com/eclipse/microprofile-telemetry/releases/tag/1.1-RC1[MicroProfile Telemetry 1.1]
+* link:https://github.com/eclipse/microprofile-open-api/releases/tag/3.1[MicroProfile OpenAPI 3.1]
+* link:https://github.com/eclipse/microprofile-jwt-auth/releases/tag/2.1[MicroProfile JWT Authentication 2.1]
+* link:https://github.com/eclipse/microprofile-rest-client/releases/tag/3.0.1[MicroProfile Rest Client 3.0]
+
+The following three specifications have minor updates, while the other five specifications remain unchanged:
+
+* MicroProfile Metrics 5.1 
+
+* MicroProfile Telemetry 1.1 
+
+* MicroProfile Config 3.1 (mainly some TCK updates to ensure the tests run against either CDI 3.x or CDI 4.0 Lite)
+
+
+See the following sections for more details about each of these features and how to try them out.
+    
+    
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
+
+
+
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/26027
+// Contact/Reviewer: Channyboy
+// // // // // // // // 
+[#mpmetrics]
+=== MicroProfile Metrics 5.1: configure statistics tracked by Histogram and Timer metrics 
+
+
+   
+MicroProfile Metrics 5.1 includes new MicroProfile Config properties that are used for configuring the statistics that the Histogram and Timer metrics track and output. In MicroProfile Metrics 5.0, the Histogram and Timer metrics only track and output the _max_ recorded value, the _sum_ of all values, the _count_ of the recorded values, and a static set of percentiles for the 50th, 75th, 95th, 98th, 99th, and 99.9th percentile. These values are emitted to the `/metrics` endpoint in Prometheus format.
+
+
+
+The new properties introduced in MicroProfile Metrics 5.1 allow you to define a custom set of percentiles as well as a custom set of histogram buckets for the Histogram and Timer metrics. There are also additional configuration properties for enabling a default set of histogram buckets, including properties for defining an upper and lower bound for the bucket set.
+
+The properties in the following table allow you to define a semicolon-separated list of value definitions using the syntax:
+
+
+[source]
+----
+metric_name=value_1[,value_2…value_n]
+----
+
+
+
+
+[%header,cols="1,1"]
+|===
+| Property  |Description
+| mp.metrics.distribution.percentiles
+a| - Defines a custom set of percentiles for matching Histogram and Timer metrics to track and output. 
+- Accepts a set of integer and decimal values for a metric name pairing. 
+- Can be used to disable percentile output if no value is provided with a metric name pairing.
+
+
+| mp.metrics.distribution.histogram.buckets
+a| - Defines a custom set of (cumulative) histogram buckets for matching Histogram metrics to track and output.  
+- Accepts a set of integer and decimal values for a metric name pairing.
+
+
+| mp.metrics.distribution.timer.buckets
+a| - Defines a custom set of (cumulative) histogram buckets for matching Timer metrics to track and output.
+ - Accepts a set of decimal values with a time unit appended (i.e., ms, s, m, h) for a metric name pairing.
+
+
+|mp.metrics.distribution.percentiles-histogram.enabled
+a| - Configures any matching Histogram or Timer metric to provide a large set of default histogram buckets to allow for percentile configuration with a monitoring tool. 
+- Accepts a true/false value for a metric name pairing.
+
+
+| mp.metrics.distribution.histogram.max-value
+a| - When percentile-histogram is enabled for a Timer, this property defines a upper bound for the buckets reported. 
+- Accepts a single integer or decimal value for a metric name pairing.
+
+
+| mp.metrics.distribution.histogram.min-value
+a| - When percentile-histogram is enabled for a Timer, this property defines a lower bound for the buckets reported. 
+- Accepts a single integer or decimal value for a metric name pairing.
+
+
+|mp.metrics.distribution.timer.max-value
+a| - When percentile-histogram is enabled for a Histogram, this property defines a upper bound for the buckets reported. 
+- Accepts a single decimal values with a time unit appended (i.e., ms, s, m, h) for a metric name pairing.
+
+|mp.metrics.distribution.timer.min-value
+a| - When percentile-histogram is enabled for a Histogram, this property defines a lower bound for the buckets reported. 
+- Accepts a single decimal value with a time unit appended (i.e., ms, s, m, h) for a metric name pairing.
+
+|===
+
+Some properties can accept multiple values for a given metric name while some can only accept a single value.
+You can use an asterisk (i.e., *) as a wild card at the end of the metric name.
+For example, the `mp.metrics.distribution.percentiles` can be defined as:
+
+[source]
+----
+mp.metrics.distribution.percentiles=alpha.timer=0.5,0.7,0.75,0.8;alpha.histogram=0.8,0.85,0.9,0.99;delta.*=
+----
+
+This example creates the `alpha.timer` timer metric to track and output the 50th, 70th, 75th, and 80th percentile values. The `alpha.histogram` histogram metric outputs the 80th, 85th, 90th, and 99th percentiles values. Percentiles are disabled for any Histogram or Timer metric that matches with `delta.*` .
+
+
+We'll expand on the previous example and define histogram buckets for the `alpha.timer` timer metric using the `mp.metrics.distribution.timer.buckets` property:
+
+
+[source,xml]
+----
+mp.metrics.distribution.timer.buckets=alpha.timer=100ms,200ms,1s
+----
+
+This configuration tells the metrics runtime to track and output the count of durations that fall within 0-100ms, 0-200ms, and 0-1 seconds. These values are ranges because the histogram buckets work _cumulatively_ .
+
+
+The corresponding Prometheus output for the `alpha.timer` metric at the `/metrics` REST endpoint is:
+
+[source]
+----
+# HELP alpha_timer_seconds_max  
+# TYPE alpha_timer_seconds_max gauge
+alpha_timer_seconds_max{scope="application",} 5.633
+# HELP alpha_timer_seconds  
+# TYPE alpha_timer_seconds histogram <1>
+alpha_timer_seconds{scope="application",quantile="0.5",} 0.67108864
+alpha_timer_seconds{scope="application",quantile="0.7",} 5.603590144
+alpha_timer_seconds{scope="application",quantile="0.75",} 5.603590144
+alpha_timer_seconds{scope="application",quantile="0.8",} 5.603590144
+alpha_timer_seconds_bucket{scope="application",le="0.1",} 0.0 <2>
+alpha_timer_seconds_bucket{scope="application",le="0.2",} 0.0 <2>
+alpha_timer_seconds_bucket{scope="application",le="1.0",} 1.0 <2>
+alpha_timer_seconds_bucket{scope="application",le="+Inf",} 2.0  <2><3>
+alpha_timer_seconds_count{scope="application",} 2.0
+alpha_timer_seconds_sum{scope="application",} 6.333
+----
+
+<1> The Prometheus metric type is `histogram`. Both the quantiles or percentiles and buckets are represented under this type. 
+<2> The `le` tag represents _less than_ and is for the defined buckets, which are converted to seconds.
+<3> Prometheus requires a `+Inf` bucket, which counts all hits.
+
+For more information about MicroProfile Metrics, see:
+
+* link:https://github.com/eclipse/microprofile-telemetry[MicroProfile Metrics repo]
+* link:{url-prefix}/docs/latest/introduction-monitoring-metrics.html[Monitoring with metrics docs]
+  
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
+
+
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/26183
+// Contact/Reviewer: yasmin-aumeeruddy
+// // // // // // // // 
+[#mptel]
+=== MicroProfile Telemetry 1.1: updated OpenTelemetry implementation 
+
+
+MicroProfile Telemetry 1.1 provides developers with the latest Open Telemetry technology; the feature now consumes OpenTelemetry-1.29.0, updated from 1.19.0. Consequently, a lot of the dependencies are now stable. 
+
+To enable the MicroProfile Telemetry 1.1 feature, add the following configuration to your `server.xml`:
+
+[source,xml]
+----
+<features>
+   <feature>mpTelemetry-1.1</feature>
+</features>
+----
+
+Additionally, you must make third-party APIs visible for your application in the `server.xml`:
+
+
+[source,xml]
+----
+<webApplication location="demo-microprofile-telemetry-inventory.war" contextRoot="/">
+    <!-- enable visibility to third party apis -->
+    <classloader apiTypeVisibility="+third-party"/>
+</webApplication>
+----
+
+For more information about MicroProfile Telemetry, see:
+
+* link:https://github.com/eclipse/microprofile-telemetry[MicroProfile Telemetry repo]
+* link:https://github.com/open-telemetry/opentelemetry-specification/blob/v1.25.0/specification/trace/api.md[OpenTelemetry spec]
+* link:{url-prefix}/docs/latest/microprofile-telemetry.html[Enable distributed tracing with MicroProfile Telemetry docs]
+   
+   
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
+
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/26222
+// Contact/Reviewer: Azquelt
+// // // // // // // // 
+
+[#mpapi]
+== MicroProfile OpenAPI 3.1: OpenAPI doc endpoint path configuration
+
+
+MicroProfile OpenAPI generates and serves OpenAPI documentation for JAX-RS applications that are deployed to the Open Liberty server. The OpenAPI documentation is served from `/openapi` and a user interface for browsing this documentation is served from `/openapi/ui`.
+
+With MicroProfile OpenAPI 3.1, you can configure the paths for these endpoints by adding configuration to your `server.xml`. For example:
+     
+[source,xml]
+----
+<mpOpenAPI docPath="/my/openapi/doc/path" uiPath="/docsUi" />
+----
+
+When you set this configuration on a local test server, you can then access the OpenAPI document at `localhost:9080/my/openapi/doc/path` and the UI at `localhost:9080/docsUi`.
+
+
+This is particularly useful if you want to expose the OpenAPI documentation through a Kubernetes ingress which routes requests to different services based on the path. For example, with this ingress configuration:
+
+[source,yaml]
+----
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+name: my-ingress
+spec:
+rules:
+- http:
+    paths:
+    - path: /appA
+        pathType: Prefix
+        backend:
+        service:
+            name: appA
+            port:
+            number: 9080
+----
+
+You could use the following `server.xml` configuration to ensure that the OpenAPI UI is available at `/appA/openapi/ui`:
+
+[source,xml]
+----
+<mpOpenAPI docPath="/appA/openapi" />
+----
+
+When `uiPath` is not set,  it defaults to the value of `docPath` with `/ui` appended.
+
+For more information about MicroProfile OpenAPI, see:
+
+* link:https://github.com/eclipse/microprofile-open-api[MicroProfile OpenAPI repo]
+* link:{url-prefix}/docs/latest/documentation-openapi.html[API documentation with OpenAPI]
+
+    
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
+
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/26235
+// Contact/Reviewer: njr-11
+// // // // // // // // 
+[#data]
+== Jakarta Data beta 3: configure the data source used to query and persist data
+
+    
+Jakarta Data is a new Jakarta EE specification being developed in the open that aims to standardize the popular data repository pattern across a variety of providers. Open Liberty includes the Jakarta Data 1.0 beta 3 release, which adds the ability to configure the data source that a Jakarta Data repository uses to query and persist data.
+
+The Open Liberty beta includes a test implementation of Jakarta Data that we are using to experiment with proposed specification features so that developers can try out these features and provide feedback to influence the specification as it is being developed. The test implementation currently works with relational databases and operates by redirecting repository operations to the built-in Jakarta Persistence provider. In preparation for Jakarta EE 11, which will require a minimum of Java 21 (not yet generally available), it runs on Java 17 and simulates the entirety of the Jakarta Data beta 3 release, plus some additional proposed features that are under consideration.
+
+
+Jakarta Data beta 3 allows the use of multiple data sources, with a specification-defined mechanism for choosing which data source a repository will use.
+
+To use Jakarta Data, you start by defining an entity class that corresponds to your data. With relational databases, the entity class corresponds to a database table and the entity properties (public methods and fields of the entity class) generally correspond to the columns of the table. You can define an entity class in one of the following ways:
+
+
+* Annotate the class with `jakarta.persistence.Entity` and related annotations from Jakarta Persistence.
+* Define a Java class without entity annotations, in which case the primary key is inferred from an entity property named `id` or ending with `Id`.
+
+
+You define one or more repository interfaces for an entity, annotate those interfaces as `@Repository`, and inject them into components using `@Inject`. The Jakarta Data provider supplies the implementation of the repository interface for you.
+
+
+Here's a simple entity:
+
+[source,java]
+----
+public class Product { // entity
+    public long id;
+    public String name;
+    public float price;
+}
+----
+
+The following example shows a repository that defines operations relating to the entity. It opts to specify the JNDI name of a data source where the entity data is to be stored and found:
+
+
+[source,java]
+----
+@Repository(dataStore = "java:app/jdbc/my-example-data")
+public interface Products extends CrudRepository<Product, Long> {
+    // query-by-method name pattern:
+    Page<Product> findByNameIgnoreCaseContains(String searchFor, Pageable pageRequest);
+
+    // query via JPQL:
+    @Query("UPDATE Product o SET o.price = o.price - (?2 * o.price) WHERE o.id = ?1")
+    boolean discount(long productId, float discountRate);
+}
+----
+
+In the following example, we have chosen to define the data source with the `@DataSourceDefinition` annotation, which we can place on a web component, such as the following example servlet.  We can then inject the repository and use it:
+
+[source,java]
+----
+@DataSourceDefinition(name = "java:app/jdbc/my-example-data",
+                      className = "org.postgresql.xa.PGXADataSource",
+                      databaseName = "ExampleDB",
+                      serverName = "localhost",
+                      portNumber = 5432,
+                      user = "${example.database.user}",
+                      password = "${example.database.password}")
+public class MyServlet extends HttpServlet {
+    @Inject
+    Products products;
+
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp)
+            throws ServletException, IOException {
+        // Request only the first 20 results on a page, ordered by price, then name, then id:
+        Pageable pageRequest = Pageable.size(20).sortBy(Sort.desc("price"), Sort.asc("name"), Sort.asc("id"));
+        Page<Product> page1 = products.findByNameIgnoreCaseContains(searchFor, pageRequest);
+    }
+}
+----
+
+The `dataStore` field of `@Repository` can also point at the `id` of a `databaseStore` element or the `id` or `jndiName` of a `dataSource` element from server configuration, or the name of a resource reference that is available to the application.
+
+
+For more information about Jakarta Data, see:
+
+* link:https://github.com/jakartaee/data/blob/main/spec/src/main/asciidoc/repository.asciidoc[Jakarta Data specification draft] 
+* link:https://repo1.maven.org/maven2/jakarta/data/jakarta-data-api/1.0.0-b3/jakarta-data-api-1.0.0-b3-javadoc.jar[Jakarta Data API 1.0.0-b3 Javadoc]
+
+Your feedback is welcome on all of the Jakarta Data features and will be helpful as the specification develops further. Let us know what you think and/or be involved directly in the specification on link:https://github.com/jakartaee/data[github].
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
+
+
+
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/26138
+// Contact/Reviewer: Zech-Hein
+// // // // // // // // 
+[#ltpa]
+== Support LTPA keys rotation without a planned outage
+
+Open Liberty can now automatically generate new primary LTPA keys files while continuing to use validation keys files to validate LTPA tokens. This update enables you to rotate LTPA keys without any disruption to the application's user experience.  Previously, application users had to log in to their applications again after the Liberty server LTPA keys were rotated, which is no longer necessary.
+
+
+Primary Keys are LTPA keys in the specified keys default `ltpa.keys` file. Primary keys are used both for generating new LTPA tokens and for validating LTPA tokens. There can only be one primary keys file per Liberty runtime.
+
+
+Validation keys are LTPA keys in any `.keys` files other than the primary keys file. The validation keys are used only for validating LTPA tokens. They are _not_ used for generating new LTPA tokens. All validation keys must be located in the same directory as the primary keys file.
+
+
+  
+There are 2 ways to enable LTPA keys rotation without a planned outage: monitoring the primary keys file directory or specifying the validation keys file.
+
+
+=== Monitor the directory of the primary keys file for any new validation keys files. 
+
+Enable the `monitorDirectory` and `monitorInterval` attributes. For example, add the following configurations to the `server.xml`:
+
+[source,xml]
+----
+<ltpa monitorDirectory="true" monitorInterval="5m"/>
+
+----
+
+The `monitorDirectory` attribute monitors the `${server.config.dir}/resources/security/` directory by default, but can monitor any directory the primary keys file is specified in. The directory monitor looks for any LTPA keys files with the `.keys` extension. The Open Liberty server reads these LTPA keys and uses them as validation keys.
+
+
+If the `monitorInterval` is set to `0`, the default value, the directory is not monitored.
+
+
+The `ltpa.keys` file can be renamed, for example, `validation1.keys` and then Liberty automatically regenerates a new `ltpa.keys` file with new primary keys that are used for all new LTPA tokens created. The keys in `validation1.keys` continue to be used for validating existing LTPA tokens. 
+
+
+When the `validation1.keys` are no longer needed, remove them by deleting the file or by setting `monitorDirectory` to `false`. It is recommended to remove unused validation keys as it can improve performance.
+
+
+=== Specify the validation keys file and optionally specify a date-time to stop using the validation keys.
+
+   1. Copy the primary keys file (`ltpa.keys`) to a validation keys file, for example `validation1.keys`.
+   2. Modify the server configuration to use the validation keys file  by specifying a `validationKeys` server configuration element inside the `ltpa` element. For example, add the following configuration to the `server.xml` file:
+
+[source,xml]
+----
+<ltpa>
+    <validationKeys fileName="validation1.keys" password="{xor}Lz4sLCgwLTs=" notUseAfterDate="2024-01-02T12:30:00Z"/>
+<ltpa/>  
+----
+
+The `validation1.keys` file can be removed from use at a specified date-time in the future with the optional `notUseAfterDate` attribute. It is recommended to use `notUseAfterDate` to ignore validation keys after a given period as it can improve performance.
+
+
+The `fileName` and `password` attributes are required in the `validationKeys` element, but `notUseAfterDate` is optional.
+
+After the validation keys file is loaded from the server configuration update, the original primary keys file (`ltpa.keys`) can be deleted, which triggers new primary keys to be created while continuing to use `validation1.keys` for validation.
+
+Specifying validation keys in this way can be combined with enabling monitor directory to also use validation keys that are not specified in the `server.xml` configuration at the same time. For example:
+
+[source,xml]
+----
+<ltpa monitorDirectory="true" monitorInterval="5m">
+    <validationKeys fileName="validation1.keys" password="{xor}Lz4sLCgwLTs=" notUseAfterDate="2024-01-02T12:30:00Z"/>
+<ltpa/>
+----
+
+To see all of the Liberty `<ltpa>` server configuration options see link:/docs/latest/reference/config/ltpa.html[LTPA configuration docs].
+    
+    
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
+
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/26175
+// Contact/Reviewer: rsherget
+// // // // // // // // 
+[#include]
+
+== Include all files in a specified directory in your server configuration
+
+
+You can use the `include` element in your `server.xml` file to specify the location of files to include in your server configuration. In previous releases,  you had to specify the location for each include file individually. Now, you can place all the included files in a directory and just specify the directory location in the `include` element.
+
+
+This is important because when running on Kubernetes, mounting secrets as a whole folder is the only way to reflect the change from the secret dynamically in the running pod.
+
+
+In the `location` attribute of the `include` element of the `server.xml` file, enter the directory that contains your configuration files. For example:
+
+
+[source,xml]
+----
+    <include location="./common/"/>
+----
+
+After you make the changes, you can see the following output in the log:
+
+
+[source]
+----
+[AUDIT   ] CWWKG0028A: Processing included configuration resource: /Users/rickyherget/libertyGit/open-liberty/dev/build.image/wlp/usr/servers/com.ibm.ws.config.include.directory/common/a.xml
+[AUDIT   ] CWWKG0028A: Processing included configuration resource: /Users/rickyherget/libertyGit/open-liberty/dev/build.image/wlp/usr/servers/com.ibm.ws.config.include.directory/common/b.xml
+[AUDIT   ] CWWKG0028A: Processing included configuration resource: /Users/rickyherget/libertyGit/open-liberty/dev/build.image/wlp/usr/servers/com.ibm.ws.config.include.directory/common/c.xml
+----
+The files in the directory are processed in alphabetical order and subdirectories are ignored.
+
+For more information about Liberty configuration includes, see link:/docs/latest/reference/config/include.html[Include configuration docs].
+
+    
+    
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
+
+
+[#run]
+== Try it now 
+
+To try out these features, update your build tools to pull the Open Liberty All Beta Features package instead of the main release. The beta works with Java SE 21, Java SE 17, Java SE 11, and Java SE 8.
+// // // // // // // //
+// In the preceding section:
+// Check if a new non-LTS Java SE version is supported that needs to be added to the list (17, 11, and 8 are LTS and will remain for a while)
+// https://openliberty.io/docs/latest/java-se.html
+// // // // // // // //
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], you can install the All Beta Features package using:
+
+[source,xml]
+----
+<plugin>
+    <groupId>io.openliberty.tools</groupId>
+    <artifactId>liberty-maven-plugin</artifactId>
+    <version>3.8.2</version>
+    <configuration>
+        <runtimeArtifact>
+          <groupId>io.openliberty.beta</groupId>
+          <artifactId>openliberty-runtime</artifactId>
+          <version>23.0.0.10-beta</version>
+          <type>zip</type>
+        </runtimeArtifact>
+    </configuration>
+</plugin>
+----
+
+You must also add dependencies to your pom.xml file for the beta version of the APIs that are associated with the beta features that you want to try.  For example, for Jakarta Data Beta 3, you would include:
+[source,xml]
+----
+<dependency>
+    <groupId>jakarta.data</groupId>
+    <artifactId>jakarta-data-api</artifactId>
+    <version>1.0.0-b3</version>
+</dependency>
+----
+
+
+For link:{url-prefix}/guides/gradle-intro.html[Gradle], you can install the All Beta Features package using:
+
+[source,gradle]
+----
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'io.openliberty.tools:liberty-gradle-plugin:3.6.2'
+    }
+}
+apply plugin: 'liberty'
+dependencies {
+    libertyRuntime group: 'io.openliberty.beta', name: 'openliberty-runtime', version: '[23.0.0.10-beta,)'
+}
+----
+// // // // // // // //
+// In the preceding section:
+// Replace the Maven `3.8.2` with the latest version of the plugin: https://search.maven.org/artifact/io.openliberty.tools/liberty-maven-plugin
+// Replace the Gradle `3.6.2` with the latest version of the plugin: https://search.maven.org/artifact/io.openliberty.tools/liberty-gradle-plugin
+// TODO: Update GHA to automatically do the above.  If the maven.org is problematic, then could fallback to using the GH Releases for the plugins
+// // // // // // // //
+
+Or if you're using link:{url-prefix}/docs/latest/container-images.html[container images]:
+
+[source]
+----
+FROM icr.io/appcafe/open-liberty:beta
+----
+
+Or take a look at our link:{url-prefix}/downloads/#runtime_betas[Downloads page].
+
+For more information on using a beta release, refer to the link:{url-prefix}docs/latest/installing-open-liberty-betas.html[Installing Open Liberty beta releases] documentation.
+
+[#feedback]
+== We welcome your feedback
+
+Let us know what you think on link:https://groups.io/g/openliberty[our mailing list]. If you hit a problem, link:https://stackoverflow.com/questions/tagged/open-liberty[post a question on StackOverflow]. If you hit a bug, link:https://github.com/OpenLiberty/open-liberty/issues[please raise an issue].
+
+
