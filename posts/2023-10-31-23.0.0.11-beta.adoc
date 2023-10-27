@@ -133,13 +133,13 @@ To use MicroProfile Reactive Stream Operators 3.0 without MicroProfile Reactive 
 <feature>mpReactiveStreams-3.0</feature>
 ----
 
-MicroProfile Reactive Messaging 3.0 has a number of new features and changes over the 1.0, including negative acknowledgements, emitters, and backpressure support.
+MicroProfile Reactive Messaging 3.0 has a number of new features and changes over MicroProfile Reactive Messaging 1.0, including negative acknowledgements, emitters, and backpressure support.
 
 === Negative acknowledgements
 
-In MicroProfile Reactive Messaging 1.0. Messages could only be positively acknowledged. If there was a problem with the payload or if exceptional behavior occurred, there was no mechanism to indicate the problem or to handle the problem if it occured within the stream. The new _nack_ support can send or handle these events.
+In MicroProfile Reactive Messaging 1.0. Messages could only be positively acknowledged. If there was a issue with the payload or if exceptional behavior occurred, there was no mechanism to indicate the problem or to handle the problem if it occured within the stream. The new _nack_ support can send or handle these events.
 
-To explicitly negatively acknowledge an incoming message:
+To explicitly negatively acknowledge an incoming Message:
 
 [source,java]
 ----
@@ -156,7 +156,7 @@ public Message<String> process(Message<String> m) {
 }
 ----
 
-The method signature of accepting a message indicates that the acknowledgement strategy for this method is `MANUAL`. It is the responsibility of your code to `ack()` and` nack()` the message. In the above example, the message can be acknowledged downstream of the out channel.
+The method signature of accepting a Message<T> indicates that the acknowledgement strategy for this method is `MANUAL`. It is the responsibility of your code to `ack()` or `nack()` the message. In the above example, the message can be acknowledged downstream of the out channel.
 
 To throw an exception that causes a negative acknowledgement:
 
@@ -176,7 +176,7 @@ The method signature of accepting a payload indicates that the acknowledgement s
 
 === Emitters
 
-One significant limitation of MicroProfile Reactive Messaging 1.0 was how to integrate imperative code such as RESTful resources and reactive beans which would put and take messages on to a channel according to the `Outgoing` or `Incoming` annotations. In version 3.0, emitters provide a bridge across the who models.
+One significant limitation of MicroProfile Reactive Messaging 1.0 was how to integrate imperative code such as RESTful resources and beans using Reactive Messaging which would put and take messages on to a channel according to the `Outgoing` or `Incoming` annotations. In version 3.0, emitters provide a bridge across the two models.
 
 To inject emitters using CDI into a RESTful resources to put messages on to a given channel:
 
@@ -210,11 +210,13 @@ public CompletionStage<Void> emitPayload(String payload){
 }
 ----
 
-If an emitter sends a payload, MicroProfile Reactive Messaging automatically handles the basic invocation of `ack()` and `nack()`. If, however, the emitter sends a message, your code must handle the message being either acked or nacked.
+When defining emitters, you define the type of Object that will be sent as either the payload or the contents of the Message.
+
+If an emitter sends a payload, MicroProfile Reactive Messaging automatically handles the invocation of `ack()` and `nack()` on the message. If, however, the emitter sends a message, the sending code must handle the message being either acked or nacked downstream.
 
 === Backpressure support
 
-Backpressure support allows for the situation in which messages or payloads are emitted faster than the consumption of the messages. Defining a backpressure strategy allows for the emitter to behave in expected ways. In the following example, the buffer holds up to 300 messages amd throws an exception if it is full when a new message is emitted:
+Backpressure support allows for the situation in which messages or payloads are emitted faster than the consumption of the messages. Defining a backpressure strategy allows for appl. In the following example, the buffer holds up to 300 messages and throws an exception if it is full when a new message is emitted:
 
 [source,java]
 ----
@@ -230,15 +232,15 @@ public void publishMessage() {
 ----
 
 
-You can define the following backpressure strategies:
+The following backpressure strategies can be defined:
 
-* `BUFFER` - use a buffer, whose size will be determined by the value of bufferSize if set. Otherwise, the size will be the value of the config property mp.messaging.emitter.default-buffer-size if it exists. Otherwise, 128 will be used. If the buffer is full, an exception will be thrown from the send method. This is the default strategy if no other strategy is defined
-* `DROP` - drops the most recent value if the downstream can’t keep up. It means that new value emitted by the emitter are ignored.
-* `FAIL` - propagates a failure in case the downstream can’t keep up. No more value will be emitted.
-* `LATEST`- keeps only the latest value, dropping any previous value if the downstream can’t keep up.
-* `NONE` - ignores the back pressure signals letting the downstream consumer to implement a strategy.
-* `THROW_EXCEPTION` - throws an exception from the send method if the downstream can’t keep up.
-* `UNBOUNDED_BUFFER` - use an unbounded buffer. The application may run out of memory if values are continually added faster than they are consumed.
+* `BUFFER` - Use a buffer, whose size will be determined by the value of bufferSize if set. Otherwise, the size will be the value of the config property mp.messaging.emitter.default-buffer-size if it exists. Otherwise, 128 will be used. If the buffer is full, an exception will be thrown from the send method. This is the default strategy if no other strategy is defined.
+* `DROP` - Drops the most recent value if the downstream can’t keep up. It means that new value emitted by the emitter are ignored.
+* `FAIL` - Propagates a failure in case the downstream can’t keep up. No more value will be emitted.
+* `LATEST`- Keeps only the latest value, dropping any previous value if the downstream can’t keep up.
+* `NONE` - Ignores the back pressure signals letting the downstream consumer to implement a strategy.
+* `THROW_EXCEPTION` - Throws an exception from the send method if the downstream can’t keep up.
+* `UNBOUNDED_BUFFER` - Use an unbounded buffer. The application may run out of memory if values are continually added faster than they are consumed.
 
 For more information, see:
 
