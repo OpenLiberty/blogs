@@ -1,0 +1,101 @@
+---
+layout: post
+title: "How does Open Liberty’s performance compare to other cloud-native Java runtimes"
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/gcharters
+author_github: https://github.com/gcharters
+seo-title: How does Open Liberty’s performance compare to other cloud-native Java runtimes - OpenLiberty.io
+seo-description: While cold startup time is critically important for cloud functions (and Open Liberty's time-to-first-response is approximately 1 second, so it's no slouch), memory footprint and throughput are far more important for microservices architectures in which each running instance is likely to serve thousands of requests before it's replaced.
+blog_description: "While cold startup time is critically important for cloud functions (and Open Liberty's time-to-first-response is approximately 1 second, so it's no slouch), memory footprint and throughput are far more important for microservices architectures in which each running instance is likely to serve thousands of requests before it's replaced."
+open-graph-image: https://openliberty.io/img/blog/perfblog3a.png
+additional_authors:
+- name: Tim Pickett
+  github: https://github.com/tpickett1
+  image: https://avatars0.githubusercontent.com/tpickett1
+---
+= How does Open Liberty’s performance compare to other cloud-native Java runtimes
+Graham Charters <https://github.com/gcharters>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+
+For many years, the most important metric for application servers was throughput: how many transactions or requests can we squeeze out of this application?  The adoption of finer-grained architecture styles, such as microservices and functions, has led to a broadening in the performance characteristics we should care about, such as _memory footprint_ and _throughput_.
+
+Where you once deployed a small number of runtime instances for your server and application, now you may be deploying tens or hundreds of microservices or functions.  Each of those instances comes with its own server, even if it's embedded in a runnable jar or pulled in as a container image there's a server in there somewhere. While cold startup time is critically important for cloud functions (and link:{url-prefix}/blog/2019/10/30/faster-startup-open-liberty.html[Open Liberty's time-to-first-response is approximately 1 second], so it's no slouch), memory footprint and throughput are far more important for microservices architectures in which each running instance is likely to serve thousands of requests before it's replaced.
+
+Given the expected usage profile of tens to hundreds of services with thousands of requests, reduced memory footprint and higher throughput directly influence cost, both in terms of infrastructure and licenses costs (if you pay for service & support):
+
+- **Memory consumption**: This has a direct impact on amount of infrastructure (e.g. cloud) you need to provision.
+- **Throughput**: The more work an instance can handle, the less infrastructure you require.  
+
+The Liberty and OpenJ9 teams have worked extremely hard over the years to make their combined performance world-leading for microservices.  Let's take a look at the latest measurements for these two metrics and compare them against other full Java runtimes.
+
+_The results in the following section were all measured on a Linux X86 setup – SLES 12.3, Intel(R) Xeon(R) Platinum 8180 CPU @ 2.50GHz, 4 physical cores, 64GB RAM.  The JDK versions (and command line settings) were whatever was distributed with the default container images used for each runtime._
+
+== Memory - less memory equals cheaper infrastructure costs
+
+Cloud services make the cost and memory footprint correlation abundantly clear.  For example, the link:https://azure.microsoft.com/pricing/calculator/?service=kubernetes-service[Azure Kubernetes Service pricing] effectively doubles as you double the memory requirements of the nodes.  There's also a correlation between memory and CPUs in the pricing, so this could have a knock-on effect on your license costs.  Let's see how Open Liberty and OpenJ9 can save you memory and money.
+
+The figure below shows memory footprint comparisons (after the server has responded to the first request) for servers running the microservices benchmark link:https://github.com/blueperf[Acme Air Microservices] each using 512Mb heap.  We can see in this scenario that Open Liberty uses 1.3x – 2.9x less memory than the other runtimes we tested:
+
+[.img_border_light]
+image::img/blog/perfblog1a.png[Memory footprint of Java app servers using Acme Air Microservices application in Docker,width=70%,align="center"]
+
+If you've chosen Spring Boot for your application (yes, you can link:{url-prefix}/guides/spring-boot.html[use Spring Boot on Open Liberty]), then our measurements show an approximately 2x memory footprint benefit from link:https://developer.ibm.com/technologies/java/articles/modernize-and-optimize-spring-boot-applications/[running on Open Liberty] rather than Tomcat.  For example, the figure below shows the relative memory usage when running the link:https://github.com/spring-projects/spring-petclinic[Spring Boot Petclinic] application under load with a 4Gb heap:
+
+[.img_border_light]
+image::img/blog/perfblog2a.png[Memory footprint during load of using Spring Boot Petclinic application in Docker,width=70%,align="center"]
+
+== Throughput - higher throughput equals cheaper infrastructure and license costs
+
+The association between throughput and costs is simple: being able to put more work through a runtime means you can deploy smaller or fewer instances to satisfy demand. You’ll pay less on infrastructure and less on license costs, which are typically based on virtual CPU usage.
+
+Open Liberty also has significant throughput benefits when compared to other runtimes.  The figure below shows throughput measurements for the link:https://github.com/blueperf[Acme Air Microservices] benchmark.  We can see Open Liberty performs better than WildFly and significantly better than the other three runtimes:
+
+[.img_border_light]
+image::img/blog/perfblog3a.png[Throughput using Acme Air Microservices application in Docker,width=70%,align="center"]
+
+When we compare Spring Boot on Open Liberty throughput with Spring Boot on Tomcat, we can see from the figure below that there is an almost 2x throughput benefit with Open Liberty. This is a similar benefit to that shown in the previous TomEE measurement, which suggests that Open Liberty inherently has a ~2x higher throughput than Tomcat-based runtimes:
+
+[.img_border_light]
+image::img/blog/perfblog4a.png[Throughput using Spring Boot Petclinic application in Docker,width=70%,align="center"]
+
+== Bringing it together
+
+In the previous sections we spoke about the importance of memory and throughput metrics for saving you money on your microservices deployments.  We saw individual measurements for each metric, but to get a picture of the overall benefit it's important to combine the two.  To do this, we can simply multiply the two benefits, the results of which are shown in the table below.  Of course, your results may vary and we'd recommend trying it out for yourself.  However, in our measurements, it’s not unrealistic to be able to run your workloads with, at most, half of the instances you’d need for other full Java runtimes:
+
+[%header,cols=4*] 
+|===
+|Runtime
+|Open Liberty memory benefit
+|Open Liberty throughput benefit
+|Open Liberty combined benefit
+
+|WildFly
+|2.1x
+|1.3x
+|2.8x
+
+|TomEE
+|1.3x
+|1.3x
+|1.7x
+
+|Payara
+|2.4x
+|6.7x
+|15.9x
+
+|JBoss
+|2.9x
+|1.4x
+|4.0x
+
+|Spring Boot (Tomcat)
+|2.0x
+|2.04x
+|4.1x
+|===
+
+One final note: although this post has focused on microservices, memory and throughput are also important costs factors for monoliths.  We've run equivalent benchmarks for monolithic applications and found similar, and in some cases, even better results.  So even if you're happy deploying monoliths, Open Liberty will still save you infrastructure and license costs on those workloads.
+
