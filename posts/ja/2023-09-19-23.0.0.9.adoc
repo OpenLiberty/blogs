@@ -1,0 +1,216 @@
+---
+layout: post
+title: "Open Liberty 23.0.0.9におけるSpring Boot 3.0のサポートと新しいセキュリティ機能"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/lauracowen
+author_github: https://github.com/lauracowen
+seo-title: Open Liberty 23.0.0.9におけるSpring Boot 3.0のサポートと新しいセキュリティ機能 - OpenLiberty.io
+seo-description: LibertyアプリケーションでSpring Boot 3.0の機能を使用します。プライベートキーでOpenID Connectクライアントを認証し、アプリケーションごとにLTPA/JWT Cookieを使い分けます。
+blog_description: LibertyアプリケーションでSpring Boot 3.0の機能を使用します。プライベートキーでOpenID Connectクライアントを認証し、アプリケーションごとにLTPA/JWT Cookieを使い分けます。
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+additional_authors:
+- name: 浅田 かおり (翻訳)
+  github: https://github.com/kaori-asa
+  image: https://avatars0.githubusercontent.com/kaori-asa
+blog-available-in-languages:
+- lang: en
+  path: /blog/2023/09/19/23.0.0.9.html
+---
+= Open Liberty 23.0.0.9におけるSpring Boot 3.0のサポートと新しいセキュリティ機能
+Laura Cowen <https://github.com/lauracowen>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+新しいSpring Boot Support 3.0機能により、LibertyアプリケーションでSpring Boot 3.xの機能を使用できます。 また、クライアントシークレットを使うよりも安全なプライベートキー方式でOpenID Connectクライアントを認証できるようになり、LTPAやJWT Cookieを使う場合は、アプリケーションごとにコンテキストルートに応じて異なるCookieを使えるようになりました。
+
+そして、happy birthday! Open Libertyは6歳になりました。link:{url-prefix}/blog/2022/09/21/history-maker-projects.html[Maker Projectにおける私たちの歴史]をご参照ください。
+
+In link:{url-about}[Open Liberty] 23.0.0.9:
+
+* <<sb3, Spring Boot 3.0 サポート>>
+* <<jwt, OIDCクライアントにおける秘密鍵JWT認証のサポート>>
+* <<cookie, 用途に応じてLTPA/JWT Cookieを使い分ける>>
+
+link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A23009+label%3A%22release+bug%22[23.0.0.9]で修正されたバグリストをご参照ください。
+
+link:{url-prefix}/blog/?search=release&search!=beta[過去のOpen Liberty GAリリースのブログ記事]もご参照ください。
+
+
+[#run]
+== 23.0.0.9を使用してアプリを実行する
+
+link:{url-prefix}/guides/maven-intro.html[Maven]を使うときは下記の設定をお使いください。
+
+[source,xml]
+----
+<plugin>
+    <groupId>io.openliberty.tools</groupId>
+    <artifactId>liberty-maven-plugin</artifactId>
+    <version>3.8.2</version>
+</plugin>
+----
+
+link:{url-prefix}/guides/gradle-intro.html[Gradle]の場合はこちらです。
+
+[source,gradle]
+----
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'io.openliberty.tools:liberty-gradle-plugin:3.6.2'
+    }
+}
+apply plugin: 'liberty'
+----
+
+link:{url-prefix}/docs/latest/container-images.html[コンテナ・イメージ]の場合はこちらです。
+
+[source]
+----
+FROM icr.io/appcafe/open-liberty
+----
+
+またはlink:{url-prefix}/start/[ダウンロード・ページ]をご参照ください。
+
+
+[link=https://stackoverflow.com/tags/open-liberty]
+image::img/blog/blog_btn_stack_ja.svg[Stack Overflowで質問する, align="center"]
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/25973
+// Contact/Reviewer: hlhoots
+// // // // // // // //
+[#sb3]
+== Spring Boot 3.0 サポート
+
+Liberty Spring Boot Support 3.0フィーチャーは、Liberty上でSpring Boot 3.0アプリケーションを実行するための、より完全なサポートを提供します。また、コンテナでアプリケーションを作成する際に、link:{url-prefix}/docs/latest/deploy-spring-boot.html#thin[ thin the application ]の機能を提供します。
+
+Libertyの以前のリリースでは、Spring Boot 1.5とSpring Boot 2.0のアプリケーションを提供していました。 また、LibertyはWARファイルとしてパッケージ化されたSpring Bootアプリケーションもサポートしていました。link:https://openliberty.io/blog/2023/06/15/running-spring-boot-3.html[ 最新のブログ記事 ]で紹介されています。 Open Liberty 23.0.0.9では、`springBoot-3.0`フィーチャーを有効にすることで、Spring Boot 3.xアプリケーションをデプロイすることができます。
+
+Liberty上でSpring Boot 3.xアプリケーションを実行するには、Java 17以上で実行する必要があります。 さらに、アプリケーションがlink:{url-prefix}/docs/latest/reference/feature/servlet.html[Jakarta Servlet]機能を使う場合は、Jakarta Servet 6.0でなければなりません。以下の例のように、`server.xml` ファイルにこれらのフィーチャーを設定します。
+
+[source,xml]
+----
+<features>
+   <feature>springBoot-3.0</feature>
+   <feature>servlet-6.0</feature>
+</features>
+----
+
+以前のバージョンのSpring Boot Supportフィーチャーと同様に、Spring BootアプリケーションのJARファイルを `/dropins/spring/` ディレクトリに置くことができます。 あるいは、`server.xml` ファイルに link:{url-prefix}/docs/latest/reference/config/springBootApplication.html[Spring Bootの設定エレメント] を指定します。例えば：
+
+[source,xml]
+----
+ <springBootApplication id="spring-boot-app" location="spring-boot-app-0.1.0.jar" name="spring-boot-app" />
+----
+
+詳細については、link:{url-prefix}/docs/latest/deploy-spring-boot.html[Spring Bootアプリケーションの設定とデプロイ]を参照してください。
+
+以前のバージョンのSpring Bootサポートフィーチャーを使用していて、Spring Boot 3を使用するようにアプリケーションを移行する場合は、以下の要件に注意してください。
+
+* link:{url-prefix}/docs/latest/reference/feature/webProfile-10.0.html[Jakarta EE 10フィーチャー]を使用する必要があります。
+
+* セキュリティ設定にはアプリケーション内での修正が必要です。
+  - link:https://spring.io/blog/2022/02/21/spring-security-without-the-websecurityconfigureradapter[WebSecurityConfigurerAdapterを使わないSpring Security]
+
+  - link:https://docs.spring.io/spring-security/reference/servlet/authorization/authorize-http-requests.html[HttpServletRequestsの認可]
+
+* 新しいlink:{url-prefix}/docs/latest/reference/command/server-create.html#_options[server template] (`springBoot3`)の利用が可能です。
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/25749
+// Contact/Reviewer: ayoho
+// // // // // // // //
+[#jwt]
+== OIDCクライアントにおける秘密鍵JWT認証のサポート
+
+Liberty の OpenID Connect クライアントは、OpenID Connect トークンのエンドポイントで `private_key_jwt` クライアント認証メソッドをサポートするようになりました。
+
+OpenID Connectクライアントは、プロバイダのトークンエンドポイントを呼び出す際に、OpenID Connectプロバイダに認証データを提供する必要があります。
+クライアントはいくつかの異なる方法で認証することができるが、それらの方法のほとんどはクライアントの秘密を必要とします。
+`private_key_jwt` 認証メソッドを使用すると、クライアントはクライアントシークレットの代わりに非対称キーを使用して署名付き JSON Web Tokens (JWT) を作成し、認証を行うことができます。
+この認証方式を使用する OpenID Connect クライアントは、クライアントシークレットを持つ必要がなくなりました。
+
+クライアントアプリケーションでは、`tokenEndpointAuthMethod` 属性の `private_key_jwt` オプションと、クライアントの `server.xml` ファイルの `openidConnectClient` 要素または `oidcLogin` 要素の `tokenEndpointAuthSigningAlgorithm` 属性と `keyAliasName` 属性を使用して、この機能を有効にします。
+
+例えば、OpenID Connect Clientフィーチャーを使用する場合、以下の設定を含めます。
+
+[source,xml]
+----
+<featureManager>
+   <feature>openidConnectClient-1.0</feature>
+</featureManager>
+    ...
+<openidConnectClient tokenEndpointAuthMethod="private_key_jwt" keyAliasName="privateKeyJwtAliasRS512" ... />
+----
+
+ソーシャルメディア・ログイン機能を使用する場合は、以下の設定を含めます。
+
+[source,xml]
+----
+<featureManager>
+    <feature>socialLogin-1.0</feature>
+</featureManager>
+...
+<oidcLogin tokenEndpointAuthMethod="private_key_jwt" tokenEndpointAuthSigningAlgorithm="E512" keyAliasName="privateKeyJwtAliasES512" ... />
+----
+
+`tokenEndpointAuthSigningAlgorithm` 属性は、クライアント認証に使われる JWT に署名するアルゴリズムを指定します。`keyAliasName` 属性は JWT に署名するために使用する鍵を指し、秘密鍵に対応する公開鍵の別名でなければなりません。秘密鍵は、OIDCクライアント構成で `sslRef` によって参照されるSSL構成によって指定されるキーストアになければなりません。公開鍵は以下のいずれかの場所にある必要があります。
+
+* `trustStoreRef` 属性で指定されたトラストストア
+* `sslRef` によって参照されるSSL設定によって指定されるトラストストア
+* `sslRef` で参照されるSSL設定によって指定されるキーストア
+
+設定オプションの詳細については、ドキュメントをご参照ください。
+
+* link:{url-prefix}/docs/latest/reference/config/openidConnectClient.html[openidConnectClient element]
+* link:{url-prefix}/docs/latest/reference/config/oidcLogin.html[oidcLogin element]
+
+JWT認証の詳細については、以下を参照してください。
+
+* link:https://openid.net/specs/openid-connect-core-1_0.html#ClientAuthentication[OpenID Connectコア仕様]
+* link:https://datatracker.ietf.org/doc/html/rfc7523[RFC 7523]
+
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/26110
+// Contact/Reviewer: arkarkala
+// // // // // // // //
+[#cookie]
+== 用途に応じてLTPA/JWT Cookieを使い分ける
+
+以前のリリースでは、LTPAとJWTのCookieは常にCookieパスが`/`に設定されていたので、ドメイン上のどのパスに対して行われたリクエストもCookieを含んでいました。LTPAまたはJWTクッキーのパスをアプリケーションコンテキストルートに設定できるようになりました。この設定によって、アプリケーションごとに異なる LTPA と JWT トークンを使うことができます。
+
+` webAppSecurity` エレメントの `useContextRootForSSOCookiePath` 属性を有効にします。例えば、`server.xml` に以下の行を追加します。
+
+[source,xml]
+----
+<webAppSecurity useContextRootForSSOCookiePath="true"/>
+----
+
+
+Open LibertyのLTPAの詳細については、ドキュメントをご参照ください。
+
+* link:{url-prefix}/docs/latest/single-sign-on.html#_ltpa[Single sign-on (SSO)]
+* link:{url-prefix}/docs/latest/reference/feature/appSecurity-5.0.html[アプリケーション・セキュリティ (Jakarta Security)フィーチャー]
+
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+
+
+== 今すぐOpen Liberty 23.0.0.9を入手する
+
+<<Maven, Gradle, Docker,ダウンロード可能なアーカイブ>>からも入手可能です。
