@@ -1,0 +1,211 @@
+---
+layout: post
+title: "Open Liberty 23.0.0.9中的Spring Boot 3.0支持和新的安全功能"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/lauracowen
+author_github: https://github.com/lauracowen
+seo-title: Open Liberty 23.0.0.9中的Spring Boot 3.0支持和新的安全功能 - OpenLiberty.io
+seo-description: 在您的Liberty应用程序中使用Spring Boot 3.0功能。使用私钥验证OpenID Connect客户端，并为不同的应用程序使用不同的LTPA/JWT cookie.
+blog_description: 在您的Liberty应用程序中使用Spring Boot 3.0功能。使用私钥验证OpenID Connect客户端，并为不同的应用程序使用不同的LTPA/JWT cookie.
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+blog-available-in-languages:
+- lang: en
+  path: /blog/2023/09/19/23.0.0.9.html
+
+---
+= Open Liberty 23.0.0.9中的Spring Boot 3.0支持和新的安全功能
+Laura Cowen <https://github.com/lauracowen>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+翻译：Haiyan Zhang
+
+您可以在您的Liberty应用程序中添加新的Spring Boot Support 3.0特性来使用Spring Boot 3.x的功能。现在还可以使用私钥对OpenID Connect客户端进行身份验证，这比使用客户端秘钥更安全。如果使用LTPA或JWT cookies，现在可以根据上下文根为不同的应用程序使用不同的cookies。
+
+最后，生日快乐！Open Liberty已经成立6年了，可以看看link:{url-prefix}/blog/2022/09/21/history-maker-projects.html[我们项目的创建历史]。
+
+在link:{url-about}[Open Liberty] 23.0.0.9里:
+
+* <<sb3, 支持Spring Boot 3.0>>
+* <<jwt, 支持OIDC客户端的私钥JWT认证>>
+* <<cookie, 支持为不同应用程序使用不同的LTPA/JWT cookies>>
+
+查看link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A23009+label%3A%22release+bug%22[23.0.0.9]里修复的bug列表.
+
+查看link:{url-prefix}/blog/?search=release&search!=beta[之前的Open Liberty GA发布博客文章].
+
+
+[#run]
+== 使用23.0.0.9运行应用程序
+
+如果您正在使用link:{url-prefix}/guides/maven-intro.html[Maven], 在您的pom.xml文件里包含以下内容：
+
+[source,xml]
+----
+<plugin>
+    <groupId>io.openliberty.tools</groupId>
+    <artifactId>liberty-maven-plugin</artifactId>
+    <version>3.8.2</version>
+</plugin>
+----
+
+或者对于link:{url-prefix}/guides/gradle-intro.html[Gradle], 在您的 build.gradle文件里包含以下内容：
+
+[source,gradle]
+----
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'io.openliberty.tools:liberty-gradle-plugin:3.6.2'
+    }
+}
+apply plugin: 'liberty'
+----
+
+或者如果您使用link:{url-prefix}/docs/latest/container-images.html[容器镜像]:
+
+[source]
+----
+FROM icr.io/appcafe/open-liberty
+----
+
+或者看看我们的link:{url-prefix}/start/[下载页面].
+
+[link=https://stackoverflow.com/tags/open-liberty]
+image::img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="center"]
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/25973
+// Contact/Reviewer: hlhoots
+// // // // // // // //
+[#sb3]
+== 支持Spring Boot 3.0
+
+Liberty Spring Boot 3.0特性为在Liberty上运行Spring Boot 3.0的应用程序提供了更完整的支持。它还提供了在容器中创建应用程序时link:{url-prefix}/docs/latest/deploy-spring-boot.html#thin[精简应用程序]的功能。
+
+之前的Liberty版本提供了对Spring Boot 1.5和Spring Boot 2.0应用程序的支持。Liberty还支持打包成WAR文件的Spring Boot应用程序，这在link:https://openliberty.io/blog/2023/06/15/running-spring-boot-3.html[最近的这篇博客文章]里有演示。使用Open Liberty 23.0.0.9，您可以通过启用springBoot-3.0特性来部署Spring Boot 3.x的应用程序，可以同时支持JAR和WAR文件类型。
+
+在Liberty上运行Spring Boot 3.x的应该程序，您必须使用Java 17或更高版本运行。另外，如果您的应用程序使用link:{url-prefix}/docs/latest/reference/feature/servlet.html[Jakarta Servlet]特性，那么必须是Jakarta Servet 6.0。在server.xml文件中配置这些特性，示例如下：
+
+[source,xml]
+----
+<features>
+   <feature>springBoot-3.0</feature>
+   <feature>servlet-6.0</feature>
+</features>
+----
+
+与以前版本的Spring Boot support特性一样，您可以将Spring Boot应用程序JAR文件放在/dropins/ Spring /目录中。或者，在server.xml文件中指定link:{url-prefix}/docs/latest/reference/config/springBootApplication.html[Spring Boot配置元素]。例如:
+
+[source,xml]
+----
+ <springBootApplication id="spring-boot-app" location="spring-boot-app-0.1.0.jar" name="spring-boot-app" />
+----
+
+有关更多信息，请参见link:{url-prefix}/docs/latest/deploy-spring-boot.html[配置和部署Spring Boot应用程序]。
+
+如果您已经使用了以前版本的Spring Boot Support特性，现在正在将您的应用程序迁移到Spring Boot 3，请注意以下要求:
+
+* 必须使用link:{url-prefix}/docs/latest/reference/feature/webProfile-10.0.html[Jakarta EE 10功能].
+
+* 安全配置需要在应用程序中修改. 
+  - link:https://spring.io/blog/2022/02/21/spring-security-without-the-websecurityconfigureradapter[没有WebSecurityConfigurerAdapter的Spring Security]
+
+  - link:https://docs.spring.io/spring-security/reference/servlet/authorization/authorize-http-requests.html[授权HttpServletRequests]
+
+* 新的link:{url-prefix}/docs/latest/reference/command/server-create.html#_options[服务器模版] (`springBoot3`)可用.
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/25749
+// Contact/Reviewer: ayoho
+// // // // // // // //
+[#jwt]
+== 支持OIDC客户端的私钥JWT认证
+
+Liberty中的OpenID Connect客户端现在支持带有OpenID Connect令牌端点的‘private_key_jwt’客户端身份验证方法。
+
+当OpenID Connect客户端调用OpenID Connect提供程序的令牌端点时，需要向OpenID Connect提供程序提供身份验证数据。客户端可以使用几种不同的方法进行身份验证，但大多数方法都需要客户端密钥。‘private_key_jwt’身份验证方法使客户端能够使用非对称密钥来创建签名的JSON Web令牌(jwt)来进行身份验证，而不是使用客户端秘钥。使用此身份验证方法的OpenID Connect客户端不再需要拥有客户端秘钥。
+
+在您的客户端应用程序中，使用‘tokenEndpointAuthMethod’属性的‘private_key_jwt’选项，以及客户端‘server.xml’文件中的‘openidConnectClient’或‘oidcLogin’元素中的‘tokenEndpointAuthSigningAlgorithm’和‘keyAliasName’属性启用此功能。
+
+例如，当您使用OpenID Connect Client特性时，需要包括以下配置:
+
+[source,xml]
+----
+<featureManager>
+   <feature>openidConnectClient-1.0</feature>
+</featureManager>
+    ...
+<openidConnectClient tokenEndpointAuthMethod="private_key_jwt" keyAliasName="privateKeyJwtAliasRS512" ... />
+----
+
+如果您正在使用社交媒体登录功能，请包括以下配置:
+
+[source,xml]
+----
+<featureManager>
+    <feature>socialLogin-1.0</feature>
+</featureManager>
+...
+<oidcLogin tokenEndpointAuthMethod="private_key_jwt" tokenEndpointAuthSigningAlgorithm="E512" keyAliasName="privateKeyJwtAliasES512" ... />
+----
+
+‘tokenEndpointAuthSigningAlgorithm’属性为用于客户端身份验证的JWT签名指定签名算法。‘keyAliasName’属性指向用于签署JWT的密钥，并且还必须是对应于私钥的公钥的别名。私钥必须位于OIDC客户端配置中由‘sslRef’引用的SSL配置指定的密钥库中。公钥必须位于以下位置之一:
+
+* 由‘trustStoreRef’属性指定的信任库
+* 由‘sslRef’引用的SSL配置指定的信任库
+* 由‘sslRef’引用的SSL配置指定的密钥库
+
+有关配置选项的更多信息，请参阅文档:
+
+* link:{url-prefix}/docs/latest/reference/config/openidConnectClient.html[openidConnectClient元素]
+* link:{url-prefix}/docs/latest/reference/config/oidcLogin.html[oidcLogin元素]
+
+有关JWT认证的更多信息，请查看：
+
+* link:https://openid.net/specs/openid-connect-core-1_0.html#ClientAuthentication[OpenID Connect核心规范]
+* link:https://datatracker.ietf.org/doc/html/rfc7523[RFC 7523]
+
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/26110
+// Contact/Reviewer: arkarkala
+// // // // // // // //
+[#cookie]
+== 支持为不同应用程序使用不同的LTPA/JWT cookies
+
+在以前的版本中，LTPA和JWT cookies总是将cookie路径设置为/，因此向域上的任何路径发出的任何请求都包含该cookie。现在可以将LTPA或JWT cookie路径设置为应用程序上下文根目录。通过这种配置，您可以为不同的应用程序使用不同的LTPA和JWT令牌。
+
+在‘webAppSecurity’元素中启用‘useContextRootForSSOCookiePath’属性。例如，在‘server.xml’中添加以下行:
+
+[source,xml]
+----
+<webAppSecurity useContextRootForSSOCookiePath="true"/>
+----
+
+
+有关Open Liberty中LTPA的更多信息，请参阅文档:
+
+* link:{url-prefix}/docs/latest/single-sign-on.html#_ltpa[单点登录(SSO)]
+* link:{url-prefix}/docs/latest/reference/feature/appSecurity-5.0.html[应用程序安全(Jakarta Security)功能]
+
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+
+
+== 现在就开始使用Liberty 23.0.0.9
+
+可以通过<<run, Maven、Gradle、Docker以及可下载的归档文件获得>> 
