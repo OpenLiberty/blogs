@@ -1,0 +1,251 @@
+---
+layout: post
+title: "Preview of Jakarta Data Milestone 1 in Open Liberty 23.0.0.12-beta"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/lauracowen
+author_github: https://github.com/lauracowen
+seo-title: Preview of Jakarta Data Milestone 1 in Open Liberty 23.0.0.12-beta - OpenLiberty.io
+seo-description: Annotate lifecycle methods in a standardized way with Jakarta Data. Try Milestone 1 now and give feedback on the spec so far.
+blog_description: Annotate lifecycle methods in a standardized way with Jakarta Data. Try Milestone 1 now and give feedback on the spec so far.
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+---
+= Preview of Jakarta Data Milestone 1 in Open Liberty 23.0.0.12-beta
+Laura Cowen <https://github.com/lauracowen>
+:imagesdir: /
+//Blank line here is necessary before starting the body of the post.
+
+Open Liberty 23.0.0.12-beta contains a preview of the new Jakarta Data specification for Jakarta EE, as it currently stands at Milestone 1. Milestone 1 provides the capability to annotate lifecycle methods such as `Insert`, `Delete`, and more. You can try it out and give feedback on the specification so far.
+
+Also in this beta, you can configure the _quiesce_ stage when the Liberty runtime shuts down to be longer than the default 30 seconds. This update is useful for services that need more time to finish processing requests.
+
+The link:/[Open Liberty] 23.0.0.12-beta includes the following beta features (along with link:/docs/latest/reference/feature/feature-overview.html[all GA features]):
+
+* <<jdata, Preview of Jakarta Data (Milestone 1)>>
+* <<timeout, Configurable Quiesce Timeout>>
+
+See also link:/blog/?search=beta&key=tag[previous Open Liberty beta blog posts].
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/26759
+// Contact/Reviewer: njr-11
+// // // // // // // // 
+[#jdata]
+== Preview of Jakarta Data (Milestone 1)
+
+Jakarta Data is a new link:https://jakarta.ee/specifications/data/1.0/[Jakarta EE specification] being developed in the open that aims to standardize the popular data repository pattern across a variety of providers. Open Liberty includes the Jakarta Data 1.0 Milestone 1 release, which adds the ability to annotatively compose custom lifecycle methods, covering `Insert`, `Update`, `Save`, and `Delete` operations. The Open Liberty beta includes a test implementation of Jakarta Data that we are using to experiment with proposed specification features so that developers can try out these features and provide feedback to influence the Jakarta Data 1.0 specification as it continues to be developed after Milestone 1. The test implementation currently works with relational databases and operates by redirecting repository operations to the built-in Jakarta Persistence provider.
+
+Jakarta Data 1.0 Milestone 1 introduces the concept of annotated lifecycle methods. To use these methods, you need an entity and a repository.
+
+Start by defining an entity class that corresponds to your data. With relational databases, the entity class corresponds to a database table and the entity properties (public methods and fields of the entity class) generally correspond to the columns of the table. An entity class can be:
+
+* annotated with `jakarta.persistence.Entity` and related annotations from Jakarta Persistence
+* a Java class without entity annotations, in which case the primary key is inferred from an entity property named `id` or ending with `Id` and an entity property named `version` designates an automatically incremented version column.
+
+You define one or more repository interfaces for an entity, annotate those interfaces as `@Repository` and inject them into components via `@Inject`. The Jakarta Data provider supplies the implementation of the repository interface for you.
+
+The following example shows a simple entity:
+
+[source,java]
+----
+@Entity
+public class Product {
+    @Id
+    public long id;
+
+    public String name;
+
+    public float price;
+
+    @Version
+    public long version;
+}
+----
+
+The following example shows a repository that defines operations that relate to the entity. Your repository interface can inherit from built-in interfaces, such as `BasicRepository` and `CrudRepository`, to gain a variety of general purpose repository methods for inserting, updating, deleting, and querying for entities. However, in this case, we will define all of the methods ourselves by using the new lifecycle annotations:
+
+[source,java]
+----
+@Repository(dataStore = "java:app/jdbc/my-example-data")
+public interface Products {
+    @Insert
+    Product add(Product newProduct);
+
+    @Update
+    boolean modify(Product product);
+
+    @Delete
+    boolean remove(Product product);
+
+    // parameter based query that requires compilation with -parameters to preserve parameter names
+    Optional<Product> find(long id);
+
+    // query-by-method name pattern:
+    Page<Product> findByNameIgnoreCaseContains(String searchFor, Pageable pageRequest);
+
+    // query via JPQL:
+    @Query("UPDATE Product o SET o.price = o.price - (?2 * o.price) WHERE o.id = ?1")
+    boolean discount(long productId, float discountRate);
+}
+----
+
+The following example shows the repository being used:
+
+[source,java]
+----
+@DataSourceDefinition(name = "java:app/jdbc/my-example-data",
+                      className = "org.postgresql.xa.PGXADataSource",
+                      databaseName = "ExampleDB",
+                      serverName = "localhost",
+                      portNumber = 5432,
+                      user = "${example.database.user}",
+                      password = "${example.database.password}")
+public class MyServlet extends HttpServlet {
+    @Inject
+    Products products;
+
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp)
+            throws ServletException, IOException {
+        // Insert:
+        Product prod = ...
+        prod = products.add(prod);
+
+        // Update:
+        prod.price = prod.price + 1.00;
+        if (products.update(prod))
+            System.out.println("Successfully increased the price.");
+        else {
+            // someone else either removed the product or updated its version before we could
+            prod = products.find(productId).orElseThrow();
+            ...
+        }
+
+        // Request only the first 20 results on a page, ordered by price, then name, then id:
+        Pageable pageRequest = Pageable.size(20).sortBy(Sort.desc("price"), Sort.asc("name"), Sort.asc("id"));
+        Page<Product> page1 = products.findByNameIgnoreCaseContains(searchFor, pageRequest);
+        ...
+    }
+}
+----
+
+
+    
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/26724
+// Contact/Reviewer: jimblye
+// // // // // // // // 
+[#timeout]
+== Configurable quiesce timeout for the Liberty runtime
+
+Liberty has a _quiesce_ stage when shutting down the Liberty runtime, which prevents services from accepting new requests and allows time for services to process existing requests. The quiesce stage has always been a fixed 30 seconds time period. This quiesce time period is now configurable.
+
+Previously, in some cases, the 30-seconds quiesce period was not long enough time for services to finish processing existing requests. So you can now increase the quiesce timeout if necessary.
+
+To configure the quiesce timeout, add the new `quiesceTimeout` attribute to the `executor` element in the `server.xml` file:
+
+[source,xml]
+----
+<executor quiesceTimeout=“1m30s”/>
+----
+
+The timeout value is a positive integer followed by a unit of time, which can be hours (`h`), minutes (`m`), or seconds (`s`). For example, specify 30 seconds as `30s`. You can include multiple units in a single entry. For example, `1m30s` is equivalent to 90 seconds. The minimum `quiesceTimeout` value is 30 seconds. If you specify a shorter length of time, the value `30s` is used.
+
+
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
+
+
+[#run]
+=== Try it now 
+
+To try out these features, update your build tools to pull the Open Liberty All Beta Features package instead of the main release. The beta works with Java SE 21, Java SE 17, Java SE 11, and Java SE 8.
+// // // // // // // //
+// In the preceding section:
+// Check if a new non-LTS Java SE version is supported that needs to be added to the list (17, 11, and 8 are LTS and will remain for a while)
+// https://openliberty.io/docs/latest/java-se.html
+// // // // // // // //
+
+If you're using link:/guides/maven-intro.html[Maven], you can install the All Beta Features package using:
+
+[source,xml]
+----
+<plugin>
+    <groupId>io.openliberty.tools</groupId>
+    <artifactId>liberty-maven-plugin</artifactId>
+    <version>3.9</version>
+    <configuration>
+        <runtimeArtifact>
+          <groupId>io.openliberty.beta</groupId>
+          <artifactId>openliberty-runtime</artifactId>
+          <version>23.0.0.12-beta</version>
+          <type>zip</type>
+        </runtimeArtifact>
+    </configuration>
+</plugin>
+----
+
+You must also add dependencies to your `pom.xml` file for the beta version of the APIs that are associated with the beta features that you want to try.  For example, for Jakarta EE 10 and MicroProfile 6, you would include:
+
+[source,xml]
+----
+<dependency>
+    <groupId>org.eclipse.microprofile</groupId>
+    <artifactId>microprofile</artifactId>
+    <version>6.0-RC3</version>
+    <type>pom</type>
+    <scope>provided</scope>
+</dependency>
+<dependency>
+    <groupId>jakarta.platform</groupId>
+    <artifactId>jakarta.jakartaee-api</artifactId>
+    <version>10.0.0</version>
+    <scope>provided</scope>
+</dependency>
+----
+
+Or for link:/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'io.openliberty.tools:liberty-gradle-plugin:3.7'
+    }
+}
+apply plugin: 'liberty'
+dependencies {
+    libertyRuntime group: 'io.openliberty.beta', name: 'openliberty-runtime', version: '[23.0.0.12-beta,)'
+}
+----
+// // // // // // // //
+// In the preceding section:
+// Replace the Maven `3.8.2` with the latest version of the plugin: https://search.maven.org/artifact/io.openliberty.tools/liberty-maven-plugin
+// Replace the Gradle `3.6.2` with the latest version of the plugin: https://search.maven.org/artifact/io.openliberty.tools/liberty-gradle-plugin
+// TODO: Update GHA to automatically do the above.  If the maven.org is problematic, then could fallback to using the GH Releases for the plugins
+// // // // // // // //
+
+Or if you're using link:/docs/latest/container-images.html[container images]:
+
+[source]
+----
+FROM icr.io/appcafe/open-liberty:beta
+----
+
+Or take a look at our link:/downloads/#runtime_betas[Downloads page].
+
+If you're using link:https://plugins.jetbrains.com/plugin/14856-liberty-tools[IntelliJ IDEA], link:https://marketplace.visualstudio.com/items?itemName=Open-Liberty.liberty-dev-vscode-ext[Visual Studio Code] or link:https://marketplace.eclipse.org/content/liberty-tools[Eclipse IDE], you can also take advantage of our open source link:/docs/latest/develop-liberty-tools.html[Liberty developer tools] to enable effective development, testing, debugging and application management all from within your IDE. 
+
+For more information on using a beta release, refer to the link:/docs/latest/installing-open-liberty-betas.html[Installing Open Liberty beta releases] documentation.
+
+[#feedback]
+== We welcome your feedback
+
+Let us know what you think on link:https://groups.io/g/openliberty[our mailing list]. If you hit a problem, link:https://stackoverflow.com/questions/tagged/open-liberty[post a question on StackOverflow]. If you hit a bug, link:https://github.com/OpenLiberty/open-liberty/issues[please raise an issue].
+
+
