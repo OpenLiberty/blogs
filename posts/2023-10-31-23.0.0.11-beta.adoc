@@ -1,0 +1,330 @@
+---
+layout: post
+title: "New vendor metrics and MicroProfile Reactive Messaging 3.0 updates available in Open Liberty 23.0.0.11-beta"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/lauracowen
+author_github: https://github.com/lauracowen
+seo-title: New vendor metrics and MicroProfile Reactive Messaging 3.0 updates available in Open Liberty 23.0.0.11-beta - OpenLiberty.io
+seo-description: With MicroProfile Metrics 5.0, you can now add metrics such as "REST Elapsed Time per Request" directly to your dashboards without needing to calculate them yourself
+blog_description: With MicroProfile Metrics 5.0, you can now add metrics such as "REST Elapsed Time per Request" directly to your dashboards without needing to calculate them yourself.
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+---
+= New vendor metrics and MicroProfile Reactive Messaging 3.0 updates available in Open Liberty 23.0.0.11-beta
+Laura Cowen <https://github.com/lauracowen>
+:imagesdir: /
+//Blank line here is necessary before starting the body of the post.
+
+The link:/[Open Liberty] 23.0.0.11-beta includes new vendor metrics for MicroProfile Metrics that you can add directly to your dashboards. This release also introduces new capabilities for MicroProfile Reactive Messaging and MicroProfile Stream Operators, including negative acknowledgement.
+
+In addition, Jakarta Data is still in beta; find out more in the link:/blog/2023/09/26/23.0.0.10-beta.html#data[Open Liberty 23.0.0.10-beta blog post].
+
+The link:/[Open Liberty] 23.0.0.11-beta includes the following beta features (along with link:/docs/latest/reference/feature/feature-overview.html[all GA features]):
+
+* <<mpmetrics, New vendor metrics for MicroProfile Metrics 5.0>>
+* <<mpreact, Negative acknowledgement and more for MicroProfile Reactive Messaging 3.0 and MicroProfile Stream Operators 3.0>>
+
+
+See also link:/blog/?search=beta&key=tag[previous Open Liberty beta blog posts].
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/26406
+// Contact/Reviewer: pgunapal
+// // // // // // // // 
+[#mpmetrics]
+== New vendor metrics for MicroProfile Metrics 5.0
+
+This update to MicroProfile Metrics 5.0 (`mpMetrics-5.0`) on Open Liberty includes some new link:/docs/latest/metrics-list.html#_base_and_vendor_metrics[vendor metrics] at the `/metrics` endpoint.  
+
+Previously, you could calculate the new metrics for yourself from the `Time` and `Total` counts that were already provided for various monitoring components. For example, to obtain a "response time per request" metric, you would calculate it using the array of time series data provided by the MicroProfile Metrics feature. However, not all monitoring tools support such complex time series expressions.
+
+With the MicroProfile Metrics 5.0 feature, you can use the new metrics directly in the dashboards of various monitoring tools, without any additional computation.
+
+The following table lists the new vendor metrics:
+
+[cols="1,1"]
+|===
+|Metric | Endpoint output (Prometheus format)
+
+|Process CPU Utilization Percent
+|`# HELP cpu_processCpuUtilization_percent The recent CPU time that is used by the JVM process from all processors that are available to the JVM. The value is between 0 and 1. +
+# TYPE cpu_processCpuUtilization_percent gauge 
+cpu_processCpuUtilization_percent{mp_scope="vendor",} 0.03710604254625131`
+
+|Heap Utilization Percent
+|`# HELP memory_heapUtilization_percent The portion of the maximum heap memory that is currently in use. This metric displays -1 if the maximum heap memory size is unknown. The value is between 0 and 1.+
+# TYPE memory_heapUtilization_percent gauge 
+memory_heapUtilization_percent{mp_scope="vendor",} 0.007193807512521744`
+
+|GC Time per Cycle
+|`# HELP gc_time_per_cycle_seconds The recent average time spent per garbage collection cycle. This metric displays -1 if the garbage collection elapsed time or count is unknown for this collector. +
+# TYPE gc_time_per_cycle_seconds gauge
+gc_time_per_cycle_seconds{mp_scope="vendor",name="global",} 0.005`
+
+|Connection Pool in Use Time per Used Connection
+|`# HELP connectionpool_inUseTime_per_usedConnection_seconds The recent average time that connections are in use. +
+# TYPE connectionpool_inUseTime_per_usedConnection_seconds gauge connectionpool_inUseTime_per_usedConnection_seconds{datasource="jdbc_exampleDS1",mp_scope="vendor",} 0.497`
+
+|Connection Pool Wait Time per Queued Request
+|`# HELP connectionpool_waitTime_per_queuedRequest_seconds The recent average wait time for queued connection requests. +
+# TYPE connectionpool_waitTime_per_queuedRequest_seconds gauge connectionpool_waitTime_per_queuedRequest_seconds{datasource="jdbc_exampleDS1",mp_scope="vendor",} 35.0`
+
+|Servlet Elapsed Time per Request
+|`# HELP servlet_request_elapsedTime_per_request_seconds The recent average elapsed response time per servlet request. +
+# TYPE servlet_request_elapsedTime_per_request_seconds gauge servlet_request_elapsedTime_per_request_seconds{mp_scope="vendor",servlet=”myapp_servletA",} 0.001256676333333333
+servlet_request_elapsedTime_per_request_seconds{mp_scope="vendor",servlet=" myapp_servletB",} 0.00372855566666666
+servlet_request_elapsedTime_per_request_seconds{mp_scope="vendor",servlet=" myapp_servletC",} 1.731813674`
+
+|REST Elapsed Time per Request
+|`# HELP REST_request_elapsedTime_per_request_seconds The recent average elapsed response time per RESTful resource method request. +
+# TYPE REST_request_elapsedTime_per_request_seconds gauge REST_request_elapsedTime_per_request_seconds{class=”my.package.MyClass",method=”simpleGet",mp_scope=”vendor"} 0.0061460695`
+
+|===
+
+
+The Heap Utilization and CPU Utilization metrics are available when the server is started. The Connection Pool, REST, and Servlet metrics are available if the application contains any of the relevant data sources, REST APIs, or servlets, as is the case with the existing vendor metrics.
+
+The new vendor metrics are available in the `/metrics` output, by enabling the following Microprofile Metrics 5.0 feature in your `server.xml`:
+
+[source, xml]
+----
+<featureManager>
+   <feature>mpMetrics-5.0</feature>
+</featureManager>   
+----
+
+For more information, see:
+
+* link:/docs/latest/introduction-monitoring-metrics.html[Microservice observability with metrics]
+* link:/docs/latest/reference/feature/mpMetrics-5.0.html[MicroProfile Metrics 5.0 feature]
+* link:/docs/latest/metrics-list.html[Metrics reference list]
+    
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/26642
+// Contact/Reviewer: abutch3r
+// // // // // // // // 
+
+[#mpreact]
+== Negative acknowledgement and more for MicroProfile Reactive Messaging 3.0 and MicroProfile Stream Operators 3.0
+
+MicroProfile Reactive Messaging 3.0 has a number of new features and changes over MicroProfile Reactive Messaging 1.0, including negative acknowledgements, emitters, and backpressure support.
+
+An application using MicroProfile Reactive Messaging or MicroProfile Stream Operators is typically composed of CDI beans that consume, produce, and process messages that are passing along reactive streams. These messages can be internal to the application, or they can be sent and received through external message brokers. MicroProfile Reactive Messaging uses MicroProfile Stream Operators to pass messages through channels between methods or to messaging solutions, such as Kafka, to provide resilient storage of messages.
+
+MicroProfile Reactive Messaging and Reactive Stream Operators 3.0 provide a range of new features and is compatible with Jakarta EE 9 onwards.
+
+To use both features together, add the Microprofile Reactive Messaging 3.0 feature to the `server.xml`:
+
+[source,xml]
+----
+<feature>mpReactiveMessaging-3.0</feature>
+----
+
+Enabling MicroProfile Reactive Messaging 3.0 automatically enables the MicroProfile Reactive Stream Operators 3.0 feature too.
+
+To use MicroProfile Reactive Stream Operators 3.0 without MicroProfile Reactive Messaging:
+
+[source,xml]
+----
+<feature>mpReactiveStreams-3.0</feature>
+----
+
+
+=== Negative acknowledgements
+
+In MicroProfile Reactive Messaging 1.0, Messages could only be positively acknowledged. If there was a problem with the payload or if exceptional behavior occurred, there was no mechanism to indicate the problem or to handle the problem if it occurred within the stream. The new _nack_ support can send or handle these events.
+
+To explicitly negatively acknowledge an incoming Message:
+
+[source,java]
+----
+@Incoming("data")
+@Outgoing("out")
+public Message<String> process(Message<String> m) { 
+    String s = m.getPayload();
+    if (s.equalsIgnoreCase("b")) {
+        // we cannot fail, we must nack explicitly.
+        m.nack(new IllegalArgumentException("b"));
+        return null;
+    }
+    return m.withPayload(s.toUpperCase());
+}
+----
+
+The method signature of accepting a Message without defining an acknowledgement strategy defaults the strategy to `MANUAL`. It is the responsibility of your code to `ack()` or `nack()` the message. In the previous example, the message can be acknowledged downstream of the out channel.
+
+To throw an exception that causes a negative acknowledgement:
+
+[source,java]
+----
+@Incoming("data")
+@Outgoing("out")
+public String process(String s) {  
+    if (s.equalsIgnoreCase("b")) {
+        throw new IllegalArgumentException("b"); 
+    }
+    return s.toUpperCase();
+}
+----
+
+The method signature of accepting a payload without defining an acknowledgement strategy defaults the strategy to `POST_PROCESSING`. The implementation handles `ack()` and `nack()` calls on the message after the method or chain completes. The upstream data receives the negative acknowledgement with the reason of `IllegalArgumentException`. In the case of an exception being thrown, the implementation invokes the 'nack()' on the message.
+
+=== Emitters
+
+MicroProfile Reactive Messaging 1.0 did not offer a clear way to integrate imperative code, such as RESTful resources and beans, because Reactive Messaging put and took messages onto a channel according to the `Outgoing` or `Incoming` annotations. In version 3.0, emitters provide a bridge across the two models.
+
+To inject emitters into a RESTful resources by using CDI to put messages onto a given channel:
+
+[source,java]
+----
+@Inject
+@Channel(CHANNEL_NAME)
+Emitter<String> emitter;
+
+@POST
+@Path("/payload")
+public CompletionStage<Void> emitPayload(String payload){
+    CompletionStage<Void> cs = emitter.send(payload);
+    return cs;
+}
+
+@POST
+@Path("/message")
+public CompletionStage<Void> emitPayload(String payload){
+    CompletableFuture<Void> ackCf = new CompletableFuture<>();
+    emitter.send(Message.of(payload,
+        () -> {
+            ackCf.complete(null);
+            return CompletableFuture.completedFuture(null);
+        },
+        t -> {
+            ackCf.completeExceptionally(t);
+            return CompletableFuture.completedFuture(null);
+        }));
+    return ackCf;
+}
+----
+
+When defining emitters, you define the type of Object that will be sent as either the payload or the contents of the Message.
+
+If an emitter sends a payload, MicroProfile Reactive Messaging automatically handles the invocation of `ack()` and `nack()` on the message. If, however, the emitter sends a message, the sending code must handle the message being either acked or nacked downstream.
+
+=== Backpressure support
+
+Backpressure support handles messages or payloads that are emitted faster than they are consumed. A backpressure strategy defines application behaviour in this circumstance. In the following example, the buffer holds up to 300 messages and throws an exception if it is full when a new message is emitted:
+
+[source,java]
+----
+@Inject @Channel("myChannel")
+@OnOverflow(value=OnOverflow.Strategy.BUFFER, bufferSize=300)
+private Emitter<String> emitter;
+
+public void publishMessage() {
+  emitter.send("a");
+  emitter.send("b");
+  emitter.complete();
+}
+----
+
+
+You can define the following backpressure strategies:
+
+* `BUFFER` - Use a buffer, with a size determined by the value of bufferSize, if set. Otherwise, the size is the value of the `mp.messaging.emitter.default-buffer-size` MicroProfile Config property,  if it exists. If neither of these values is defined, the default size is 128. If the buffer is full, an exception is thrown from the send method. This is the default strategy if no other strategy is defined.
+* `DROP` - Drops the most recent value if the downstream can’t keep up. Any new values emitted by the emitter are ignored.
+* `FAIL` - Propagates a failure in case the downstream can’t keep up. No more values will be emitted.
+* `LATEST`- Keeps only the latest value, dropping any previous value if the downstream can’t keep up.
+* `NONE` - Ignores the backpressure signals and leave it to the downstream consumer to implement a strategy.
+* `THROW_EXCEPTION` - Throws an exception from the send method if the downstream can’t keep up.
+* `UNBOUNDED_BUFFER` - Use an unbounded buffer. The application might run out of memory if values are continually added faster than they are consumed.
+
+For more information, see:
+
+* link:https://download.eclipse.org/microprofile/microprofile-reactive-messaging-3.0/microprofile-reactive-messaging-spec-3.0.html[Reactive Messaging spec]
+* link:https://download.eclipse.org/microprofile/microprofile-reactive-streams-operators-3.0/microprofile-reactive-streams-operators-spec-3.0.html[Reactive Stream Operators spec]
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
+
+[#run]
+== Try it now 
+
+To try out these features, update your build tools to pull the Open Liberty All Beta Features package instead of the main release. The beta works with Java SE 21, Java SE 17, Java SE 11, and Java SE 8.
+
+If you're using link:/guides/maven-intro.html[Maven], you can install the All Beta Features package using:
+
+[source,xml]
+----
+<plugin>
+    <groupId>io.openliberty.tools</groupId>
+    <artifactId>liberty-maven-plugin</artifactId>
+    <version>3.9</version>
+    <configuration>
+        <runtimeArtifact>
+          <groupId>io.openliberty.beta</groupId>
+          <artifactId>openliberty-runtime</artifactId>
+          <version>23.0.0.11-beta</version>
+          <type>zip</type>
+        </runtimeArtifact>
+    </configuration>
+</plugin>
+----
+
+You must also add dependencies to your `pom.xml` file for the beta version of the APIs that are associated with the beta features that you want to try.  For example, for Jakarta EE 10 and MicroProfile 6, you would include:
+
+[source,xml]
+----
+<dependency>
+    <groupId>org.eclipse.microprofile</groupId>
+    <artifactId>microprofile</artifactId>
+    <version>6.0-RC3</version>
+    <type>pom</type>
+    <scope>provided</scope>
+</dependency>
+<dependency>
+    <groupId>jakarta.platform</groupId>
+    <artifactId>jakarta.jakartaee-api</artifactId>
+    <version>10.0.0</version>
+    <scope>provided</scope>
+</dependency>
+----
+
+Or for link:/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'io.openliberty.tools:liberty-gradle-plugin:3.7'
+    }
+}
+apply plugin: 'liberty'
+dependencies {
+    libertyRuntime group: 'io.openliberty.beta', name: 'openliberty-runtime', version: '[23.0.0.11-beta,)'
+}
+----
+
+Or if you're using link:/docs/latest/container-images.html[container images]:
+
+[source]
+----
+FROM icr.io/appcafe/open-liberty:beta
+----
+
+Or take a look at our link:/downloads/#runtime_betas[Downloads page].
+
+If you're using link:https://plugins.jetbrains.com/plugin/14856-liberty-tools[IntelliJ IDEA], link:https://marketplace.visualstudio.com/items?itemName=Open-Liberty.liberty-dev-vscode-ext[Visual Studio Code], or link:https://marketplace.eclipse.org/content/liberty-tools[Eclipse IDE], try our open source link:https://openliberty.io/docs/latest/develop-liberty-tools.html[Liberty developer tools] for efficient development, testing, debugging, and application management, all within your IDE. 
+
+For more information on using a beta release, refer to the link:/docs/latest/installing-open-liberty-betas.html[Installing Open Liberty beta releases] documentation.
+
+[#feedback]
+== We welcome your feedback
+
+Let us know what you think on link:https://groups.io/g/openliberty[our mailing list]. If you hit a problem, link:https://stackoverflow.com/questions/tagged/open-liberty[post a question on StackOverflow]. If you hit a bug, link:https://github.com/OpenLiberty/open-liberty/issues[please raise an issue].
+
+
