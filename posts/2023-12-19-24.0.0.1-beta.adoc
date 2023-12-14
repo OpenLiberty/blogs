@@ -1,0 +1,211 @@
+---
+layout: post
+title: "Jakarta Data 1.0 hits milestone 2 in 24.0.0.1 beta"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/dmuelle
+author_github: https://github.com/dmuelle
+seo-title: Jakarta Data 1.0 hits milestone 2 in 24.0.0.1 beta - OpenLiberty.io
+seo-description: Open Liberty 24.0.0.1-beta includes a preview of the new Jakarta Data specification for Jakarta EE, as it currently stands at Milestone 2. Milestone 2 provides API updates to pagination and various improvements to the Javadoc and specification text. You can try it out and give feedback on the specification so far.
+blog_description: Open Liberty 24.0.0.1-beta includes a preview of the new Jakarta Data specification for Jakarta EE, as it currently stands at Milestone 2. Milestone 2 provides API updates to pagination and various improvements to the Javadoc and specification text. You can try it out and give feedback on the specification so far.
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+---
+= Jakarta Data 1.0 hits milestone 2 in 24.0.0.1 beta
+David Mueller <https://github.com/dmuelle>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+Open Liberty 24.0.0.1-beta includes a preview of the new Jakarta Data specification for Jakarta EE, as it currently stands at Milestone 2. Milestone 2 provides API updates to pagination and various improvements to the Javadoc and specification text. You can try it out and give feedback on the specification so far.
+
+
+See also link:{url-prefix}/blog/?search=beta&key=tag[previous Open Liberty beta blog posts].
+
+[#milestone_2]
+== Preview of Jakarta Data (Milestone 2)
+
+Jakarta Data is a new Jakarta EE specification being developed in the open that standardizes the popular Data Repository pattern across a variety of providers. Open Liberty 24.0.0.1-beta includes the Jakarta Data 1.0 Milestone 2 release, which provides API updates to pagination and various improvements to the Javadoc and specification text. The Open Liberty beta includes a test implementation of Jakarta Data that we are using to experiment with proposed specification features so that developers can try out these features and provide feedback to influence the development of the Jakarta Data 1.0 specification beyond Milestone 2. The test implementation currently works with relational databases and operates by redirecting repository operations to the built-in Jakarta Persistence provider.
+
+To use the pagination API to request pages of results in Jakarta Data, you need an Entity and a Repository.
+
+Start by defining an entity class that corresponds to your data. With relational databases, the entity class corresponds to a database table. The entity properties (public methods and fields of the entity class) generally correspond to the columns of the table. An entity class can be:
+
+- annotated with `jakarta.persistence.Entity` and related annotations from Jakarta Persistence
+- a Java class without entity annotations, in which case the primary key is inferred from an entity property named `id` or ending with `Id` and an entity property named `version` designates an automatically incremented version column.
+
+You define one or more repository interfaces for an entity, annotate those interfaces as `@Repository` and inject them into components via `@Inject`. The Jakarta Data provider supplies the implementation of the repository interface for you.
+
+Here's a simple entity,
+
+```
+@Entity
+public class Product {
+    @Id
+    public long id;
+
+    public String name;
+
+    public float price;
+
+    @Version
+    public long version;
+}
+```
+
+Here is a repository that defines operations relating to the entity. Your repository interface can inherit from built-in interfaces such as `BasicRepository` and `CrudRepository` to gain a variety of general purpose repository methods for inserting, updating, deleting and querying for entities, but in this case we will define all of the methods ourselves, taking advantage of the life cycle annotations.
+
+```
+@Repository(dataStore = "java:app/jdbc/my-example-data")
+public interface Products {
+    @Insert
+    Product add(Product newProduct);
+
+    @Update
+    boolean modify(Product product);
+
+    @Delete
+    boolean remove(Product product);
+
+    // parameter based query that requires compilation with -parameters to preserve parameter names
+    Optional<Product> find(long id);
+
+    // query-by-method name pattern:
+    KeysetAwarePage<Product> findByNameIgnoreCaseContains(String searchFor, Pageable pageRequest);
+
+    // query via JPQL:
+    @Query("UPDATE Product o SET o.price = o.price - (?2 * o.price) WHERE o.id = ?1")
+    boolean discount(long productId, float discountRate);
+}
+```
+
+Here is an example of the repository being used,
+
+```
+@DataSourceDefinition(name = "java:app/jdbc/my-example-data",
+                      className = "org.postgresql.xa.PGXADataSource",
+                      databaseName = "ExampleDB",
+                      serverName = "localhost",
+                      portNumber = 5432,
+                      user = "${example.database.user}",
+                      password = "${example.database.password}")
+public class MyServlet extends HttpServlet {
+    @Inject
+    Products products;
+
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp)
+            throws ServletException, IOException {
+        // Insert:
+        Product prod = ...
+        prod = products.add(prod);
+
+        // Update:
+        prod.price = prod.price + 1.00;
+        if (products.update(prod))
+            System.out.println("Successfully increased the price.");
+        else {
+            // someone else either removed the product or updated its version before we could
+            prod = products.find(productId).orElseThrow();
+            ...
+        }
+
+        // Request only the first 10 results on a page, ordered by price, then name, then id:
+        Pageable pageRequest = Pageable.size(10).sortBy(Sort.desc("price"), Sort.asc("name"), Sort.asc("id"));
+        KeysetAwarePage<Product> page = products.findByNameIgnoreCaseContains(searchFor, pageRequest);
+        ...
+        // Request the next page relative to the end of the current page
+        page = products.findByNameIgnoreCaseContains(searchFor, page.nextPageable());
+        ...
+        // Request the prior page relative to the start of the current page
+        page = products.findByNameIgnoreCaseContains(searchFor, page.previousPageable());
+        ...
+    }
+}
+```
+
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+[#run]
+=== Try it now
+
+To try out these features, update your build tools to pull the Open Liberty All Beta Features package instead of the main release. The beta works with Java SE 21, Java SE 17, Java SE 11, and Java SE 8.
+// // // // // // // //
+// In the preceding section:
+// Check if a new non-LTS Java SE version is supported that needs to be added to the list (17, 11, and 8 are LTS and will remain for a while)
+// https://openliberty.io/docs/latest/java-se.html
+// // // // // // // //
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], you can install the All Beta Features package using:
+
+[source,xml]
+----
+<plugin>
+    <groupId>io.openliberty.tools</groupId>
+    <artifactId>liberty-maven-plugin</artifactId>
+    <version>3.10</version>
+    <configuration>
+        <runtimeArtifact>
+          <groupId>io.openliberty.beta</groupId>
+          <artifactId>openliberty-runtime</artifactId>
+          <version>24.0.0.1-beta</version>
+          <type>zip</type>
+        </runtimeArtifact>
+    </configuration>
+</plugin>
+----
+
+You must also add dependencies to your pom.xml file for the beta version of the APIs that are associated with the beta features that you want to try.  For example, for Jakarta EE 10 and MicroProfile 6, you would include:
+[source,xml]
+----
+<dependency>
+    <groupId>org.eclipse.microprofile</groupId>
+    <artifactId>microprofile</artifactId>
+    <version>6.0-RC3</version>
+    <type>pom</type>
+    <scope>provided</scope>
+</dependency>
+<dependency>
+    <groupId>jakarta.platform</groupId>
+    <artifactId>jakarta.jakartaee-api</artifactId>
+    <version>10.0.0</version>
+    <scope>provided</scope>
+</dependency>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'io.openliberty.tools:liberty-gradle-plugin:3.8'
+    }
+}
+apply plugin: 'liberty'
+dependencies {
+    libertyRuntime group: 'io.openliberty.beta', name: 'openliberty-runtime', version: '[24.0.0.1-beta,)'
+}
+----
+
+Or if you're using link:{url-prefix}/docs/latest/container-images.html[container images]:
+
+[source]
+----
+FROM icr.io/appcafe/open-liberty:beta
+----
+
+Or take a look at our link:{url-prefix}/downloads/#runtime_betas[Downloads page].
+
+If you're using link:https://plugins.jetbrains.com/plugin/14856-liberty-tools[IntelliJ IDEA], link:https://marketplace.visualstudio.com/items?itemName=Open-Liberty.liberty-dev-vscode-ext[Visual Studio Code] or link:https://marketplace.eclipse.org/content/liberty-tools[Eclipse IDE], you can also take advantage of our open source link:https://openliberty.io/docs/latest/develop-liberty-tools.html[Liberty developer tools] to enable effective development, testing, debugging and application management all from within your IDE.
+
+For more information on using a beta release, refer to the link:{url-prefix}docs/latest/installing-open-liberty-betas.html[Installing Open Liberty beta releases] documentation.
+
+[#feedback]
+== We welcome your feedback
+
+Let us know what you think on link:https://groups.io/g/openliberty[our mailing list]. If you hit a problem, link:https://stackoverflow.com/questions/tagged/open-liberty[post a question on StackOverflow]. If you hit a bug, link:https://github.com/OpenLiberty/open-liberty/issues[please raise an issue].
