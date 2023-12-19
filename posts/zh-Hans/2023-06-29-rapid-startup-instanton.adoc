@@ -1,0 +1,271 @@
+---
+layout: post
+title: "实现快速启动云原生Java应用程序的打包方法"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/tjwatson
+author_github: https://github.com/tjwatson
+seo-title: 实现快速启动云原生Java应用程序的打包方法 - OpenLiberty.io
+seo-description: 您是否知道我们可以重新打包云原生Java应用程序，使其以毫秒为单位启动，而不会影响吞吐量、内存、开发-生产对等性或Java语言特性？并且不需要重构应用程序代码吗？方法就是……
+blog_description: "您是否知道我们可以重新打包云原生Java应用程序，使其以毫秒为单位启动，而不会影响吞吐量、内存、开发-生产对等性或Java语言特性？并且不需要重构应用程序代码吗？方法就是……"
+open-graph-image: https://openliberty.io/img/blog/checkpoint4.png
+open-graph-image-alt: InstantOn checkpoint and restore process
+additional_authors:
+- name: Vijay Sundaresan
+  github: https://github.com/vijaysun-omr
+  image: https://avatars0.githubusercontent.com/vijaysun-omr
+- name: Laura Cowen
+  github: https://github.com/lauracowen
+  image: https://avatars0.githubusercontent.com/lauracowen
+- name: 张海燕 (翻译)
+  github: https://github.com/CynthiaHY
+  image: https://avatars0.githubusercontent.com/CynthiaHY
+
+blog-available-in-languages:
+- lang: en
+  path: /blog/2023/06/29/rapid-startup-instanton.html
+- lang: ja
+  path: /ja/blog/2023/06/29/rapid-startup-instanton.html
+
+---
+= 实现快速启动云原生Java应用程序的打包方法
+Thomas Watson <https://github.com/tjwatson>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+您是否知道我们可以重新打包云原生Java应用程序，使其以毫秒为单位启动，而不会影响吞吐量、内存、开发-生产对等性或Java语言特性？并且不需要重构应用程序代码吗？方法就是……
+
+== 提高启动速度的必要性
+
+在无服务器（serverless）环境中，通过在没有请求处理时关闭不需要的应用程序实例，缩容至0（scale-to-zero）可以帮助降低部署应用程序的总体云计算成本。当应用程序的活动开始时，新的实例能快速启动，而不会给应用程序终端用户带来明显的延迟。
+
+尽管JDK技术有很大改进，使得它可以在不到1秒的时间内启动，比如类数据共享和动态AOT编译，但它的启动速度仍然不够快，无法支持从零缩放。但是，JDK对于优化吞吐量和内存、确保开发与生产的一致性以及支持各种Java语言特性等非常重要。那么，我们如何既改善启动时间，又从完整运行的JDK中获益呢？
+
+Open Liberty运行时中的InstantOn功能使用IBM Semeru JDK和称为link:https://criu.org/Main_Page[用户空间中的检查点/恢复点](CRIU)的Linux技术来获取应用程序进程的检查点或时间点快照。然后可以非常快速地恢复这个检查点，使应用程序进程恢复到使用检查点时的状态。应用程序可以多次恢复，因为Open Liberty和Semeru JDK保留了容器中每个恢复进程的唯一性。每个恢复的应用程序进程都可以不必先经历整个启动序列而运行，从而节省高达90%的启动时间（取决于您的应用程序）。InstantOn只需要对Java应用程序进行很少的修改就可以实现这种改进。
+
+下图演示了如何在容器镜像构建期间生成检查点，通过将它们恢复到应用程序进程的检查点阶段来快速启动生产环境中多个应用程序实例的。
+
+[.img_border_light]
+image::/img/blog/checkpoint4.jpg[diagram of the checkpoint and restore process,width=70%,align="center"]
+
+InstantOn不能在容器镜像构建之外使用。应用程序容器镜像提供了一个一致的环境，这是确保Open Liberty应用程序进程可靠恢复所必需的。由于InstantOn检查点包含在应用程序容器镜像的最后一层中，因此从检查点创建到镜像恢复期间，镜像底层中的资源不会发生变化。
+
+下面的教程将引导您使用Linux上的 Open Liberty Java运行时、InstantOn、IBM Semeru JDK和Podman容器工具对应用程序进行容器化。有关使用Open Liberty容器化应用程序的信息，请参阅link:/guides/containerize-podman.html[使用Podman进行容器化微服务]指南。
+
+== 检查点/恢复容器化应用程序的先决条件
+
+目前，link:/blog/2023/06/27/23.0.0.6.html[Open Liberty 23.0.0.6]或更高版本只支持在x86-64/amd64架构上运行InstantOn。我们所有的测试都是在RHEL 9.0和Ubuntu 22.04上完成的，但如果具备以下先决条件，也可以在其他Linux发行版本上运行:
+
+-	内核必须支持Linux link:https://man7.org/linux/man-pages/man7/capabilities.7.html[CAP_CHECKPOINT_RESTORE]功能，此功能是在内核5.9版本中引入的
+-	必须安装Linux发行版最新版本的Podman
+-	Linux发行版必须允许使用Podman或Docker来执行特权容器构建
+
+For more information about the runtime and host build system prerequisites, see the link:/docs/latest/instanton.html#prereq[Open Liberty InstantOn documentation].
+有关运行时和主机构建系统先决条件的更多信息，请参阅link:/docs/latest/instanton.html#prereq[Open Liberty InstantOn文档]
+
+== 创建一个应用程序WAR文件
+
+如果您手上没有自己的应用程序，您可以按照link:/guides/getting-started.html[Open Liberty入门指南]中的示例应用程序进行操作：
+
+首先，克隆指南的link:https://github.com/openliberty/guide-getting-started[Git存储库]：
+
+[source,console]
+----
+git clone https://github.com/openliberty/guide-getting-started.git
+cd guide-getting-started
+----
+
+然后，在'finish/'目录下构建应用程序，并将其部署到Open Liberty：
+
+[source,console]
+----
+cd finish
+mvn liberty:run
+----
+
+当您看到下面的消息时，您的Open Liberty实例已经准备好了:
+
+[source,console]
+----
+The defaultServer server is ready to run a smarter planet.
+----
+
+在http://localhost:9080/dev/system/properties的URL上查看该服务。在启动Open Liberty的命令行会话中按**CTRL+C**停止正在运行的Open Liberty实例。
+
+最后，为应用程序构建WAR：
+
+[source,console]
+----
+mvn package
+----
+
+这个命令会构建一个`target/guide-getting-started.war`的归档。现在，我们可以在使用InstantOn特性的容器镜像中加入这个WAR。
+
+== 测试应用程序的启动时间
+
+为了比较使用和不使用InstantOn时Open Liberty应用程序容器镜像启动所需的时间，我们首先先介绍如何在不使用InstantOn的情况下构建容器镜像。然后，再说明如何使用InstantOn构建并运行生成的容器。
+
+=== 在没有InstantOn的情况下容器化Open Liberty应用程序
+
+构建不使用InstantOn的应用程序容器镜像：
+
+[source,console]
+----
+podman build -t getting-started .
+----
+
+这个命令创建的是一个不包含任何检查点镜像的getting-started入门容器镜像。
+
+运行这个应用容器：
+
+[source,console]
+----
+podman run --name getting-started --rm -p 9080:9080 getting-started
+----
+
+请注意Open Liberty报告它已启动所花费的时间，并通过http://localhost:9080/dev/system/properties URL检查容器中运行的服务。检出应用程序后，在运行`podman run`命令的命令行会话中按**CTRL+C**停止正在运行的容器。
+
+=== 用InstantOn容器化Open Liberty应用程序
+
+Open Liberty容器镜像包含构建具有检查点运行时进程的应用程序容器镜像的先决条件。应用程序可以使用Open Liberty镜像作为基础来构建自己的应用程序容器镜像，并以此为基础，使用检查点进程创建自己的应用程序容器镜像。
+
+[#build]
+==== 构建应用程序容器镜像并检查应用程序
+
+通过在应用程序容器镜像的构建步骤中启动Open Liberty运行时，可以创建一个InstantOn检查点。在此启动期间，运行时处理配置、加载所有启用的功能并开始处理配置的应用程序。根据应用程序的需要，您可以在Open Liberty启动期间选择两个特定阶段中的一个来检查进程。您必须配置Dockerfile以指定您选择的阶段(稍后会介绍)。
+
+官方link:/docs/latest/container-images.htmlIBM Container Registry] (ICR)的Open Liberty镜像包含了InstantOn检查应用程序进程所需的所有先决条件。对于本例，`getting-started`入门应用程序容器镜像使用来自ICR的`icr.io/appcafe/open-liberty:full-java11-openj9-ubi`映像作为父镜像。目前，InstantOn只支持基于Java 11和Java 17的Open Liberty UBI镜像。
+
+更新应用的Dockerfile文件，在文件末尾添加`checkpoint.sh`脚本的`RUN`命令，如下面的例子所示
+
+[source,console]
+----
+FROM icr.io/appcafe/open-liberty:full-java11-openj9-ubi
+ARG VERSION=1.0
+ARG REVISION=SNAPSHOT
+LABEL \
+  org.opencontainers.image.authors="Your Name" \
+  org.opencontainers.image.vendor="IBM" \
+  org.opencontainers.image.url="local" \
+  org.opencontainers.image.source="https://github.com/OpenLiberty/guide-getting-started" \
+  org.opencontainers.image.version="$VERSION" \
+  org.opencontainers.image.revision="$REVISION" \
+  vendor="Open Liberty" \
+  name="system" \
+  version="$VERSION-$REVISION" \
+  summary="The system microservice from the Getting Started guide" \
+  description="This image contains the system microservice running with the Open Liberty runtime."
+
+COPY --chown=1001:0 src/main/liberty/config/ /config/
+COPY --chown=1001:0 target/*.war /config/apps/
+
+RUN configure.sh
+RUN checkpoint.sh afterAppStart
+----
+
+此配置将应用程序进程检查点添加为应用程序容器镜像的最后一层。`checkpoint.sh`脚本允许指定'afterAppStart'或'beforeAppStart'，以指示在启动的哪个阶段执行进程检查。
+
+两个选项可选来确定检查点发生在应用程序启动之前还是之后：
+
+- `beforeAppStart`: 检查点发生在处理配置的应用程序元数据之后。如果应用程序有作为应用程序启动的一部分运行的任何组件，则在执行应用程序中的任一代码之前采取检查点。这个选项是InstantOn提供的最早检查点阶段。
+- `afterAppStart`: 此选项是检查点能够发生的最后阶段，因此在恢复应用程序实例时，它有可能提供最快的启动时间。检查点发生在所有已配置的应用程序报告为已启动之后。它发生在打开任何监听端口以侦听应用程序的传入请求之前。
+
+`afterAppStart`阶段会为应用程序提供最快的启动时间，但它也可能导致一些应用程序代码在服务器进程检查点发生之前运行。由于本教程中使用的`getting-started`应用程序在其启动逻辑中没有做任何会导致恢复问题的事情，因此我们可以选择使用`afterAppStart` 。
+
+为了InstantOn创建检查点并恢复进程，CRIU二进制文件需要额外的link:/docs/latest/instanton.html#linux-capabilities[Linux功能]。虽然Open Liberty容器镜像包含赋予二进制文件的必要功能。但是，容器在启动时还必须要赋这些功能。
+
+With podman, you can use the `-–cap-add` and `--security-opt` options to grant the container build the necessary capabilities to take a checkpoint during the container build step. The user who launches the Podman container must have the authority to grant it the necessary Linux capabilities, so you must run the following command as root or `sudo`:
+使用podman，您可以使用`-–cap-add`和`--security-opt`选项为容器构建赋予必要的功能，以便在容器构建步骤中创建检查点。启动Podman容器的用户必须具有赋予它必要的Linux功能的权限，因此必须以root或sudo身份运行以下命令
+
+[source,console]
+----
+podman build \
+   -t dev.local/getting-started-instanton \
+   --cap-add=CHECKPOINT_RESTORE \
+   --cap-add=SYS_PTRACE\
+   --cap-add=SETPCAP \
+   --security-opt seccomp=unconfined .
+----
+
+Dockerfile中的最后一条指令是运行`checkpoint.sh`脚本。当您执行前面的Podman构建命令时，它会启动Open Liberty并在Dockerfile中指定的阶段执行检查点。容器进程数据持久化后，Open Liberty停止，容器镜像构建完成。生成的应用程序容器镜像包含检查点进程数据作为容器镜像的最后一层。输出如下面的例子:
+
+[source,console]
+----
+Performing checkpoint --at=afterAppStart
+
+Launching defaultServer (Open Liberty 23.0.0.6/wlp-1.0.78.cl230620230612-1100) on Eclipse OpenJ9 VM, version 11.0.19+7 (en_US)
+[AUDIT   ] CWWKE0001I: The server defaultServer has been launched.
+[AUDIT   ] CWWKG0093A: Processing configuration drop-ins resource: /opt/ol/wlp/usr/servers/defaultServer/configDropins/defaults/keystore.xml
+[AUDIT   ] CWWKG0093A: Processing configuration drop-ins resource: /opt/ol/wlp/usr/servers/defaultServer/configDropins/defaults/open-default-port.xml
+[AUDIT   ] CWWKZ0058I: Monitoring dropins for applications.
+[AUDIT   ] CWWKZ0001I: Application guide-getting-started started in 1.886 seconds.
+[AUDIT   ] CWWKC0451I: A server checkpoint "afterAppStart" was requested. When the checkpoint completes, the server stops.
+----
+
+[#run]
+==== 运行InstantOn应用程序映像
+
+使用以下命令运行`getting-started-instanton`容器:
+
+[source,console]
+----
+podman run \
+  --rm \
+  --cap-add=CHECKPOINT_RESTORE \
+  --cap-add=SETPCAP \
+  --security-opt seccomp=unconfined \
+  -p 9080:9080 \
+  getting-started-instanton
+----
+
+The `--cap-add` options grant the container the two Linux capabilities that CRIU requires to restore the application process. When Open Liberty restores the application process, it logs the following messages:
+`--cap-add`的选项赋予容器两个Linux功能，这两个功能是CRIU恢复应用程序进程所需的。当Open Liberty恢复应用程序进程时，它会输出以下消息:
+
+[source,console]
+----
+[AUDIT   ] Launching defaultServer (Open Liberty 23.0.0.6/wlp-1.0.78.cl230620230612-1100) on Eclipse OpenJ9 VM, version 11.0.19+7 (en_US)
+[AUDIT   ] CWWKZ0001I: Application guide-getting-started started in 0.233 seconds.
+[AUDIT   ] CWWKT0016I: Web application available (default_host): http://850ba43df239:9080/dev/
+[AUDIT   ] CWWKT0016I: Web application available (default_host): http://850ba43df239:9080/metrics/
+[AUDIT   ] CWWKT0016I: Web application available (default_host): http://850ba43df239:9080/health/
+[AUDIT   ] CWWKT0016I: Web application available (default_host): http://850ba43df239:9080/ibm/api/
+[AUDIT   ] CWWKC0452I: The Liberty server process resumed operation from a checkpoint in 0.283 seconds.
+[AUDIT   ] CWWKF0012I: The server installed the following features: [cdi-4.0, distributedMap-1.0, jndi-1.0, json-1.0, jsonb-3.0, jsonp-2.1, monitor-1.0, mpConfig-3.0, mpHealth-4.0, mpMetrics-5.0, restfulWS-3.1, restfulWSClient-3.1, ssl-1.0, transportSecurity-1.0].
+[AUDIT   ] CWWKF0011I: The defaultServer server is ready to run a smarter planet. The defaultServer server started in 0.297 seconds.
+----
+
+如果Open Liberty未能恢复检查点进程，它会通过启动没有检查点的镜像来恢复，并输出以下消息:
+
+[source,console]
+----
+CWWKE0957I: Restoring the checkpoint server process failed. Check the /logs/checkpoint/restore.log log to determine why the checkpoint process was not restored. Launching the server without using the checkpoint image.
+----
+
+检查Open Liberty启动所需的时间，并将其与没有InstantOn的时间进行比较。
+
+== 性能结果
+
+InstantOn improves startup time of Open Liberty applications significantly by restoring the process from the checkpointed state. The improvement in the time to first response (i.e. the time taken to serve the first request) is also impressive but obviously more of the application logic runs after the restore in that case. We measured both metrics for multiple applications running in containers and using the `afterAppStart` checkpoint phase.
+InstantOn通过从检查点状态恢复进程，显著改善了Open Liberty应用程序的启动时间。对第一次响应时间(即服务第一个请求所花费的时间)的改进也令人印象深刻，但在这种情况下，显然更多的应用程序逻辑是在恢复之后运行。我们测量了在容器中运行和使用afterAppStart 检查点两种情况下运行多个应用程序的指标。
+
+- link:https://github.com/HotswapProjects/pingperf-quarkus/[Pingperf]是一个非常简单的ping类型应用程序，涉及单个REST端点
+- link:https://github.com/johnaohara/quarkusRestCrudDemo/[Rest crud]有点复杂，涉及JPA和远程数据库
+- link:https://github.com/blueperf/acmeair-mainservice-java#acme-air-main-service---javaliberty/[AcmeAir Microservice Main]使用MicroProfile功能
+
+image::/img/blog/startup.png[Startup time in ms,width=70%,align="center"]
+
+{empty} +
+{empty} +
+
+image::/img/blog/response.png[First response time in ms,width=70%,align="center"]
+
+这些实验表明，与没有InstantOn的普通JVM模式相比，所有3个应用程序的启动时间都有了健康的改善，第一次响应的时间也提高了8.8倍。footnote:[这些实验是在24核Linux X86-64系统上运行，使用 `taskset -c`为每种情况下容器中运行的Open Liberty进程分配4核CPU资源。启动时间是计算的从Open Liberty服务器启动的开始时间到服务器准备好接受请求的时间，表示为messages.log里的信息：“ The <server name> server is ready to run a smarter planet”。启动容器本身所需的时间也包含在显示的结果中。InstantOn和应用程序的正常启动时间在这里以毫秒为单位显示。您的结果可能会根据您的环境、系统上安装的硬件和软件以及其他因素而有所不同。]
+
+== 总结
+
+这篇文章描述了如何通过使用Open Liberty InstantOn特性生成应用程序容器镜像来配置云原生应用程序，使其几乎立即启动。InstantOn的关键价值主张是，您可以重新打包云原生Java应用程序，使其以毫秒为单位启动，而不会影响吞吐量、内存、开发-生产对等性或Java语言特性。
+该特性现在可以在公共云AWS EKS和Azure AKS环境中X86-64/AMD64平台上的link:/blog/2023/06/27/23.0.0.6.html[Open Liberty 23.0.0.6]中可用。
+
+在未来，我们计划扩大我们的平台覆盖范围，并扩展到能够在更受管理的公共云和混合云环境中运行。我们还打算探索更大的Open Liberty特性集来支持InstantOn。有关Open Liberty InstantOn的更多详细信息，请参阅link:/docs/latest/instanton.html[使用Open Liberty InstantOn的容器化应用程序的快速启动文档】，该文档会包含已知限制条件以及Semeru JDK对该特性支持情况的更详细讨论。
