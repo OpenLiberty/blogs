@@ -29,12 +29,14 @@ Previously, OpenID Connect servers could notify OpenID Connect clients that a us
 
 == Back-channel logout support for OpenID Connect clients
 
-With this release, back-channel logout support for OpenID Connect clients is enabled by default when the link:{url-prefix}/docs/latest/reference/feature/openidConnectClient.html[OpenID Connect Client] and link:{url-prefix}/docs/latest/reference/feature/socialLogin.html[Social Media Login] features are enabled. When either of these features are enabled and an `openidConnectClient` or a `socialLogin` element is defined in the `server.xml` file, back-channel logout endpoints are also automatically enabled on the OpenID Connect client. The OpenID Connect server sends back-channel logout requests to these endpoints to log out the user at the OpenID Connect client. The OpenID Connect server needs the absolute URI of the back-channel logout endpoint to send the back-channel logout requests. The following back-channel logout endpoints are enabled for those features:
+With this release, back-channel logout support for OpenID Connect clients is enabled by default when the link:{url-prefix}/docs/latest/reference/feature/openidConnectClient.html[OpenID Connect Client] feature or the link:{url-prefix}/docs/latest/reference/feature/socialLogin.html[Social Media Login] feature is enabled. When either of these features are enabled and an `openidConnectClient` or a `socialLogin` element is defined in the `server.xml` file, back-channel logout endpoints are also automatically enabled on the OpenID Connect client. The OpenID Connect server sends back-channel logout requests to these endpoints to log out the user at the OpenID Connect client.
+
+The OpenID Connect server needs the absolute URI of the back-channel logout endpoint to send the back-channel logout requests. The following back-channel logout endpoints are enabled for those features:
 
 * OpenID Connect Client: `/oidcclient/backchannel_logout/{oidcClientId}`
 * Social Media Login: `/ibm/api/social-login/backchannel_logout/{socialLoginId}`
 
-For example, when the OpenID Connect Client feature is enabled, the back-channel logout endpoint is `/oidcclient/backchannel_logout/oidcClientId` for the following configuration:
+For example, the following OpenID Connect Client feature configuration enables the `/oidcclient/backchannel_logout/oidcClientId` back-channel logout endpoint on the OpenID Connect client:
 
 [source,xml]
 ----
@@ -45,7 +47,7 @@ For example, when the OpenID Connect Client feature is enabled, the back-channel
 <openidConnectClient id="oidcClientId" ... />
 ----
 
-Similarly, if the Social Media Login feature is enabled, the back-channel logout endpoint is `/ibm/api/social-login/backchannel_logout/socialLoginId` for the following configuration:
+Similarly, the following Social Media Login feature configuration enables the `/ibm/api/social-login/backchannel_logout/socialLoginId` back-channel logout endpoint on the OpenID Connect client:
 
 [source,xml]
 ----
@@ -58,11 +60,7 @@ Similarly, if the Social Media Login feature is enabled, the back-channel logout
 
 == Back-channel logout support for OpenID Connect servers
 
-Two options are available to enable back-channel logout for OpenID Connect servers:
-
-* Use the `backchannel_logout_uri` metadata value to specify the OpenID Connect client's back-channel logout URI when the OAuth client is dynamically registered by using the OpenID Connect provider's client registration endpoint.
-
-* Use the `backchannelLogoutUri` attribute for OAuth clients that are defined in a `localStore` element.
+To enable back-channel logout for OpenID Connect servers, specify the `backchannelLogoutUri` attribute for OAuth clients that are defined in a `localStore` element in the `server.xml` file.
 
 Also, the OpenID Connect server waits for a default of 180 seconds before the back-channel logout request times out. You can specify a custom duration by using the `backchannelLogoutRequestTimeout` attribute for the `openidConnectProvider` element.
 
@@ -92,7 +90,13 @@ The following `server.xml` file example demonstrates how to specify the back-cha
 ----
 
 
-Now, when the OpenID Connect server's logout or `end_session` endpoint is invoked, the OpenID Connect server also sends back-channel logout requests to log out the user at the OpenID Connect clients. The OpenID Connect server's logout endpoint is `/oidc/endpoint/{oidcProviderId}/logout` and the `end_session` endpoint is `/oidc/endpoint/{oidcProviderId}/end_session`. Optionally, you can add an `id_token_hint` query parameter that contains an ID Token that is issued by that OpenID Connect server to the endpoint request as a query parameter to help determine the user to log out. This configuration is useful in scenarios where the logout or `end_session` request is made without the user's OpenID Connect server SSO cookie.
+Now, when the OpenID Connect server's logout or `end_session` endpoint is invoked, the OpenID Connect server also sends back-channel logout requests to log out the user at the OpenID Connect clients. The OpenID Connect server's logout endpoint is `/oidc/endpoint/{oidcProviderId}/logout` and the `end_session` endpoint is `/oidc/endpoint/{oidcProviderId}/end_session`. In the previous example, the server's logout endpoint is `/oidc/endpoint/OidcConfigSample/logout` and the `end_session` endpoint is `/oidc/endpoint/OidcConfigSample/end_session`
+
+Alternatively, you can enable back-channel logout for an OpenID Connect server by defining the `backchannel_logout_uri` metadata value to specify the OpenID Connect client's back-channel logout URI when the OAuth client is dynamically registered by using the OpenID Connect provider's client registration endpoint.
+
+=== Back-channel logout without an OpenID Connect server SSO cookie
+
+Optionally, you can add an `id_token_hint` query parameter that contains an ID Token that is issued by that OpenID Connect server to the endpoint request as a query parameter to help determine the user to log out. This configuration is useful in scenarios where the logout or `end_session` request is made without the user's OpenID Connect server SSO cookie.
 
 For example, if the OpenID Connect server is hosted on `\http://localhost:9081` and the user’s OpenID Connect server SSO cookie is available, then invoking either of the following endpoints causes the OpenID Connect server to also send back-channel logout requests to the configured back-channel logout URIs:
 
@@ -104,13 +108,17 @@ If the user’s OpenID Connect server SSO cookie is not available, such as when 
 * Logout endpoint with ID token hint: `\http://localhost:9081/oidc/endpoint/{oidcProviderId}/logout?id_token_hint={id_token}`
 * End session endpoint with ID token hint: `\http://localhost:9081/oidc/endpoint/{oidcProviderId}/end_session?id_token_hint={id_token}`
 
-Also, if the OpenID Connect server is configured with a SAML Identity Provider (IdP) by using the link:https://openliberty.io/docs/latest/reference/feature/samlWeb-2.0.html[SAML Web Single Sign-On] feature, then a logout at the IdP also triggers the OpenID Connect server to send back-channel logout requests to the configured OpenID Connect clients.
+=== Back-channel logout for SAML-configured OpenID Connect servers
+
+Back-channel logout is also enabled for OpenID Connect servers that are configured with a SAML Identity Provider (IdP) by using the link:{url-prefix}/docs/latest/reference/feature/samlWeb-2.0.html[SAML Web Single Sign-On] feature. A logout at the IdP also triggers the OpenID Connect server to send back-channel logout requests to the configured OpenID Connect clients.
+
+=== Learn more
 
 For more information about the Open Liberty configuration options, see the following resources:
 
 - link:{url-prefix}/docs/latest/reference/config/openidConnectClient.html[openidConnectClient]
 - link:{url-prefix}/docs/latest/reference/config/oidcLogin.html[oidcLogin]
-- link:{url-prefix}/docs/latest/reference/config/openidConnectProvider.html#oauthProvider[openidConnectProvider]
+- link:{url-prefix}/docs/latest/reference/config/openidConnectProvider.html[openidConnectProvider]
 
 For more information about the back-channel logout specification, see link:https://openid.net/specs/openid-connect-backchannel-1_0.html[OpenID Connect Back-Channel Logout 1.0].
 
@@ -118,9 +126,9 @@ For more information about the back-channel logout specification, see link:https
 // DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
 
 [#run]
-=== Try it now
+== Try it now
 
-To try out these features, update your build tools to pull the Open Liberty All Beta Features package instead of the main release. The beta works with Java SE 21, Java SE 17, Java SE 11, and Java SE 8.
+To try out this feature, update your build tools to pull the Open Liberty All Beta Features package instead of the main release. The beta works with Java SE 21, Java SE 17, Java SE 11, and Java SE 8.
 // // // // // // // //
 // In the preceding section:
 // Check if a new non-LTS Java SE version is supported that needs to be added to the list (17, 11, and 8 are LTS and will remain for a while)
