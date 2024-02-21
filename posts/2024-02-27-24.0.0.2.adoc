@@ -6,8 +6,8 @@ categories: blog
 author_picture: https://avatars3.githubusercontent.com/dmuelle
 author_github: https://github.com/dmuelle
 seo-title: Negative acknowledgement and more for MicroProfile Reactive Messaging in 24.0.0.2 - OpenLiberty.io
-seo-description: The 24.0.0.2 release includes new capabilities for MicroProfile Reactive Messaging and MicroProfile Streams Operators, including negative acknowledgement.
-blog_description: The 24.0.0.2 release includes new capabilities for MicroProfile Reactive Messaging and MicroProfile Streams Operators, including negative acknowledgement.
+seo-description: The 24.0.0.2 release includes new capabilities for MicroProfile Reactive Messaging and MicroProfile Streams Operators, including negative acknowledgement, emitters, and backpressure support.
+blog_description: The 24.0.0.2 release includes new capabilities for MicroProfile Reactive Messaging and MicroProfile Streams Operators, including negative acknowledgement, emitters, and backpressure support.
 open-graph-image: https://openliberty.io/img/twitter_card.jpg
 open-graph-image-alt: Open Liberty Logo
 ---
@@ -18,7 +18,7 @@ David Mueller <https://github.com/dmuelle>
 :url-about: /
 //Blank line here is necessary before starting the body of the post.
 
-The 24.0.0.2 release includes new capabilities for MicroProfile Reactive Messaging and MicroProfile Streams Operators, including negative acknowledgment. It also introduces a new Open Liberty guide to help you build true-to-production integration tests for your applications.
+The 24.0.0.2 release includes new capabilities for MicroProfile Reactive Messaging and MicroProfile Streams Operators, including negative acknowledgment, emitters, and backpressure support. It also introduces a new Open Liberty guide to help you build true-to-production integration tests for your applications.
 
 
 In link:{url-about}[Open Liberty] 24.0.0.2:
@@ -93,7 +93,7 @@ If you're using link:https://plugins.jetbrains.com/plugin/14856-liberty-tools[In
 // Blog issue: https://github.com/OpenLiberty/open-liberty/issues/27584
 // Contact/Reviewer: gkwan-ibm
 // // // // // // // //
-[
+
 // DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
 
 // // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
@@ -109,11 +109,9 @@ If you're using link:https://plugins.jetbrains.com/plugin/14856-liberty-tools[In
 [#mpreact]
 == Negative acknowledgment and more for MicroProfile Reactive Messaging 3.0 and MicroProfile Streams Operators 3.0
 
-MicroProfile Reactive Messaging 3.0 has a number of new features and changes over MicroProfile Reactive Messaging 1.0, including negative acknowledgments, emitters, and backpressure support.
+MicroProfile Reactive Messaging 3.0 introduces a number of new features and changes from MicroProfile Reactive Messaging 1.0, including negative acknowledgments, emitters, and backpressure support. These features and are compatible with Jakarta EE 9 and later.
 
 An application that uses MicroProfile Reactive Messaging or MicroProfile Streams Operators is typically composed of CDI beans that consume, produce, and process messages that are passed along reactive streams. These messages can be internal to the application, or they can be sent and received through external message brokers. MicroProfile Reactive Messaging uses MicroProfile Streams Operators to pass messages through channels between methods or to messaging solutions, such as Kafka, to provide resilient storage of messages.
-
-MicroProfile Reactive Messaging and Reactive Streams Operators 3.0 provide a range of new features and are compatible with Jakarta EE 9 onwards.
 
 To use both features together, add the Microprofile Reactive Messaging 3.0 feature to your `server.xml` file:
 
@@ -134,9 +132,9 @@ To use MicroProfile Reactive Streams Operators 3.0 without MicroProfile Reactive
 
 === Negative acknowledgments
 
-In MicroProfile Reactive Messaging 1.0, messages could be only positively acknowledged. If a problem existed with the payload or if exceptional behavior occurred, no mechanism was available to indicate or to handle the problem if it occurred within the stream. The new `_nack_` support can send or handle these events.
+In MicroProfile Reactive Messaging 1.0, messages could be only positively acknowledged. If a problem existed with the payload or if exceptional behavior occurred, no mechanism was available to indicate or to handle the problem if it occurred within the stream. The new negative acknowledgment (nack) support can send or handle these events.
 
-To explicitly negatively acknowledge an incoming message:
+The following example explicitly negatively acknowledges an incoming message:
 
 [source,java]
 ----
@@ -153,9 +151,9 @@ public Message<String> process(Message<String> m) {
 }
 ----
 
-The method signature of accepting a message without defining an acknowledgment strategy defaults to the `MANUAL`strategy. Your code is responsible to `ack()` or `nack()` the message. In the previous example, the message can be acknowledged downstream of the outgoing channel.
+The method signature of accepting a message without defining an acknowledgment strategy defaults to the `MANUAL` strategy. Your code is then responsible for negatively (`ack()`) or positively (`nack()`) acknowledging the message. In the previous example, the message can be acknowledged downstream of the outgoing channel.
 
-To throw an exception that causes a negative acknowledgment:
+The following example throws an exception that causes a negative acknowledgment:
 
 [source,java]
 ----
@@ -169,7 +167,7 @@ public String process(String s) {
 }
 ----
 
-The method signature of accepting a payload without defining an acknowledgment strategy defaults to the `POST_PROCESSING` strategy. The implementation handles `ack()` and `nack()` calls on the message after the method or chain completes. The upstream data receives the negative acknowledgment with the reason of `IllegalArgumentException`. In the case that an exception is thrown, the implementation invokes the 'nack()' on the message.
+The method signature of accepting a payload without defining an acknowledgment strategy defaults to the `POST_PROCESSING` strategy. The implementation handles `ack()` and `nack()` calls on the message after the method or chain completes. The upstream data receives the negative acknowledgment with the reason of `IllegalArgumentException`. In the case that an exception is thrown, the implementation invokes the `nack()` call on the message.
 
 === Emitters
 
@@ -209,7 +207,7 @@ public CompletionStage<Void> emitPayload(String payload){
 
 When you define emitters, you specify the type of Object that is sent as either the payload or the contents of the message.
 
-If an emitter sends a payload, MicroProfile Reactive Messaging automatically handles the invocation of `ack()` and `nack()` calls on the message. However, if the emitter sends a message, the sending code must handle whether the message is either acked or nacked downstream.
+If an emitter sends a payload, MicroProfile Reactive Messaging automatically handles the invocation of `ack()` and `nack()` calls on the message. However, if the emitter sends a message, the sending code must handle whether the message is either negatively  or positively acknowledged downstream.
 
 === Backpressure support
 
@@ -241,7 +239,7 @@ You can define the following backpressure strategies:
 
 For more information, see:
 
-* link:{url-prefix}/docs/latest/liberty-kafka-connector.html[Optimizing Kafka Integration with MicroProfile Messaging]
+* link:{url-prefix}/docs/latest/liberty-kafka-connector.html[Optimizing asynchronous communication with MicroProfile Messaging]
 * link:https://download.eclipse.org/microprofile/microprofile-reactive-messaging-3.0/microprofile-reactive-messaging-spec-3.0.html[Reactive Messaging spec]
 * link:https://download.eclipse.org/microprofile/microprofile-reactive-streams-operators-3.0/microprofile-reactive-streams-operators-spec-3.0.html[Reactive Streams Operators spec]
 
@@ -252,7 +250,7 @@ Open Liberty provides a Kafka connector for use with MicroProfile Reactive Messa
 
 ==== Configure incoming acknowledgment with fast.ack
 
-`fast.ack` is a boolean attribute that determines the acknowledgment behavior of the connector for incoming channels.
+The `fast.ack` boolean attribute determines the acknowledgment behavior of the connector for incoming channels.
 
 - `true`: an acknowledgment is reported as complete as soon as the Kafka Connector receives the acknowledgment signal.
 - `false`: an acknowledgment is not reported as complete until the partition offset is committed to the Kafka broker. If an error occurs during this process, the acknowledgment is reported as failed.
@@ -275,7 +273,7 @@ For `mpReactiveMessaging-3.0`, the default value of the option is `true`,
 
 ==== Manage asynchronous tasks with context.service
 
-`context.service` specifies the context service that is used for asynchronous tasks.
+The `context.service` attribute specifies the context service that is used for asynchronous tasks.
 The value of the `context.service` attribute is a reference to the `id` attribute of a `context.service` instance that is defined in `server.xml` file.
 
 In the following `server.xml` file, three different context services are defined with unique IDs.
@@ -305,13 +303,13 @@ If a version of the feature:concurrent[display=Jakarta Concurrency] feature is e
 For more information, see the following resources:
 
 - link:{url-prefix}/docs/latest/liberty-kafka-connector.html[Optimizing Kafka integration with MicroProfile Messaging]
-- Reactive Messaging link:https://download.eclipse.org/microprofile/microprofile-reactive-messaging-3.0/microprofile-reactive-messaging-spec-3.0.html[spec]
-- Reactive Streams Operators link:https://download.eclipse.org/microprofile/microprofile-reactive-streams-operators-3.0/microprofile-reactive-streams-operators-spec-3.0.html[spec]
+- link:https://download.eclipse.org/microprofile/microprofile-reactive-messaging-3.0/microprofile-reactive-messaging-spec-3.0.html[Reactive Messaging specification]
+- link:https://download.eclipse.org/microprofile/microprofile-reactive-streams-operators-3.0/microprofile-reactive-streams-operators-spec-3.0.html[Reactive Streams Operators specification]
 
 
 // DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
 
-#tescont]
+[#tescont]
 == New guide: "Building true-to-production integration tests with Testcontainers"
 
 A new guide link:https://openliberty.io/guides/testcontainers.html[Building true-to-production integration tests with Testcontainers] is published under the link:https://openliberty.io/guides/#test[Test] category.
@@ -321,7 +319,7 @@ In this guide, You’ll learn how to write true-to-production integration tests 
 [#CVEs]
 == Security vulnerability (CVE) fixes in this release
 
-There are no security vulnerability fixes in Open Liberty [24.0.0.2].
+There are no security vulnerability fixes in Open Liberty 24.0.0.2.
 
 For a list of past security vulnerability fixes, reference the link:{url-prefix}/docs/latest/security-vulnerabilities.html[Security vulnerability (CVE) list].
 
