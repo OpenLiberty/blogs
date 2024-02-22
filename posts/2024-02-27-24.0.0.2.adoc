@@ -1,0 +1,332 @@
+---
+layout: post
+title: "Negative acknowledgment and more for MicroProfile Reactive Messaging in 24.0.0.2"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/dmuelle
+author_github: https://github.com/dmuelle
+seo-title: Negative acknowledgement and more for MicroProfile Reactive Messaging in 24.0.0.2 - OpenLiberty.io
+seo-description: The 24.0.0.2 release includes new capabilities for MicroProfile Reactive Messaging and MicroProfile Streams Operators, including negative acknowledgement, emitters, and backpressure support.
+blog_description: The 24.0.0.2 release includes new capabilities for MicroProfile Reactive Messaging and MicroProfile Streams Operators, including negative acknowledgement, emitters, and backpressure support.
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+---
+= Negative acknowledgment and more for MicroProfile Reactive Messaging in 24.0.0.2
+David Mueller <https://github.com/dmuelle>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+The 24.0.0.2 release includes new capabilities for MicroProfile Reactive Messaging and MicroProfile Streams Operators, including negative acknowledgment, emitters, and backpressure support. It also introduces a new Open Liberty guide to help you build true-to-production integration tests for your applications.
+
+
+In link:{url-about}[Open Liberty] 24.0.0.2:
+
+* <<mpreact, Negative acknowledgment and more for MicroProfile Reactive Messaging 3.0 and MicroProfile Streams Operators 3.0>>
+* <<tescont, New guide: "Building true-to-production integration tests with Testcontainers">>
+* <<CVEs, Security Vulnerability (CVE) Fixes>>
+
+View the list of fixed bugs in link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A24002+label%3A%22release+bug%22[24.0.0.2].
+
+Check out link:{url-prefix}/blog/?search=release&search!=beta[previous Open Liberty GA release blog posts].
+
+
+[#run]
+
+// // // // // // // //
+// LINKS
+//
+// OpenLiberty.io site links:
+// link:{url-prefix}/guides/maven-intro.html[Maven]
+//
+// Off-site links:
+//link:https://openapi-generator.tech/docs/installation#jar[Download Instructions]
+//
+// IMAGES
+//
+// Place images in ./img/blog/
+// Use the syntax:
+// image::/img/blog/log4j-rhocp-diagrams/current-problem.png[Logging problem diagram,width=70%,align="center"]
+// // // // // // // //
+
+== Develop and run your apps using 24.0.0.2
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], include the following in your `pom.xml` file:
+
+[source,xml]
+----
+<plugin>
+    <groupId>io.openliberty.tools</groupId>
+    <artifactId>liberty-maven-plugin</artifactId>
+    <version>3.10</version>
+</plugin>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle], include the  code in your `build.gradle` file:
+
+[source,gradle]
+----
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'io.openliberty.tools:liberty-gradle-plugin:3.8'
+    }
+}
+apply plugin: 'liberty'
+----
+
+Or if you're using link:{url-prefix}/docs/latest/container-images.html[container images]:
+
+[source]
+----
+FROM icr.io/appcafe/open-liberty
+----
+
+Or take a look at our link:{url-prefix}/start/[Downloads page].
+
+If you're using link:https://plugins.jetbrains.com/plugin/14856-liberty-tools[IntelliJ IDEA], link:https://marketplace.visualstudio.com/items?itemName=Open-Liberty.liberty-dev-vscode-ext[Visual Studio Code] or link:https://marketplace.eclipse.org/content/liberty-tools[Eclipse IDE], you can also take advantage of our open source link:https://openliberty.io/docs/latest/develop-liberty-tools.html[Liberty developer tools] to enable effective development, testing, debugging, and application management all from within your IDE.
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/27584
+// Contact/Reviewer: gkwan-ibm
+// // // // // // // //
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/27213
+// Contact/Reviewer: abutch3r
+// // // // // // // //
+
+// The following excerpt for issue https://github.com/OpenLiberty/open-liberty/issues/26642 was found in 2023-10-31-23.0.0.11-beta.adoc.
+// ------ <Excerpt From Previous Post: Start> ------
+// Contact/Reviewer: abutch3r
+// // // // // // // //
+
+[#mpreact]
+== Negative acknowledgment and more for MicroProfile Reactive Messaging 3.0 and MicroProfile Streams Operators 3.0
+
+MicroProfile Reactive Messaging 3.0 introduces a number of new features and changes from MicroProfile Reactive Messaging 1.0, including negative acknowledgments, emitters, and backpressure support. These features and are compatible with Jakarta EE 9 and later.
+
+An application that uses MicroProfile Reactive Messaging or MicroProfile Streams Operators is typically composed of CDI beans that consume, produce, and process messages that are passed along reactive streams. These messages can be internal to the application, or they can be sent and received through external message brokers. MicroProfile Reactive Messaging uses MicroProfile Streams Operators to pass messages through channels between methods or to messaging solutions, such as Kafka, to provide resilient storage of messages.
+
+To use both features together, add the Microprofile Reactive Messaging 3.0 feature to your `server.xml` file:
+
+[source,xml]
+----
+<feature>mpReactiveMessaging-3.0</feature>
+----
+
+Enabling MicroProfile Reactive Messaging 3.0 also automatically enables the MicroProfile Reactive Streams Operators 3.0 feature.
+
+To use MicroProfile Reactive Streams Operators 3.0 without MicroProfile Reactive Messaging, add the Microprofile Reactive Streams Operators 3.0 feature to your `server.xml` file:
+
+[source,xml]
+----
+<feature>mpReactiveStreams-3.0</feature>
+----
+
+
+=== Negative acknowledgments
+
+In MicroProfile Reactive Messaging 1.0, messages could be only positively acknowledged. If a problem existed with the payload or if exceptional behavior occurred, no mechanism was available to indicate or to handle the problem if it occurred within the stream. The new negative acknowledgment (nack) support can send or handle these events.
+
+The following example explicitly negatively acknowledges an incoming message:
+
+[source,java]
+----
+@Incoming("data")
+@Outgoing("out")
+public Message<String> process(Message<String> m) {
+    String s = m.getPayload();
+    if (s.equalsIgnoreCase("b")) {
+        // we cannot fail, we must nack explicitly.
+        m.nack(new IllegalArgumentException("b"));
+        return null;
+    }
+    return m.withPayload(s.toUpperCase());
+}
+----
+
+The method signature of accepting a message without defining an acknowledgment strategy defaults to the `MANUAL` strategy. Your code is then responsible for negatively (`ack()`) or positively (`nack()`) acknowledging the message. In the previous example, the message can be acknowledged downstream of the outgoing channel.
+
+The following example throws an exception that causes a negative acknowledgment:
+
+[source,java]
+----
+@Incoming("data")
+@Outgoing("out")
+public String process(String s) {
+    if (s.equalsIgnoreCase("b")) {
+        throw new IllegalArgumentException("b");
+    }
+    return s.toUpperCase();
+}
+----
+
+The method signature of accepting a payload without defining an acknowledgment strategy defaults to the `POST_PROCESSING` strategy. The implementation handles `ack()` and `nack()` calls on the message after the method or chain completes. The upstream data receives the negative acknowledgment with the reason of `IllegalArgumentException`. In the case that an exception is thrown, the implementation invokes the `nack()` call on the message.
+
+=== Emitters
+
+MicroProfile Reactive Messaging 1.0 did not offer a clear way to integrate imperative code, such as RESTful resources and beans, because Reactive Messaging put and took messages onto a channel according to the `Outgoing` or `Incoming` annotations. In version 3.0, emitters provide a bridge across the two models.
+
+The following example injects emitters into a RESTful resource by using CDI to put messages onto a given channel:
+
+[source,java]
+----
+@Inject
+@Channel(CHANNEL_NAME)
+Emitter<String> emitter;
+
+@POST
+@Path("/payload")
+public CompletionStage<Void> emitPayload(String payload){
+    CompletionStage<Void> cs = emitter.send(payload);
+    return cs;
+}
+
+@POST
+@Path("/message")
+public CompletionStage<Void> emitPayload(String payload){
+    CompletableFuture<Void> ackCf = new CompletableFuture<>();
+    emitter.send(Message.of(payload,
+        () -> {
+            ackCf.complete(null);
+            return CompletableFuture.completedFuture(null);
+        },
+        t -> {
+            ackCf.completeExceptionally(t);
+            return CompletableFuture.completedFuture(null);
+        }));
+    return ackCf;
+}
+----
+
+When you define emitters, you specify the type of Object that is sent as either the payload or the contents of the message.
+
+If an emitter sends a payload, MicroProfile Reactive Messaging automatically handles the invocation of `ack()` and `nack()` calls on the message. However, if the emitter sends a message, the sending code must handle whether the message is either negatively  or positively acknowledged downstream.
+
+=== Backpressure support
+
+Backpressure support handles messages or payloads that are emitted faster than they are consumed. A backpressure strategy defines application behaviour in this circumstance. In the following example, the buffer holds up to 300 messages and throws an exception if it is full when a new message is emitted:
+
+[source,java]
+----
+@Inject @Channel("myChannel")
+@OnOverflow(value=OnOverflow.Strategy.BUFFER, bufferSize=300)
+private Emitter<String> emitter;
+
+public void publishMessage() {
+  emitter.send("a");
+  emitter.send("b");
+  emitter.complete();
+}
+----
+
+
+You can define the following backpressure strategies:
+
+* `BUFFER` - Use a buffer, with a size determined by the value of bufferSize, if set. Otherwise, the size is the value of the `mp.messaging.emitter.default-buffer-size` MicroProfile Config property,  if it exists. If neither of these values is defined, the default size is 128. If the buffer is full, an exception is thrown from the send method. This is the default strategy if no other strategy is defined.
+* `DROP` - Drops the most recent value if the downstream can’t keep up. Any new values that are emitted by the emitter are ignored.
+* `FAIL` - Propagates a failure in case the downstream can’t keep up. No more values are emitted.
+* `LATEST`- Keeps only the latest value, dropping any previous value if the downstream can’t keep up.
+* `NONE` - Ignores the backpressure signals and leave it to the downstream consumer to implement a strategy.
+* `THROW_EXCEPTION` - Throws an exception from the send method if the downstream can’t keep up.
+* `UNBOUNDED_BUFFER` - Use an unbounded buffer. The application might run out of memory if values are continually added faster than they are consumed.
+
+For more information, see:
+
+* link:{url-prefix}/docs/latest/liberty-kafka-connector.html[Optimizing asynchronous communication with MicroProfile Messaging]
+* link:https://download.eclipse.org/microprofile/microprofile-reactive-messaging-3.0/microprofile-reactive-messaging-spec-3.0.html[Reactive Messaging spec]
+* link:https://download.eclipse.org/microprofile/microprofile-reactive-streams-operators-3.0/microprofile-reactive-streams-operators-spec-3.0.html[Reactive Streams Operators spec]
+
+
+=== New Liberty-kafka connector options
+
+Open Liberty provides a Kafka connector for use with MicroProfile Reactive Messaging to send and receive messages by using Kafka as a messaging intermediary. Two new options are added to the connector in this release, `fast.ack` and `context.service`. These options are set as link:{url-prefix}/docs/latest/microprofile-config-properties.html#react[MicroProfile Config properties].
+
+==== Configure incoming acknowledgment with fast.ack
+
+The `fast.ack` boolean attribute determines the acknowledgment behavior of the connector for incoming channels.
+
+- `true`: an acknowledgment is reported as complete as soon as the Kafka Connector receives the acknowledgment signal.
+- `false`: an acknowledgment is not reported as complete until the partition offset is committed to the Kafka broker. If an error occurs during this process, the acknowledgment is reported as failed.
+
+`fast.ack` is defined as an attribute on either the `liberty-kafka` connector or an incoming channel. If it is specified on an outgoing channel, it is ignored.
+
+[source,properties]
+----
+mp.messaging.connector.liberty-kafka.fast.ack=false
+
+mp.messaginging.incoming.foo.connector=liberty-kafka
+mp.messaginging.incoming.foo.fast.ack=true
+----
+
+In this example, the connector sets the standard value that is used by all channels. However, the `foo` channel uses the `true` value because channel attributes take precedence over connector attributes.
+
+
+For `mpReactiveMessaging-1.0`, the default value of the option is `false`.
+For `mpReactiveMessaging-3.0`, the default value of the option is `true`,
+
+==== Manage asynchronous tasks with context.service
+
+The `context.service` attribute specifies the context service that is used for asynchronous tasks.
+The value of the `context.service` attribute is a reference to the `id` attribute of a `context.service` instance that is defined in `server.xml` file.
+
+In the following `server.xml` file, three different context services are defined with unique IDs.
+
+[source,xml]
+----
+<contextService id=“rst”/>
+<contextService id=“uvw”/>
+<contextService id=“xyz”/>
+----
+
+In the application's `microprofile-config.properties` file, the first context service is set on the connector. The application has three channels. The `def` channel does not specify its own `context.service` instance, so it uses the one that is defined on the connector. The second and third channels define and use their own services.
+
+[source,properties]
+----
+mp.messaging.connector.liberty-kafka.context.service=rst
+
+mp.messaging.incoming.def.connector=liberty-kafka
+mp.messaging.incoming.foo.connector=liberty-kafka
+mp.messaging.incoming.foo.context.service=uvw
+mp.messaging.outgoing.bar.connector=liberty-kafka
+mp.messaging.outgoing.bar.context.service=xyz
+----
+
+If a version of the link:{url-prefix}/docs/latest/reference/feature/concurrent-3.0.html[Jakarta Concurrency] feature is enabled in the `server.xml` file, the default context service is used. If this feature is not enabled, the built-in Open Liberty context service is used with a set list of context types to capture and apply around asynchronous tasks.
+
+For more information, see the following resources:
+
+- link:{url-prefix}/docs/latest/liberty-kafka-connector.html[Optimizing Kafka integration with MicroProfile Messaging]
+- link:https://download.eclipse.org/microprofile/microprofile-reactive-messaging-3.0/microprofile-reactive-messaging-spec-3.0.html[Reactive Messaging specification]
+- link:https://download.eclipse.org/microprofile/microprofile-reactive-streams-operators-3.0/microprofile-reactive-streams-operators-spec-3.0.html[Reactive Streams Operators specification]
+
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+[#tescont]
+== New guide: "Building true-to-production integration tests with Testcontainers"
+
+A new guide, link:https://openliberty.io/guides/testcontainers.html[Building true-to-production integration tests with Testcontainers], is published under the link:https://openliberty.io/guides/#test[Test] category.
+In this guide, you’ll learn how to write true-to-production integration tests for Java microservices by using link:https://www.testcontainers.org/[Testcontainers] and JUnit. You can also run this guide in a hosted environment, without having to worry about local setup and prerequisites. To access the cloud-hosted version of this guide, click the **Run in cloud** button in the guide code pane.
+
+
+[#CVEs]
+== Security vulnerability (CVE) fixes in this release
+
+There are no security vulnerability fixes in Open Liberty 24.0.0.2.
+
+For a list of past security vulnerability fixes, reference the link:{url-prefix}/docs/latest/security-vulnerabilities.html[Security vulnerability (CVE) list].
+
+
+== Get Open Liberty 24.0.0.2 now
+
+Available through <<run,Maven, Gradle, Docker, and as a downloadable archive>>.
+
+[link=https://stackoverflow.com/tags/open-liberty]
+image::img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="center"]
