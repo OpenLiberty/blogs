@@ -407,13 +407,78 @@ The expected winner ranking structure should follow the JSON below:
 
 I said, it'll be interesting!
 
-=== Setup dependencies
+=== Implementing the Winner Ranking
 
-=== Setup Eclipse JNoSQL
+The winner ranking requires a set of game matches results for its creation. To get that, we need to add to JNopo a persistence layer in order to capture and store the game match results.
 
 === Implementing the persistence layer
 
-=== Implementing the Winner Ranking
+Let's add the required dependencies to the project in order to be able to create the persistence layer. Our persistence layer will be implemented using Jakarta NoSQL and Jakarta Data specification. Both are Jakarta EE specifications, and they require an implementation at least to work. Eclipse JNoSQL is the implementation that we'll going to use.
+
+Eclipse JNoSQL offers a Database API collection which covers these NoSQL flavours: Document, Key-value, Column and Graph databases. For now, Eclipse JNoSQL supports about https://www.jnosql.org/docs/supported_dbs.html[30 NoSQL databases].
+
+For this challenge, let's develop the persistence layer to integrate with Document NoSQL databases type. Eclipse JNoSQL supports various Document NoSQL databases. You can find a list of supported databases, along with their configurations and dependencies, on the https://github.com/eclipse/jnosql-databases[GitHub repository].
+
+Let's use MongoDB as Document NoSQL database default. Add the following Maven dependency into the `pom.xml` file of the project:
+
+[source, xml]
+----
+<dependency>
+  <groupId>org.eclipse.jnosql.databases</groupId>
+  <artifactId>jnosql-mongodb</artifactId>
+  <version>1.1.0</version>
+</dependency>
+----
+
+Once you have added the appropriate dependency, you need to configure the credentials for your Document NoSQL database. These credentials typically include details such as the database name, host, port, and any required authentication credentials. To configure MongoDB, you can find the supported credentials properties at the https://github.com/eclipse/jnosql-databases#mongodb[Eclipse JNoSQL MongoDB Database API Configuration].
+
+==== Setting up the NoSQL databases locally
+
+Install and manage databases locally requires additional efforts, and we will not cover it in this blog post. We chose to use Docker Compose as the tooling for managing containers locally. Take a look at https://docs.docker.com/compose/[Docker Compose Overview] to learn more about this tool.
+
+Let's create a `docker-compose.yml` file into the project root directory and add the following content:
+
+[source, yaml]
+----
+services:
+
+  mongo:
+    image: mongo
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: example
+    ports:
+      - 27017:27017
+
+  mongo-express:
+    image: mongo-express:1.0.0-alpha
+    restart: always
+    ports:
+      - 8081:8081
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: root
+      ME_CONFIG_MONGODB_ADMINPASSWORD: example
+      ME_CONFIG_MONGODB_URL: mongodb://root:example@mongo:27017/
+----
+
+For convenience, the content above added a mongo-express service that will allow us to navigate and manage MongoDB data by a friendly web interface.
+
+NOTE: Feel free to customize the declaration of the containers in the `docker-compose.yml` file. For example, the database data is saved inside the container image, which means that the data will be lost ever the containers are deleted.
+
+Now, to start up the databases we just need to perform the following command:
+
+[source, bash]
+----
+docker-compose up -d
+----
+
+After that, you should be able to access the mongo-express at http://localhost:8081/ :
+
+[.img_border_light]
+image::/img/blog/mongo-express.png[Mongo Express, align="center" width=80%]
+
+
 
 == Takeaways
 
