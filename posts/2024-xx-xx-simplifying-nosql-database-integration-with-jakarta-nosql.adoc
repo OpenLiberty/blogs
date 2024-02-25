@@ -419,6 +419,8 @@ Eclipse JNoSQL offers a Database API collection which covers these NoSQL flavour
 
 For this challenge, let's develop the persistence layer to integrate with Document NoSQL databases type. Eclipse JNoSQL supports various Document NoSQL databases. You can find a list of supported databases, along with their configurations and dependencies, on the https://github.com/eclipse/jnosql-databases[GitHub repository].
 
+==== Setup dependencies
+
 Let's use MongoDB as Document NoSQL database default. Add the following Maven dependency into the `pom.xml` file of the project:
 
 [source, xml]
@@ -432,7 +434,7 @@ Let's use MongoDB as Document NoSQL database default. Add the following Maven de
 
 Once you have added the appropriate dependency, you need to configure the credentials for your Document NoSQL database. These credentials typically include details such as the database name, host, port, and any required authentication credentials. To configure MongoDB, you can find the supported credentials properties at the https://github.com/eclipse/jnosql-databases#mongodb[Eclipse JNoSQL MongoDB Database API Configuration].
 
-=== Setting up the NoSQL databases locally
+==== Setting up the NoSQL databases locally
 
 Install and manage databases locally requires additional efforts, and we will not cover it in this blog post. We chose to use Docker Compose as the tooling for managing containers locally. Take a look at https://docs.docker.com/compose/[Docker Compose Overview] to learn more about this tool.
 
@@ -479,7 +481,7 @@ After perform this command, you should be able to access the mongo-express at ht
 image::/img/blog/mongo-express.png[Mongo Express, align="center" width=80%]
 
 
-=== Configuring Database Credentials
+==== Configuring Database Credentials
 
 After to define the MongoDB database instance that we'll use, we are able to setting up Eclipse JNoSQL framework correctly.
 
@@ -495,10 +497,114 @@ jnosql.mongodb.password=example
 jnosql.mongodb.authentication.source=admin
 ----
 
+=== Modeling the data with Jakarta NoSQL
+
+Once we added the Eclipse JNoSQL dependencies, Jakarta NoSQL api comes together as a transient dependency to the project, allowing us to create the NoSQL entities we want.
+
+Let's modeling the `GameMatch` entity. Such entity will represent each game match result.
+
+As we said before, Eclipse JNoSQL allows us to use Java Records as entities, so, let's use this feature:
+
+[source, java]
+----
+package org.jakartaee.sample.server.persistence;
+
+import jakarta.nosql.Column;
+import jakarta.nosql.Entity;
+import jakarta.nosql.Id;
+
+@Entity
+public record GameMatch (
+        @Id
+        String id,
+
+        @Column
+        PlayerInfo playerA,
+
+        @Column
+        PlayerInfo playerB,
+
+        @Column
+        PlayerInfo winner,
+
+        @Column
+        PlayerInfo loser,
+
+        @Column
+        Boolean tied
+){
+}
+----
+
+To represent each player name and movement, lets modeling such data as `PlayerInfo` record class:
+
+[source, java]
+----
+package org.jakartaee.sample.server.persistence;
+
+import jakarta.nosql.Column;
+import jakarta.nosql.Entity;
+
+@Entity
+public record PlayerInfo (
+
+        @Column
+        String name,
+
+        @Column
+        String movement
+){
+}
+
+----
+
+=== Store and retrieve data with Jakarta Data
+
+Now, in order to store and retrieve such entities from MongoDB database, it's required to create a component that will be responsible to do that. It's common to see developers using patterns like Data Access Object (DAO) to implement these components. That's not a problem at all, but we use to see them making the components closer to a specific vendor database semantics, raising a vendor lock-in situation.
+
+Nowadays, in the cloud era where we pay as we go, switching between NoSQL solutions could be interesting to save resources and costs. Vendor lock-in compromises will compromise this action, probably. Also, other consideration comes to the table when there's a need to switch databases, like: time spent on the change, the learning curve of a new API to use with this database, the code that will be lost, the persistence layer that needs to be replaced, etc. This is where the flexibility of Jakarta NoSQL shines.
+
+Another interesting point is that DAO components tend to be closer to the database semantics than the business domain model language, requiring from developers a high cognitive load to connects the dots and fill the gaps between the technical codes and business necessities, once the code is not expressive enough, and doesn't fit with the ubiquitous language of the business. In this point, Jakarta Data comes to play!
+
+Resuming our challenge, let's create a repository component that will represents the play-offs:
+
+[source, java]
+----
+package org.jakartaee.sample.server.persistence;
+
+import jakarta.data.repository.PageableRepository;
+import jakarta.data.repository.Query;
+import jakarta.data.repository.Repository;
+
+import java.util.List;
+
+@Repository
+public interface Playoffs extends Data<GameMatch,String> {
+
+    @Query("select * from GameMatch where tied=false")
+    List<GameMatch> listPlayoffsWithWinnerAndLoser();
+
+}
+----
+
+=== Put all the components to play!
+
+WIP
 
 == Takeaways
 
+This challenge is an amazing opportunity to learn more about Jakarta NoSQL and Jakarta Data to simplify the NoSQL integration with Java applications.
+
+What we learned:
+
+* How to configure Eclipse JNoSQL to allow us to work with Jakarta NoSQL and Jakarta Data in a Jakarta EE / MicroProfile project;
+* How to work with Jakarta NoSQL to create entities pretty similar to Jakarta Persistence approach;
+* How to create repositories with Jakarta Data, the newest Jakarta EE Specification that will be available in the Jakarta EE 11;
+
+
 == Nice work! Where to next?
+
+WIP
 
 == References
 
