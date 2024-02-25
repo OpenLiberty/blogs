@@ -589,7 +589,125 @@ public interface Playoffs extends Data<GameMatch,String> {
 
 === Put all the components to play!
 
-WIP
+With the entity and repository already created, it's needed to capture and persist the results of each game match. The next obvious question is: how could we capture the required game events?
+
+It's a really good question! The answer is: https://jakarta.ee/specifications/cdi/4.0/jakarta-cdi-spec-4.0#events[the Events API provided by the Jakarta Context and Dependency Injection (CDI) specification]!
+
+*JNopo* game is using https://jakarta.ee/specifications/cdi/4.0/jakarta-cdi-spec-4.0#events[CDI Events] to promote extension points, based on event publishing, to be used as needed. With that, we can implement an `@Observable` methods on any CDI bean to handle event objects.
+
+See below the `GameState` interface. Objects that implements this interface will act as event objects:
+
+[source, java]
+----
+package org.jakartaee.sample.game;
+
+public sealed interface GameState permits
+        WaitingPlayers,
+        GameInvalid,
+        GameAbandoned,
+        GameReady,
+        GameRunning,
+        GameOver {
+    String gameId();
+}
+----
+
+The `GameState` interface is a sealed interface that defines all the supported game state. According to the sealed implementation, the event that we're interested is the `GameOver` state. Such class is a record class but, it's not just a simple record class that acts like a data transfer object (DTO), it has useful methods that returns important info like:
+
+* The game identification;
+* A tied attribute, to know if the game has ended as a tied one;
+* The player A and its movement;
+* The player B and its movement;
+* The winner player and its movement, if the game has ended as a non-tied one.
+* The loser player and its movement, if the game has ended as a non-tied one.
+
+Next step: let`s create the `GameMatchCapturer` bean that will be responsible to capture the emitted `GameOver` state and then store the game match results into the database:
+
+[source, java]
+----
+package org.jakartaee.sample.persistence;
+
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.event.Observes;
+import jakarta.inject.Inject;
+import org.jakartaee.sample.game.GameOver;
+
+@ApplicationScoped
+public class GameMatchCapturer {
+
+    public void captureAndPersist(@Observes GameOver gameOver){
+        // put the persistence logic here...
+    }
+
+}
+
+----
+
+At this point, let's instantiate a new `GameMatch` entity instance, populate it from `GameOver` data and then store it into the database by using the `Playoffs` component, our repository offered by Jakarta Data specification implementation, Eclipse JNoSQL, which was injected with the `@Inject` CDI annotation:
+
+[source, java]
+----
+package org.jakartaee.sample.persistence;
+
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.event.Observes;
+import jakarta.inject.Inject;
+import org.jakartaee.sample.game.GameOver;
+
+@ApplicationScoped
+public class GameMatchCapturer {
+
+    @Inject
+    Playoffs playoffs;
+
+    public void captureAndPersist(@Observes GameOver gameOver){
+
+            var gameMatch  = new GameMatch(
+                    gameOver.gameId(),
+                    PlayerInfo.of(gameOver.playerAInfo()),
+                    PlayerInfo.of(gameOver.playerBInfo()),
+                    gameOver.winnerInfo().map(PlayerInfo::of).orElse(PlayerInfo.NOBODY),
+                    gameOver.winnerInfo().map(PlayerInfo::of).orElse(PlayerInfo.NOBODY),
+                    gameOver.isTied()
+            );
+
+            playoffs.add(gameMatch);
+    }
+
+}
+----
+
+Now, let's get started the OpenLiberty runtime to figure out if the game match results are being stored on the MongoDB:
+
+* On Linux/Mac machines, perform the following command:
++
+[source, bash]
+----
+./mvnw liberty:dev
+----
+
+* On Windows machines, perform the following command:
++
+[source, powershell]
+----
+mvnw.cmd liberty:dev
+----
+
+After some game matches, we can confirm the persistence of the game matches into the database by looking at Mongo Express instance running on http://localhost:8081 :
+
+[.img_border_light]
+image::/img/blog/mongo-express-01.png[Mongo Express 01, align="center" width=80%]
+
+[.img_border_light]
+image::/img/blog/mongo-express-02.png[Mongo Express 02, align="center" width=80%]
+
+[.img_border_light]
+image::/img/blog/mongo-express-03.png[Mongo Express 03, align="center" width=80%]
+
+[.img_border_light]
+image::/img/blog/mongo-express-04.png[Mongo Express 04, align="center" width=80%]
+
+
 
 == Takeaways
 
@@ -597,9 +715,11 @@ This challenge is an amazing opportunity to learn more about Jakarta NoSQL and J
 
 What we learned:
 
+* A practical example on how to use Sealed classes (since Java ??) and the benefits to use Pattern Matching (since Java ??) and Pattern Matching for Switch (since Java ??);
 * How to configure Eclipse JNoSQL to allow us to work with Jakarta NoSQL and Jakarta Data in a Jakarta EE / MicroProfile project;
 * How to work with Jakarta NoSQL to create entities pretty similar to Jakarta Persistence approach;
 * How to create repositories with Jakarta Data, the newest Jakarta EE Specification that will be available in the Jakarta EE 11;
+
 
 
 == Nice work! Where to next?
