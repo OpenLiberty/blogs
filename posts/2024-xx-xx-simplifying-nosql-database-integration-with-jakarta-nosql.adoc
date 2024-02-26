@@ -507,7 +507,7 @@ As we said before, Eclipse JNoSQL allows us to use Java Records as entities, so,
 
 [source, java]
 ----
-package org.jakartaee.sample.persistence;
+package org.jakartaee.sample.model;
 
 import jakarta.nosql.Column;
 import jakarta.nosql.Entity;
@@ -540,7 +540,7 @@ To represent each player name and movement, lets modeling such data as `PlayerIn
 
 [source, java]
 ----
-package org.jakartaee.sample.persistence;
+package org.jakartaee.sample.model;
 
 import jakarta.nosql.Column;
 import jakarta.nosql.Entity;
@@ -570,24 +570,23 @@ Coming back to our challenge, let's create a repository component that will repr
 
 [source, java]
 ----
-package org.jakartaee.sample.persistence;
+package org.jakartaee.sample.model;
 
-import jakarta.data.repository.PageableRepository;
+import jakarta.data.repository.DataRepository;
 import jakarta.data.repository.Query;
 import jakarta.data.repository.Repository;
-
-import java.util.List;
+import jakarta.data.repository.Save;
 
 @Repository
-public interface Playoffs extends Data<GameMatch,String> {
+public interface Playoffs extends DataRepository<GameMatch,String> {
 
-    @Query("select * from GameMatch where tied=false")
-    List<GameMatch> listPlayoffsWithWinnerAndLoser();
+    @Save
+    GameMatch add(GameMatch gameMatch);
 
 }
 ----
 
-=== Put all the components to play!
+=== Collecting and storing the game matches
 
 With the entity and repository already created, it's needed to capture and persist the results of each game match. The next obvious question is: how could we capture the required game events?
 
@@ -625,7 +624,7 @@ Next step: let`s create the `GameMatchCapturer` bean that will be responsible to
 
 [source, java]
 ----
-package org.jakartaee.sample.persistence;
+package org.jakartaee.sample.model;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
@@ -647,7 +646,7 @@ At this point, let's instantiate a new `GameMatch` entity instance, populate it 
 
 [source, java]
 ----
-package org.jakartaee.sample.persistence;
+package org.jakartaee.sample.model;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
@@ -693,7 +692,7 @@ Now, let's get started the OpenLiberty runtime to figure out if the game match r
 mvnw.cmd liberty:dev
 ----
 
-After some game matches, we can confirm the persistence of the game matches into the database by looking at Mongo Express instance running on http://localhost:8081 :
+After some game matches, we can confirm the persistence of the game matches into the database by looking at Mongo Express running on http://localhost:8081 :
 
 [.img_border_light]
 image::/img/blog/mongo-express-01.png[Mongo Express 01, align="center" width=80%]
@@ -707,6 +706,239 @@ image::/img/blog/mongo-express-03.png[Mongo Express 03, align="center" width=80%
 [.img_border_light]
 image::/img/blog/mongo-express-04.png[Mongo Express 04, align="center" width=80%]
 
+Or, if you're a command-line practitioner, you can check the data by using the `mongosh` cli:
+
+[source, bash]
+----
+docker exec -it finish-mongo-1 mongosh -u root -p example --authenticationDatabase admin jnopo
+----
+
+Once connected, feel free to perform mongo commands:
+
+* Getting the number of stored documents:
++
+[source, bash]
+----
+jnopo> db.GameMatch.countDocuments()
+3
+----
+
+* Getting the stored documents list:
++
+[source, bash]
+----
+jnopo> db.GameMatch.find()
+[
+  {
+    _id: '2f42cf9e-f99c-44e5-bda8-7707da2579a3',
+    tied: true,
+    winner: { name: '', movement: '' },
+    playerA: { name: 'Max', movement: 'ROCK' },
+    playerB: { name: 'Ghost', movement: 'ROCK' },
+    loser: { name: '', movement: '' }
+  },
+  {
+    _id: 'c425815c-2aaf-4caa-a975-8e8089f0a0ce',
+    tied: false,
+    winner: { name: 'Max', movement: 'PAPER' },
+    playerA: { name: 'Ghost', movement: 'ROCK' },
+    playerB: { name: 'Max', movement: 'PAPER' },
+    loser: { name: 'Max', movement: 'PAPER' }
+  },
+  {
+    _id: 'bb7e7cd5-f8fe-4db1-9e90-44ecd433b4de',
+    tied: false,
+    winner: { name: 'Ghost', movement: 'ROCK' },
+    playerA: { name: 'Ghost', movement: 'ROCK' },
+    playerB: { name: 'Max', movement: 'SCISSORS' },
+    loser: { name: 'Ghost', movement: 'ROCK' }
+  }
+]
+----
+
+Great! *JNopo* is storing the game match results as expected! It's time to create the winner ranking and then expose it though a restful endpoint http://localhost:9080/jakarta-nosql-game/api/playoffs/ranking .
+
+=== Implementing and exposing the Winner ranking
+
+Collecting and storing the game matches results is a great step to make us able to implement the winner ranking feature.
+
+Let's implement the `Ranking` class to represent any ranking on the *JNopo* application.
+
+The `Ranking` creation requires the data from the `Playoffs` component. In order to avoid to create a new layer to keep the logic of the ranking creation, I decided to use a simple approach: a simple static factory method on the `Ranking` class itself.
+
+Firstly, `Playoffs` needs to provide a method to retrieve the non-tied game results:
+
+[source, java]
+----
+package org.jakartaee.sample.model;
+
+import jakarta.data.repository.DataRepository;
+import jakarta.data.repository.Query;
+import jakarta.data.repository.Repository;
+import jakarta.data.repository.Save;
+
+import java.util.stream.Stream;
+
+@Repository
+public interface Playoffs extends DataRepository<GameMatch,String> {
+
+    @Save
+    GameMatch add(GameMatch gameMatch);
+
+    @Query("select * from GameMatch where tied=false")
+    Stream<GameMatch> nonTiedGameMatches();
+
+}
+----
+
+NOTE: *JNoSQL* offers a simple query language pretty similar to SQL but be sure that it's not a complete SQL implementation, which means, some aggregation and functions will be not available.
+
+Regarding the aggregation process that evolves the ranking logic creation, we use to see developers delegating this aggregation logic to the DBMS and, depending on the persistence mechanism, it should be the best approach. By now, the grouping projection functions like we have with Jakarta Persistence is not available on the Jakarta NoSQL for now, but, in the future, such capability could be available as well.
+
+In order to keep our implementation free of vendor lock-in, I decided to implement the aggregation process by using the Stream API. I added comments on the code to help you to understand the implemented logic.
+
+[source, java]
+----
+package org.jakartaee.sample.model;
+
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+public record Ranking(Map<String, Integer> data) {
+    public static Ranking winnerRanking(Playoffs playoffs) {
+
+        var data =
+                // getting the game matches that are not tied
+                playoffs.nonTiedGameMatches()
+                // grouping by winner's name and summarize by game match
+                .collect(Collectors.groupingBy(
+                        g -> g.winner().name(),
+                        Collectors.collectingAndThen(Collectors.toList(), Collection::size)))
+                .entrySet()
+                .stream()
+                // sorting the results by number of game match in descending order
+                .sorted(Map.Entry.comparingByValue(Comparator.reverseOrder()))
+                // collecting as a LinkedHashMap to keep the sorted items
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        Map.Entry::getValue,
+                        (e1, e2) -> e1, LinkedHashMap::new));
+
+        return new Ranking(data);
+    }
+}
+----
+
+Now, let make this ranking be accessible by our model. As the ranking needs the data from `Playoffs` component, why not to put this ranking creation on the `Playoffs` interface? That's we're going to do! It is possible since the Java 8:
+
+[source, java]
+----
+package org.jakartaee.sample.model;
+
+import jakarta.data.repository.DataRepository;
+import jakarta.data.repository.Query;
+import jakarta.data.repository.Repository;
+import jakarta.data.repository.Save;
+
+import java.util.stream.Stream;
+
+@Repository
+public interface Playoffs extends DataRepository<GameMatch,String> {
+
+    @Save
+    GameMatch add(GameMatch gameMatch);
+
+    @Query("select * from GameMatch where tied=false")
+    Stream<GameMatch> nonTiedGameMatches();
+
+    default Ranking winnerRanking(){
+       return Ranking.winnerRanking(this);
+    }
+}
+----
+
+It looks like we're getting closer to our goal!
+
+Following the challenge requirements, let's create the resource component that will expose the winner ranking.
+
+Firstly, let's create the `RestApplication` class to define the url dedicated to restful endpoints:
+[source, java]
+----
+package org.jakartaee.sample.resources;
+
+import jakarta.ws.rs.ApplicationPath;
+import jakarta.ws.rs.core.Application;
+
+@ApplicationPath("/api")
+public class RestApplication extends Application {
+
+}
+----
+
+Now, any url under `/api` will be handled by the Jakarta Restful Webservices implementation available in our runtime environment.
+
+Next step: let's implement the `PlayoffsResource` resource. This component will expose an HTTP GET endpoint for the `/api/playoffs/ranking` url:
+
+[source, java]
+----
+package org.jakartaee.sample.resources;
+
+import jakarta.inject.Inject;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.MediaType;
+import org.jakartaee.sample.model.Playoffs;
+import org.jakartaee.sample.model.Ranking;
+
+@Path("/playoffs")
+@Consumes({MediaType.APPLICATION_JSON})
+@Produces({MediaType.APPLICATION_JSON})
+public class PlayoffsResource {
+
+    @Inject
+    Playoffs playoffs;
+
+    @GET
+    @Path("/ranking")
+    public Ranking getRanking(){
+        return playoffs.winnerRanking();
+    }
+}
+----
+
+It's time to test everything!
+
+OpenLiberty provides us an amazing tooling to help during the development of Jakarta EE / MicroProfile applications. When the dev mode is running, we can use some HTTP addresses to test and explore the capabilities offered by this amazing Jakarta EE/MicroProfile runtime:
+
+[source, console]
+----
+[INFO] [AUDIT   ] CWWKT0016I: Web application available (default_host): http://localhost:9080/openapi/
+[INFO] [AUDIT   ] CWWKT0016I: Web application available (default_host): http://localhost:9080/health/
+[INFO] [AUDIT   ] CWWKT0016I: Web application available (default_host): http://localhost:9080/jwt/
+[INFO] [AUDIT   ] CWWKT0016I: Web application available (default_host): http://localhost:9080/metrics/
+[INFO] [AUDIT   ] CWWKT0016I: Web application available (default_host): http://localhost:9080/openapi/ui/
+[INFO] [AUDIT   ] CWWKT0016I: Web application available (default_host): http://localhost:9080/ibm/api/
+[INFO] [AUDIT   ] CWWKT0016I: Web application available (default_host): http://localhost:9080/jakarta-nosql-game/
+----
+
+In this blog post, let's focus on two of these url:
+
+* http://localhost:9080/jakarta-nosql-game/ : it's the url of the application that we can use locally;
+
+* http://localhost:9080/openapi/ui/ : it's the Swagger UI interface that OpenLiberty offers out-of-the-box, facilitating the rest endpoint testing via browser.
+
+[.img_border_light]
+image::/img/blog/swagger-ui-01.png[Swagger UI 01, align="center" width=80%]
+
+
+
+
+=== Switching to another Document NoSQL Database
 
 
 == Takeaways
