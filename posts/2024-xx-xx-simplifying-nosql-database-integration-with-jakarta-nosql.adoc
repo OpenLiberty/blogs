@@ -642,7 +642,9 @@ public class GameMatchCapturer {
 
 ----
 
-At this point, let's instantiate a new `GameMatch` entity instance, populate it from `GameOver` data and then store it into the database by using the `Playoffs` component, our repository offered by Jakarta Data specification implementation, Eclipse JNoSQL, which was injected with the `@Inject` CDI annotation:
+At this point, let's instantiate a new `GameMatch` entity instance, populate it from `GameOver` data and then store it into the database by using the `Playoffs` component.
+
+The required `Playoff` component, which is a repository implementation offered by Jakarta Data specification implementation, Eclipse JNoSQL, will be injected by CDI using the `@Inject` and `@Database(DOCUMENT)` annotations:
 
 [source, java]
 ----
@@ -651,12 +653,15 @@ package org.jakartaee.sample.model;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
+import org.eclipse.jnosql.mapping.Database;
+import org.eclipse.jnosql.mapping.DatabaseType;
 import org.jakartaee.sample.game.GameOver;
 
 @ApplicationScoped
 public class GameMatchCapturer {
 
     @Inject
+    @Database(DatabaseType.DOCUMENT)
     Playoffs playoffs;
 
     public void captureAndPersist(@Observes GameOver gameOver){
@@ -892,6 +897,8 @@ import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
+import org.eclipse.jnosql.mapping.Database;
+import org.eclipse.jnosql.mapping.DatabaseType;
 import org.jakartaee.sample.model.Playoffs;
 import org.jakartaee.sample.model.Ranking;
 
@@ -901,11 +908,12 @@ import org.jakartaee.sample.model.Ranking;
 public class PlayoffsResource {
 
     @Inject
+    @Database(DatabaseType.DOCUMENT)
     Playoffs playoffs;
 
     @GET
     @Path("/ranking")
-    public Ranking getRanking(){
+    public Ranking getRanking() {
         return playoffs.winnerRanking();
     }
 }
@@ -972,6 +980,20 @@ To explore this capability, let's suppose that it's needed to change the Documen
 
 Just a few changes, we'll be able to archive this goal easily.
 
+==== Adding Eclipse JNoSQL Database API for Couchbase dependency
+
+In the `pom.xml` file, add the following dependency:
+
+[source, xml]
+----
+<dependency>
+  <groupId>org.eclipse.jnosql.databases</groupId>
+  <artifactId>jnosql-couchbase</artifactId>
+  <version>1.1.0</version>
+</dependency>
+----
+
+
 ==== Setting up a local Couchbase cluster
 
 Add the following content to the `docker-compose.yml` file:
@@ -1033,6 +1055,28 @@ CREATE PRIMARY INDEX primaryGameMatch ON jnopo._default.GameMatch
 +
 [.img_border_light]
 image::/img/blog/couchbase-06.png[Couchbase 06, align="center" width=80%]
+
+With a Couchbase cluster running, we just need to set up Eclipse JNoSQL to connect to it.
+
+Apply the following changes into the `resources/META-INF/microprofile-config.properties` file:
+
+[source, properties]
+----
+## Couchbase
+jnosql.couchbase.host=couchbase://localhost
+jnosql.couchbase.user=root
+jnosql.couchbase.password=123456
+jnosql.document.provider=org.eclipse.jnosql.databases.couchbase.communication.CouchbaseDocumentConfiguration
+----
+
+The `jnosql.document.provider` property is required in this context because we have more than one Eclipse JNoSQL Database API for Document NoSQL implementations. Learn more about these configurations about Eclipse JNoSQL Database API for Couchbase at this https://github.com/eclipse/jnosql-databases/tree/main?tab=readme-ov-file#configuration-2[Git repository].
+
+That's all! Restart the application and play the game multiple times in order to be able to make sure that everything is running smoothly:
+
+[.img_border_light]
+image::/img/blog/couchbase-verification-01.png[Couchbase Verification 01, align="center" width=80%]
+[.img_border_light]
+image::/img/blog/couchbase-verification-02.png[Couchbase Verification 02, align="center" width=80%]
 
 
 == Takeaways
