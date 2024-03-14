@@ -129,7 +129,7 @@ image::/img/blog/langchain4j-example-chat-room.png[Chat Room of LangChain4j Jaka
 You can type in any text that you want to chat with the AI agent. Here are some suggested messages:
 
 * `What is MicroProfile?`
-* `Which companies contribute MicroProfile?`
+* `Which top 10 companies contribute MicroProfile?`
 * `any documentation?`
 
 
@@ -141,25 +141,35 @@ The application demostrates how to use the LangChain4j APIs, https://openliberty
 [#create_service]
 === Creating the LangChain4j AI service
 
-The application uses the `HuggingFaceChatModel` class to provide the model for building the AI service. Through the customized {example-location}/src/main/java/dev/langchain4j/example/chat/ChatAgent.java[`ChatAgent`] interface, the application can send messages to the LLM by its `chat()` method.
+The application uses the `HuggingFaceChatModel` class to provide the model for building the AI service. 
 
-See the {example-location}/src/main/java/dev/langchain4j/example/chat/AgentManager.java[`src/main/java/dev/langchain4j/example/chat/AgentManager.java`] file.
+See the {example-location}/src/main/java/dev/langchain4j/example/chat/ChatAgent.java[`src/main/java/dev/langchain4j/example/chat/ChatAgent.java`] file.
 [source, java, role="no_copy"]
 ----
-    private ChatAgent createAgent() {
-        HuggingFaceChatModel model = HuggingFaceChatModel.builder()
-                                         .accessToken(HUGGING_FACE_API_KEY)
-                                         .modelId(CHAT_MODEL_ID)
-                                         .timeout(ofSeconds(TIMEOUT))
-                                         .temperature(TEMPERATURE)
-                                         .maxNewTokens(MAX_NEW_TOKEN)
-                                         .waitForModel(true)
-                                         .build();
-        ChatAgent agent = AiServices.builder(ChatAgent.class)
-                                    .chatLanguageModel(model)
-                                    .chatMemory(MessageWindowChatMemory.withMaxMessages(MAX_MESSAGES))
-                                    .build();
+    public Assistant getAssistant() {
+        ...
+            HuggingFaceChatModel model = HuggingFaceChatModel.builder()
+                .accessToken(HUGGING_FACE_API_KEY)
+                .modelId(CHAT_MODEL_ID)
+                .timeout(ofSeconds(TIMEOUT))
+                .temperature(TEMPERATURE)
+                .maxNewTokens(MAX_NEW_TOKEN)
+                .waitForModel(true)
+                .build();
+            assistant = AiServices.builder(Assistant.class)
+                .chatLanguageModel(model)
+                .chatMemoryProvider(
+                    sessionId -> MessageWindowChatMemory.withMaxMessages(MAX_MESSAGES))
+                .build();
        ...
+    }
+----
+
+Through the customized {example-location}/src/main/java/dev/langchain4j/example/chat/ChatAgent.java[`Assistant`] interface, the application can send messages to the LLM by its `chat()` method.
+
+----
+    interface Assistant {
+       String chat(@MemoryId String sessionId, @UserMessage String userMessage);
     }
 ----
 
@@ -168,7 +178,7 @@ See the {example-location}/src/main/java/dev/langchain4j/example/chat/AgentManag
 
 As the above code, to access the model, an API key is required. For security practice, it is not hard-coded in the code. The application externalizes the API key and the LangChain4j model properties with the MicroProfile Config feature that helps the application to run in different environments without code changes. You can learn more from the https://openliberty.io/docs/latest/external-configuration.html[External configuration of microservices] document.
 
-See the {example-location}/src/main/java/dev/langchain4j/example/chat/AgentManager.java[`src/main/java/dev/langchain4j/example/chat/AgentManager.java`] file.
+See the {example-location}/src/main/java/dev/langchain4j/example/chat/ChatAgent.java[`src/main/java/dev/langchain4j/example/chat/ChatAgent.java`] file.
 [source, java, role="no_copy"]
 ----
     @Inject
@@ -234,22 +244,19 @@ See the {example-location}/src/main/java/dev/langchain4j/example/chat/ChatServic
     @OnMessage
     public void onMessage(String message, Session session) {
         ...
-        String answer = askAgent(session, message);
-        ...
-    }
- 
-    private String askAgent(Session session, String userMessage) {
-        ...
-        answer = agent.chat(userMessage).trim();
-        ...
-    }
- 
-    private void sendMessageToSession(Session session, String message) {
-        ...
-        manager.getSession(session.getId())
-               .getBasicRemote()
-               .sendObject(message);
-        ...
+        try {
+            ...
+            answer = agent.chat(sessionId, message);
+        } catch (Exception e) {
+            ...
+        }
+
+        try {
+            session.getBasicRemote().sendObject(answer);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
     }
 ----
 
@@ -271,21 +278,8 @@ See the {example-location}/src/main/java/dev/langchain4j/example/chat/ChatServic
 
 And, collect how many agents are created by applying the `@Counted` annotation to the `AgentManager.createAgent()` method.
 
-See the {example-location}/src/main/java/dev/langchain4j/example/chat/AgentManager.java[`src/main/java/dev/langchain4j/example/chat/AgentManager.java`] file.
-[source, java, role="no_copy"]
-----
-    @Counted(name = "createChatAgentCount",
-             absolute = true,
-             description = "Number of ChatAgent are created.")
-    public ChatAgent createAgent(Session session) {
-        ...
-----
-
 Visit the url http://localhost:9080/metrics?scope=application to check out the metrics.
 ----
-# HELP createChatAgentCount_total Number of ChatAgent are created.
-# TYPE createChatAgentCount_total counter
-createChatAgentCount_total{mp_scope="application",} 5.0
 # HELP chatProcessingTime_seconds Time needed chatting to the agent.
 # TYPE chatProcessingTime_seconds summary
 chatProcessingTime_seconds{mp_scope="application",quantile="0.5",} 0.0
