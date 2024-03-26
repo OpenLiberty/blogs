@@ -1,0 +1,221 @@
+---
+layout: post
+title: "Default verbose garbage collection and OpenID Connect back-channel logout support in 24.0.0.3"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/dmuelle
+author_github: https://github.com/dmuelle
+seo-title: Default verbose garbage collection and OpenID Connect back-channel logout support in 24.0.0.3 - OpenLiberty.io
+seo-description: Starting in 24.0.0.3, verbose garbage collection is enabled by default when your Java implementation is IBM Java or IBM Semeru Runtimes. Also in this release, OpenID Connect clients and servers in Open Liberty now support back-channel logout.
+blog_description: Starting in 24.0.0.3, verbose garbage collection is enabled by default when your Java implementation is IBM Java or IBM Semeru Runtimes. Also in this release, OpenID Connect clients and servers in Open Liberty now support back-channel logout.
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+---
+= Default verbose garbage collection and OpenID Connect back-channel logout support in 24.0.0.3
+David Mueller <https://github.com/dmuelle>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+Starting in 24.0.0.3, verbose garbage collection is enabled by default when your Java implementation is IBM Java or IBM Semeru Runtimes. Also in this release, OpenID Connect clients and servers in Open Liberty now support back-channel logout.
+
+
+In link:{url-about}[Open Liberty] 24.0.0.3:
+
+* <<verbose, Default verbose garbage collection on IBM Java and IBM Semeru Runtimes>>
+* <<oidc, Back-channel logout support for OpenID Connect clients and servers>>
+* <<CVEs, Security Vulnerability (CVE) Fixes>>
+
+View the list of fixed bugs in link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A24003+label%3A%22release+bug%22[24.0.0.3].
+
+Check out link:{url-prefix}/blog/?search=release&search!=beta[previous Open Liberty GA release blog posts].
+
+
+[#run]
+== Develop and run your apps using 24.0.0.3
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], include the following code in your `pom.xml` file:
+
+[source,xml]
+----
+<plugin>
+    <groupId>io.openliberty.tools</groupId>
+    <artifactId>liberty-maven-plugin</artifactId>
+    <version>3.10.2</version>
+</plugin>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle], include the  code in your `build.gradle` file:
+
+[source,gradle]
+----
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'io.openliberty.tools:liberty-gradle-plugin:3.8.2'
+    }
+}
+apply plugin: 'liberty'
+----
+
+Or if you're using link:{url-prefix}/docs/latest/container-images.html[container images]:
+
+[source]
+----
+FROM icr.io/appcafe/open-liberty
+----
+
+Or take a look at our link:{url-prefix}/start/[Downloads page].
+
+If you're using link:https://plugins.jetbrains.com/plugin/14856-liberty-tools[IntelliJ IDEA], link:https://marketplace.visualstudio.com/items?itemName=Open-Liberty.liberty-dev-vscode-ext[Visual Studio Code] or link:https://marketplace.eclipse.org/content/liberty-tools[Eclipse IDE], you can also take advantage of our open source link:https://openliberty.io/docs/latest/develop-liberty-tools.html[Liberty developer tools] to enable effective development, testing, debugging, and application management all from within your IDE.
+
+[link=https://stackoverflow.com/tags/open-liberty]
+image::img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="center"]
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/27459
+// Contact/Reviewer: rsherget
+// // // // // // // //
+[#verbose]
+== Default verbose garbage collection on IBM Java and IBM Semeru Runtimes
+
+Enabling link:https://eclipse.dev/openj9/docs/vgclog/[verbose garbage collection] for your Java runtime can help you debug memory leaks and other performance bottlenecks. Starting in 24.0.0.3, verbose garbage collection logging is enabled by default when you use link:https://www.ibm.com/docs/en/sdk-java-technology/8[IBM Java] or link:https://developer.ibm.com/languages/java/semeru-runtimes/[IBM Semeru Runtimes] as your Java implementation. Up to 10 `verbosegc.XXX.log` rolling log files are created in your log directory, with 1024 GC cycles per file, where XXX represents the sequence number of the log file.
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+
+For more information, see link:{url-prefix}/docs/latest/log-trace-configuration.html[Log and trace configuration].
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/27477
+// Contact/Reviewer: jimmy1wu
+// // // // // // // //
+[#oidc]
+== Back-channel logout support for OpenID Connect clients and servers
+
+OpenID Connect clients and servers in Open Liberty now support back-channel logout. Back-channel logout allows OpenID Connect servers to directly notify OpenID Connect clients of a user logout so each OpenID Connect client can also log the user out locally.
+
+Previously, OpenID Connect servers could notify OpenID Connect clients that a user logged out only by using iframes that were embedded in the OpenID Connect client's web page. If the web page wasn't active, the OpenID Connect client wasn't notified of the logout that occurred on the OpenID Connect server. Back-channel logout solves this problem through direct communication between the OpenID Connect server and clients.
+
+=== Back-channel logout support for OpenID Connect clients
+
+With this release, back-channel logout support for OpenID Connect clients is enabled by default when the link:{url-prefix}/docs/latest/reference/feature/openidConnectClient.html[OpenID Connect Client] feature or the link:{url-prefix}/docs/latest/reference/feature/socialLogin.html[Social Media Login] feature is enabled. When either of these features are enabled and an `openidConnectClient` or a `socialLogin` element is defined in the `server.xml` file, back-channel logout endpoints are also automatically enabled on the OpenID Connect client. The OpenID Connect server sends back-channel logout requests to these endpoints to log out the user at the OpenID Connect client.
+
+The OpenID Connect server needs the absolute URI of the back-channel logout endpoint to send the back-channel logout requests. The following back-channel logout endpoints are enabled for those features:
+
+* OpenID Connect Client: `/oidcclient/backchannel_logout/{oidcClientId}`
+* Social Media Login: `/ibm/api/social-login/backchannel_logout/{socialLoginId}`
+
+For example, the following OpenID Connect Client feature configuration enables the `/oidcclient/backchannel_logout/oidcClientId` back-channel logout endpoint on the OpenID Connect client:
+
+[source,xml]
+----
+<featureManager>
+    <feature>openidConnectClient-1.0</feature>
+</featureManager>
+...
+<openidConnectClient id="oidcClientId" ... />
+----
+
+Similarly, the following Social Media Login feature configuration enables the `/ibm/api/social-login/backchannel_logout/socialLoginId` back-channel logout endpoint on the OpenID Connect client:
+
+[source,xml]
+----
+<featureManager>
+    <feature>socialLogin-1.0</feature>
+</featureManager>
+...
+<oidcLogin id="socialLoginId" ... />
+----
+
+=== Back-channel logout support for OpenID Connect servers
+
+To enable back-channel logout for OpenID Connect servers, specify the `backchannelLogoutUri` attribute for OAuth clients that are defined in a `localStore` element in the `server.xml` file.
+
+Also, the OpenID Connect server waits for a default of 180 seconds before the back-channel logout request times out. You can specify a custom duration by using the `backchannelLogoutRequestTimeout` attribute for the `openidConnectProvider` element.
+
+The following `server.xml` file example demonstrates how to specify the back-channel logout URI that an OpenID Connect server uses to make back-channel logout requests, with a timeout of 60 seconds.
+
+[source,xml]
+----
+<featureManager>
+    <feature>openidConnectServer-1.0</feature>
+</featureManager>
+
+...
+
+<openidConnectProvider
+    id="OidcConfigSample"
+    backchannelLogoutRequestTimeout="60s"
+    oauthProviderRef="OAuthConfigSample" ... />
+
+<oauthProvider id="OAuthConfigSample" ... >
+    <localStore>
+        <client
+            name="client01"
+            backchannelLogoutUri="http://localhost:9080/oidcclient/backchannel_logout/client01"
+            ... />
+    </localStore>
+</oauthProvider>
+----
+
+
+Now, when the OpenID Connect server's logout or `end_session` endpoint is invoked, the OpenID Connect server also sends back-channel logout requests to log out the user at the OpenID Connect clients. The OpenID Connect server's logout endpoint is `/oidc/endpoint/{oidcProviderId}/logout` and the `end_session` endpoint is `/oidc/endpoint/{oidcProviderId}/end_session`. In the previous example, the server's logout endpoint is `/oidc/endpoint/OidcConfigSample/logout` and the `end_session` endpoint is `/oidc/endpoint/OidcConfigSample/end_session`
+
+Alternatively, you can enable back-channel logout for an OpenID Connect server by defining the `backchannel_logout_uri` metadata value to specify the OpenID Connect client's back-channel logout URI when the OAuth client is dynamically registered by using the OpenID Connect provider's client registration endpoint.
+
+==== Back-channel logout without an OpenID Connect server SSO cookie
+
+Optionally, you can add an `id_token_hint` query parameter that contains an ID Token that is issued by that OpenID Connect server to the endpoint request as a query parameter to help determine the user to log out. This configuration is useful in scenarios where the logout or `end_session` request is made without the user's OpenID Connect server SSO cookie.
+
+For example, if the OpenID Connect server is hosted on `\http://localhost:9081` and the user’s OpenID Connect server SSO cookie is available, then invoking either of the following endpoints causes the OpenID Connect server to also send back-channel logout requests to the configured back-channel logout URIs:
+
+* Logout endpoint: `\http://localhost:9081/oidc/endpoint/{oidcProviderId}/logout`
+* End session endpoint: `\http://localhost:9081/oidc/endpoint/{oidcProviderId}/end_session`
+
+If the user’s OpenID Connect server SSO cookie is not available, such as when you invoke the endpoints by using a curl command, then an ID token that belongs to the user must be appended to the request by using the `id_token_hint` query parameter.
+
+* Logout endpoint with ID token hint: `\http://localhost:9081/oidc/endpoint/{oidcProviderId}/logout?id_token_hint={id_token}`
+* End session endpoint with ID token hint: `\http://localhost:9081/oidc/endpoint/{oidcProviderId}/end_session?id_token_hint={id_token}`
+
+==== Back-channel logout for SAML-configured OpenID Connect servers
+
+Back-channel logout is also enabled for OpenID Connect servers that are configured with a SAML Identity Provider (IdP) by using the link:{url-prefix}/docs/latest/reference/feature/samlWeb-2.0.html[SAML Web Single Sign-On] feature. A logout at the IdP also triggers the OpenID Connect server to send back-channel logout requests to the configured OpenID Connect clients.
+
+=== Learn more
+
+For more information about OpenID Connect configuration for Open Liberty, see the following resources:
+
+- link:{url-prefix}/docs/latest/reference/config/openidConnectClient.html[openidConnectClient]
+- link:{url-prefix}/docs/latest/reference/config/oidcLogin.html[oidcLogin]
+- link:{url-prefix}/docs/latest/reference/config/openidConnectProvider.html[openidConnectProvider]
+
+For more information about the back-channel logout specification, see link:https://openid.net/specs/openid-connect-backchannel-1_0.html[OpenID Connect Back-Channel Logout 1.0].
+
+
+
+[#CVEs]
+== Security vulnerability (CVE) fixes in this release
+[cols="5*"]
+|===
+|CVE |CVSS Score |Vulnerability Assessment |Versions Affected |Notes
+
+|http://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2023-50312[CVE-2023-50312]
+|5.3
+|Weaker security
+|17.0.0.3 - 24.0.0.2
+|24.0.0.3
+|
+|===
+
+For a list of past security vulnerability fixes, reference the link:{url-prefix}/docs/latest/security-vulnerabilities.html[Security vulnerability (CVE) list].
+
+
+== Get Open Liberty 24.0.0.3 now
+
+Available through <<run,Maven, Gradle, Docker, and as a downloadable archive>>.
