@@ -1,0 +1,223 @@
+---
+layout: post
+title: "Running a Spring Boot 3.x application WAR file on Liberty"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/scottkurz
+author_github: https://github.com/scottkurz
+seo-title: Running a Spring Boot 3.x application WAR file on Liberty
+seo-description: TODO In version 23.0.0.9 and later, you can easily run a Spring Boot 3.x application from a WAR file on Open Liberty. This post use the Spring Boot Petclinic sample application and the Liberty Maven plugin to create and run a WAR-based Spring Boot 3.1 application on Open Liberty. 
+blog_description: TODO In version 23.0.0.9 and later, you can easily run a Spring Boot 3.x application from a WAR file on Open Liberty. This post uses the Spring Boot Petclinic sample application and the Liberty Maven plugin to create and run a WAR-based Spring Boot 3.1 application on Open Liberty. 
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+---
+= Running a Spring Boot 3.x application WAR file on Liberty
+Scott Kurz <https://github.com/scottkurz>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+As of Liberty version 23.0.0.9 there are now two ways to deploy Spring Boot WAR files on Liberty.
+
+While a Spring Boot WAR can be deployed like any standard Jakarta EE WAR, it can also be deployed using an optimized deployment for Spring Boot applications. This deployment adds some additional configuration options, and provides advantages for efficiently building Docker container images.
+
+In this blog post we will step through a simple flow starting from the Spring Initializr.  We will deploy this to Liberty via a standard WAR deployment without any Liberty modifications to the app.  
+
+From there we'll show how to deploy using the optimized Spring Boot deployment by adding the liberty-maven-plugin and some minimal config to the pom.xml, and simple server.xml configuration using the `springBoot-3.0` feature.   We will then be able to build an efficiently-layered Docker image.
+
+Much of the Liberty documentation relating to Spring Boot focuses on the optimized deployment associated with the Spring Boot features, and so we spend some extra time in this post explaining both options.
+
+== Prerequisites
+- Java 21 (sample could be easily reworked with Java 17)
+
+== Deploy as standard WAR
+
+1. Create project from Spring Initializr
++
+From browser:  https://start.spring.io/#!type=maven-project&language=java&platformVersion=3.2.4&packaging=war&jvmVersion=21&groupId=demo&artifactId=spring-liberty&name=spring-liberty&description=Demo%20project%20for%20Spring%20Boot&packageName=demo&dependencies=web
++
+2. Add web controller `vi src/main/java/demo/HelloController.java`
++
+[source,java]
+----
+package demo;
+
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class HelloController {
+
+    @GetMapping("/")
+    public String hello() {
+        return "Hello from Spring Boot in Open Liberty!";
+    }
+
+}
+----
++
+3. Run with standard WAR deployment with default configuration
++
+[source,sh]
+----
+./mvnw io.openliberty.tools:liberty-maven-plugin:3.10:dev -Dtemplate=webProfile10 -DskipTests
+----
++
+4. Test the application by visiting the following URL in a browser: http://localhost:9080/spring-liberty-0.0.1-SNAPSHOT/
++
+5. Stop the server (with  `<Ctrl>+C` or `q,<Enter>` to quit dev mode).
++
+6. Recap
++
+The app is bootstrapped by the web container via the ServletInitializer, extending `SpringBootServletInitializer`.  We go out of our way to run this example with only default Liberty and Maven configuration even though it'd be more typical to maintain a server.xml configuration for your app.
+
+== Use Liberty Spring Boot feature deployment
+
+We're going to reuse the app from the previous example.
+
+1. Add liberty-maven-plugin with Spring Boot deployment config to pom.xml:
++
+[source,xml]
+----
+    <plugin>
+        <groupId>io.openliberty.tools</groupId>
+        <artifactId>liberty-maven-plugin</artifactId>
+        <version>3.10</version>
+        <configuration>
+            <appsDirectory>apps</appsDirectory>
+            <deployPackages>spring-boot-project</deployPackages>
+        </configuration>
+    </plugin>
+----
++
+2. Create your Liberty server.xml by copying from the Spring Boot template
++
+[source,sh]
+----
+./mvnw clean liberty:create -Dtemplate=springBoot3
+mkdir -p src/main/liberty/config/
+cp target/liberty/wlp/usr/servers/defaultServer/server.xml src/main/liberty/config/server.xml
+----
++
+3. Add application arguments to your Spring Boot application configuration in Liberty server.xml
++
+[source,xml]
+----
+ <springBootApplication id="spring-liberty" location="thin-spring-liberty-0.0.1-SNAPSHOT.war" name="spring-liberty">
+    <applicationArgument>--server.servlet.context-path=/testpath</applicationArgument>
+    <applicationArgument>--myarg=myval</applicationArgument>
+ </springBootApplication>
+----
++
+4. Add println to echo args in output
++
+[source,java]
+----
+	public static void main(String[] args) {
+        System.out.println("Arguments array = " + java.util.Arrays.toString(args));
+		SpringApplication.run(SpringLibertyApplication.class, args);
+	}
+----
++
+5. Run
++
+Though we won't benefit from using dev mode, we can still use the "lifecycle" built into the 'run' goal.  We do need to do a 'package' first to get the Spring Boot "repackage" packaging.
++
+[source,sh]
+----
+./mvnw package liberty:run
+----
++
+6.  Observe the output:
++
+[source,sh]
+----
+[INFO] Arguments array = [--server.servlet.context-path=/testpath, --myarg=myval]
+[INFO]   .   ____          _            __ _ _
+[INFO]  /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+[INFO] ( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+[INFO]  \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+[INFO]   '  |____| .__|_| |_|_| |_\__, | / / / /
+[INFO]  =========|_|==============|___/=/_/_/_/
+[INFO]  :: Spring Boot ::                (v3.2.4)
+----
++
+and also
++
+[source,sh]
+----
+[INFO] [AUDIT   ] CWWKT0016I: Web application available (default_host): http://localhost:9080/testpath/
+----
++
+7. Test the application by visiting the following URL in a browser: http://localhost:9080/testpath/
++
+8. When you finish testing the application, stop the server by typing `<Ctrl>+C`.
++
+9. Recap
++
+The server is configured with the https://openliberty.io/docs/latest/reference/feature/springBoot-3.0.html[springBoot-3.0] feature. The liberty-maven-plugin has been added to the pom.xml along with special configuration to use the optimized Spring Boot deployment.  The app is packaged as an "executable WAR" by running the `spring-boot:repackage` goal in the `package` phase, and the app is bootstrapped via its `main()` method in `SpringLibertyApplication` passing in application arguments defined in `server.xml`.
++
+If you're wondering, yes, the "executable WAR" binary package here could still be deployed as a standard WAR (though a Spring Boot WAR must be repackaged as an executable WAR to use the optimized deployment).
+
+== Build container image with efficient layering
+
+Now that we have used the optimized Spring Boot deployment, we can efficiently build a container image.  This image uses an indexed cache at `/lib.index.cache` to store Spring Boot dependencies in their own layer, separate from your application code.
+
+1. Create your `Dockerfile`.  
++
+[source,dockerfile]
+----
+# Stage and thin the application 
+FROM icr.io/appcafe/open-liberty:full-java21-openj9-ubi-minimal as staging
+
+ARG APPNAME=spring-liberty-0.0.1-SNAPSHOT.war
+COPY --chown=1001:0 target/$APPNAME \
+  /staging/$APPNAME
+
+RUN springBootUtility thin \
+ --sourceAppPath=/staging/$APPNAME \
+ --targetThinAppPath=/staging/thin-$APPNAME \
+ --targetLibCachePath=/staging/lib.index.cache
+
+FROM icr.io/appcafe/open-liberty:kernel-slim-java21-openj9-ubi-minimal
+
+ARG APPNAME=spring-liberty-0.0.1-SNAPSHOT.war
+ARG VERSION=1.0
+ARG REVISION=SNAPSHOT
+COPY --chown=1001:0 src/main/liberty/config/server.xml /config/server.xml
+
+RUN features.sh
+
+COPY --chown=1001:0 --from=staging /staging/lib.index.cache /lib.index.cache
+COPY --chown=1001:0 --from=staging /staging/thin-$APPNAME \
+                    /config/apps/thin-$APPNAME
+
+RUN configure.sh 
+----
++
+(Note you can use the `full-java17-openj9-ubi` tag to build the equivalent Java 17 image.)
++
+2. Build then run the image
++
+[source,sh]
+----
+docker build -t springboot:demo .
+docker run -p 9080:9080 -p 9443:9443 -it springboot:demo
+----
++
+== Results
+
+To recap, a Spring Boot WAR can be deployed to Liberty like any other WAR, or it can be deployed with an optimized deployment using special liberty-maven-plugin configuration and the `springBoot-3.0` feature configured in server.xml.
+Though much of the programming model is the same across the two cases, there are some differences including the bootstrap mechanism.
+
+== References
+* Clone the https://github.com/scottkurz/spring-liberty[repository] with the finished code for this blog.
+* doc:   https://openliberty.io/docs/latest/deploy-spring-boot.html   
+* instanton: https://openliberty.io/blog/2023/09/26/spring-boot-3-instant-on.html
+* GH repo:  https://github.com/scottkurz/spring-liberty
+
+* TODO - way to note support for minor references
+   24.0.0.1 (https://github.com/OpenLiberty/open-liberty/pull/27276) support for 3.2 thinning
+
+
