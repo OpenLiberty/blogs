@@ -1,0 +1,163 @@
+---
+layout: post
+title: "A Solution to Configuration Drift - Deploying Open Liberty with GitOps"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/danielguinan1
+author_github: https://github.com/danielguinan1
+seo-title: A Solution to Configuration Drift - Deploying Open Liberty with GitOps - OpenLiberty.io
+seo-description: Learn how to deploy an Open Liberty Application with GitOps
+blog_description: "Learn how to deploy an Open Liberty Application with GitOps"
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+additional_authors: 
+- name: Monica Tamboli
+  github: https://github.com/mtamboli
+  image: https://avatars0.githubusercontent.com/mtamboli
+---
+= A Solution to Configuration Drift - Deploying Open Liberty with GitOps 
+Daniel Guinan <https://github.com/danielguinan1>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+
+Many organizations are struggling with configuration drift, and GitOps provides a robust solution. If you're unfamiliar with what configuration drift is, how it can be caused, why it's bad or how GitOps can help to mitigate this, then check out part 1 of this two part blog series: [Configuration drift: Why its bad and how to solve it with GitOps and ArgoCD]
+
+In this blog, part 2 of this series, we will demonstrate how the solutions introduced in part 1 can be practically applied. We will walk you through the deployment of an Open Liberty application to a Kubernetes cluster using a continuous deployment approach with GitOps and ArgoCD (a leading GitOps tool designed to automate application deployment and ensure configuration consistency, effectively addressing the drift issue).
+
+* <<setup_argocd, See how to setup ArgoCD>>
+* <<setup_gitops_repo, Explore how to setup a GitOps repo for your app>>
+* <<deploy_app_with_gitops, Learn how to deploy a Java application with GitOps and ArgoCD>>
+* <<manually_sync, Discover how to manually sync your app>>
+* <<gitops_solve_config_drift, See how GitOps can solve Configuration Drift>>
+
+== Getting your Cluster Ready
+
+In this blog, we assume you have some form of kubernetes cluster, which you have access to using the `kubectl`CLI or `oc` CLI if on OpenShift. 
+
+=== Using the Open Liberty Operator
+
+The Open Liberty Operator streamlines the deployment and management of Open Liberty Applications on Kubernetes. Instead of manually crafting Kubernetes resources for the application (like services, deployments, routes, etc.), the Operator enables us to define a few application details, and it automatically generates the required Kubernetes resources. Furthermore, it simplifies day 2 operations such as traces and heap dumps when needed. For more on the Open Liberty Operator check out the docs on it https://openliberty.io/docs/latest/open-liberty-operator.html[here].
+
+To take advantage of all of these benefits, we can make use of the Open Liberty Operator to deploy an application using the following commands, which install the operator with its default configuration (watching all namespaces):
+```
+git clone https://github.com/OpenLiberty/open-liberty-operator.git
+kubectl create namespace open-liberty
+kubectl apply --server-side -k open-liberty-operator/deploy/releases/1.2.2/kustomize/overlays/watch-all-namespaces
+```
+
+For a more detailed tutorial on the Open Liberty Operator and how to make use of it, see our interactive guide: https://openliberty.io/guides/openliberty-operator-intro.html[Deploying a microservice to Kubernetes using Open Liberty Operator].
+
+[#setup_argocd]
+=== Setup ArgoCD for effective GitOps and Continuous Deployment
+
+ArgoCD follows a GitOps pattern of using Git repositories as the source of truth for defining the desired application state, which we will use to deploy and monitor our Open Liberty configuration repository.  ArgoCD will help us identify any drift that occurs between the current cluster state and the desired state in the configuration repository.  
+
+To install ArgoCD simply run these commands from the https://argo-cd.readthedocs.io/en/stable/getting_started/[Quickstart section] of the docs:
+
+
+First, we'll use the following commands to create a new namespace named `argocd` and install ArgoCD by applying manifests to that namespace.
+```
+kubectl create namespace argocd
+kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+```
+
+Next we'll get the default Admin credentials to access the ArgoCD user interface.  Using the UI is a great way to get started, allowing us to create our application and identify configuration drift in a visual way.
+To get the default Admin password run the following command:
+```
+kubectl get secret argocd-initial-admin-secret -n argocd -o jsonpath='{.data.password}' | base64 -d
+```
+To access the ArgoCD UI, go to the route of the `argocd-server` and log with the `admin` user and password.
+[.img_border_light]
+image::/img/blog/configuration-drift-1.png[Argo Login,width=70%,align="center"]
+
+Once logged in, you should see the ArgoCD landing page similar to the screenshot below:
+[.img_border_light]
+image::/img/blog/configuration-drift-2.png[Argo Home,width=70%,align="center"]
+
+[#setup_gitops_repo]
+== Setting up a GitOps Repository for your Application
+Now that you've successfully installed ArgoCD and gained access to its console, the next step is to set up a GitHub repository for ArgoCD to synchronize with.  In our example we have created a deployment directory in the application code repo which we will point ArgoCD to for deployment.  In our experience we found it better to separate the deployment configuration into a separate repository from the application code, however for this small example we have it with the application code.  
+
+It's a recommended best practice to maintain separation between configuration repositories and code repositories. Keeping these separate ensures that infrastructure changes are decoupled from application changes, allowing for more granular control, better audit trails, and reduced risk of unintended side-effects.  The reasons why can be found in https://argo-cd.readthedocs.io/en/stable/user-guide/best_practices/[ArgoCD's documentation on best practices].
+
+For the purposes of this blog, we'll use the Daytrader7 sample application. This application is built around the concept of an online stock trading system, and the Daytrader7 https://github.com/WASdev/sample.daytrader7#readme[README] provides a comprehensive overview of this application.
+
+In this example, we have a `deploy` directory within our existing repository to house the deployment configuration.  This directory contains the manifests for full application deployment as well as annotations telling ArgoCD which order they should be deployed in.  
+
+To begin, navigate to GitHub and fork this repository: https://github.com/WASdev/sample.daytrader7. Use your forked repository when configuring ArgoCD in the following steps.
+
+In this example, we have a pre-built container image for DayTrader sample application pushed to Docker Hub that is used in the deployment files deploy/daytrader7-deploy.yaml.  For more information on how to containerize your Open Liberty application check out our interactive guide: https://openliberty.io/guides/docker.html[Using Docker containers to develop microservices].
+
+[#deploy_app_with_gitops]
+== Deploying a Java application with GitOps and ArgoCD
+
+Now that you have the Git repository forked and ready for deployment, it’s time to configure ArgoCD to deploy the application.
+
+First, go to the ArgoCD console dashboard that we viewed before.
+
+Next, click the New App button near the top left of the console.  This opens a window where you will give ArgoCD the details on the application you want to deploy, which you can see an example of in the image below.
+
+For our demo applicayion, we've called the Application name daytrader7. We've checked the Auto-Create Namespace box which creates the namespace if it doesn't already exist.  We've left the ArgoCD project as "default" as this is a way to group Applications together for large scale deployment of applications, which is not needed in our case. And, we've set the Sync Policy to Manual. This configuration option determines whether we want ArgoCD to automatically correct configuration drift or wait for us to manually tell it to.  
+[.img_border_light]
+image::/img/blog/configuration-drift-3.png[Creating the App,width=70%,align="center"]
+
+Select the configiration options that best suit your application. For the purposes of just trying out and getting started with ArgoCD, feel free to copy the configuration we've set in our example app.
+
+Next, you will need to scroll down to the configuration section labelled "Source", shown in the image below. Here, you will need to set several configuration options.
+
+First, change the Repository URL to your newly forked repo. This tells ArgoCD what git repository has the configuration for the application you are looking to deploy. 
+
+You'll also need to change the path, which is the path in the git repo where ArgoCD is looking for deployment files to deploy. 
+
+Additionally, you'll need to set the Cluster URL. In this example, we have set it to https://kubernetes.default.svc, which is the local cluster URL.
+
+Then, lastly, you will need to set the namespace. In our case, this is daytrader7 (which will be created because we selected the "Auto-Create Namespace" option).
+
+
+After verifying these options, click Create in the top left.  This creates an "Application" resource that ArgoCD uses to watch the repository we gave it.  
+
+[.img_border_light]
+image::/img/blog/configuration-drift-4.png[Setting the Repo,width=70%,align="center"]
+
+[#manually_sync]
+=== Manually Syncing your Application with the Repository
+
+Since we chose manual sync policy in the options for demonstrative purposes, we have to sync the application manually for ArgoCD to deploy the application. If you have also selected this option, on the main page of the ArgoCD console, you should see a new tile that looks like this:
+
+[.img_border_light]
+image::/img/blog/configuration-drift-5.png[Argo Dashboard,width=70%,align="center"]
+
+Click the Sync button, then on the window that appears click Sync again.
+To monitor the progress of this application sync, you can click on the daytrader7 tile.
+Over the course of a few minutes, you should see resources being created and the app dashboard should look like this:
+[.img_border_light]
+image::/img/blog/configuration-drift-6.png[App deploying,width=70%,align="center"]
+
+This diagram shows the many kubernetes resources created for the application, such as the deployment, pod, and service.  We can also monitor the health of each of these resources and verify they were created properly.  
+
+
+Now that the application is deployed and all the resources are created we need to make sure it is exposed externally.  This sample sets `.spec.expose` to `true`, which automatically creates an external route on OpenShift.  If you are on Kubernetes, you need to either configure a load balancer or an Ingress controller for the application.  Find the URL via `oc get routes –n daytrader7` if on OpenShift, or `kubectl get ingress -n daytrader7` if on Kubernetes with Ingress configured.  Then paste the URL in a browser to access the Daytrader login page.
+
+And there we go! We have fully deployed our application with GitOps!
+[.img_border_light]
+image::/img/blog/configuration-drift-7.png[Daytrader Home,width=70%,align="center"]
+
+[#gitops_solve_config_drift]
+== See how GitOps can solve Configuration Drift
+
+Now that we have the app deployed let's show a scenario where configuration drift occurs and how we can easily correct it.
+Let's say a developer changes the memory settings in the configuration file for a quick test.  To represent this, change the memory request for the `deploy/daytrader7-deploy.yaml` file from 1024Mi to 2048Mi using either the Kubernetes CLI or the console itself.  In a few moments the argo console should show it is out of sync:
+[.img_border_light]
+image::/img/blog/configuration-drift-outofsync.png[Daytrader Home,width=70%,align="center"]
+
+"Out of Sync" means that some form of configuration drift occured in the application.  We can refer back to the diagram to tell exactly where it occured.  
+Since we set Auto-Sync to disable earlier in this blog, we have to manually tell ArgoCD to correct the configuration drift.  To do this, click on the `Sync` button to return the configuration to match what git says it should be.
+
+[.img_border_light]
+image::/img/blog/configuration-drift-synced.png[Daytrader Home,width=70%,align="center"]
+
+== Next Steps
+In this blog post, we've explored the seamless deployment of an Open Liberty application through the GitOps methodology, highlighting its effectiveness in mitigating configuration drift. Whether you're seeking to refine your deployment strategy or embark on a fresh project for an Open Liberty application, we encourage experimenting with GitOps. This approach can be easily extended to automate the deployment of other dependencies like databases for your applications.
+
+And for those looking to create or update Open Liberty applications, the https://openliberty.io/guides/[open liberty guides] offer helpful insights and steps.
