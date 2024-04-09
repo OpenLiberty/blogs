@@ -1,0 +1,258 @@
+---
+layout: post
+title: "Jakarta NoSQL in Action: Switching NoSQL Databases with Ease"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/dearrudam
+author_github: https://github.com/dearrudam
+seo-title: TITLE - OpenLiberty.io
+seo-description: |
+  Nowadays, in the cloud era, switching between NoSQL solutions could be interesting to save resources and costs, but it could be a nightmare, specially if we're highly coupled to a particular vendor. It will cause some changes that will make this approach very expensive, like: time spent on the change, the learning curve of a new API to use with this database, the code that will be lost, the persistence layer that needs to be replaced, etc. This is where the flexibility of Jakarta NoSQL with an implementation like Eclipse JNoSQL together shines.
+
+blog_description: "Nowadays, in the cloud era, switching between NoSQL solutions could be interesting to save resources and costs, but it could be a nightmare, specially if we're highly coupled to a particular vendor. It will cause some changes that will make this approach very expensive, like: time spent on the change, the learning curve of a new API to use with this database, the code that will be lost, the persistence layer that needs to be replaced, etc. This is where the flexibility of Jakarta NoSQL with an implementation like Eclipse JNoSQL together shines."
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+---
+= Jakarta NoSQL in Action: Switching NoSQL Databases with Ease
+Maximillian Arruda <https://github.com/dearrudam>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+
+
+// // // // // // // //
+// In the preceding section:
+// Do not insert any blank lines between any of the lines.
+//
+// "open-graph-image" is set to OL logo. Whenever possible update this to a more appropriate/specific image (For example if present a image that is being used in the post). However, it
+// can be left empty which will set it to the default
+//
+// "open-graph-image-alt" is a description of what is in the image (not a caption). When changing "open-graph-image" to
+// a custom picture, you must provide a custom string for "open-graph-image-alt".
+//
+// Replace DESCRIPTION with a short summary (~60 words) of the release (a more succinct version of the first paragraph of the post).
+//
+// If adding image into the post add :
+// -------------------------
+// [.img_border_light]
+// image::img/blog/FILE_NAME[IMAGE CAPTION ,width=70%,align="center"]
+// -------------------------
+// "[.img_border_light]" = This adds a faint grey border around the image to make its edges sharper. Use it around screenshots but not
+// around diagrams. Then double check how it looks.
+// There is also a "[.img_border_dark]" class which tends to work best with screenshots that are taken on dark backgrounds.
+// Change "FILE_NAME" to the name of the image file. Also make sure to put the image into the right folder which is: img/blog
+// change the "IMAGE CAPTION" to a couple words of what the image is
+// // // // // // // //
+
+Nowadays, in the cloud era, switching between NoSQL solutions could be interesting to save resources and costs, but it could be a nightmare, specially if we're highly coupled to a particular vendor. It will cause some changes that will make this approach very expensive, like: time spent on the change, the learning curve of a new API to use with this database, the code that will be lost, the persistence layer that needs to be replaced, etc.
+
+This is where the flexibility of Jakarta NoSQL with an implementation like https://www.jnosql.org[Eclipse JNoSQL] together shines.
+
+NOTE: As of March 2024, Eclipse JNoSQL supports about https://www.jnosql.org/docs/supported_dbs.html[30 NoSQL databases].
+
+== Jakarta NoSQL in Action: Switching NoSQL Databases with Ease
+
+To explore this capability, let's use the link:../../../2024/04/17/jakarta-nosql-in-action-meet-jnopo-game.html[*JNopo* game].
+
+Here's the challenge: let's suppose that it's needed to change the *JNopo*'s Document NoSQL database, *MongoDB*, to another Document NoSQL database for save money purposes, e.g. *Couchbase*.
+
+By using Jakarta NoSQL specification to connect to the NoSQL solutions, we got some benefits and one of them is that with just a few changes, we'll be able to archive this goal easily.
+
+=== Configuring Eclipse JNoSQL dependencies for Couchbase
+
+In the `pom.xml` file, add the following dependency:
+
+[source, xml]
+----
+<dependency>
+  <groupId>org.eclipse.jnosql.databases</groupId>
+  <artifactId>jnosql-couchbase</artifactId>
+  <version>1.1.0</version>
+</dependency>
+----
+
+=== Configuring a Local Couchbase Cluster
+
+First of all, let's add the following content to the `docker-compose.yml` file:
+
+[source, yaml]
+----
+  couchbase-db:
+    image: couchbase
+    container_name: couchbase-db
+    ports:
+      - "8091-8097:8091-8097"
+      - "9123:9123"
+      - "11207:11207"
+      - "11210:11210"
+      - "11280:11280"
+      - "18091-18097:18091-18097"
+----
+
+After to apply these changes, initialize the container by executing the following command:
+
+[source, bash]
+----
+docker-compose up -d
+----
+
+Now, let's configure the Couchbase cluster for this study scenario:
+
+. With the Couchbase container started, go to: http://localhost:8091/ui/index.html
+. Select the "Configure New Cluster" option
++
+[.img_border_light]
+image::/img/blog/couchbase-01.png[Couchbase 01, align="center" width=80%]
+. Defines a name for the cluster name
+. Set `root` to "Administrator" username
+. Set `123456` as "Password"
++
+[.img_border_light]
+image::/img/blog/couchbase-02.png[Couchbase 02, align="center" width=80%]
+. Check “I accept the terms and conditions” and click the “Finish With Defaults” button
++
+[.img_border_light]
+image::/img/blog/couchbase-03.png[Couchbase 03, align="center" width=80%]
+. Go to the "Buckets" section
+. Create a `jnopo` Bucket by clicking on the "Add Bucket" option
++
+[.img_border_light]
+image::/img/blog/couchbase-04.png[Couchbase 04, align="center" width=80%]
+. Click on "Scopes & Collections" and then click on "Add Collection"
+. Enter `GameMatch` as the collection name and click the "Save" button to complete your creation
++
+[.img_border_light]
+image::/img/blog/couchbase-05.png[Couchbase 05, align="center" width=80%]
+. Now, in the "Query" section, run this command https://www.couchbase.com/products/n1ql/[N1QL] to create the primary index for the `GameMatch` collection:
++
+[source, n1ql]
+----
+CREATE PRIMARY INDEX primaryGameMatch ON jnopo._default.GameMatch
+----
++
+[.img_border_light]
+image::/img/blog/couchbase-06.png[Couchbase 06, align="center" width=80%]
+
+With a Couchbase cluster running, we just need to set up Eclipse JNoSQL to connect to it.
+
+Apply the following changes into the `resources/META-INF/microprofile-config.properties` file:
+
+[source, properties]
+----
+## Couchbase
+jnosql.couchbase.host=couchbase://localhost
+jnosql.couchbase.user=root
+jnosql.couchbase.password=123456
+jnosql.document.provider=org.eclipse.jnosql.databases.couchbase.communication.CouchbaseDocumentConfiguration
+----
+
+The `jnosql.document.provider` property is required in this context because we have more than one Eclipse JNoSQL Database API for Document NoSQL implementations. Learn more about these configurations about Eclipse JNoSQL Database API for Couchbase at this https://github.com/eclipse/jnosql-databases/tree/main?tab=readme-ov-file#configuration-2[Git repository].
+
+That's all! Let's restart the https://openliberty.io/[Open Liberty] runtime in order to be able to make sure that everything is running smoothly:
+
+* On Linux/Mac machines, perform the following command:
++
+[source, bash]
+----
+./mvnw liberty:dev
+----
+
+* On Windows machines, perform the following command:
++
+[source, powershell]
+----
+mvnw.cmd liberty:dev
+----
+
+After some game matches, here are the evidences:
+
+[.img_border_light]
+image::/img/blog/couchbase-verification-01.png[Couchbase Verification 01, align="center" width=80%]
+[.img_border_light]
+image::/img/blog/couchbase-verification-02.png[Couchbase Verification 02, align="center" width=80%]
+
+If you're interesting to take a look on the finished project code version developed during this challenge, clone this https://github.com/OpenLiberty/sample-jakartaNoSQL-game[Git repository] and navigate to the `database-switching-challenge` directory.
+
+[source, bash]
+----
+git clone https://github.com/OpenLiberty/sample-jakartaNoSQL-game.git
+cd sample-jakartaNoSQL-game
+cd database-switching-challenge
+----
+
+== Key Takeaways
+
+This challenge was an amazing opportunity to learn how it's ease to switch between NoSQL solutions by using Jakarta NoSQL, bringing one more item to your utility belt that could be interesting to save resources and costs.
+
+What we got by doing this challenge:
+
+* How to set up the Couchbase database cluster for development purposes;
+
+* How to switch between NoSQL database from different vendors, in our example: switching MongoDB to Couchbase;
+
+== Next Steps: Continuing the Journey
+
+Congratulations on getting this far!
+
+This blog post is the 3rd part of a set of blog posts:
+
+* link:../../../2024/04/15/simplifying-nosql-database-integration-with-jakarta-nosql.html[Simplifying NoSQL Database Integration with Jakarta NoSQL, window="_blank"];
+* link:../../../2024/04/17/jakarta-nosql-in-action-meet-jnopo-game.html[Jakarta NoSQL in Action: JNopo Game, window="_blank"];
+
+To see more sample projects, take a look at the official Eclipse JNoSQL samples repositories:
+
+- https://github.com/jnosql/demos-se
+- https://github.com/JNOSQL/demos-ee
+
+To learn more about Eclipse JNoSQL, take a look at these official repositories:
+
+- https://github.com/eclipse/jnosql
+- https://github.com/eclipse/jnosql-databases
+- https://github.com/eclipse/jnosql-extensions
+
+if you're an expert on some NoSQL database that Eclipse JNoSQL doesn't support, feel free to open an issue or a PR on the project repositories mentioned above.
+
+Except for the NoSQL solutions mentioned like MongoDB and Couchbase, all the technology used in this blog post are open-source, so, what do you think about contributing to these projects?
+
+If you don't know how to get started to contribute, take a look at this https://www.youtube.com/live/7qhHOOoZEBU?feature=share[Coffee.withJava("Contribute to JNoSQL") Youtube Series], or if you prefer, feel free to contact me!
+
+Contributing to these projects is not just with codes, you could help a lot by promoting and speaking about them wherever you go!
+
+Contributing to open-source is a great way to boost your career, and improve your skills to become an effective developer and relevant in the market! Think about that!
+
+== Special Thanks
+
+I'm bursting with gratitude and would love to give a big shout-out to my incredible Java community friends for their unwavering support throughout my journey. A special round of applause for:
+
+- Otavio Santana, you're not just a mentor but a guiding star in my open-source journey. Your mentorship have opened doors for me to become an active open-source contributor and a proud Eclipse Foundation committer. Thank you for being such a monumental part of my journey. Also, thanks for your insightful reviews of the codes featured in this blog post.
+
+- Karina Varela, your keen eye for detail and your generosity in sharing your knowledge have enriched this content beyond measure. Your thoughtful reviews have made this content not just better, but truly curated and relevant. I'm so grateful for your contribution.
+
+- Fabio Franco, you were the catalyst for this wonderful opportunity, connecting me with the fantastic OpenLiberty team and offering your support throughout the publishing process of this blog post. Your belief in me and your encouragement have been invaluable. Thank you for making this possible.
+
+- And to the OpenLiberty team, thank you for opening your doors and allowing me the privilege to share and post this content that I've thoroughly enjoyed working on. Thanks for this opportunity.
+
+To each of you, your support means a lot to me, and I'm deeply thankful.
+
+== References and Further Reading
+
+* Official documentation:
+** https://jnosql.org[Eclipse JNoSQL website]
+** https://jakarta.ee/specifications/[Jakarta EE Specifications]
+
+* Articles:
+** https://dzone.com/articles/jakarta-nosql-100-b5-how-to-make-your-life-easier[Jakarta NoSQL 1.0.0-b5: How To Make Your Life Easier Around Enterprise Java and NoSQL Databases by Otavio Santana]
+** https://dzone.com/articles/eclipse-jnosql-100-streamlining-java-and-nosql-int[Eclipse JNoSQL 1.0.0: Streamlining Java and NoSQL Integration With New Features and Bug Fixes by Otavio Santana]
+** https://dzone.com/articles/mastering-java-persistence-best-practices-for-clou[Mastering Java Persistence: Best Practices for Cloud-Native Applications and Modernization by Otavio Santana]
+** https://dzone.com/articles/eclipse-jnosql-102-empowering-java-with-nosql-data[Eclipse JNoSQL 1.0.2: Empowering Java With NoSQL Database Flexibility by Otavio Santana]
+** https://blogs.oracle.com/nosql/post/getting-started-accessing-oracle-nosql-database-using-jakarta-nosql[Getting Started - Accessing Oracle NoSQL Database using Jakarta NoSQL by Dario VEGA]
+** https://dzone.com/articles/exploring-the-new-eclipse-jnosql-version-110-a-div[Exploring the New Eclipse JNoSQL Version 1.1.0: A Dive Into Oracle NoSQL by Otavio Santana]
+** https://eldermoraes.com/how-to-create-cdi-events/[How to create CDI Events by Elder Moraes]
+** https://blogs.oracle.com/javamagazine/post/jakarta-data-mysql[Simplifying data access with MySQL and Jakarta Data by Ivar Grimstad]
+** https://dzone.com/articles/introduction-to-nosql-database-1[Introduction to NoSQL Database by Rama Krishna Panguluri];
+
+* Books:
+** https://www.amazon.com/Persistence-Best-Practices-Java-Applications/dp/1837631271/[Persistence Best Practices for Java Applications by Otavio Santana and Karina Varela]
+** https://bpbonline.com/products/java-persistence-with-nosql[Java Persistence with NoSQL by Otavio Santana]
+** https://a.co/d/4dlvHQj[NoSQL Distilled: A Brief Guide to the Emerging World of Polyglot Persistence by Pramod Sadalage and Martin Fowler]
+
