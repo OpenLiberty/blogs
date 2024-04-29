@@ -1,0 +1,565 @@
+---
+layout: post
+title: "Jakarta EE 11 previews and InstantOn support for IBM MQ in 24.0.0.5-beta"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/dmuelle
+author_github: https://github.com/dmuelle
+seo-title: Jakarta EE 11 previews and InstantOn support for IBM MQ in 24.0.0.5-beta - OpenLiberty.io
+seo-description: The 24.0.0.5-beta release introduces previews for several Jakarta EE 11 features, including Jakarta Concurrency 3.1, Jakarta Data 1.0, Jakarta Expression Language 6.0, Jakarta Pages 4.0, and Jakarta Servlet 6.1. This release also includes support for using InstantOn with IBM MQ messaging.
+blog_description: The 24.0.0.5-beta release introduces previews for several Jakarta EE 11 features, including Jakarta Concurrency 3.1, Jakarta Data 1.0, Jakarta Expression Language 6.0, Jakarta Pages 4.0, and Jakarta Servlet 6.1. This release also includes support for using InstantOn with IBM MQ messaging.
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+---
+= Jakarta EE 11 previews and InstantOn support for IBM MQ in 24.0.0.5-beta
+David Mueller <https://github.com/dmuelle>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+
+// For every link starting with "https://openliberty.io" in the post make sure to use
+// {url-prefix}. e.g- link:{url-prefix}/guides/GUIDENAME[GUIDENAME]:
+
+The 24.0.0.5-beta release introduces previews for several Jakarta EE 11 features, including Jakarta Concurrency 3.1, Jakarta Data 1.0, Jakarta Expression Language 6.0, Jakarta Pages 4.0, and Jakarta Servlet 6.1. This release also includes support for using InstantOn with IBM MQ messaging.
+
+
+The link:{url-about}[Open Liberty] 24.0.0.5-beta includes the following beta features (along with link:{url-prefix}/docs/latest/reference/feature/feature-overview.html[all GA features]):
+
+* <<cdi, Jakarta CDI 4.1>>
+* <<concurrent, Preview of Jakarta Concurrency 3.1>>
+* <<data, Preview of Jakarta Data (Milestone 4)>>
+* <<el, Jakarta EE11 Expression Language 6.0>>
+* <<pages, Jakarta EE11 Pages 4.0>>
+* <<servlet, Jakarta EE11 Servlet 6.1>>
+* <<mq, Use InstantOn with IBM® MQ in Liberty 24.0.0.5-beta>>
+
+
+See also link:{url-prefix}/blog/?search=beta&key=tag[previous Open Liberty beta blog posts].
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/28201
+// Contact/Reviewer: Azquelt
+// // // // // // // //
+[#cdi]
+== Jakarta CDI 4.1
+
+CDI allows objects to be bound to lifecycle contexts, to be injected, to be associated with interceptors and decorators, and to interact in a loosely coupled fashion by firing and observing events. Highlights of CDI 4.1 include the ability for interceptors to inspect the annotations that are used to bind them. This update also brings in new Jakarta EE 11 versions of the Jakarta Annotations and Jakarta Interceptors APIs.
+
+=== Retrieve interceptor binding info
+
+Support is added to allow interceptors to retrieve and inspect the annotations that are used to bind them. Interceptors can now call [InvocationContext.getInterceptorBindings()][get-bindings] or one of the related methods to retrieve the annotations so that they can read values from them. This capability is particularly useful when some of the fields of an interceptor binding annotation are annotated with `@Nonbinding`. These fields are not used to restrict which interceptor is bound and can now be read by the interceptor when the interceptor method is called.
+
+For example, a binding annotation for a logging interceptor could look like this:
+
+[source,java]
+----
+@InterceptorBinding
+public @interface Logged {
+    @Nonbinding String value();
+}
+----
+
+This annotation could be applied to a method on a managed bean like this:
+[source,java]
+----
+@Logged("myName")
+public void myMethod() {
+   // ....
+}
+----
+
+Then an interceptor like this could read the `myName` value from the annotation and include it in the log message:
+[source,java]
+----
+@Interceptor
+@Logged("")
+public class LoggedInterceptor {
+
+    private static final Logger LOG = Logger.getLogger(LoggedInterceptor.class.getName());
+
+    @AroundInvoke
+    public Object intercept(InvocationContext ctx) throws Exception {
+        Logged binding = ctx.getInterceptorBinding(Logged.class);
+        LOG.info("Method called: " + binding.value());
+        return ctx.proceed();
+    }
+}
+----
+
+The new methods added to [InvocationContext][invocationContext] make it easier to retrieve the annotations. These methods return the correct binding annotations whether they're applied to the class or the method and reflect any changes made to the annotations by a CDI extension.
+
+=== Invoker support
+
+Support is added for extensions to create `Invoker`s, which are used to call a method on a CDI managed bean indirectly and can support looking up the object instance and the method arguments from CDI. This feature is intended for people who want to build frameworks that build on or integrate with CDI.
+
+For more information on how to create and use an `Invoker`, see the CDI specification blog.
+
+=== Deprecated methods in BeanManager
+
+The `BeanManager.getELResolver` and `BeanManager.wrapExpressionFactory` methods are deprecated and will be removed in the next major version so that the CDI API won't need to depend on the Expression Language (EL) API. The same methods are added to `ELAwareBeanManager`, which extends `BeanManager` and lives in a new API jar.
+
+These methods were mostly used by EL implementations, but any users who wish to continue using these methods must switch to using `ELAwareBeanManager` and include the new API artifact in their dependencies. for example by adding it to their maven `pom.xml` file:
+
+[source,xml]
+----
+<dependency>
+    <groupId>jakarta.enterprise</groupId>
+    <artifactId>jakarta.enterprise.cdi-el-api</artifactId>
+    <scope>provided</provided>
+    <version>4.1.0</version>
+</dependency>
+----
+
+NOTE: in this beta, `ELAwareBeanManager` cannot be injected directly, but a `BeanManager` can be injected and then cast to an `ELAwareBeanManager`. This will be fixed before release.
+
+=== Remove references to Managed Beans specification
+
+Jakarta EE 11 will not include the Managed Beans specification, which was separate from the CDI specification but did many of the same things. As a result, the associated `@ManagedBean` annotation is removed from the Jakarta Annotations API.
+
+=== Changes to EE integration
+
+The parts of the CDI specification that define how CDI integrates with other Jakarta EE technologies are moved from the CDI specification into the Jakarta EE 11 Platform, Web Profile and Core Profile specifications. This has no effect on end users, but if you use the [CDI specification][cdi-spec] as a documentation reference, you will find that some parts of it are now in the [Plaform][platform-spec], [Web Profile][web-profile-spec] and [Core Profile][core-profile-spec] specifications instead.
+
+To use the CDI 4.1 feature, add `cdi-4.1` to your `server.xml` file:
+
+[source,xml]
+----
+<featureManager>
+  <feature>cdi-4.0</feature>
+</featureManager>
+----
+
+Further references:
+* link:https://jakarta.ee/specifications/cdi/4.1/apidocs/[CDI API]
+* link:https://jakarta.ee/specifications/interceptors/2.2/apidocs/[Interceptors API]
+* link:https://jakarta.ee/specifications/annotations/3.0/apidocs/jakarta.annotation/module-summary.html[Jakarta Annotations API]
+* link:https://jakarta.ee/specifications/cdi/4.1/jakarta-cdi-spec-4.1[CDI Specification]
+* link:https://jakarta.ee/specifications/interceptors/2.2/jakarta-interceptors-spec-2.2[Interceptors Specification]
+* link:https://jakarta.ee/specifications/annotations/3.0/annotations-spec-3.0[Jakarta Annotations Specification]
+
+[get-bindings]: https://jakarta.ee/specifications/interceptors/2.2/apidocs/jakarta.interceptor/jakarta/interceptor/invocationcontext#getInterceptorBindings()
+[invocationContext]: https://jakarta.ee/specifications/interceptors/2.2/apidocs/jakarta.interceptor/jakarta/interceptor/invocationcontext
+[spec-blog]: https://jakartaee.github.io/cdi/2024/02/27/whats-new-in-cdi41.html
+[cdi-spec]: https://jakarta.ee/specifications/cdi/4.1/jakarta-cdi-spec-4.1
+[platform-spec]: https://jakarta.ee/specifications/platform/11/
+[web-profile-spec]: https://jakarta.ee/specifications/webprofile/11/
+[core-profile-spec]: https://jakarta.ee/specifications/coreprofile/11/
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/28075
+// Contact/Reviewer: mswatosh
+// // // // // // // //
+[#concurrent]
+== Preview of Jakarta Concurrency 3.1
+
+Jakarta Concurrency allows applications to use concurrency while maintaining the benefits of running on a Jakarta EE runtime. Jakarta Concurrency 3.1 is the new version for the upcoming Jakarta EE 11, and it adds support for new features of the latest Java SE releases as well as some usability improvements.
+
+The new features in Jakarta Concurrency 3.1 are improved support for the Java Flow (Reactive Streams) APIs, and the use of virtual threads in `ManagedExecutors` and `ManagedThreadFactories`. Support is also included for for using `@Inject` in place of `@Resource`, and the option to run asynchronous methods on a schedule using the new `@Schedule` annotation.
+
+To support the Flow APIs, `ContextService` has two new methods, `contextualSubscriber` and `contextualProcessor`, which provides context in a `Flow.Subscriber` and `Flow.Processor` respectively. These new methods allow for context in a flow when using a `Flow.Publisher` which does not allow configuring a `ManagedExecutor`.
+
+[source,java]
+----
+publisher.subscribe(contextService.contextualSubscriber(subscriber));
+----
+
+Virtual threads are available in Jakarta Concurrency 3.1 by specifying ‘virtual = true’ on a `ManagedExecutorDefinition`, `ManagedScheduledExecutorDefinition`, or `ManagedThreadFactory` instance. Virtual threads are a new feature of Java 21, so when running on Java 17 if ‘virtual = true’ is specified, platform threads are provided instead of virtual threads.
+
+[source,java]
+----
+@ManagedExecutorDefinition(name = "java:module/concurrent/virtual-executor",
+                           virtual = true)
+----
+
+The new `@Schedule` annotation allows asynchronous methods to run on a schedule. In this example, after the method is called, it runs asynchronously on a schedule set by the provided cron string
+
+[source,java]
+----
+@Asynchronous(runAt = { @Schedule(cron = "*/3 * * * * *")})
+void scheduledMethod() {
+----
+
+To try out Jakarta Concurrency 3.1, check out link:https://github.com/OpenLiberty/sample-concurrency[the sample application].
+
+To use this feature, add the following code to your `server.xml` file:
+
+[source,xml]
+----
+<featureManager>
+     <feature>concurrent-3.0</feature>
+</featureManager>`
+----
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/28072
+// Contact/Reviewer: njr-11
+// // // // // // // //
+[#data]
+== Preview of Jakarta Data (Milestone 4)
+
+Jakarta Data is a new Jakarta EE specification being developed in the open that aims to standardize the popular Data Repository pattern across a variety of providers. Open Liberty includes the Jakarta Data 1.0 Milestone 4 release, which adds the Jakarta Data Query Language (JDQL) and enhances the Static Metamodel.
+
+The Open Liberty beta includes a test implementation of Jakarta Data that we are using to experiment with proposed specification features. You can try out these features and provide feedback to influence the Jakarta Data 1.0 specification as it continues to be developed. The test implementation currently works with relational databases and operates by redirecting repository operations to the built-in Jakarta Persistence provider.
+
+Jakarta Data 1.0 Milestone 4 introduces Jakarta Data Query Language (JDQL), which is a subset of Jakarta Persistence Query Language (JPQL). JDQL allows basic comparison and update operations on a single entity (an entity identifier variable is not used), as well as the ability to perform deletion. Find operations in JDQL consist of SELECT, FROM, WHERE, and ORDER BY clauses, all of which are optional. The static metamodel, which allows for more type-safe usage, is simplified in Milestone 4 to allow all fields to be pre-initialized. To use these capabilities, you need an Entity and a Repository.
+
+Start by defining an entity class that corresponds to your data. With relational databases, the entity class corresponds to a database table and the entity properties (public methods and fields of the entity class) generally correspond to the columns of the table. An entity class can be:
+
+- annotated with `jakarta.persistence.Entity` and related annotations from Jakarta Persistence
+- a Java class without entity annotations, in which case the primary key is inferred from an entity property named `id` or ending with `Id` and an entity property named `version` designates an automatically incremented version column.
+
+You define one or more repository interfaces for an entity, annotate those interfaces as `@Repository`, and inject them into components by using `@Inject`. The Jakarta Data provider supplies the implementation of the repository interface for you.
+
+The following example shows a simple entity:
+
+[source,java]
+----
+@Entity
+public class Product {
+    @Id
+    public long id;
+
+    public boolean isDiscounted;
+
+    public String name;
+
+    public float price;
+
+    @Version
+    public long version;
+}
+----
+
+The following example shows a repository that defines operations that relate to the entity. Your repository interface can inherit from built-in interfaces such as `BasicRepository` and `CrudRepository` to gain a variety of general purpose repository methods for inserting, updating, deleting and querying for entities. You can add methods to further customize it.
+
+[source,java]
+----
+@Repository(dataStore = "java:app/jdbc/my-example-data")
+public interface Products extends BasicRepository<Product, Long> {
+    @Insert
+    Product add(Product newProduct);
+
+    // query-by-method name pattern:
+    List<Product> findByNameIgnoreCaseContains(String searchFor, Order<Product> orderBy);
+
+    // parameter based query that does not require -parameters because it explicitly specifies the name
+    @Find
+    Page<Product> find(@By("isDiscounted") boolean onSale,
+                       PageRequest<Product> pageRequest);
+
+    // find query in JDQL that requires compilation with -parameters to preserve parameter names
+    @Query("SELECT price FROM Product WHERE id=:productId")
+    Optional<Float> getPrice(long productId);
+
+    // update query in JDQL:
+    @Query("UPDATE Product SET price = price - (?2 * price), isDiscounted = true WHERE id = ?1")
+    boolean discount(long productId, float discountRate);
+
+    // delete query in JDQL:
+    @Query("DELETE FROM Product WHERE name = ?1")
+    int discontinue(String name);
+}
+----
+
+Observe that the repository interface includes type parameters in `PageRequest<Product>` and `Order<Product>`. These parameters helps ensure that the page request and sort criteria are for a `Product` entity rather than some other entity.  To accomplish this, you can optionally define a static metamodel class for the entity (or various IDEs might generate one for you after the 1.0 specification is actually released). Here is one that can be used with the `Product` entity:
+
+[source,java]
+----
+@StaticMetamodel(Product.class)
+public class _Product {
+    public static final String ID = "id";
+    public static final String IS_DISCOUNTED = "isDiscounted";
+    public static final String NAME = "name";
+    public static final String PRICE = "price";
+    public static final String VERSION = "version";
+
+    public static final SortableAttribute<Product> id = new SortableAttributeRecord(ID);
+    public static final SortableAttribute<Product> isDiscounted = new SortableAttributeRecord(IS_DISCOUNTED);
+    public static final TextAttribute<Product> name = new TextAttributeRecord(NAME);
+    public static final SortableAttribute<Product> price = new SortableAttributeRecord(PRICE);
+    public static final SortableAttribute<Product> version = new SortableAttributeRecord(VERSION);
+}
+----
+
+The following example shows the repository and static metamodel being used,
+
+[source,java]
+----
+@DataSourceDefinition(name = "java:app/jdbc/my-example-data",
+                      className = "org.postgresql.xa.PGXADataSource",
+                      databaseName = "ExampleDB",
+                      serverName = "localhost",
+                      portNumber = 5432,
+                      user = "${example.database.user}",
+                      password = "${example.database.password}")
+public class MyServlet extends HttpServlet {
+    @Inject
+    Products products;
+
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp)
+            throws ServletException, IOException {
+        // Insert:
+        Product prod = ...
+        prod = products.add(prod);
+
+        // Find the price of one product:
+        price = products.getPrice(productId).orElseThrow();
+
+        // Find all, sorted:
+        List<Product> all = products.findByNameIgnoreCaseContains(searchFor, Order.by(
+                                     _Product.price.desc(),
+                                     _Product.name.asc(),
+                                     _Product.id.asc()));
+
+        // Find the first 20 most expensive products on sale:
+        Page<Product> page1 = products.find(onSale, Order.by(_Product.price.desc(),
+                                                             _Product.name.asc(),
+                                                             _Product.id.asc())
+                                                         .pageSize(20));
+        ...
+    }
+}
+----
+
+To use this feature, add the following code to your `server.xml` file:
+
+[source,xml]
+----
+<featureManager>
+     <feature>Data-1.0</feature>
+</featureManager>`
+----
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/27964
+// Contact/Reviewer: pnicolucci
+// // // // // // // //
+[#el]
+== Jakarta Expression Language 6.0
+
+The expressionLanguage-6.0 feature is an implementation of the Expression Language 6.0 Specification for Jakarta EE 11. The Expression Language 6.0 specification includes a number of new features and specification clarifications.
+
+Support for `java.util.Optional` (not enabled by default) and `java.lang.Record` is added. Another new feature is the addition of the length property for Arrays. For more information and the change history of the specification between Expression Language 5.0 and Expression Language 6.0, see link:https://jakarta.ee/specifications/expression-language/6.0/jakarta-expression-language-spec-6.0#changes-between-6-0-and-5-0[Changes between 6.0 and 5.0].
+
+To use this feature, add the following code to your `server.xml` file:
+
+[source,xml]
+----
+<featureManager>
+     <feature>expressionLanguage-6.0</feature>
+</featureManager>`
+----
+
+For more information, see the link:https://jakarta.ee/specifications/expression-language/6.0/ [Jakarta Expression Language 6.0 Specification and Javadocs].
+
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/27963
+// Contact/Reviewer: volosied,pnicolucci
+// // // // // // // //
+[#pages]
+== Jakarta Pages 4.0
+
+The pages-4.0 feature is an implementation of the Pages 4.0 Specification for Jakarta EE 11. The Pages 4.0 specification includes a couple of new features and removal of previously deprecated functions.
+
+The `jakarta.servlet.jsp.ErrorData` class was updated to add support for the new `jakarta.servlet.error.method`, and `jakarta.servlet.error.query_string` attributes.  The following deprecated classes, methods and actions were removed:
+
+* `jakarta.servlet.jsp.JspException.getRootCause()`
+* Classes in `jakarta.servlet.jsp.el`.
+* `isThreadSafe` page directive
+* `jsp:plugin` action and related actions
+* `jakarta.servet.jsp.tagext.BodyTag.EVAL_BODY_TAG` constant
+* Any methods that implemented `jakarta.el.ELResolver.getFeatureDescriptors()` were removed as the `getFeatureDescriptors()` method was removed in Expression Language 6.0.
+
+For more information and the change history of the specification between Pages 3.1 and Pages 4.0, see link:https://github.com/jakartaee/pages/blob/master/spec/src/main/asciidoc/ServerPages.adoc#c1-changes-between-jsp-40-and-jsp-31[Changes between 3.1 and 4.0].
+
+To use this feature, add the following code to your `server.xml` file:
+
+[source,xml]
+----
+<featureManager>
+     <feature>pages-4.0</feature>
+</featureManager>`
+----
+
+For more information, see the https://jakarta.ee/specifications/pages/4.0/[Jakarta Pages 4.0 Specification].
+
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/27962
+// Contact/Reviewer: pmd1nh,pnicolucci
+// // // // // // // //
+[#servlet]
+== Jakarta Servlet 6.1
+
+The Open Liberty `servlet-6.1` feature is an implementation of the Servlet 6.1 specification for Jakarta EE 11 . It includes a number of new features, specification clarifications, and deprecates some existing servlet features.`
+
+Before Servlet 6.1, there was no way for an application to control the response data when doing a send redirect, as well as the response status code, which always set to 302. An application could not easily retrieve the initial request's query string or request HTTP method during an error handling dispatch. It also could not set the character encoding for a request or a response using the `java.nio.charset.Charset`; the only available option was using a String.  During the read or write of a servlet data, the `jakarta.servlet.ServletInputStream` or `jakarta.servlet.ServletOutputStream` only supports a byte array.
+
+Servlet 6.1 provides additional servlet APIs that allow the send redirect to include an optional response data or set a compliant status code, instead of the default 302. Additional request attributes are available during the error handling process to easily retrieve the initial request’s query string or method. Furthermore, international applications can now set the character encoding using a Charset instead of a String.  The `ServletInputStream` or `ServletOutputStream` can use `java.nio.ByteBuffer` to read or write the data.
+
+Several clarifications are added to the behavior of the existing servlet APIs. For example, the `getParameter` family from the `jakar.servlet.ServletRequest` is now throwing the runtime j`ava.lang.IllegalStateException` when an error occurs during the parsing of the request’s parameters.  While processing an error handling dispatch, the HTTP GET method is always used instead of the original request’s HTTP method.`
+
+To use this feature, add the following code to your `server.xml` file:
+
+[source,xml]
+----
+<featureManager>
+   <feature>servlet-6.1</feature>
+</featureManager>
+----
+
+For more information, see the https://jakarta.ee/specifications/servlet/6.1/[Jakarta Servlet 6.1 specification].
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/28109
+// Contact/Reviewer: jakub-pomykala,austin0,dazavala
+// // // // // // // //
+[#mq]
+== Use InstantOn with IBM® MQ in Liberty
+
+The Liberty 24005-beta release introduces InstantOn feature support for link:https://openliberty.io/docs/latest/reference/feature/messaging-3.0.html[Jakarta Messaging], link:https://openliberty.io/docs/latest/reference/feature/connectors-2.1.html[Jakarta Connectors], and link:https://openliberty.io/docs/latest/reference/feature/mdb-4.0.html[Jakarta Enterprise Beans Message-Driven Beans (MDB)]. InstantOn now provides blazing fast startup times for applications that use resource adapters to access external EIS resources -- including applications that use the Jakarta Messaging API to access external messaging systems, like IBM® MQ. And, these "messaging client" applications can manage message delivery to endpoints that have message-driven bean listeners.
+
+Here's a server configuration snippet to deploy applications that use the JakartaEE-10 Messaging API and require the link:https://repo1.maven.org/maven2/com/ibm/mq/wmq.jakarta.jmsra/9.3.5.0/wmq.jakarta.jmsra-9.3.5.0.rar[IBM® MQ resource adapter] to access external messaging resources. This configuration automatically includes the `connectors-2.1` feature, which supports the resource adapter configuration element.
+
+[source,xml]
+----
+<featureManager>
+   <feature>messaging-3.1</feature>
+   <feature>mdb-4.0</feature>
+   <feature>servlet-6.0</feature>
+<featureManager/>
+
+<resourceAdapter id="mqJms" location="${server.config.dir}/wmq.jakarta.jmsra-9.3.5.0.rar"/>
+----
+
+> Tip: Use the link:https://developer.ibm.com/tutorials/mq-connect-app-queue-manager-containers/[MQ in Container image] to stand up an MQ server that provides the following resources: queue manager `QM1`, queue `DEV.QUEUE.1`, channel `DEV.APP.SVRCONN`, and listener `SYSTEM.LISTENER.TCP.1` on port `1414`.  These resources can support a simple point-to-point messaging scenario and are named within the messaging feature configuration elements shown in the following example.
+
+InstantOn can dynamically update the Messaging and Connectors feature configurations to access resources provided by any environment in which a server is restored from checkpoint. The following messaging configuration snippet uses the hostname and MQ listener port values (variables) defined in the restore environment. When this server restores, the connection factory and endpoint activation configurations access MQ resources by using the updated hostname and port values.
+
+[source,xml]
+----
+   <jmsQueue id="jms/queue1" jndiName="jms/queue1">
+      <properties.mqJms  baseQueueName="DEV.QUEUE.1"  baseQueueManagerName="QM1"/>
+   </jmsQueue>
+
+   <variable name="MQ_LISTENER_PORT" value="1414"/>
+
+   <jmsQueueConnectionFactory jndiName="jms/qcf1" connectionManagerRef="ConMgr7">
+      <properties.mqJms  hostName="${HOSTNAME}"  port="${MQ_LISTENER_PORT}"
+            channel="DEV.APP.SVRCONN"  queueManager="QM1"/>
+   </jmsQueueConnectionFactory>
+
+   <jmsConnectionFactory jndiName="jms/cf1" connectionManagerRef="ConMgr1">
+      <properties.mqJms  hostName="${HOSTNAME}"  port="${MQ_LISTENER_PORT}"
+            channel="DEV.APP.SVRCONN"  queueManager="QM1"/>
+   </jmsConnectionFactory>
+    <connectionManager id="ConMgr1" maxPoolSize="10"/>
+
+   <jmsActivationSpec id="myapp/mymdb/FVTMessageDrivenBean">
+      <properties.mqJms  destinationRef="jms/queue1"  destinationType="jakarta.jms.Queue"
+            transportType="CLIENT"  hostName="${HOSTNAME}"  port="${MQ_LISTENER_PORT}"
+            channel="DEV.APP.SVRCONN"  queueManager="QM1"/>
+   </jmsActivationSpec>
+----
+
+Enjoy the time savings and stay tuned for upcoming announcements regarding InstantOn support for the Jakarta embedded messaging features.
+
+
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+[#run]
+=== Try it now
+
+To try out these features, update your build tools to pull the Open Liberty All Beta Features package instead of the main release. The beta works with Java SE 22, Java SE 21, Java SE 17, Java SE 11, and Java SE 8.
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], you can install the All Beta Features package using:
+
+[source,xml]
+----
+<plugin>
+    <groupId>io.openliberty.tools</groupId>
+    <artifactId>liberty-maven-plugin</artifactId>
+    <version>3.10.2</version>
+    <configuration>
+        <runtimeArtifact>
+          <groupId>io.openliberty.beta</groupId>
+          <artifactId>openliberty-runtime</artifactId>
+          <version>24.0.0.5-beta</version>
+          <type>zip</type>
+        </runtimeArtifact>
+    </configuration>
+</plugin>
+----
+
+You must also add dependencies to your pom.xml file for the beta version of the APIs that are associated with the beta features that you want to try. For example, the following block adds dependencies for two example beta APIs:
+
+[source,xml]
+----
+<dependency>
+    <groupId>org.example.spec</groupId>
+    <artifactId>exampleApi</artifactId>
+    <version>7.0</version>
+    <type>pom</type>
+    <scope>provided</scope>
+</dependency>
+<dependency>
+    <groupId>example.platform</groupId>
+    <artifactId>example.example-api</artifactId>
+    <version>11.0.0</version>
+    <scope>provided</scope>
+</dependency>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'io.openliberty.tools:liberty-gradle-plugin:3.8.2'
+    }
+}
+apply plugin: 'liberty'
+dependencies {
+    libertyRuntime group: 'io.openliberty.beta', name: 'openliberty-runtime', version: '[24.0.0.5-beta,)'
+}
+----
+
+
+Or if you're using link:{url-prefix}/docs/latest/container-images.html[container images]:
+
+[source]
+----
+FROM icr.io/appcafe/open-liberty:beta
+----
+
+Or take a look at our link:{url-prefix}/downloads/#runtime_betas[Downloads page].
+
+If you're using link:https://plugins.jetbrains.com/plugin/14856-liberty-tools[IntelliJ IDEA], link:https://marketplace.visualstudio.com/items?itemName=Open-Liberty.liberty-dev-vscode-ext[Visual Studio Code] or link:https://marketplace.eclipse.org/content/liberty-tools[Eclipse IDE], you can also take advantage of our open source link:https://openliberty.io/docs/latest/develop-liberty-tools.html[Liberty developer tools] to enable effective development, testing, debugging and application management all from within your IDE.
+
+For more information on using a beta release, refer to the link:{url-prefix}docs/latest/installing-open-liberty-betas.html[Installing Open Liberty beta releases] documentation.
+
+[#feedback]
+== We welcome your feedback
+
+Let us know what you think on link:https://groups.io/g/openliberty[our mailing list]. If you hit a problem, link:https://stackoverflow.com/questions/tagged/open-liberty[post a question on StackOverflow]. If you hit a bug, link:https://github.com/OpenLiberty/open-liberty/issues[please raise an issue].
