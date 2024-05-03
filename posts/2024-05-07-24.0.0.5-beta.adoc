@@ -6,8 +6,8 @@ categories: blog
 author_picture: https://avatars3.githubusercontent.com/dmuelle
 author_github: https://github.com/dmuelle
 seo-title: Jakarta EE 11 previews and InstantOn support for IBM MQ in 24.0.0.5-beta - OpenLiberty.io
-seo-description: The 24.0.0.5-beta release introduces previews for several Jakarta EE 11 features, including Jakarta Concurrency 3.1, Jakarta Data 1.0, Jakarta Expression Language 6.0, Jakarta Pages 4.0, and Jakarta Servlet 6.1. This release also includes support for using InstantOn with IBM MQ messaging.
-blog_description: The 24.0.0.5-beta release introduces previews for several Jakarta EE 11 features, including Jakarta Concurrency 3.1, Jakarta Data 1.0, Jakarta Expression Language 6.0, Jakarta Pages 4.0, and Jakarta Servlet 6.1. This release also includes support for using InstantOn with IBM MQ messaging.
+seo-description: The 24.0.0.5-beta release introduces previews for several Jakarta EE 11 features, including Jakarta Contexts and Dependency Injection 4.1, Jakarta Concurrency 3.1, Jakarta Data 1.0, Jakarta Expression Language 6.0, Jakarta Pages 4.0, and Jakarta Servlet 6.1. This release also includes support for using InstantOn with IBM MQ messaging.
+blog_description: The 24.0.0.5-beta release introduces previews for several Jakarta EE 11 features, including Jakarta Contexts and Dependency Injection 4.1, Jakarta Concurrency 3.1, Jakarta Data 1.0, Jakarta Expression Language 6.0, Jakarta Pages 4.0, and Jakarta Servlet 6.1. This release also includes support for using InstantOn with IBM MQ messaging.
 open-graph-image: https://openliberty.io/img/twitter_card.jpg
 open-graph-image-alt: Open Liberty Logo
 ---
@@ -17,8 +17,7 @@ David Mueller <https://github.com/dmuelle>
 :url-prefix:
 :url-about: /
 
-The 24.0.0.5-beta release introduces previews for several Jakarta EE 11 features, including Jakarta Concurrency 3.1, Jakarta Data 1.0, Jakarta Expression Language 6.0, Jakarta Pages 4.0, and Jakarta Servlet 6.1. This release also includes support for using InstantOn with IBM MQ messaging.
-
+The 24.0.0.5-beta release introduces previews for several Jakarta EE 11 features, including Jakarta Contexts and Dependency Injection 4.1, Jakarta Concurrency 3.1, Jakarta Data 1.0, Jakarta Expression Language 6.0, Jakarta Pages 4.0, and Jakarta Servlet 6.1. This release also includes support for using InstantOn with IBM MQ messaging.
 
 The link:{url-about}[Open Liberty] 24.0.0.5-beta includes the following beta Jakarta EE 11 features (along with link:{url-prefix}/docs/latest/reference/feature/feature-overview.html[all GA features]):
 
@@ -148,16 +147,18 @@ Further references:
 
 Jakarta Concurrency allows applications to use concurrency while maintaining the benefits of running on a Jakarta EE runtime. Jakarta Concurrency 3.1 is the new version for the upcoming Jakarta EE 11, and it adds support for new features of the latest Java SE releases as well as some usability improvements.
 
-The new features in Jakarta Concurrency 3.1 are improved support for the Java Flow (Reactive Streams) APIs, and the use of virtual threads in `ManagedExecutors` and `ManagedThreadFactories`. Support is also included for using `@Inject` in place of `@Resource`, and the option to run asynchronous methods on a schedule by using the new `@Schedule` annotation.
+The new features in Jakarta Concurrency 3.1 are improved support for the Java Flow (Reactive Streams) APIs and the use of virtual threads in managed executors and managed thread factories. Support is also included for using `@Inject` in place of `@Resource` and the option to run asynchronous methods on a schedule by using the new `@Schedule` annotation.
 
-To support the Flow APIs, `ContextService` has two new methods, `contextualSubscriber`, which provides context in a `Flow.Subscriber`, and `Flow.Processor`, which provides context in a `contextualProcessor`. These new methods allow for context in a flow when using a `Flow.Publisher` which does not allow configuring a `ManagedExecutor`.
+
+To support the Flow APIs, `ContextService` has two new methods, `contextualSubscriber`, which provides context in a `Flow.Subscriber`, and `Flow.Processor`, which provides context in a `contextualProcessor`. These new methods allow for context in a flow when using a `Flow.Publisher`, which does not allow configuring a `ManagedExecutor`.
 
 [source,java]
 ----
 publisher.subscribe(contextService.contextualSubscriber(subscriber));
 ----
 
-Virtual threads are available in Jakarta Concurrency 3.1 by specifying ‘virtual = true’ on a `ManagedExecutorDefinition`, `ManagedScheduledExecutorDefinition`, or `ManagedThreadFactory` instance. Virtual threads are a new feature of Java 21, so when running on Java 17 if ‘virtual = true’ is specified, platform threads are provided instead of virtual threads.
+Virtual threads are available in Jakarta Concurrency 3.1 by specifying ‘virtual = true’ on a `ManagedExecutorDefinition`, `ManagedScheduledExecutorDefinition`, or `ManagedThreadFactory` instance. Virtual threads are a new feature of Java 21, so when running on Java 17 and ‘virtual = true’ is specified, platform threads are provided instead of virtual threads.
+
 
 [source,java]
 ----
@@ -165,13 +166,18 @@ Virtual threads are available in Jakarta Concurrency 3.1 by specifying ‘virtua
                            virtual = true)
 ----
 
-The new `@Schedule` annotation allows asynchronous methods to run on a schedule. In this example, after the method is called, it runs asynchronously on a schedule set by the provided cron string
+The new `@Schedule` annotation allows asynchronous methods to run on a schedule. In this example, after the method is called, it runs asynchronously at 10 AM on every day of every month where the day of the week is a Monday, Wednesday, or Friday, according to the provided cron string.
 
 [source,java]
 ----
-@Asynchronous(runAt = { @Schedule(cron = "*/3 * * * * *")})
-void scheduledMethod() {
+@Asynchronous(runAt = @Schedule(cron = "0 10 * * MON,WED,FRI", zone = "America/Chicago"))
+void runAt10MWF() {
+    ...
+    if (neverRunAgain)
+        Asynchronous.Result.complete(null);
+}
 ----
+
 
 To try out Jakarta Concurrency 3.1, check out the link:https://github.com/OpenLiberty/sample-concurrency[sample application].
 
@@ -345,7 +351,7 @@ To use this feature, add the following code to your `server.xml` file:
 ----
 <featureManager>
      <feature>expressionLanguage-6.0</feature>
-</featureManager>`
+</featureManager>
 ----
 
 For more information, see the link:https://jakarta.ee/specifications/expression-language/6.0[Jakarta Expression Language 6.0 specification and Javadocs].
@@ -379,7 +385,7 @@ To use this feature, add the following code to your `server.xml` file:
 ----
 <featureManager>
      <feature>pages-4.0</feature>
-</featureManager>`
+</featureManager>
 ----
 
 For more information, see the https://jakarta.ee/specifications/pages/4.0/[Jakarta Pages 4.0 Specification].
@@ -394,13 +400,13 @@ For more information, see the https://jakarta.ee/specifications/pages/4.0/[Jakar
 [#servlet]
 == Jakarta Servlet 6.1
 
-The Open Liberty `servlet-6.1` feature is an implementation of the Servlet 6.1 specification for Jakarta EE 11 . It includes a number of new features, specification clarifications, and deprecates some existing servlet features.`
+The Open Liberty `servlet-6.1` feature is an implementation of the Servlet 6.1 specification for Jakarta EE 11 . It includes a number of new features, specification clarifications, and deprecates some existing servlet features.
 
 Before Servlet 6.1, there was no way for an application to control the response data when doing a send redirect, as well as the response status code, which always set to 302. An application could not easily retrieve the initial request's query string or request HTTP method during an error handling dispatch. It also could not set the character encoding for a request or a response using the `java.nio.charset.Charset`; the only available option was using a String.  During the read or write of a servlet data, the `jakarta.servlet.ServletInputStream` or `jakarta.servlet.ServletOutputStream` only supports a byte array.
 
 Servlet 6.1 provides servlet APIs that allow the send redirect to include an optional response data or set a compliant status code, instead of the default 302. Additional request attributes are available during the error handling process to easily retrieve the initial request’s query string or method. Furthermore, international applications can now set the character encoding using a Charset instead of a String.  The `ServletInputStream` or `ServletOutputStream` can use `java.nio.ByteBuffer` to read or write the data.
 
-Several clarifications are added to the behavior of the existing servlet APIs. For example, the `getParameter` family from the `jakar.servlet.ServletRequest` is now throwing the runtime j`ava.lang.IllegalStateException` when an error occurs during the parsing of the request’s parameters.  While processing an error-handling dispatch, the HTTP GET method is always used instead of the original request’s HTTP method.`
+Several clarifications are added to the behavior of the existing servlet APIs. For example, the `getParameter` family from the `jakarta.servlet.ServletRequest` is now throwing the runtime `java.lang.IllegalStateException` when an error occurs during the parsing of the request’s parameters.  While processing an error-handling dispatch, the HTTP GET method is always used instead of the original request’s HTTP method.
 
 To use this feature, add the following code to your `server.xml` file:
 
@@ -439,7 +445,9 @@ Here's a server configuration snippet to deploy applications that use the Jakart
 
 You can use the link:https://developer.ibm.com/tutorials/mq-connect-app-queue-manager-containers/[MQ in Container image] to stand up an MQ server that provides the following resources: queue manager `QM1`, queue `DEV.QUEUE.1`, channel `DEV.APP.SVRCONN`, and listener `SYSTEM.LISTENER.TCP.1` on port `1414`.  These resources can support a simple point-to-point messaging scenario and are named within the messaging feature configuration elements shown in the following example.
 
-InstantOn can dynamically update the Messaging and Connectors feature configurations to access resources that are provided by any environment in which a server is restored from checkpoint. The following messaging configuration snippet uses the hostname and MQ listener port values (variables) defined in the restore environment. When this server restores, the connection factory and endpoint activation configurations access MQ resources by using the updated hostname and port values.
+InstantOn can dynamically update the messaging and connectors configuration elements to enable connections to external resources that are made available in any environment where a server is restored from checkpoint.
+
+In the following example, the messaging configuration elements use Liberty variables named `MQ_HOSTNAME` and `MQ_PORT` to specify the hostname and IP port of the system that the MQ queue manager runs on. You can define these variables in the `server.env` file of a checkpointed server. When the server is restored, the queue connection factory and message endpoint activation configurations update to the environment-specific hostname and port values for the MQ queue manager.
 
 [source,xml]
 ----
@@ -447,7 +455,8 @@ InstantOn can dynamically update the Messaging and Connectors feature configurat
       <properties.mqJms  baseQueueName="DEV.QUEUE.1"  baseQueueManagerName="QM1"/>
    </jmsQueue>
 
-   <variable name="MQ_LISTENER_PORT" value="1414"/>
+   <variable name="MQ_PORT" value="1414"/>
+   <variable name="MQ_HOSTNAME" value="localhost"/>
 
    <jmsQueueConnectionFactory jndiName="jms/qcf1" connectionManagerRef="ConMgr7">
       <properties.mqJms  hostName="${HOSTNAME}"  port="${MQ_LISTENER_PORT}"
