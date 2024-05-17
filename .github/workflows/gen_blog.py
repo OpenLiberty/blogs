@@ -120,8 +120,8 @@ def make_blog(issues, is_beta):
         
         # Get the issue body.  First look for tags, then for linked issues, and finally the issue itself
         body = ""
-        # For now, just be greedy and grab everything between "<GHA-BLOG-RELATED-FEATURES>" and "</GHA-BLOG-SUMMARY>"
-        if "<GHA-BLOG-RELATED-FEATURES>" in issue['body'] and "</GHA-BLOG-SUMMARY>" in issue['body'] :
+        # Grab everything between "<GHA-BLOG-SUMMARY>" and "</GHA-BLOG-SUMMARY>"
+        if "<GHA-BLOG-SUMMARY>" in issue['body'] and "</GHA-BLOG-SUMMARY>" in issue['body'] :
             body = issue['body'].partition("<GHA-BLOG-RELATED-FEATURES>")[2].partition("</GHA-BLOG-SUMMARY>")[0]
         else:
             body = linked_issue['body'] if (linked_issue != None and linked_issue['body']) else issue['body']
