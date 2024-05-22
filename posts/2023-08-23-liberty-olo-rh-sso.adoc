@@ -52,7 +52,10 @@ Rumana Haque <https://github.com/rumanaHaque>
 
 Security is paramount in today's world, and it is important to ensure your cloud applications are protected. A common way to do that is to configure Single Sign On for your application such as GitHub, Google, Facebook or OpenID Connect (OIDC). Single Sign-On (SSO) is a mechanism that allows users to authenticate themselves once and gain access to multiple applications or systems without the need to re-enter their credentials every time. This improves productivity and reduces the number of attack surfaces by reducing the number of times users have to sign in and only requiring the use of one set of credentials. To pass authorization from a single sign-on (SSO) service to another cloud application, OAuth can be used. This can help to further improve the security of an application as user credentials can be better protected by storing a token, and not the credentials themselves in local storage, filesystem or cookies.
 
-This blog will show you step by step how to configure your Liberty application deployed in OpenShift to use a specific type of OIDC - RedHat Single SignOn (RH-SSO). Liberty application will be deployed using the Open Liberty Operator (OLO) in OpenShift, with special configuration to be able to connect to RH-SSO. Configure the RH-SSO to create a client specifically for your liberty application. Once configuration is complete, when you login to your application, you will first be re-directed to RH-SSO, and once you authenticate successfully, it will redirect you back to your application.
+Why use OIDC? The main benefit of using OpenID Connect is that it provides a completely standardized setup. OIDC also adds an extra layer of protection via JSON Web Tokens (JWTs). 
+
+This blog will show you step by step how to configure your Liberty application deployed in OpenShift to use a specific type of OIDC - RedHat Single SignOn (RH-SSO). We used RH-SSO since it is an integrated sign-on solution available within Open Shift.
+You will deploy the Liberty application using the Open Liberty Operator (OLO) in OpenShift, with special configuration to be able to connect to RH-SSO. The Open Liberty Operator (OLO) is being used here to help simplify the deployment process in Open Shift. After you have deployed the Liberty application, you will need to configure the RH-SSO to create a client specifically for your liberty application. Once configuration is complete, when you login to your application, you will first be re-directed to RH-SSO, and once you authenticate successfully, it will redirect you back to your application.
 
 
 == Overview of steps
@@ -61,30 +64,21 @@ To show how to configure your Liberty application to use RH-SSO, we'll take a si
 
 1) <<prepareApp, Set up, build and containerize the sample application>>
 
-* <<setUpApp, Set up the example application from the guide>>
-* <<buildApp, Build the updated application>>
-* <<containerize, Containerizing the application>>
 
 2) <<installRHSSO, Configure the Red Hat OpenShift cluster to make use of RH-SSO>>
 
-* <<installRHSSO, Installing and configuring RH-SSO (RedHat Single Sign-On) Operator>>
+3) <<createSecret, Create the olapp-sso secret>>
 
-3) <<deployApp, Deploy the application to the Open Shift cluster using the Open Liberty Operator>>
+4) <<deployApp, Install Open Liberty Operator, and deploy the application to Open Shift using the Open Liberty Operator>>
 
-* <<createSecret, Create the olapp-sso secret>>
+5) <<createOIDCClient, Create a new client in RH-SSO for the deployed application, so you can use RH-SSO to login to the application>>
 
-* <<deployApp, Install Open Liberty Operator, and deploy the application to Open Shift using the Open Liberty Operator>>
-
-4) Create a new client in RH-SSO for this deployed application, so that you can use RH-SSO to login to the application.
-
-* <<createOIDCClient, Create the OIDC Client in RH-SSO>>
-
-5) Run the application, and logging in will redirect you to use OIDC using RH-SSO
-
-* <<runApp, Running the application, and logging in using OIDC>>
+6) <<runApp, Run the application, and log in using OIDC>>
 
 
-[#setUpApp]
+
+
+[#prepareApp]
 == Set up the example application project from Social Media Guide
 
 Before we get into the details of configuring Security, we first need to set up an example application to apply this security to. For this example, we will have a look at the application used in the Open Liberty guide -  link:/guides/social-media-login.html[Authenticating users through social media providers]
@@ -151,7 +145,7 @@ Here is the updated server.xml that you will need to use:
 
 This edited server.xml provides the feature socialLogin-1.0 to your application's feature list, and adds the required ports. The configuration previously provided for the keystore and truststore is now commented out as this is no longer needed when running the application with the Open Liberty Operator, as we will do in this example.
 
-[#buildApp]
+
 == Build and run the updated Application
 After updating the server.xml file, you're now ready to build and then run the application.
 
@@ -195,7 +189,7 @@ After you finish checking out the application, stop the Open Liberty server by p
 
 We can now include the WAR file you built above in a container image so it can be used to deploy this application in OCP.
 
-[#containerize]
+
 == Containerizing the application
 
 For the application to be deployed on Open Shift using the Open Liberty Operator, it must first be containerized using the Open Liberty image.
@@ -249,14 +243,15 @@ By specifying ARG SEC_SSO_PROVIDERS="oidc", you are telling the configuration th
 
 Build the application image using the Docker File shown above, and upload to a repository of your choice (for e.g. dockerhub or artifactory), and note the image location so that you can use it later on for deploying this application to OpenShift using the Open Liberty Operator (OLO)
 
+With this step, we have completed the steps needed to successfully set up the application. Now we can move onto the next setp of installing and configuring their openshift cluster for us to deploy this application to.
 
 
 [#installRHSSO]
 == Installing and configuring RH-SSO (RedHat Single Sign-On) Operator in the OpenShift cluster
 
-In this section we'll walk through the steps necessary to correctly set up our OpenShift cluster so that we can make use of RH-SSO. 
+In this section we will walk through the steps necessary to correctly set up our OpenShift cluster so that we can make use of RH-SSO. 
 
-1. Step 1 - Install RH-SSO
+Step 1 - Install RH-SSO
 
 The first step we'll need to take is to install the Red Hat Single Sign-On Operator to the cluster. This will allow us to easily install RH-SSO. When installing this operator, ensure that it is installed in the namespace - "rh-sso". To do this, follow the instructions provided in the Red Hat documentation:
 
@@ -265,7 +260,7 @@ https://access.redhat.com/documentation/en-us/red_hat_single_sign-on/7.6/html/se
 Install the Operator in the namespace - "rh-sso".
 
 
-2. Step 2 - Create a KeyCloak instance
+Step 2 - Create a KeyCloak instance, and log in to the instance
 
 After installing the RH-SSO Operator, create a KeyCloak instance using the default values provided. After creating the KeyCloak instance, you should be able to access the KeyCloak by looking at the routes. The route should be in this format - https://keycloak-rh-sso.apps.<cluster_name>
 
@@ -277,9 +272,13 @@ Get the secret password from the console for the admin username in this secret
 
 Use this username and password to login on to the KeyCloak.
 
+Step 3 - Create a realm named "sso-realm"
+
 After logging in, create a realm, called - "sso-realm".
 This is the url to access this realm
 https://keycloak-rh-sso.apps.<cluster-name>/auth/admin/master/console/#/realms/sso-realm
+
+Step 4 - Create users for this realm
 
 Next we need to create users (non-admin) for this realm. We can use them to test social login when RH-SSO is used as OIDC provider, the non-admin users can be used to log in to the client application. 
 
@@ -320,6 +319,8 @@ This will be needed for the client registration as the discoveryEndpoint later o
 
 [#createSecret]
 == Create the olapp-sso secret 
+
+Next, we will need to create a secret for the Open Liberty Application
 
 Create a new project - called `gsm-test`, and create a secret in that namespace - - (Workloads->Secrets->Create Secret), called `guide-social-media-login-olapp-sso`, using key `oidc-clientId` and value `gsmapp`.
 
@@ -419,7 +420,7 @@ and click on Save.
 [#runApp]
 == Running the application, and logging in using OIDC
 
-Congratulations! You've now completed all the required configuration to use SSO to login to your application.
+Congratulations! You've now completed all the required configurations to use SSO to login to your application.
 
 Now, you're ready to run the application. When you click on the "Log In" button for the app, it will now redirect you to the RH-SSO console, where you can log in using the username and password that you created earlier.
 
@@ -447,7 +448,7 @@ Log in using testuser1/testpasswd1, and it will redirect you back to the applica
 [.img_border_light]
 image::img/blog/rh_social_media_logged_in.png[Social Media Logged in after Redirect,width=50%,align="center"]
 
-By following the steps mentioned above, you have successfully secured your Liberty Application running in Open Shift, so you can authenticate and authorsize your users using OAuth.
+By following the steps mentioned above, you have successfully secured your Liberty Application running in Open Shift, so you can authenticate and authorize your users using OAuth.
 // // // // // // // //
 // LINKS
 //
