@@ -1,0 +1,230 @@
+---
+layout: post
+title: "24.0.0.3におけるデフォルトの冗長ガベージコレクションとOpenID Connectのバックチャネルログアウトのサポート"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/dmuelle
+author_github: https://github.com/dmuelle
+seo-title: 24.0.0.3におけるデフォルトの冗長ガベージコレクションとOpenID Connectのバックチャネルログアウトのサポート - OpenLiberty.io
+seo-description: 24.0.0.3から、Java実行がIBM JavaまたはIBM Semeru Runtimesの場合、冗長ガベージ・コレクションがデフォルトで有効になりました。また、このリリースでは、Open LibertyのOpenID Connectクライアントとサーバーがバックチャネル・ログアウトをサポートするようになりました。
+blog_description: 24.0.0.3から、Java実行がIBM JavaまたはIBM Semeru Runtimesの場合、冗長ガベージ・コレクションがデフォルトで有効になりました。また、このリリースでは、Open LibertyのOpenID Connectクライアントとサーバーがバックチャネル・ログアウトをサポートするようになりました。
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+additional_authors:
+- name: 浅田 かおり (翻訳)
+  github: https://github.com/kaori-asa
+  image: https://avatars0.githubusercontent.com/kaori-asa
+blog-available-in-languages:
+- lang: en
+  path: /blog/2024/03/26/24.0.0.3.html
+---
+
+= 24.0.0.3におけるデフォルトの冗長ガベージコレクションとOpenID Connectのバックチャネルログアウトのサポート
+David Mueller <https://github.com/dmuelle>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+24.0.0.3から、Java実行がIBM JavaまたはIBM Semeru Runtimesの場合、冗長ガベージ・コレクションがデフォルトで有効になりました。また、このリリースでは、Open LibertyのOpenID Connectクライアントとサーバーがバックチャネル・ログアウトをサポートするようになりました。
+
+
+In link:{url-about}[Open Liberty] 24.0.0.3:
+
+* <<verbose, IBM JavaおよびIBM Semeruランタイムのデフォルトの冗長ガベージ・コレクション>>
+* <<oidc, OpenID Connectクライアントとサーバーのバックチャネル・ログアウトのサポート>>
+* <<CVEs, セキュリティ脆弱性（CVE）の修正>>
+
+link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A24003+label%3A%22release+bug%22[24.0.0.3]で修正されたバグリストをご参照ください。
+
+過去のセキュリティ脆弱性修正の一覧は、 link:{url-prefix}/blog/?search=release&search!=beta[以前のOpen Liberty GAリリースブログ]をご参照ください。
+
+
+[#run]
+== 24.0.0.3を使用したアプリの開発と実行
+
+link:{url-prefix}/guides/maven-intro.html[Maven]を使うときは下記の設定をお使いください。 以下のコードを `pom.xml` ファイルにインクルードしてください。
+
+[source,xml]
+----
+<plugin>
+    <groupId>io.openliberty.tools</groupId>
+    <artifactId>liberty-maven-plugin</artifactId>
+    <version>3.10.2</version>
+</plugin>
+----
+
+link:{url-prefix}/guides/gradle-intro.html[Gradle]の場合は、`build.gradle` ファイルに以下をインクルードします。
+
+[source,gradle]
+----
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'io.openliberty.tools:liberty-gradle-plugin:3.8.2'
+    }
+}
+apply plugin: 'liberty'
+----
+
+link:{url-prefix}/docs/latest/container-images.html[コンテナ・イメージ]の場合はこちらです。
+
+[source]
+----
+FROM icr.io/appcafe/open-liberty
+----
+
+link:{url-prefix}/start/[ダウンロード・ページ]をご参照ください。
+
+link:https://plugins.jetbrains.com/plugin/14856-liberty-tools[IntelliJ IDEA], link:https://marketplace.visualstudio.com/items?itemName=Open-Liberty.liberty-dev-vscode-ext[Visual Studio Code]またはlink:https://marketplace.eclipse.org/content/liberty-tools[Eclipse IDE]をお使いの場合は、IDE内で効率的な開発、テスト、デバッグ、アプリケーション管理を行うためのオープンソースlink:https://openliberty.io/docs/latest/develop-liberty-tools.html[Liberty開発者ツール]をお試しください。
+
+[link=https://stackoverflow.com/tags/open-liberty]
+image::img/blog/blog_btn_stack_ja.svg[Stack Overflowで質問する, align="center"]
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/27459
+// Contact/Reviewer: rsherget
+// // // // // // // //
+[#verbose]
+== IBM JavaおよびIBM Semeruランタイムのデフォルトの冗長ガベージ・コレクション
+
+Javaランタイムのlink:https://eclipse.dev/openj9/docs/vgclog/[冗長ガベージ・コレクション]を有効にすると、メモリ・リークやその他のパフォーマンス・ボトルネックのデバッグに役立ちます。24.0.0.3から、Java実装としてlink:https://www.ibm.com/docs/en/sdk-java-technology/8[IBM Java]またはlink:https://developer.ibm.com/languages/java/semeru-runtimes/[IBM Semeru Runtimes]を使用すると、冗長ガベージ・コレクション・ロギングがデフォルトで有効になります。最大10個の `verbosegc.XXX.log` ローリングログファイルがログディレクトリに作成され、ファイルごとに1024GCサイクルが記録されます。
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+
+さらに詳細はlink:{url-prefix}/docs/latest/log-trace-configuration.html[ログとトレースの設定]をご参照ください。
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/27477
+// Contact/Reviewer: jimmy1wu
+// // // // // // // //
+[#oidc]
+== OpenID Connectクライアントとサーバーのバックチャネル・ログアウトのサポート
+
+Open LibertyのOpenID Connectクライアントとサーバーがバックチャネルログアウトに対応しました。バックチャネルログアウトは、OpenID ConnectサーバーがユーザーのログアウトをOpenID Connectクライアントに直接通知し、各OpenID Connectクライアントもローカルでユーザーをログアウトできるようにします。
+
+以前は、OpenID Connectサーバーは、OpenID Connectクライアントのウェブページに埋め込まれたiframeを使用することによってのみ、ユーザーがログアウトしたことをOpenID Connectクライアントに通知することができました。ウェブページがアクティブでない場合、OpenID ConnectクライアントはOpenID Connectサーバーで発生したログアウトを通知されませんでした。バックチャネルログアウトは、OpenID Connectサーバーとクライアント間の直接通信によってこの問題を解決します。
+
+=== OpenID Connectクライアントのバックチャネル・ログアウトのサポート
+
+このリリースでは、link:{url-prefix}/docs/latest/reference/feature/openidConnectClient.html[OpenID Connect Client]機能またはlink:{url-prefix}/docs/latest/reference/feature/socialLogin.html[ソーシャルメディアログイン]機能が有効になっている場合、OpenID Connectクライアントのバックチャネルログアウトサポートがデフォルトで有効になります。これらの機能のいずれかが有効で、かつ `server.xml` ファイルに `openidConnectClient` 要素または `socialLogin` 要素が定義されている場合、OpenID Connect クライアントのバックチャネルログアウトエンドポイントも自動的に有効になります。OpenID Connect サーバーはこれらのエンドポイントにバックチャネルログアウトリクエストを送信し、OpenID Connect クライアントでユーザをログアウトさせます。
+
+OpenID Connectサーバーは、バックチャネルログアウト要求を送信するために、バックチャネルログアウトエンドポイントの絶対URIを必要とします。これらの機能では、以下のバックチャネル・ログアウト・エンドポイントが有効になっています。
+
+* OpenID Connect Client: `/oidcclient/backchannel_logout/{oidcClientId}`
+* Social Media Login: `/ibm/api/social-login/backchannel_logout/{socialLoginId}`
+
+例えば、以下のOpenID Connectクライアント機能設定は、OpenID Connectクライアントの `/oidcclient/backchannel_logout/oidcClientId` バックチャネルログアウトエンドポイントを有効にします。
+
+[source,xml]
+----
+<featureManager>
+    <feature>openidConnectClient-1.0</feature>
+</featureManager>
+...
+<openidConnectClient id="oidcClientId" ... />
+----
+
+同様に、以下のソーシャルメディアログイン機能の設定は、OpenID Connectクライアント上で `/ibm/api/social-login/backchannel_logout/socialLoginId` バックチャネルログアウトエンドポイントを有効にします。
+
+[source,xml]
+----
+<featureManager>
+    <feature>socialLogin-1.0</feature>
+</featureManager>
+...
+<oidcLogin id="socialLoginId" ... />
+----
+
+=== OpenID Connectサーバーのバックチャネル・ログアウトのサポート
+
+OpenID Connect サーバのバックチャネルログアウトを有効にするには、`server.xml` ファイルの `localStore` 要素で定義されている OAuth クライアントに `backchannelLogoutUri` 属性を指定します。
+
+また、OpenID Connectサーバはバックチャネルログアウトリクエストがタイムアウトするまで、デフォルトの180秒間待機します。`openidConnectProvider` 要素の `backchannelLogoutRequestTimeout` 属性を使用することで、カスタム期間を指定することができます。
+
+次の `server.xml` ファイルの例は、OpenID Connect サーバがバックチャネル・ログアウト・リクエストを行う際に使用するバックチャネル・ログアウト URI を、タイムアウト 60 秒で指定する方法を示しています。
+
+[source,xml]
+----
+<featureManager>
+    <feature>openidConnectServer-1.0</feature>
+</featureManager>
+
+...
+
+<openidConnectProvider
+    id="OidcConfigSample"
+    backchannelLogoutRequestTimeout="60s"
+    oauthProviderRef="OAuthConfigSample" ... />
+
+<oauthProvider id="OAuthConfigSample" ... >
+    <localStore>
+        <client
+            name="client01"
+            backchannelLogoutUri="http://localhost:9080/oidcclient/backchannel_logout/client01"
+            ... />
+    </localStore>
+</oauthProvider>
+----
+
+
+これで、OpenID Connect サーバの logout または `end_session` エンドポイントが呼び出されると、OpenID Connect サーバもバックチャネルでログアウト要求を送信し、OpenID Connect クライアントでユーザをログアウトさせることができます。OpenID Connect サーバの logout エンドポイントは `/oidc/endpoint/{oidcProviderId}/logout` で、`end_session` エンドポイントは `/oidc/endpoint/{oidcProviderId}/end_session` です。前の例では、サーバのログアウトエンドポイントは `/oidc/endpoint/OidcConfigSample/logout` であり、 `end_session` エンドポイントは `/oidc/endpoint/OidcConfigSample/end_session` である。
+
+あるいは、OpenID Connect プロバイダのクライアント登録エンドポイントを使用して OAuth クライアントを動的に登録する際に、OpenID Connect クライアントのバックチャネルログアウト URI を指定するために `backchannel_logout_uri` メタデータ値を定義することで、OpenID Connect サーバのバックチャネルログアウトを有効にすることができます。
+
+==== OpenID ConnectサーバーのSSO Cookieを使用しないバックチャネル・ログアウト
+
+オプションで、ログアウトするユーザーを判断するためのクエリパラメータとして、その OpenID Connect サーバーが発行する ID Token を含む `id_token_hint` クエリパラメータをエンドポイントリクエストに追加することができます。この設定は、ログアウトまたは `end_session` リクエストがユーザの OpenID Connect サーバの SSO Cookie なしで行われる場合に便利です。
+
+例えば、OpenID Connectサーバーが `http://localhost:9081` でホストされていて、ユーザーのOpenID ConnectサーバーのSSO Cookieが利用可能な場合、以下のいずれかのエンドポイントを起動すると、OpenID Connectサーバーは設定されたバックチャネルログアウトURIにもバックチャネルログアウトリクエストを送信します。
+
+* Logout endpoint: `\http://localhost:9081/oidc/endpoint/{oidcProviderId}/logout`
+* End session endpoint: `\http://localhost:9081/oidc/endpoint/{oidcProviderId}/end_session`
+
+curl コマンドでエンドポイントを呼び出す場合など、ユーザの OpenID Connect サーバの SSO クッキーが利用できない場合は、`id_token_hint` クエリパラメータを使用して、ユーザに属する ID トークンをリクエストに追加する必要があります。
+
+* Logout endpoint with ID token hint: `\http://localhost:9081/oidc/endpoint/{oidcProviderId}/logout?id_token_hint={id_token}`
+* End session endpoint with ID token hint: `\http://localhost:9081/oidc/endpoint/{oidcProviderId}/end_session?id_token_hint={id_token}`
+
+==== SAMLで構成されたOpenID Connectサーバのバックチャネルログアウト
+
+バックチャネルログアウトは、link:{url-prefix}/docs/latest/reference/feature/samlWeb-2.0.html[SAML Web Single Sign-On]機能を使用してSAML Identity Provider（IdP）と構成されているOpenID Connectサーバーでも有効です。IdP でのログアウトは、OpenID Connect サーバーが設定された OpenID Connect クライアントにバックチャネルのログアウト要求を送信するトリガーにもなります。
+
+=== さらに詳しく
+
+Open LibertyのOpenID Connectの設定については、以下のリソースを参照してください。
+
+- link:{url-prefix}/docs/latest/reference/config/openidConnectClient.html[openidConnectClient]
+- link:{url-prefix}/docs/latest/reference/config/oidcLogin.html[oidcLogin]
+- link:{url-prefix}/docs/latest/reference/config/openidConnectProvider.html[openidConnectProvider]
+
+バックチャネル・ログアウト仕様の詳細については、link:https://openid.net/specs/openid-connect-backchannel-1_0.html[OpenID Connect Back-Channel Logout 1.0]を参照してください。
+
+
+
+[#CVEs]
+== 本リリースにおけるセキュリティ脆弱性 (CVE) の修正
+[cols="5*"]
+|===
+|CVE |CVSSスコア |脆弱性アセスメント |影響を受けるバージョン |ノート
+
+|http://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2023-50312[CVE-2023-50312]
+|5.3
+|Weaker security
+|17.0.0.3 - 24.0.0.2
+|24.0.0.3
+|
+|===
+
+For a list of past security vulnerability fixes, reference the link:{url-prefix}/docs/latest/security-vulnerabilities.html[Security vulnerability (CVE) list].
+過去のセキュリティ脆弱性修正リストについては、link:{url-prefix}/docs/latest/security-vulnerabilities.html[セキュリティ脆弱性(CVE)リスト]を参照してください。
+
+
+== 今すぐOpen Liberty 24.0.0.3を入手する
+
+<<Maven, Gradle, Docker,ダウンロード可能なアーカイブ>>からも入手可能です。
