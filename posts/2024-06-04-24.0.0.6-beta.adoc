@@ -24,9 +24,10 @@ The 24.0.0.6-beta release includes previews of the Jakarta Validation and Jakart
 The link:{url-about}[Open Liberty] 24.0.0.6-beta includes the following beta features (along with link:{url-prefix}/docs/latest/reference/feature/feature-overview.html[all GA features]):
 
 * <<validate, Preview of Jakarta Validation 3.1>>
-* <<SUB_TAG_1, MicroProfile Metrics 3.0/4.0 for 24.0.0.6-beta>>
-* <<SUB_TAG_2, InstantOn Support for HTTP Session Cache in Liberty 24.0.0.6>>
-* <<SUB_TAG_3, Preview of Jakarta Data (Release Candidate 1)>>
+* <<data, Preview of Jakarta Data (Release Candidate 1)>>
+* <<mpm, MicroProfile Metrics 3.0/4.0 for 24.0.0.6-beta>>
+* <<jcache, InstantOn Support for HTTP Session Cache in Liberty 24.0.0.6>>
+
 
 // // // // // // // //
 // In the preceding section:
@@ -67,7 +68,7 @@ Set<ConstraintViolation<Employee>> violations = validator.validate(employee);
 // Blog issue: https://github.com/OpenLiberty/open-liberty/issues/28293
 // Contact/Reviewer: njr-11
 // // // // // // // //
-[#SUB_TAG_3]
+[#data]
 == Preview of Jakarta Data (Release Candidate 1)
 
 
@@ -86,13 +87,14 @@ To use these capabilities, you need an Entity and a Repository.
 Start by defining an entity class that corresponds to your data. With relational databases, the entity class corresponds to a database table and the entity properties (public methods and fields of the entity class) generally correspond to the columns of the table. An entity class can be:
 
 - annotated with `jakarta.persistence.Entity` and related annotations from Jakarta Persistence
-- a Java class without entity annotations, in which case the primary key is inferred from an entity property named `id` or ending with `Id` and an entity property named `version` designates an automatically incremented version column.
+- a Java class without entity annotations, in which case the primary key is inferred from an entity property that is named `id` or ends with `Id` and an entity property that is named `version` designates an automatically incremented version column.
 
-You define one or more repository interfaces for an entity, annotate those interfaces as `@Repository` and inject them into components via `@Inject`. The Jakarta Data provider supplies the implementation of the repository interface for you.
+You define one or more repository interfaces for an entity, annotate those interfaces as `@Repository`, and inject them into components by using `@Inject`. The Jakarta Data provider supplies the implementation of the repository interface for you.
 
-Here's a simple entity,
+The following example shows a simple entity:
 
-```
+[source,java]
+----
 @Entity
 public class Product {
     @Id
@@ -107,11 +109,12 @@ public class Product {
     @Version
     public long version;
 }
-```
+----
 
-Here is a repository that defines operations relating to the entity. Your repository interface can inherit from built-in interfaces such as `BasicRepository` and `CrudRepository` to gain a variety of general purpose repository methods for inserting, updating, deleting and querying for entities. You can add methods to further customize it.
+Here is a repository that defines operations relating to the entity. Your repository interface can inherit from built-in interfaces, such as `BasicRepository` and `CrudRepository`, to gain a variety of general purpose repository methods for inserting, updating, deleting and querying for entities. You can add methods to further customize it.
 
-```
+[source,java]
+----
 @Repository(dataStore = "java:app/jdbc/my-example-data")
 public interface Products extends BasicRepository<Product, Long> {
     @Insert
@@ -138,11 +141,12 @@ public interface Products extends BasicRepository<Product, Long> {
     @Query("DELETE FROM Product WHERE name = ?1")
     int discontinue(String name);
 }
-```
+----
 
-Observe that the repository interface includes type parameters in `Order<Product>`.  This helps ensure that the sort criteria are for a `Product` entity rather than some other entity.  To accomplish this, you can optionally define a Static Metamodel class for the entity (or various IDEs might generate one for you after the 1.0 specification is actually released).  Here is one that can be used with the `Product` entity,
+Observe that the repository interface includes type parameters in `PageRequest<Product>` and `Order<Product>`. These parameters help ensure that the page request and sort criteria are for a `Product` entity rather than some other entity. To accomplish this, you can optionally define a static metamodel class for the entity (or various IDEs might generate one for you after the 1.0 specification is actually released). Here is one that can be used with the `Product` entity:
 
-```
+[source,java]
+----
 @StaticMetamodel(Product.class)
 public interface _Product {
     String ID = "id";
@@ -157,11 +161,12 @@ public interface _Product {
     SortableAttribute<Product> price = new SortableAttributeRecord(PRICE);
     SortableAttribute<Product> version = new SortableAttributeRecord(VERSION);
 }
-```
+----
 
-Here is an example of the repository and static metamodel being used,
+The following example shows the repository and static metamodel being used:
 
-```
+[source,java]
+----
 @DataSourceDefinition(name = "java:app/jdbc/my-example-data",
                       className = "org.postgresql.xa.PGXADataSource",
                       databaseName = "ExampleDB",
@@ -196,7 +201,7 @@ public class MyServlet extends HttpServlet {
         ...
     }
 }
-```
+----
 
 // DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
 
@@ -204,25 +209,30 @@ public class MyServlet extends HttpServlet {
 // Blog issue: https://github.com/OpenLiberty/open-liberty/issues/28355
 // Contact/Reviewer: tonyreigns
 // // // // // // // //
-[#SUB_TAG_1]
+[#mpm]
 == MicroProfile Metrics 3.0/4.0 for 24.0.0.6-beta
 
-3. Provide a summary of the update, including the following points:
-   The upcoming MicroProfile Metrics 3.0/4.0 feature updates are backported changes from MicroProfile Metrics 5.1, which includes new MicroProfile Config properties used for configuring the statistics that are tracked and outputted by the Histogram and Timer metrics. In the prior MicroProfile Metrics 3.0/4.0 releases, Histogram and Timer metrics only tracked the min/max recorded values, the sum of all values, the count of the recorded values and a static set of percentiles for the 50th, 75th, 95th, 98th, 99th and 99.9th percentile. These values are output to the /metrics endpoint in Prometheus format.
 
-The new properties introduced in MicroProfile Metrics 3.0/4.0 will allow users to define a custom set of percentiles as well as custom set of histogram buckets for the Histogram and Timer metrics. There are also additional configuration properties for enabling a default set of histogram buckets including properties for defining and upper and lower bound for the bucket set.
+This release introduces MicroProfile Config properties for MicroProfile 3.0 and 4.0 that are used for configuring the statistics that are tracked and outputted by the Histogram and Timer metric. THese changes are already available in MicroProfile Metrics 5.1.
 
-The properties above allow you to define a semi-colon separated list of value definitions that follow the below syntax:
-```
+In the prior MicroProfile Metrics 3.0 and 4.0 releases, Histogram and Timer metrics only tracked the min/max recorded values, the sum of all values, the count of the recorded values and a static set of percentiles for the 50th, 75th, 95th, 98th, 99th and 99.9th percentile. These values are output to the `/metrics` endpoint in Prometheus format.
+
+The new properties allow users to define a custom set of percentiles as well as custom set of histogram buckets for the Histogram and Timer metrics. There are also additional configuration properties for enabling a default set of histogram buckets, including properties for defining and upper and lower bound for the bucket set.
+
+With these properties, you can define a semicolon-separated list of value definitions that use the following syntax:
+
+----
 <metric name>=<value-1>[,<value-2>…<value-n>]
-```
-- Some properties can accept multiple values for a given metric name while some can only accept a single value.
-- The use of an asterisk (i.e., *) can be used as a wild card at the end of the metric name.
+----
 
+Some properties can accept multiple values for a given metric name, while others can only accept a single value.
 
+You can use an asterisk ( *) as a wild card at the end of the metric name.
 
+[cols="2*"]
+|===
 | Property  | Description |
-| ----------- | ----------- |
+
 | mp.metrics.distribution.percentiles| Defines a custom set of percentiles for matching Histogram and Timer metrics to track and output. Accepts for a set of integer and decimal values for a metric name pairing. Can be used to disable percentile output if no value is provided with a metric name pairing.|
 | mp.metrics.distribution.histogram.buckets| Defines a custom set of (cumulative) histogram buckets for matching Histogram metrics to track and output.  Accepts for a set of integer and decimal values for a metric name pairing. |
 | mp.metrics.distribution.timer.buckets| Defines a custom set of (cumulative) histogram buckets for matching Timer metrics to track and output.  Accepts for a set of decimal values with a time unit appended (i.e., ms, s, m, h) for a metric name pairing.|
@@ -232,25 +242,27 @@ The properties above allow you to define a semi-colon separated list of value de
 |mp.metrics.distribution.timer.max-value | When percentile-histogram is enabled for a Histogram, this property defines a upper bound for the buckets reported. Accepts a single decimal values with a time unit appended (i.e., ms, s, m, h) for a metric name pairing. Accepts for a single decimal value with a time unit appended (i.e., ms, s, m, h) for a metric name pairing.|
 |mp.metrics.distribution.timer.min-value | When percentile-histogram is enabled for a Histogram, this property defines a lower bound for the buckets reported. Accepts for a single decimal value with a time unit appended (i.e., ms, s, m, h) for a metric name pairing.|
 
+|===
 
+For example, yu can define the `mp.metrics.distribution.percentiles` property similar to the following example.
 
-For example, the `mp.metrics.distribution.percentiles` can be defined as :
-```
+----
 mp.metrics.distribution.percentiles=alpha.timer=0.5,0.7,0.75,0.8;alpha.histogram=0.8,0.85,0.9,0.99;delta.*=
-```
+----
 
-This will create the `alpha.timer` timer metric to track and output the 50th, 70th, 75th and 80th percentile values. The `alpha.histogram` histogram metric will output the 80th, 85th, 90th and 99th percentiles values. Any Histogram  or Timer metric that matches with `delta.*` will have its percentiles disabled.
+This property creates the `alpha.timer` timer metric to track and output the 50th, 70th, 75th and 80th percentile values. The `alpha.histogram` histogram metric outputs the 80th, 85th, 90th and 99th percentiles values. Percentiles for any Histogram  or Timer metric that matches with `delta.*` are disabled.
 
-We'll expand on the above example and define histogram buckets for the `alpha.timer` timer metric using the `mp.metrics.distribution.timer.buckets` property.
+We'll expand on this example and define histogram buckets for the `alpha.timer` timer metric using the `mp.metrics.distribution.timer.buckets` property.
 
-```
+----
 mp.metrics.distribution.timer.buckets=alpha.timer=100ms,200ms,1s
-```
-This configuration will tell the metrics runtime to track and output the count of durations that fall within 0-100ms, 0-200ms and 0-1 seconds. This is due to the  histogram buckets working in a _cumulative_ fashion.
+----
 
-The corresponding prometheus output for the `alpha.timer` metric at the `/metrics` REST endpoint will be:
+This configuration tells the metrics runtime to track and output the count of durations that fall within 0-100ms, 0-200ms and 0-1 seconds. This output is due to the  histogram buckets working in a _cumulative_ fashion.
 
-```
+The corresponding prometheus output for the `alpha.timer` metric at the `/metrics` REST endpoint is similar to the following example:
+
+----
 # TYPE application_alpha_timer_mean_seconds gauge
 application_alpha_timer_mean_seconds 2.9700022497975187
 # TYPE application_alpha_timer_max_seconds gauge
@@ -270,10 +282,10 @@ application_alpha_timer_seconds{quantile="0.5"} 1.0
 application_alpha_timer_seconds{quantile="0.7"} 5.0
 application_alpha_timer_seconds{quantile="0.75"} 5.0
 application_alpha_timer_seconds{quantile="0.8"} 5.0
-```
+----
 
 <1> The Prometheus metric type is `histogram`. Both the quantiles/percentile and buckets are represented under this type.
-<2> The `le` tag represents _less than_ and is for the defined buckets which are converted to seconds.
+<2> The `le` tag represents _less than_ and is for the defined buckets, which are converted to seconds.
 <3> Prometheus requires that a `+Inf` bucket which count all hits.
 
 
@@ -283,32 +295,27 @@ application_alpha_timer_seconds{quantile="0.8"} 5.0
 // Blog issue: https://github.com/OpenLiberty/open-liberty/issues/28337
 // Contact/Reviewer: anjumfatima90
 // // // // // // // //
-[#SUB_TAG_2]
+[#jcache]
 == Instant Support for HTTP Session Cache in Liberty 24.0.0.6
-
-3. Provide a summary of the update, including the following points:
-
-   - A sentence or two that introduces the update to someone new to the general technology/concept.
-
-   - What was the problem before and how does your update make their life better? (Why should they care?)
-
-   - Briefly explain how to make your update work. Include screenshots, diagrams, and/or code snippets, and provide a `server.xml` snippet.
-
-   - Where can they find out more about this specific update (eg Open Liberty docs, Javadoc) and/or the wider technology?
 
 Open Liberty link:https://openliberty.io/docs/latest/instanton.html[InstantOn] provides fast startup times for MicroProfile and Jakarta EE applications. With InstantOn, your applications can start in milliseconds, without compromising on throughput, memory, development-production parity, or Java language features. InstantOn uses the Checkpoint/Restore In Userspace (link:https://criu.org/[CRIU]) feature of the Linux kernel to take a checkpoint of the JVM that can be restored later.
 
-The `Liberty Beta 24.0.0.6` provides InstantOn support for link:https://openliberty.io/docs/latest/reference/feature/sessionCache-1.0.html[JCache Session Persistence]. The `sessionCache-1.0` feature uses a JCache provider to create a distributed in-memory cache. Distributed Session Caching is achieved when the server is connected to at least one other server to form a cluster. Open Liberty servers can behave in the following ways in a cluster.
+The 24.0.0.6-beta release provides InstantOn support for the link:{url-prefix}/docs/latest/reference/feature/sessionCache-1.0.html[JCache Session Persistence] feature. This feature uses a JCache provider to create a distributed in-memory cache. Distributed session caching is achieved when the server is connected to at least one other server to form a cluster. Open Liberty servers can behave in the following ways in a cluster.
 
-1. Client Server Model : An Open Liberty server can act as the JCache client and connect to a dedicated JCache server.
-2. Peer-to-Peer Model : An Open Liberty server can connect with other Open Liberty servers that are also running with the JCache Session Persistence feature and configured to be part of the same cluster.
+- Client server model: An Open Liberty server can act as the JCache client and connect to a dedicated JCache server.
+- Peer-to-Peer model: An Open Liberty server can connect with other Open Liberty servers that are also running with the JCache Session Persistence feature and configured to be part of the same cluster.
 
-To enable JCache Session Persistence, `sessionCache-1.0` feature must be enabled
-```
+To enable JCache Session Persistence, the  `sessionCache-1.0` feature must be enabled in your `server.xml` file:
+
+[source,xm]
+----
 <feature>sessionCache-1.0</feature>
-```
-The client/server mode can be configured using the below `server.xml` configuration.
-```
+----
+
+You can configure the client/server model in the`server.xml`, similar to the following example.
+
+[source,xm]
+----
 <library id="InfinispanLib">
     <fileset dir="${shared.resource.dir}/infinispan" includes="*.jar"/>
 </library>
@@ -325,10 +332,12 @@ The client/server mode can be configured using the below `server.xml` configurat
             "org.infinispan.commons.marshall.JavaSerializationMarshaller"/>
     <cachingProvider jCacheLibraryRef="InfinispanLib" />
 </cacheManager>
-```
+----
 
-The peer-to-peer mode can be configured using the following `server.xml` configuration.
-```
+You can configure the peer-to-peer model in the`server.xml`, similar to the following example.
+
+[source,xm]
+----
 <library id="JCacheLib">
     <file name="${shared.resource.dir}/hazelcast/hazelcast.jar"/>
 </library>
@@ -338,13 +347,15 @@ The peer-to-peer mode can be configured using the following `server.xml` configu
 <cacheManager id="CacheManager" >
     <cachingProvider jCacheLibraryRef="JCacheLib" />
 </cacheManager>
-```
+----
+
 **Note:**
-In order to provide InstantOn support for peer-to-peer mode using Infinispan as a JCache Provider, Infinispan 12 and above must be used. Additionally, link:https://openliberty.io/docs/latest/reference/feature/mpReactiveStreams-3.0.html[MicroProfile Reactive Streams 3.0] and above, and link:https://openliberty.io/docs/latest/reference/feature/mpMetrics-4.0.html[MicroProfile Metrics 4.0] and above features must be enabled inside server.xml in addition to the JCache session persistence feature.
+In order to provide InstantOn support for peer-to-peer mode using Infinispan as a JCache Provider, you muast use Infinispan 12 or later. You must also enable link:{url-prefiux}/docs/latest/reference/feature/mpReactiveStreams-3.0.html[MicroProfile Reactive Streams 3.0] or later and link:{url-prefix}docs/latest/reference/feature/mpMetrics-4.0.html[MicroProfile Metrics 4.0] or later  must in the `server.xml` file, in addition to the JCache Session Persistence feature.
 
-Vendor-specific JCache configuration properties can be provided by the environment when the server is restored from the checkpoint. The following configuration uses server list, username and password values as variables defined in the restore environment.
+The environment can provide vendor-specific JCache configuration properties when the server is restored from the checkpoint. The following configuration uses server list, username, and password values as variables defined in the restore environment.
 
-```
+[source,xml]
+----
 <httpSessionCache libraryRef="InfinispanLib">
     <properties infinispan.client.hotrod.server_list="${INF_SERVERLIST}"/>
     <properties infinispan.client.hotrod.auth_username="${INF_USERNAME}"/>
@@ -352,32 +363,15 @@ Vendor-specific JCache configuration properties can be provided by the environme
     <properties infinispan.client.hotrod.auth_realm="default"/>
     <properties infinispan.client.hotrod.sasl_mechanism="PLAIN"/>
 </httpSessionCache>
-```
+----
 
 // DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
-
-
-
-
-To enable the new beta features in your app, add them to your `server.xml`:
-
-[source, xml]
-----
-
-----
 
 [#run]
 === Try it now
 
-To try out these features, update your build tools to pull the Open Liberty All Beta Features package instead of the main release. The beta works with Java SE 21, Java SE 17, Java SE 11, and Java SE 8.
-// // // // // // // //
-// In the preceding section:
-// Check if a new non-LTS Java SE version is supported that needs to be added to the list (21, 17, 11, and 8 are LTS and will remain for a while)
-// https://openliberty.io/docs/latest/java-se.html
-//
-// In the following section:
-// Check if a new MicroProfile or Jakarta version is in beta that could replace the example values in the codeblock
-// // // // // // // //
+To try out these features, update your build tools to pull the Open Liberty All Beta Features package instead of the main release. The beta works with Java SE 22, Java SE 21, Java SE 17, Java SE 11, and Java SE 8.
+
 
 If you're using link:{url-prefix}/guides/maven-intro.html[Maven], you can install the All Beta Features package using:
 
@@ -386,7 +380,7 @@ If you're using link:{url-prefix}/guides/maven-intro.html[Maven], you can instal
 <plugin>
     <groupId>io.openliberty.tools</groupId>
     <artifactId>liberty-maven-plugin</artifactId>
-    <version>3.8.2</version>
+    <version>3.10.3</version>
     <configuration>
         <runtimeArtifact>
           <groupId>io.openliberty.beta</groupId>
@@ -426,7 +420,7 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath 'io.openliberty.tools:liberty-gradle-plugin:3.6.2'
+        classpath 'io.openliberty.tools:liberty-gradle-plugin:3.8.3'
     }
 }
 apply plugin: 'liberty'
@@ -434,12 +428,7 @@ dependencies {
     libertyRuntime group: 'io.openliberty.beta', name: 'openliberty-runtime', version: '[24.0.0.6-beta,)'
 }
 ----
-// // // // // // // //
-// In the preceding section:
-// Replace the Maven `3.8.2` with the latest version of the plugin: https://search.maven.org/artifact/io.openliberty.tools/liberty-maven-plugin
-// Replace the Gradle `3.6.2` with the latest version of the plugin: https://search.maven.org/artifact/io.openliberty.tools/liberty-gradle-plugin
-// TODO: Update GHA to automatically do the above.  If the maven.org is problematic, then could fallback to using the GH Releases for the plugins
-// // // // // // // //
+
 
 Or if you're using link:{url-prefix}/docs/latest/container-images.html[container images]:
 
