@@ -1,0 +1,460 @@
+---
+layout: post
+title: "Jakarta EE11 previews and more in 24.0.0.6-beta"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/dmuelle
+author_github: https://github.com/dmuelle
+seo-title: Jakarta EE11 previews and more in 24.0.0.6-beta - OpenLiberty.io
+seo-description: The 24.0.0.6-beta release includes previews of the Jakarta Validation and Jakarta Data implementations, both of which are part of Jakarta EE 11. The release also includes enhancements for histogram and timer metrics in MicroProfile 3.0 and 4.0 and InstantOn support for distributed HTTP session caching.
+blog_description: The 24.0.0.6-beta release includes previews of the Jakarta Validation and Jakarta Data implementations, both of which are part of Jakarta EE 11. The release also includes enhancements for histogram and timer metrics in MicroProfile 3.0 and 4.0 and InstantOn support for distributed HTTP session caching.
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+---
+= Jakarta EE11 previews and more in 24.0.0.6-beta
+David Mueller <https://github.com/dmuelle>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+
+The 24.0.0.6-beta release includes previews of the Jakarta Validation and Jakarta Data implementations, both of which are part of Jakarta EE 11. The release also includes enhancements for histogram and timer metrics in MicroProfile 3.0 and 4.0 and InstantOn support for distributed HTTP session caching.
+
+The link:{url-about}[Open Liberty] 24.0.0.6-beta includes the following beta features (along with link:{url-prefix}/docs/latest/reference/feature/feature-overview.html[all GA features]):
+
+* <<validate, Validate Java constraints and records with Jakarta Validation 3.1>>
+* <<data, Preview of Jakarta Data (Release Candidate 1)>>
+* <<mpm, Enhanced histogram and timer metrics in MicroProfile 3.0 and 4.0>>
+* <<jcache, InstantOn support for distributed HTTP session caching>>
+
+
+// // // // // // // //
+// In the preceding section:
+// Change SUB_FEATURE_TITLE to the feature that is included in this release and
+// change the SUB_TAG_1/2/3 to the heading tags
+//
+// However if there's only 1 new feature, delete the previous section and change it to the following sentence:
+// "The link:{url-about}[Open Liberty] 24.0.0.6-beta includes SUB_FEATURE_TITLE"
+// // // // // // // //
+
+See also link:{url-prefix}/blog/?search=beta&key=tag[previous Open Liberty beta blog posts].
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/28397
+// Contact/Reviewer: mswatosh
+// // // // // // // //
+[#validate]
+== Validate Java constraints and records with Jakarta Validation 3.1
+
+Jakarta Validation provides a mechanism to validate constraints that are imposed on Java objects by using annotations. The most noticeable change in version 3.1 is the name change, from Jakarta Bean Validation to  Jakarta Validation. This version also includes explicit support for validating Java record classes, which were added in Java 16. Records reduce much of the boilerplate code in simple data classes, and pair nicely with Jakarta Validation.
+
+The following examples demonstrate the simplicity of defining a Java record with Jakarta Validation annotations, as well as performing validation.
+
+In this example, an `Employee` record is defined with two fields, `empid` and `email`.
+
+[source,java]
+----
+public record Employee(@NotEmpty String empid, @Email String email) {}
+----
+
+The `@NotEmpty` annotation specifies that `empid` cannot be an empty string, while the `@Email` annotation specifies that the value for `email` must be a properly formatted email address.
+
+In this example, a validator is created to check the specified `Employee` values against the constraints that were set in the previous example.
+
+[source,java]
+----
+Employee employee = new Employee("12432", "mark@example.com");
+Set<ConstraintViolation<Employee>> violations = validator.validate(employee);
+----
+
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/28293
+// Contact/Reviewer: njr-11
+// // // // // // // //
+[#data]
+== Preview of Jakarta Data (Release Candidate 1)
+
+Jakarta Data is a new Jakarta EE specification being developed in the open that aims to standardize the popular Data Repository pattern across various providers. Open Liberty 24.0.0.6-beta includes the Jakarta Data 1.0 release candidate 1, which decouples sorting from pagination, improves the static metamodel, and completes the initial definition of Jakarta Data Query Language (JDQL).
+
+The Open Liberty beta includes a test implementation of Jakarta Data that we are using to experiment with proposed specification features. You can try out these features and provide feedback to influence the Jakarta Data 1.0 specification as it continues to be developed. The test implementation currently works with relational databases and operates by redirecting repository operations to the built-in Jakarta Persistence provider.
+
+Jakarta Data 1.0 Release Candidate 1 completes the definition of Jakarta Data Query Language (JDQL) as a subset of Jakarta Persistence Query Language (JPQL). JDQL allows basic comparison and update operations on a single type of entity (an entity identifier variable is not used), as well as the ability to perform deletion and count operations. Find operations in JDQL consist of SELECT, FROM, WHERE, and ORDER BY clauses, all of which are optional.
+
+Jakarta Data 1.0 Release Candidate 1 decouples sorting from pagination, allowing you to request pages of results without needing to duplicate the specification of the entity type that is queried.
+
+The static metamodel, which allows for more type-safe usage, is streamlined in Release Candidate 1 to allow the use of interface classes with constant fields to define the metamodel.
+
+To use these capabilities, you need an Entity and a Repository.
+
+Start by defining an entity class that corresponds to your data. With relational databases, the entity class corresponds to a database table and the entity properties (public methods and fields of the entity class) generally correspond to the columns of the table. An entity class can be:
+
+- Annotated with `jakarta.persistence.Entity` and related annotations from Jakarta Persistence
+- A Java class without entity annotations, in which case the primary key is inferred from an entity property that is named `id` or ends with `Id` and an entity property that is named `version` designates an automatically incremented version column.
+
+You define one or more repository interfaces for an entity, annotate those interfaces as `@Repository`, and inject them into components by using `@Inject`. The Jakarta Data provider supplies the implementation of the repository interface for you.
+
+The following example shows a simple entity:
+
+[source,java]
+----
+@Entity
+public class Product {
+    @Id
+    public long id;
+
+    public boolean isDiscounted;
+
+    public String name;
+
+    public float price;
+
+    @Version
+    public long version;
+}
+----
+
+Here is a repository that defines operations relating to the entity. Your repository interface can inherit from built-in interfaces, such as `BasicRepository` and `CrudRepository`, to gain various general-purpose repository methods for inserting, updating, deleting, and querying for entities. You can add methods to further customize it.
+
+[source,java]
+----
+@Repository(dataStore = "java:app/jdbc/my-example-data")
+public interface Products extends BasicRepository<Product, Long> {
+    @Insert
+    Product add(Product newProduct);
+
+    // query-by-method name pattern:
+    List<Product> findByNameIgnoreCaseContains(String searchFor, Order<Product> orderBy);
+
+    // parameter based query that does not require -parameters because it explicitly specifies the name
+    @Find
+    Page<Product> find(@By("isDiscounted") boolean onSale,
+                       PageRequest pageRequest,
+                       Order <Product> orderBy);
+
+    // find query in JDQL that requires compilation with -parameters to preserve parameter names
+    @Query("SELECT price FROM Product WHERE id=:productId")
+    Optional<Float> getPrice(long productId);
+
+    // update query in JDQL:
+    @Query("UPDATE Product SET price = price - (?2 * price), isDiscounted = true WHERE id = ?1")
+    boolean discount(long productId, float discountRate);
+
+    // delete query in JDQL:
+    @Query("DELETE FROM Product WHERE name = ?1")
+    int discontinue(String name);
+}
+----
+
+Observe that the repository interface includes type parameters in `PageRequest<Product>` and `Order<Product>`. These parameters help ensure that the page request and sort criteria are for a `Product` entity rather than some other entity. To accomplish this, you can optionally define a static metamodel class for the entity (or various IDEs might generate one for you after the 1.0 specification is released). Here is one that can be used with the `Product` entity:
+
+[source,java]
+----
+@StaticMetamodel(Product.class)
+public interface _Product {
+    String ID = "id";
+    String IS_DISCOUNTED = "isDiscounted";
+    String NAME = "name";
+    String PRICE = "price";
+    String VERSION = "version";
+
+    SortableAttribute<Product> id = new SortableAttributeRecord(ID);
+    SortableAttribute<Product> isDiscounted = new SortableAttributeRecord(IS_DISCOUNTED);
+    TextAttribute<Product> name = new TextAttributeRecord(NAME);
+    SortableAttribute<Product> price = new SortableAttributeRecord(PRICE);
+    SortableAttribute<Product> version = new SortableAttributeRecord(VERSION);
+}
+----
+
+The following example shows the repository and static metamodel being used:
+
+[source,java]
+----
+@DataSourceDefinition(name = "java:app/jdbc/my-example-data",
+                      className = "org.postgresql.xa.PGXADataSource",
+                      databaseName = "ExampleDB",
+                      serverName = "localhost",
+                      portNumber = 5432,
+                      user = "${example.database.user}",
+                      password = "${example.database.password}")
+public class MyServlet extends HttpServlet {
+    @Inject
+    Products products;
+
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp)
+            throws ServletException, IOException {
+        // Insert:
+        Product prod = ...
+        prod = products.add(prod);
+
+        // Find the price of one product:
+        price = products.getPrice(productId).orElseThrow();
+
+        // Find all, sorted:
+        List<Product> all = products.findByNameIgnoreCaseContains(searchFor, Order.by(
+                                     _Product.price.desc(),
+                                     _Product.name.asc(),
+                                     _Product.id.asc()));
+
+        // Find the first 20 most expensive products on sale:
+        Page<Product> page1 = products.find(onSale, PageRequest.ofSize(20), Order.by(
+                                       _Product.price.desc(),
+                                       _Product.name.asc(),
+                                       _Product.id.asc()));
+        ...
+    }
+}
+----
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/28355
+// Contact/Reviewer: tonyreigns
+// // // // // // // //
+[#mpm]
+== Enhanced histogram and timer metrics in MicroProfile 3.0 and 4.0
+
+This release introduces MicroProfile Config properties for MicroProfile 3.0 and 4.0 that are used for configuring the statistics that are tracked and outputted by the histogram and timer metrics. These changes are already available in MicroProfile Metrics 5.1.
+
+In previous MicroProfile Metrics 3.0 and 4.0 releases, histogram and timer metrics tracked only the following values:
+
+* Min/max recorded values
+* The sum of all values
+* The count of the recorded values
+* A static set of percentiles for the 50th, 75th, 95th, 98th, 99th and 99.9th percentile.
+
+These values are output to the `/metrics` endpoint in Prometheus format.
+
+The new properties can define a custom set of percentiles as well as custom set of histogram buckets for the histogram and timer metrics. Other new configuration properties can enable a default set of histogram buckets, including properties that define an upper and lower bound for the bucket set.
+
+With these properties, you can define a semicolon-separated list of value definitions that use the following syntax:
+
+----
+<metric name>=<value-1>[,<value-2>…<value-n>]
+----
+
+Some properties can accept multiple values for a given metric name, while others can accept only a single value.
+
+You can use an asterisk ( *) as a wildcard at the end of the metric name.
+
+[cols="2*"]
+|===
+| Property  | Description
+| mp.metrics.distribution.percentiles | Defines a custom set of percentiles for matching Histogram and Timer metrics to track and output. Accepts a set of integer and decimal values for a metric name pairing. Can be used to disable percentile output if no value is provided with a metric name pairing.
+| mp.metrics.distribution.histogram.buckets| Defines a custom set of (cumulative) histogram buckets for matching Histogram metrics to track and output.  Accepts a set of integer and decimal values for a metric name pairing.
+| mp.metrics.distribution.timer.buckets| Defines a custom set of (cumulative) histogram buckets for matching Timer metrics to track and output.  Accepts a set of decimal values with a time unit appended (that is, ms, s, m, h) for a metric name pairing.
+|mp.metrics.distribution.percentiles-histogram.enabled | Configures any matching Histogram or Timer metric to provide a large set of default histogram buckets to allow for percentile configuration with a monitoring tool. Accepts a true/false value for a metric name pairing.
+| mp.metrics.distribution.histogram.max-value| When percentile-histogram is enabled for a Timer, this property defines an upper bound for the buckets reported. Accepts a single integer or decimal value for a metric name pairing.
+| mp.metrics.distribution.histogram.min-value| When percentile-histogram is enabled for a Timer, this property defines a lower bound for the buckets reported. Accepts a single integer or decimal value for a metric name pairing.
+|mp.metrics.distribution.timer.max-value | When percentile-histogram is enabled for a Histogram, this property defines an upper bound for the buckets reported. Accepts a single decimal value with a time unit appended (that is, ms, s, m, h) for a metric name pairing. Accepts a single decimal value with a time unit appended (that is, ms, s, m, h) for a metric name pairing.
+|mp.metrics.distribution.timer.min-value | When percentile-histogram is enabled for a Histogram, this property defines a lower bound for the buckets reported. Accepts a single decimal value with a time unit appended (that is, ms, s, m, h) for a metric name pairing.
+
+|===
+
+You can define the `mp.metrics.distribution.percentiles` property similar to the following example.
+
+----
+mp.metrics.distribution.percentiles=alpha.timer=0.5,0.7,0.75,0.8;alpha.histogram=0.8,0.85,0.9,0.99;delta.*=
+----
+
+This property creates the `alpha.timer` timer metric to track and output the 50th, 70th, 75th, and 80th percentile values. The `alpha.histogram` histogram metric outputs the 80th, 85th, 90th, and 99th percentile values. Percentiles for any histogram or timer metric that matches with `delta.*` are disabled.
+
+We'll expand on this example and define histogram buckets for the `alpha.timer` timer metric by using the `mp.metrics.distribution.timer.buckets` property.
+
+----
+mp.metrics.distribution.timer.buckets=alpha.timer=100ms,200ms,1s
+----
+
+This configuration tells the metrics runtime to track and output the count of durations that fall within 0-100ms, 0-200ms and 0-1 seconds. This output is due to the histogram buckets working in a _cumulative_ fashion.
+
+The corresponding prometheus output for the `alpha.timer` metric at the `/metrics` REST endpoint is similar to the following example:
+
+----
+# TYPE application_alpha_timer_mean_seconds gauge
+application_alpha_timer_mean_seconds 2.9700022497975187
+# TYPE application_alpha_timer_max_seconds gauge
+application_alpha_timer_max_seconds 5.0
+# TYPE application_alpha_timer_min_seconds gauge
+application_alpha_timer_min_seconds 1.0
+# TYPE application_alpha_timer_stddev_seconds gauge
+application_alpha_timer_stddev_seconds 1.9997750210918204
+# TYPE alpha_timer_seconds histogram <1>
+application_alpha_timer_seconds_bucket{le="0.1"} 0.0 <2>
+application_alpha_timer_seconds_bucket{le="0.2"} 0.0 <2>
+application_alpha_timer_seconds_bucket{le="1.0"} 1.0 <2>
+application_alpha_timer_seconds_bucket{le="+Inf"} 2.0 <2> <3>
+application_alpha_timer_seconds_count 2
+application_alpha_timer_seconds_sum 6.0
+application_alpha_timer_seconds{quantile="0.5"} 1.0
+application_alpha_timer_seconds{quantile="0.7"} 5.0
+application_alpha_timer_seconds{quantile="0.75"} 5.0
+application_alpha_timer_seconds{quantile="0.8"} 5.0
+----
+
+<1> The Prometheus metric type is `histogram`. Both the quantiles/percentile and buckets are represented under this type.
+<2> The `le` tag represents _less than_ and is for the defined buckets, which are converted to seconds.
+<3> Prometheus requires that a `+Inf` bucket counts all hits.
+
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/28337
+// Contact/Reviewer: anjumfatima90
+// // // // // // // //
+[#jcache]
+== InstantOn support for distributed HTTP session caching
+
+Open Liberty link:https://openliberty.io/docs/latest/instanton.html[InstantOn] provides fast startup times for MicroProfile and Jakarta EE applications. With InstantOn, your applications can start in milliseconds, without compromising on throughput, memory, development-production parity, or Java language features. InstantOn uses the Checkpoint/Restore In Userspace (link:https://criu.org/[CRIU]) feature of the Linux kernel to take a checkpoint of the JVM that can be restored later.
+
+The 24.0.0.6-beta release provides InstantOn support for the link:{url-prefix}/docs/latest/reference/feature/sessionCache-1.0.html[JCache Session Persistence] feature. This feature uses a JCache provider to create a distributed in-memory cache. Distributed session caching is achieved when the server is connected to at least one other server to form a cluster. Open Liberty servers can behave in the following ways in a cluster.
+
+- Client-server model: An Open Liberty server can act as the JCache client and connect to a dedicated JCache server.
+- Peer-to-Peer model: An Open Liberty server can connect with other Open Liberty servers that are also running with the JCache Session Persistence feature and configured to be part of the same cluster.
+
+To enable JCache Session Persistence, the `sessionCache-1.0` feature must be enabled in your `server.xml` file:
+
+[source,xml]
+----
+<feature>sessionCache-1.0</feature>
+----
+
+You can configure the client/server model in the `server.xml` file, similar to the following example.
+
+[source,xml]
+----
+<library id="InfinispanLib">
+    <fileset dir="${shared.resource.dir}/infinispan" includes="*.jar"/>
+</library>
+<httpSessionCache cacheManagerRef="CacheManager"/>
+<cacheManager id="CacheManager">
+    <properties
+        infinispan.client.hotrod.server_list="infinispan-server:11222"
+        infinispan.client.hotrod.auth_username="sampleUser"
+        infinispan.client.hotrod.auth_password="samplePassword"
+        infinispan.client.hotrod.auth_realm="default"
+        infinispan.client.hotrod.sasl_mechanism="PLAIN"
+        infinispan.client.hotrod.java_serial_whitelist=".*"
+        infinispan.client.hotrod.marshaller=
+            "org.infinispan.commons.marshall.JavaSerializationMarshaller"/>
+    <cachingProvider jCacheLibraryRef="InfinispanLib" />
+</cacheManager>
+----
+
+You can configure the peer-to-peer model in the `server.xml` file, similar to the following example.
+
+[source,xml]
+----
+<library id="JCacheLib">
+    <file name="${shared.resource.dir}/hazelcast/hazelcast.jar"/>
+</library>
+
+<httpSessionCache cacheManagerRef="CacheManager"/>
+
+<cacheManager id="CacheManager" >
+    <cachingProvider jCacheLibraryRef="JCacheLib" />
+</cacheManager>
+----
+
+**Note:**
+To provide InstantOn support for the peer-to-peer model by using Infinispan as a JCache Provider, you must use Infinispan 12 or later. You must also enable link:{url-prefiux}/docs/latest/reference/feature/mpReactiveStreams-3.0.html[MicroProfile Reactive Streams 3.0] or later and link:{url-prefix}docs/latest/reference/feature/mpMetrics-4.0.html[MicroProfile Metrics 4.0] or later in the `server.xml` file, in addition to the JCache Session Persistence feature.
+
+The environment can provide vendor-specific JCache configuration properties when the server is restored from the checkpoint. The following configuration uses server list, username, and password values as variables defined in the restore environment.
+
+[source,xml]
+----
+<httpSessionCache libraryRef="InfinispanLib">
+    <properties infinispan.client.hotrod.server_list="${INF_SERVERLIST}"/>
+    <properties infinispan.client.hotrod.auth_username="${INF_USERNAME}"/>
+    <properties infinispan.client.hotrod.auth_password="${INF_PASSWORD}"/>
+    <properties infinispan.client.hotrod.auth_realm="default"/>
+    <properties infinispan.client.hotrod.sasl_mechanism="PLAIN"/>
+</httpSessionCache>
+----
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+[#run]
+=== Try it now
+
+To try out these features, update your build tools to pull the Open Liberty All Beta Features package instead of the main release. The beta works with Java SE 22, Java SE 21, Java SE 17, Java SE 11, and Java SE 8.
+
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], you can install the All Beta Features package by using:
+
+[source,xml]
+----
+<plugin>
+    <groupId>io.openliberty.tools</groupId>
+    <artifactId>liberty-maven-plugin</artifactId>
+    <version>3.10.3</version>
+    <configuration>
+        <runtimeArtifact>
+          <groupId>io.openliberty.beta</groupId>
+          <artifactId>openliberty-runtime</artifactId>
+          <version>24.0.0.6-beta</version>
+          <type>zip</type>
+        </runtimeArtifact>
+    </configuration>
+</plugin>
+----
+
+You must also add dependencies to your pom.xml file for the beta version of the APIs that are associated with the beta features that you want to try. For example, the following block adds dependencies for two example beta APIs:
+
+[source,xml]
+----
+<dependency>
+    <groupId>org.example.spec</groupId>
+    <artifactId>exampleApi</artifactId>
+    <version>7.0</version>
+    <type>pom</type>
+    <scope>provided</scope>
+</dependency>
+<dependency>
+    <groupId>example.platform</groupId>
+    <artifactId>example.example-api</artifactId>
+    <version>11.0.0</version>
+    <scope>provided</scope>
+</dependency>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'io.openliberty.tools:liberty-gradle-plugin:3.8.3'
+    }
+}
+apply plugin: 'liberty'
+dependencies {
+    libertyRuntime group: 'io.openliberty.beta', name: 'openliberty-runtime', version: '[24.0.0.6-beta,)'
+}
+----
+
+
+Or if you're using link:{url-prefix}/docs/latest/container-images.html[container images]:
+
+[source]
+----
+FROM icr.io/appcafe/open-liberty:beta
+----
+
+Or take a look at our link:{url-prefix}/downloads/#runtime_betas[Downloads page].
+
+If you're using link:https://plugins.jetbrains.com/plugin/14856-liberty-tools[IntelliJ IDEA], link:https://marketplace.visualstudio.com/items?itemName=Open-Liberty.liberty-dev-vscode-ext[Visual Studio Code] or link:https://marketplace.eclipse.org/content/liberty-tools[Eclipse IDE], you can also take advantage of our open source link:https://openliberty.io/docs/latest/develop-liberty-tools.html[Liberty developer tools] to enable effective development, testing, debugging, and application management all from within your IDE.
+
+For more information on using a beta release, refer to the link:{url-prefix}docs/latest/installing-open-liberty-betas.html[Installing Open Liberty beta releases] documentation.
+
+[#feedback]
+== We welcome your feedback
+
+Let us know what you think on link:https://groups.io/g/openliberty[our mailing list]. If you hit a problem, link:https://stackoverflow.com/questions/tagged/open-liberty[post a question on StackOverflow]. If you hit a bug, link:https://github.com/OpenLiberty/open-liberty/issues[please raise an issue].
