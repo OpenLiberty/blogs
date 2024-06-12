@@ -1,0 +1,533 @@
+---
+layout: post
+title: "MicroProfile 6.1, Liberty Tools updates, and more in Open Liberty 23.0.0.12"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/dmuelle
+author_github: https://github.com/dmuelle
+seo-title: MicroProfile 6.1, Liberty Tools updates, and more in Open Liberty 23.0.0.12 - OpenLiberty.io
+seo-description: Open Liberty 23.0.0.12 introduces MicroProfile 6.1, which includes updates for MicroProfile Metrics and MicroProfile Telemetry. This release also coincides with new versions of the Liberty Maven and Gradle plug-ins, and includes enhancements for OpenID Connect, LTPA key management, and more.
+blog_description: Open Liberty 23.0.0.12 introduces MicroProfile 6.1, which includes updates for MicroProfile Metrics and MicroProfile Telemetry. This release also coincides with new versions of the Liberty Maven and Gradle plug-ins, and includes enhancements for OpenID Connect, LTPA key management, and more.
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+---
+= MicroProfile 6.1, Liberty Tools updates, and more in Open Liberty 23.0.0.12
+David Mueller <https://github.com/dmuelle>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+Open Liberty 23.0.0.12 introduces MicroProfile 6.1, which includes updates for MicroProfile Metrics and MicroProfile Telemetry. This release also coincides with new versions of Liberty Tools and the Liberty Maven and Gradle plug-ins, and includes enhancements for OpenID Connect, LTPA key management, and more.
+
+In link:{url-about}[Open Liberty] 23.0.0.12:
+
+* <<mp61, MicroProfile 6.1 support>>
+  ** <<mpm51, Configure statistics tracked by histogram and timer metrics with MicroProfile Metrics 5.1>>
+  ** <<mpt11, Expanded Java EE and Jakarta EE support in MicroProfile Telemetry 1.1>>
+  ** <<trace, Trace incoming HTTP requests with MicroProfile Telemetry 1.0 and 1.1>>
+  * <<mpoa, MicroProfile OpenAPI: OpenAPI doc endpoint path configuration>>
+* <<ltpa, Support for LTPA keys rotation without requiring a planned outage>>
+* <<auth, Send the resource parameter with an authorization request that uses the authorization code flow>>
+* <<oidc, Obtain role information from the OpenID Connect access token>>
+* <<CVEs, Security Vulnerability (CVE) fixes>>
+* <<maven, Liberty Maven plug-in 3.10 and Liberty Gradle plug-in 3.8>>
+* <<lt, Liberty Tools 23.0.12 for Eclipse IDE, IntelliJ IDEA, and Visual Studio Code>>
+
+
+
+View the list of fixed bugs in link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A230012+label%3A%22release+bug%22[23.0.0.12].
+
+Check out link:{url-prefix}/blog/?search=release&search!=beta[previous Open Liberty GA release blog posts].
+
+// The following excerpt for issue https://github.com/OpenLiberty/open-liberty/issues/26170 was found in 2023-09-26-23.0.0.10-beta.adoc.
+// ------ <Excerpt From Previous Post: Start> ------
+// Contact/Reviewer: Emily-Jiang
+// // // // // // // //
+== Get Open Liberty 23.0.0.12 now
+
+Available through <<run,Maven, Gradle, Docker, and as a downloadable archive>>.
+
+[link=https://stackoverflow.com/tags/open-liberty]
+image::img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="center"]
+
+[#mp61]
+== MicroProfile 6.1 support
+
+MicroProfile 6.1 is a minor release and is compatible with MicroProfile 6.0. It brings in Jakarta EE 10 Core Profile APIs and the following MicroProfile component specifications:
+
+* link:https://jakarta.ee/specifications/coreprofile/10/[Jakarta EE 10 Core Profile]
+* link:https://github.com/eclipse/microprofile-config/releases/tag/3.1-RC1[MicroProfile Config 3.1]
+* link:https://github.com/eclipse/microprofile-fault-tolerance/releases/tag/4.0.2[MicroProfile Fault Tolerance 4.0]
+* link:https://github.com/eclipse/microprofile-metrics/releases/tag/5.1.0-RC1[MicroProfile Metrics 5.1]
+* link:https://github.com/eclipse/microprofile-health/releases/tag/4.0.1[MicroProfile Health 4.0]
+* link:https://github.com/eclipse/microprofile-telemetry/releases/tag/1.1-RC1[MicroProfile Telemetry 1.1]
+* link:https://github.com/eclipse/microprofile-open-api/releases/tag/3.1[MicroProfile OpenAPI 3.1]
+* link:https://github.com/eclipse/microprofile-jwt-auth/releases/tag/2.1[MicroProfile JWT Authentication 2.1]
+* link:https://github.com/eclipse/microprofile-rest-client/releases/tag/3.0.1[MicroProfile Rest Client 3.0]
+
+The following three specifications have minor updates, while the other five specifications remain unchanged:
+
+* MicroProfile Metrics 5.1
+
+* MicroProfile Telemetry 1.1
+
+* MicroProfile Config 3.1 (mainly some TCK updates to ensure the tests run against either CDI 3.x or CDI 4.0 Lite)
+
+
+See the following sections for more details about each of these features and how to try them out.
+
+[#mpm51]
+=== Configure statistics that are tracked by histogram and timer metrics with MicroProfile Metrics 5.1
+
+MicroProfile Metrics 5.1 includes new MicroProfile Config properties to configure the statistics that the histogram and timer metrics track and output. In MicroProfile Metrics 5.0, the histogram and timer metrics track and output only the _max_ recorded value, the _sum_ of all values, the _count_ of the recorded values, and a static set of the 50th, 75th, 95th, 98th, 99th, and 99.9th percentiles. These values are emitted to the `/metrics` endpoint in Prometheus format.
+
+The properties that are introduced in MicroProfile Metrics 5.1 can define a custom set of percentiles and a custom set of histogram buckets for the histogram and timer metrics. Configuration properties are also included to enable a default set of histogram buckets, including properties for defining an upper and lower bound for the bucket set.
+
+The properties in the following table can define a semicolon-separated list of value definitions by using the following syntax:
+
+
+[source]
+----
+metric_name=value_1[,value_2…value_n]
+----
+
+[%header,cols="1,1"]
+|===
+| Property  |Description
+| mp.metrics.distribution.percentiles
+a| - Defines a custom set of percentiles for matching histogram and timer metrics to track and output.
+- Accepts a set of integer and decimal values for a metric name pairing.
+- Can be used to disable percentile output if no value is provided with a metric name pairing.
+
+
+| mp.metrics.distribution.histogram.buckets
+a| - Defines a custom set of (cumulative) histogram buckets for matching histogram metrics to track and output.
+- Accepts a set of integer and decimal values for a metric name pairing.
+
+
+| mp.metrics.distribution.timer.buckets
+a| - Defines a custom set of (cumulative) histogram buckets for matching timer metrics to track and output.
+ - Accepts a set of decimal values with a time unit appended (such as, ms, s, m, h) for a metric name pairing.
+
+
+|mp.metrics.distribution.percentiles-histogram.enabled
+a| - Configures any matching histogram or timer metric to provide a large set of default histogram buckets to allow for percentile configuration with a monitoring tool.
+- Accepts a true/false value for a metric name pairing.
+
+
+| mp.metrics.distribution.histogram.max-value
+a| - When percentile-histogram is enabled for a timer, this property defines an upper bound for the buckets reported.
+- Accepts a single integer or decimal value for a metric name pairing.
+
+
+| mp.metrics.distribution.histogram.min-value
+a| - When percentile-histogram is enabled for a timer, this property defines a lower bound for the buckets reported.
+- Accepts a single integer or decimal value for a metric name pairing.
+
+
+|mp.metrics.distribution.timer.max-value
+a| - When percentile-histogram is enabled for a histogram, this property defines an upper bound for the buckets reported.
+- Accepts a single decimal value with a time unit appended (such as ms, s, m, h) for a metric name pairing.
+
+|mp.metrics.distribution.timer.min-value
+a| - When percentile-histogram is enabled for a histogram, this property defines a lower bound for the buckets reported.
+- Accepts a single decimal value with a time unit appended (such as ms, s, m, h) for a metric name pairing.
+
+|===
+
+Some properties can accept multiple values for a given metric name while some can only accept a single value.
+You can use an asterisk (`*`) as a wildcard at the end of the metric name.
+For example, the `mp.metrics.distribution.percentiles` can be defined as:
+
+[source]
+----
+mp.metrics.distribution.percentiles=alpha.timer=0.5,0.7,0.75,0.8;alpha.histogram=0.8,0.85,0.9,0.99;delta.*=
+----
+
+This example creates the `alpha.timer` timer metric to track and output the 50th, 70th, 75th, and 80th percentile values. The `alpha.histogram` histogram metric outputs the 80th, 85th, 90th, and 99th percentile values. Percentiles are disabled for any histogram or timer metric that matches with `delta.*` .
+
+
+The following example expands on the previous example to define histogram buckets for the `alpha.timer` timer metric by using the `mp.metrics.distribution.timer.buckets` property:
+
+
+[source,xml]
+----
+mp.metrics.distribution.timer.buckets=alpha.timer=100ms,200ms,1s
+----
+
+This configuration tells the metrics runtime to track and output the count of durations that fall within 0-100ms, 0-200ms, and 0-1 seconds. These values are ranges because the histogram buckets work cumulatively.
+
+
+The corresponding Prometheus output for the `alpha.timer` metric at the `/metrics` REST endpoint is:
+
+[source]
+----
+# HELP alpha_timer_seconds_max
+# TYPE alpha_timer_seconds_max gauge
+alpha_timer_seconds_max{scope="application",} 5.633
+# HELP alpha_timer_seconds
+# TYPE alpha_timer_seconds histogram <1>
+alpha_timer_seconds{scope="application",quantile="0.5",} 0.67108864
+alpha_timer_seconds{scope="application",quantile="0.7",} 5.603590144
+alpha_timer_seconds{scope="application",quantile="0.75",} 5.603590144
+alpha_timer_seconds{scope="application",quantile="0.8",} 5.603590144
+alpha_timer_seconds_bucket{scope="application",le="0.1",} 0.0 <2>
+alpha_timer_seconds_bucket{scope="application",le="0.2",} 0.0 <2>
+alpha_timer_seconds_bucket{scope="application",le="1.0",} 1.0 <2>
+alpha_timer_seconds_bucket{scope="application",le="+Inf",} 2.0  <2><3>
+alpha_timer_seconds_count{scope="application",} 2.0
+alpha_timer_seconds_sum{scope="application",} 6.333
+----
+
+<1> The Prometheus metric type is `histogram`. Both the quantiles or percentiles and buckets are represented under this type.
+<2> The `le` tag represents _less than_ and is for the defined buckets, which are converted to seconds.
+<3> Prometheus requires a `+Inf` bucket, which counts all hits.
+
+Additionally, the `@RegistryScope` annotation is now a CDI qualifier.
+
+For more information about MicroProfile Metrics, see:
+
+* link:https://github.com/eclipse/microprofile-metrics[MicroProfile Metrics repo]
+* link:{url-prefix}/docs/latest/introduction-monitoring-metrics.html[Monitoring with metrics documentation]
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/26945
+// Contact/Reviewer: yasmin-aumeeruddy
+// // // // // // // //
+[#mpt11]
+=== Expanded Java EE and Jakarta EE support in MicroProfile Telemetry 1.1
+
+MicroProfile Telemetry 1.1 provides you with the latest Open Telemetry technology as the feature now consumes OpenTelemetry-1.29.0, which is updated from 1.19.0.
+
+The feature is compatible with the following programming model combinations:
+
+* Java EE 7 paired with MicroProfile 1.4
+* Java EE 8 paired with MicroProfile 4.1
+* Jakarta EE 9 paired with MicroProfile 5.0
+* Jakarta EE 10 paired with MicroProfile 6.1.
+
+To enable this feature, add the following feature definition to your `server.xml` file:
+
+[source,xml]
+----
+<features>
+   <feature>mpTelemetry-1.1</feature>
+</features>
+----
+
+Also, you must make third-party APIs visible for your application in the `server.xml` file:
+
+[source,xml]
+----
+<webApplication location="demo-microprofile-telemetry-inventory.war" contextRoot="/">
+    <!-- enable visibility to third party apis -->
+    <classloader apiTypeVisibility="+third-party"/>
+</webApplication>
+----
+
+[#trace]
+=== Trace incoming HTTP requests with MicroProfile Telemetry 1.0 and 1.1
+Also in Open Liberty 23.0.0.12, the MicroProfile Telemetry 1.0 and 1.1 features are enhanced to automatically trace incoming HTTP requests (static files, servlets, and JSPs).
+
+For more information about MicroProfile Telemetry, see the following links:
+
+* link:https://github.com/open-telemetry/opentelemetry-specification/blob/v1.20.0/specification/trace/api.md[Tracing API]
+* link:https://openliberty.io/docs/latest/docs/latest/microprofile-telemetry.html[Enable distributed tracing with MicroProfile Telemetry]
+
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/27046
+// Contact/Reviewer: abutch3r
+// // // // // // // //
+// The following excerpt for issue https://github.com/OpenLiberty/open-liberty/issues/26222 was found in 2023-09-26-23.0.0.10-beta.adoc.
+// ------ <Excerpt From Previous Post: Start> ------
+// Contact/Reviewer: Azquelt
+// // // // // // // //
+
+[#mpoa]
+== MicroProfile OpenAPI: OpenAPI doc endpoint path configuration
+
+MicroProfile OpenAPI generates and serves OpenAPI documentation for RESTful Web Services (or JAX-RS) applications that are deployed to the Liberty server. The OpenAPI documentation is served from the `/openapi` endpoint  and a user interface for browsing this documentation is served from the `/openapi/ui` endpoint.
+
+When using any of the MicroProfile OpenAPI features on Open Liberty, you can now configure the paths for these endpoints by adding configuration to your `server.xml`, as shown in the following example:
+
+[source,xml]
+----
+<mpOpenAPI docPath="/my/openapi/doc/path" uiPath="/docsUi" />
+----
+
+When you set this configuration on a local test server, you can then access the OpenAPI document at `localhost:9080/my/openapi/doc/path` and the UI at `localhost:9080/docsUi`.
+
+
+This configuration is particularly useful if you want to expose the OpenAPI documentation through a Kubernetes ingress that routes requests to different services based on the path. For example, with this ingress configuration:
+
+[source,yaml]
+----
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+name: my-ingress
+spec:
+rules:
+- http:
+    paths:
+    - path: /appA
+        pathType: Prefix
+        backend:
+        service:
+            name: appA
+            port:
+            number: 9080
+----
+
+You might use the following `server.xml` configuration to ensure that the OpenAPI UI is available at `/appA/openapi/ui`:
+
+[source,xml]
+----
+<mpOpenAPI docPath="/appA/openapi" />
+----
+
+When `uiPath` is not set, it defaults to the value of `docPath` with `/ui` appended.
+
+For more information about MicroProfile OpenAPI, see the following resources:
+
+* link:{url-prefix}/docs/latest/reference/feature/mpOpenAPI-3.1.html#_configure_microprofile_openapi_documentation_endpoints[Configure MicroProfile OpenAPI documentation endpoints]
+* link:https://github.com/eclipse/microprofile-open-api[MicroProfile OpenAPI repo]
+* link:{url-prefix}/docs/latest/documentation-openapi.html[API documentation with OpenAPI]
+
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/27048
+// Contact/Reviewer: Zech-Hein
+// // // // // // // //
+
+// The following excerpt for issue https://github.com/OpenLiberty/open-liberty/issues/26138 was found in 2023-09-26-23.0.0.10-beta.adoc.
+// ------ <Excerpt From Previous Post: Start> ------
+// Contact/Reviewer: Zech-Hein
+// // // // // // // //
+
+[#ltpa]
+== Support LTPA keys rotation without a planned outage
+
+Open Liberty can now automatically generate new primary LTPA keys files while it continues to use validation keys files to validate LTPA tokens. With this update, you can rotate LTPA keys without any disruption to the application user experience. Previously, application users had to log in to their applications again after the Liberty server LTPA keys were rotated, which is no longer necessary.
+
+Primary Keys are LTPA keys in the specified keys default `ltpa.keys` file. Primary keys are used both for generating new LTPA tokens and for validating LTPA tokens. Only one primary keys file is permitted per Liberty runtime.
+
+Validation keys are LTPA keys in any `.keys` files other than the primary keys file. The validation keys are used only for validating LTPA tokens. They are not used for generating new LTPA tokens. All validation keys must be located in the same directory as the primary keys file.
+
+Two ways are available to enable LTPA keys rotation without a planned outage: monitoring the primary keys file directory or specifying the validation keys file.
+
+Monitor the directory of the primary keys file for any new validation keys files::
++
+Enable the `monitorValidationKeysDir` and `monitorInterval` attributes. For example, add the following configurations to the `server.xml` file:
++
+[source,xml]
+----
+<ltpa monitorValidationKeysDir="true" monitorInterval="5s"/>
+----
++
+The `monitorValidationKeysDir` attribute monitors the directory of the primary keys file for any `.keys` extension files. By default, this directory is `${server.config.dir}/resources/security/` but it can be configured. The Liberty server loads these LTPA keys and uses them as validation keys.
++
+Monitoring is enabled only when the `updateTrigger` is set to `polled` and the `monitorInterval` is set to a duration greater than 0. The default value of `updateTrigger` is `polled` and the default value of `monitorInterval` is `0`.
++
+The `ltpa.keys` file can be renamed, for example, `validation1.keys` and then Liberty automatically regenerates a new `ltpa.keys` file with new primary keys that are used for all new LTPA tokens created. The keys in `validation1.keys` continue to be used for validating existing LTPA tokens.
++
+When the `validation1.keys` are no longer needed, remove them by deleting the file or by setting `monitorValidationKeysDir` to false. Removing unused validation keys can improve performance.
+
+Specify the validation keys file and optionally specify a date-time to stop using the validation keys::
++
+1. Copy the primary keys file (`ltpa.keys`) to a validation keys file, for example `validation1.keys`.
++
+2. Modify the server configuration to use the validation keys file by specifying a `validationKeys` server configuration element inside the `ltpa` element. For example, add the following configuration to the `server.xml` file:
++
+[source,xml]
+----
+<ltpa>
+    <validationKeys fileName="validation1.keys" password="{xor}Lz4sLCgwLTs=" validUntilDate="2024-01-02T12:30:00Z"/>
+</ltpa>
+----
++
+The `validation1.keys` file can be removed from use at a specified date-time in the future with the optional `validUntilDate` attribute. It is recommended to use `validUntilDate` to ignore validation keys after a period as it can improve performance.
++
+The `fileName` and `password` attributes are required in the `validationKeys` element, but `validUntilDate` is optional.
++
+After the validation keys file is loaded from the server configuration update, the original primary keys file (`ltpa.keys`) can be deleted, which triggers new primary keys to be created while it continues to use `validation1.keys` for validation.
++
+Specifying validation keys in this way can be combined with enabling the monitor directory to also use validation keys that are not specified in the `server.xml` configuration at the same time, as shown in the following example:
++
+[source,xml]
+----
+<ltpa monitorValidationKeysDir="true" monitorInterval="5s">
+    <validationKeys fileName="validation1.keys" password="{xor}Lz4sLCgwLTs=" validUntilDate="2024-01-02T12:30:00Z"/>
+</ltpa>
+----
+
+For more information, see link:{url-prefix}/docs/latest/reference/feature/appSecurity-5.0.html#validationkeys[Rotate LTPA keys without requiring users to reauthenticate].
+
+=== UpdateTrigger attribute added to LTPA element
+
+LTPA keys files can be reloaded by the server if the `updateTrigger` attribute is set to `polled` or `mbean`. It is `polled` by default. If set to `polled`, then the server monitors the keys files for changes based on the rate set in the `monitorInterval` attribute. If the `updateTrigger` attribute is set to `mbean`, the server reloads the keys files when it receives notification from the `WebSphere:service=com.ibm.ws.kernel.filemonitor.FileNotificationMBean` MBean, as shown in the following example:
+
+[source,xml]
+----
+<ltpa monitorValidationKeysDir="true" updateTrigger="mbean"/>
+----
+
+If `updateTrigger` is set to `disabled` then no file monitoring occurs.
+
+For more information on `ltpa` server configuration options see link:https://openliberty.io/docs/latest/reference/config/ltpa.html[LTPA configuration docs].
+
+
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/26970
+// Contact/Reviewer: kdcptkai31
+// // // // // // // //
+
+[#auth]
+== Send the resource parameter with an authorization request that uses the authorization code flow
+
+Authorization requests can be made by using either the implicit flow or the authorization code flow. When requests use the implicit flow, all tokens are returned from the authorization endpoint and the token endpoint is not used. When requests use the authorization code flow, all tokens are returned from the token endpoint.
+
+Previously, Liberty sent the resource parameter only during an implicit flow request. So if your request needed the resource parameter but could use only the authorization code flow, the request failed. This update enables the resource parameter to be sent with the authorization code flow.
+
+To implement this update, a check was removed that only sent the resource parameter during an implicit flow. The parameter is now sent for both flows.
+
+For more information, see this link:https://github.com/OpenLiberty/open-liberty/issues/23126[issue].
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/26969
+// Contact/Reviewer: kdcptkai31
+// // // // // // // //
+
+[#oidc]
+== Obtain the role information from the OpenID Connect access token
+
+For authentication and authorization, a token is a digital object that contains information about the identity of the principal that made the request and what kind of access they are authorized for. Generally, these tokens fall into one of two types: access tokens or ID tokens.
+
+ID tokens are JSON Web Tokens that conform to the OpenID Connect specification. Previously, user role information could be obtained only from this ID token. If role information was not provided within the ID token, then the information was not found. This update provides checks to attempt to obtain role information from the Access Token if it is not found within the ID token.
+
+A check was added to attempt to get the role information from access token, if it was not found within the ID token. You can enable this check by setting the `tokensOrderToFetchCallerClaims` attribute to `AccessToken IDToken Userinfo`, as shown in the following `sever.xml` file example:
+
+[source,xml]
+----
+<openidConnectClient tokensOrderToFetchCallerClaims="AccessToken IDToken Userinfo"  userIdentifier="unique_name" groupIdentifier="aud" ... />
+----
+
+For more information, see xref:/docs/latest/reference/feature/openidConnectClient-1.0.html#access-token[Check the access token for user and group information].
+
+[#CVEs]
+== Security vulnerability (CVE) fixes in this release
+[cols="5*"]
+|===
+|CVE |CVSS Score |Vulnerability Assessment |Versions Affected |Notes
+
+|http://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2023-44487[CVE-2023-44487]
+|7.5
+|Denial of service
+|18.0.0.2 - 23.0.0.11
+|Affects the link:{url-prefix}/docs/latest/reference/feature/servlet-3.1.html[servlet-3.0], link:{url-prefix}/docs/latest/reference/feature/servlet-4.0.html[servlet-4.0], link:{url-prefix}/docs/latest/reference/feature/servlet-5.0.html[servlet-5.0] and link:{url-prefix}/docs/latest/reference/feature/servlet-6.0.html[servlet-6.0] features
+|===
+
+For a list of past security vulnerability fixes, reference the link:{url-prefix}/docs/latest/security-vulnerabilities.html[Security vulnerability (CVE) list].
+
+// ------ <Excerpt From Previous Post: End> ------
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/27087
+// Contact/Reviewer: yeekangc
+// // // // // // // //
+[#maven]
+== Liberty Maven plug-in 3.10 and Liberty Gradle plug-in 3.8
+
+New releases for Liberty Maven and Gradle plug-ins are now available. The following notable new features are included:
+
+* Support for deploying Spring Boot 3 applications to Liberty by using the build plug-ins through Liberty's `springBoot-3.0` feature
+* Support for running the plug-ins with Java 21
+
+
+To use the new Maven plug-in version, specify the 3.10 release in your Maven `pom.xml` file.
+For Gradle, specify the 3.8 release in your `build.gradle` file.
+
+For more information about these plug-ins, see the following resources:
+
+* link:https://github.com/OpenLiberty/ci.maven/releases[Liberty Maven plug-in 3.10 release notes]
+* link:https://github.com/OpenLiberty/ci.gradle/releases[Liberty Gradle plug-in 3.8 release notes]
+
+For more information about Spring Boot support with the Liberty Maven plug-in, see link:https://github.com/OpenLiberty/ci.maven/blob/main/docs/spring-boot-support.md[ci.maven: Spring Boot Support].
+For more information about Spring Boot support with the Liberty Gradle plug-in, see link:https://github.com/OpenLiberty/ci.gradle/blob/main/docs/spring-boot-support.md[ci.gradle: Spring Boot Support].
+
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/27086
+// Contact/Reviewer: yeekangc
+// // // // // // // //
+
+[#lt]
+== Liberty Tools 23.0.12 for Eclipse IDE, IntelliJ IDEA, and Visual Studio Code
+
+Liberty Tools now support newer releases of Eclipse IDE, IntelliJ IDEA, and Visual Studio Code. This release also includes various enhancements and fixes.
+
+Update to the latest release of the Liberty Tools from the IDE you are working with or download the latest version from the marketplace of your IDE.
+
+* Liberty Tools for Eclipse IDE - link:https://marketplace.eclipse.org/content/liberty-tools[Eclipse Marketplace]
+* Liberty Tools for IntelliJ IDEA -  link:https://plugins.jetbrains.com/plugin/14856-liberty-tools[JetBrains Marketplace]
+* Liberty Tools for Visual Studio Code -  link:https://marketplace.visualstudio.com/items?itemName=Open-Liberty.liberty-dev-vscode-ext[Visual Studio Marketplace]
+
+For more information, see the following release notes:
+
+* link:https://github.com/OpenLiberty/liberty-tools-eclipse/releases[Release notes for Liberty Tools for Eclipse IDE]
+* link:https://github.com/OpenLiberty/liberty-tools-intellij/releases[Release notes for Liberty Tools for IntelliJ IDEA]
+* link:https://github.com/OpenLiberty/liberty-tools-vscode/releases[Release notes for Liberty Tools for Visual Studio Code]
+
+[#run]
+== Develop and run your apps using 23.0.0.12
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], include the following in your `pom.xml` file:
+
+[source,xml]
+----
+<plugin>
+    <groupId>io.openliberty.tools</groupId>
+    <artifactId>liberty-maven-plugin</artifactId>
+    <version>3.10</version>
+</plugin>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle], include the following in your `build.gradle` file:
+
+[source,gradle]
+----
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'io.openliberty.tools:liberty-gradle-plugin:3.8'
+    }
+}
+apply plugin: 'liberty'
+----
+
+Or if you're using link:{url-prefix}/docs/latest/container-images.html[container images]:
+
+[source]
+----
+FROM icr.io/appcafe/open-liberty
+----
+
+Or take a look at our link:{url-prefix}/start/[Downloads page].
+
+If you're using link:https://plugins.jetbrains.com/plugin/14856-liberty-tools[IntelliJ IDEA], link:https://marketplace.visualstudio.com/items?itemName=Open-Liberty.liberty-dev-vscode-ext[Visual Studio Code] or link:https://marketplace.eclipse.org/content/liberty-tools[Eclipse IDE], you can also take advantage of our open source link:https://openliberty.io/docs/latest/develop-liberty-tools.html[Liberty developer tools] to enable effective development, testing, debugging, and application management all from within your IDE.
