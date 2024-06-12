@@ -1,0 +1,288 @@
+---
+layout: post
+title: "Faster startup for Spring Boot 3.x applications and more in 24.0.0.6"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/dmuelle
+author_github: https://github.com/dmuelle
+seo-title: Faster startup for Spring Boot 3.x applications and more in 24.0.0.6 - OpenLiberty.io
+seo-description: The 24.0.0.6 release introduces the Coordinated Restore at Checkpoint feature, which improves startup times Spring Boot 3.x applications with Liberty InstantOn. This release also includes InstantOn support for applications that use distributed HTTP session caching and IBM MQ messaging.
+blog_description: The 24.0.0.6 release introduces the Coordinated Restore at Checkpoint feature, which improves startup times Spring Boot 3.x applications with Liberty InstantOn. This release also includes InstantOn support for applications that use distributed HTTP session caching and IBM MQ messaging.
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+---
+= Faster startup for Spring Boot 3.x applications and more in 24.0.0.6
+David Mueller <https://github.com/dmuelle>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+
+The 24.0.0.6 release introduces the Coordinated Restore at Checkpoint feature, which improves startup times for Spring Boot 3.x applications with Liberty InstantOn. This release also includes InstantOn support for applications that use distributed HTTP session caching and IBM MQ messaging.
+
+In link:{url-about}[Open Liberty] 24.0.0.6:
+
+* <<sbcrac, Faster startup of Spring Boot apps (Spring Boot 3.0 InstantOn with CRaC)>>
+* <<mq,use IBM® MQ messaging with InstantOn support>>
+* <<jcache, InstantOn support for distributed HTTP session caching>>
+* <<CVEs, Security Vulnerability (CVE) Fixes>>
+
+
+View the list of fixed bugs in link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A24006+label%3A%22release+bug%22[24.0.0.6].
+
+Check out link:{url-prefix}/blog/?search=release&search!=beta[previous Open Liberty GA release blog posts].
+
+
+[#run]
+
+// // // // // // // //
+// LINKS
+//
+// OpenLiberty.io site links:
+// link:{url-prefix}/guides/maven-intro.html[Maven]
+//
+// Off-site links:
+//link:https://openapi-generator.tech/docs/installation#jar[Download Instructions]
+//
+// IMAGES
+//
+// Place images in ./img/blog/
+// Use the syntax:
+// image::/img/blog/log4j-rhocp-diagrams/current-problem.png[Logging problem diagram,width=70%,align="center"]
+// // // // // // // //
+
+== Develop and run your apps using 24.0.0.6
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], include the following in your `pom.xml` file:
+
+[source,xml]
+----
+<plugin>
+    <groupId>io.openliberty.tools</groupId>
+    <artifactId>liberty-maven-plugin</artifactId>
+    <version>3.10.3</version>
+</plugin>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle], include the following in your `build.gradle` file:
+
+[source,gradle]
+----
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'io.openliberty.tools:liberty-gradle-plugin:3.8.3'
+    }
+}
+apply plugin: 'liberty'
+----
+
+Or if you're using link:{url-prefix}/docs/latest/container-images.html[container images]:
+
+[source]
+----
+FROM icr.io/appcafe/open-liberty
+----
+
+Or take a look at our link:{url-prefix}/start/[Downloads page].
+
+If you're using link:https://plugins.jetbrains.com/plugin/14856-liberty-tools[IntelliJ IDEA], link:https://marketplace.visualstudio.com/items?itemName=Open-Liberty.liberty-dev-vscode-ext[Visual Studio Code] or link:https://marketplace.eclipse.org/content/liberty-tools[Eclipse IDE], you can also take advantage of our open source link:https://openliberty.io/docs/latest/develop-liberty-tools.html[Liberty developer tools] to enable effective development, testing, debugging, and application management all from within your IDE.
+
+[link=https://stackoverflow.com/tags/open-liberty]
+image::img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="center"]
+
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/26059
+// Contact/Reviewer: tjwatson
+// // // // // // // //
+
+[#sbcrac]
+== Faster startup of Spring Boot apps (Spring Boot 3.0 InstantOn with CRaC)
+
+Open Liberty InstantOn provides fast startup times for MicroProfile and Jakarta EE applications. With link:{url-prefix}/blog/2023/06/29/rapid-startup-instanton.html[InstantOn], your applications can start in milliseconds, without compromising on throughput, memory, development-production parity, or Java language features. InstantOn uses the Checkpoint/Restore In Userspace (link:https://criu.org/[CRIU]) feature of the Linux kernel to take a checkpoint of the JVM that can be restored later.
+
+The Spring Framework (version 6.1+) includes link:https://docs.spring.io/spring-framework/reference/6.1/integration/checkpoint-restore.html[support for Coordinated Restore at Checkpoint (CRaC)], which also uses CRIU to provide Checkpoint and Restore for Java applications.  Spring Boot version 3.2+ uses Spring Framework version 6.1, enabling Spring Boot applications to also use CRaC to achieve rapid startup times.
+
+The link:docs/latest/reference/feature/springBoot-3.0.html[Open Liberty `springBoot-3.0` feature] allows Spring Boot 3.x-based applications to be deployed with Open Liberty.  And now, with the new Open Liberty link:docs/latest/reference/feature/crac-1.4.html[Coordinated Restore at Checkpoint] (`crac-1.4`) feature, a Spring Boot 3.2+-based application can be deployed with Liberty InstantOn to achieve rapid startup times for your Spring Boot application.
+
+To use the CRaC 1.4 functionality with the `springBoot-3.0` feature, you must be running with Java 17 or higher and enable the `crac-1.4` feature in your `server.xml` file.  Additionally, if your application uses Servlet, it needs to use the `servlet-6.0` feature. Configure these features are configured in the `server.xml` file, similar to the following example:
+
+[source,xml]
+----
+<features>
+   <feature>springBoot-3.0</feature>
+   <feature>servlet-6.0</feature>
+   <feature>crac-1.4</feature>
+</features>
+----
+
+With these features enabled, you can containerize your Spring Boot 3.2+ application with Liberty InstantOn support by following the link:{url-prefix}/docs/latest/instanton.html[Liberty InstantOn documentation] and the Liberty recommendations for containerizing Spring Boot applications in the link:{url-prefix}/guides/spring-boot.html[Liberty Spring Boot guide].
+
+For more information and an example Spring Boot application that uses the Liberty InstantOn `crac-1.4` feature, see the link:/blog/2023/09/26/spring-boot-3-instant-on.html[How to containerize your Spring Boot application for rapid startup] blog post.
+
+
+You can also use the `crac-1.4` feature with other applications, such as applications that use Jakarta EE or MicroProfile. Such applications can register resources with CRaC to get notifications for checkpoint and restore. These notifications help applications to prepare for a checkpoint and to perform necessary actions when the application is restored.  For more information on the `org.crac` APIs, see the link:https://javadoc.io/doc/org.crac/crac/latest/index.html[org.crac] Javadoc.
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/28572
+// Contact/Reviewer: dazavala
+// // // // // // // //
+[#mq]
+== Use InstantOn with IBM® MQ in Liberty
+
+The 24.0.0.6 release introduces InstantOn feature support for link:{url-prefix}/docs/latest/reference/feature/messaging-3.0.html[Jakarta Messaging], link:{url-prefix}/docs/latest/reference/feature/connectors-2.1.html[Jakarta Connectors], and link:{url-prefix}/docs/latest/reference/feature/mdb-4.0.html[Jakarta Enterprise Beans Message-Driven Beans (MDB)]. InstantOn now provides blazing fast startup times for applications that use resource adapters to access external EIS resources, including applications that use the Jakarta Messaging API to access external messaging systems like IBM® MQ. These "messaging client" applications can also manage message delivery to endpoints with message-driven bean listeners.
+
+Here's a server configuration snippet to deploy applications that use the JakartaEE-10 Messaging API and require the link:https://repo1.maven.org/maven2/com/ibm/mq/wmq.jakarta.jmsra/9.3.5.0/wmq.jakarta.jmsra-9.3.5.0.rar[IBM® MQ resource adapter] to access external messaging resources. This configuration automatically includes the `connectors-2.1` feature, which supports the resource adapter configuration element.
+
+[source,xml]
+----
+<featureManager>
+   <feature>messaging-3.1</feature>
+   <feature>mdb-4.0</feature>
+   <feature>servlet-6.0</feature>
+<featureManager/>
+
+<resourceAdapter id="mqJms" location="${server.config.dir}/wmq.jakarta.jmsra-9.3.5.0.rar"/>
+----
+
+You can use the link:https://developer.ibm.com/tutorials/mq-connect-app-queue-manager-containers/[MQ in Container image] to stand up an IBM MQ server that provides the following resources: queue manager `QM1`, queue `DEV.QUEUE.1`, channel `DEV.APP.SVRCONN`, and listener `SYSTEM.LISTENER.TCP.1` on port `1414`.  These resources can support a simple point-to-point messaging scenario and are named within the messaging feature configuration elements that are shown in the following example.
+
+InstantOn can dynamically update the messaging and connectors configuration elements to enable connections to external resources that are made available in any environment where a server is restored from checkpoint.
+
+In the following example, the messaging configuration elements use Liberty variables that are named `MQ_HOSTNAME` and `MQ_PORT` to specify the hostname and IP port of the system that the IBM MQ queue manager runs on. You can define these variables in the `server.env` file of a checkpointed server. When the server is restored, the queue connection factory and message endpoint activation configurations update to the environment-specific hostname and port values for the IBM MQ queue manager.
+
+[source,xml]
+----
+   <jmsQueue id="jms/queue1" jndiName="jms/queue1">
+      <properties.mqJms  baseQueueName="DEV.QUEUE.1"  baseQueueManagerName="QM1"/>
+   </jmsQueue>
+
+   <variable name="MQ_PORT" value="1414"/>
+   <variable name="MQ_HOSTNAME" value="localhost"/>
+
+   <jmsQueueConnectionFactory jndiName="jms/qcf1" connectionManagerRef="ConMgr7">
+      <properties.mqJms  hostName="${MQ_HOSTNAME}"  port="${MQ_PORT}"
+            channel="DEV.APP.SVRCONN"  queueManager="QM1"/>
+   </jmsQueueConnectionFactory>
+
+   <jmsConnectionFactory jndiName="jms/cf1" connectionManagerRef="ConMgr1">
+      <properties.mqJms  hostName="${MQ_HOSTNAME}"  port="${MQ_PORT}"
+            channel="DEV.APP.SVRCONN"  queueManager="QM1"/>
+   </jmsConnectionFactory>
+    <connectionManager id="ConMgr1" maxPoolSize="10"/>
+
+   <jmsActivationSpec id="myapp/mymdb/FVTMessageDrivenBean">
+      <properties.mqJms  destinationRef="jms/queue1"  destinationType="jakarta.jms.Queue"
+            transportType="CLIENT"  hostName="${MQ_HOSTNAME}"  port="${MQ_PORT}"
+            channel="DEV.APP.SVRCONN"  queueManager="QM1"/>
+   </jmsActivationSpec>
+----
+
+Enjoy the time savings and stay tuned for upcoming announcements regarding InstantOn support for Jakarta features.
+
+
+
+
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/28496
+// Contact/Reviewer: anjumfatima90
+// // // // // // // //
+[#jcache]
+== InstantOn support for distributed HTTP session caching
+
+Open Liberty link:https://openliberty.io/docs/latest/instanton.html[InstantOn] provides fast startup times for MicroProfile and Jakarta EE applications. With InstantOn, your applications can start in milliseconds, without compromising on throughput, memory, development-production parity, or Java language features. InstantOn uses the Checkpoint/Restore In Userspace (link:https://criu.org/[CRIU]) feature of the Linux kernel to take a checkpoint of the JVM that can be restored later.
+
+The 24.0.0.6 release provides InstantOn support for the link:{url-prefix}/docs/latest/reference/feature/sessionCache-1.0.html[JCache Session Persistence] feature. This feature uses a JCache provider to create a distributed in-memory cache. Distributed session caching is achieved when the server is connected to at least one other server to form a cluster. Open Liberty servers can behave in the following ways in a cluster.
+
+- Client-server model: An Open Liberty server can act as the JCache client and connect to a dedicated JCache server.
+- Peer-to-Peer model: An Open Liberty server can connect with other Open Liberty servers that are also running with the JCache Session Persistence feature and configured to be part of the same cluster.
+
+To enable JCache Session Persistence, the `sessionCache-1.0` feature must be enabled in your `server.xml` file:
+
+[source,xml]
+----
+<feature>sessionCache-1.0</feature>
+----
+
+You can configure the client/server model in the `server.xml` file, similar to the following example.
+
+[source,xml]
+----
+<library id="InfinispanLib">
+    <fileset dir="${shared.resource.dir}/infinispan" includes="*.jar"/>
+</library>
+<httpSessionCache cacheManagerRef="CacheManager"/>
+<cacheManager id="CacheManager">
+    <properties
+        infinispan.client.hotrod.server_list="infinispan-server:11222"
+        infinispan.client.hotrod.auth_username="sampleUser"
+        infinispan.client.hotrod.auth_password="samplePassword"
+        infinispan.client.hotrod.auth_realm="default"
+        infinispan.client.hotrod.sasl_mechanism="PLAIN"
+        infinispan.client.hotrod.java_serial_whitelist=".*"
+        infinispan.client.hotrod.marshaller=
+            "org.infinispan.commons.marshall.JavaSerializationMarshaller"/>
+    <cachingProvider jCacheLibraryRef="InfinispanLib" />
+</cacheManager>
+----
+
+You can configure the peer-to-peer model in the `server.xml` file, similar to the following example.
+
+[source,xml]
+----
+<library id="JCacheLib">
+    <file name="${shared.resource.dir}/hazelcast/hazelcast.jar"/>
+</library>
+
+<httpSessionCache cacheManagerRef="CacheManager"/>
+
+<cacheManager id="CacheManager" >
+    <cachingProvider jCacheLibraryRef="JCacheLib" />
+</cacheManager>
+----
+
+**Note:**
+To provide InstantOn support for the peer-to-peer model by using Infinispan as a JCache Provider, you must use Infinispan 12 or later. You must also enable link:{url-prefiux}/docs/latest/reference/feature/mpReactiveStreams-3.0.html[MicroProfile Reactive Streams 3.0] or later and link:{url-prefix}docs/latest/reference/feature/mpMetrics-4.0.html[MicroProfile Metrics 4.0] or later in the `server.xml` file, in addition to the JCache Session Persistence feature.
+
+The environment can provide vendor-specific JCache configuration properties when the server is restored from the checkpoint. The following configuration uses server list, username, and password values as variables defined in the restore environment.
+
+[source,xml]
+----
+<httpSessionCache libraryRef="InfinispanLib">
+    <properties infinispan.client.hotrod.server_list="${INF_SERVERLIST}"/>
+    <properties infinispan.client.hotrod.auth_username="${INF_USERNAME}"/>
+    <properties infinispan.client.hotrod.auth_password="${INF_PASSWORD}"/>
+    <properties infinispan.client.hotrod.auth_realm="default"/>
+    <properties infinispan.client.hotrod.sasl_mechanism="PLAIN"/>
+</httpSessionCache>
+----
+
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+
+
+[#CVEs]
+== Security vulnerability (CVE) fixes in this release
+[cols="5*"]
+|===
+|CVE |CVSS Score |Vulnerability Assessment |Versions Affected |Notes
+
+|http://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2024-22354[CVE-2024-22354]
+|7.0
+|XML External Entity (XXE) injection
+|17.0.0.3 - 24.0.0.5
+|
+|===
+
+For a list of past security vulnerability fixes, reference the link:{url-prefix}/docs/latest/security-vulnerabilities.html[Security vulnerability (CVE) list].
+
+
+== Get Open Liberty 24.0.0.6 now
+
+Available through <<run,Maven, Gradle, Docker, and as a downloadable archive>>.
