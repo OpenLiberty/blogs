@@ -1,0 +1,351 @@
+---
+layout: post
+title: "An introduction to using Versionless Features with Open Liberty"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/hlhoots
+author_github: https://github.com/hlhoots
+seo-title: TITLE - OpenLiberty.io
+seo-description: Learn how to utlize Versionless Features in your Open Liberty application configurations.
+blog_description: "Learn how to utlize Versionless Features in your Open Liberty application configurations."
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+additional_authors: 
+- name: Thomas Bitonti
+  github: https://github.com/tbitonti
+  image: https://avatars0.githubusercontent.com/tbitonti
+- name: Ricky Herget
+  github: https://github.com/rsherget
+  image: https://avatars0.githubusercontent.com/rsherget
+---
+= Working with Versionless Features
+Harry L. Hoots III <https://github.com/hlhoots>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+// // // // // // // //
+// In the preceding section:
+// Do not insert any blank lines between any of the lines.
+//
+// "open-graph-image" is set to OL logo. Whenever possible update this to a more appropriate/specific image (for example if present an image that is being used in the post). 
+// However, it can be left empty which will set it to the default
+//
+// "open-graph-image-alt" is a description of what is in the image (not a caption). When changing "open-graph-image" to
+// a custom picture, you must provide a custom string for "open-graph-image-alt".
+//
+// Replace TITLE with the blog post title
+//
+// Replace SECOND_AUTHOR_NAME with the name of the second author.
+// Replace SECOND_GITHUB_USERNAME with the GitHub user name of the second author.
+// Replace THIRD_AUTHOR_NAME with the name of the third author. And so on for fourth, fifth, etc authors.
+// Replace THIRD_GITHUB_USERNAME with the GitHub user name of the third author. And so on for fourth, fifth, etc authors.
+//
+// Replace AUTHOR_NAME with your name as first author.
+// Replace GITHUB_USERNAME with your GitHub username eg: lauracowen
+// Replace DESCRIPTION with a short summary (~60 words) of the release (a more succinct version of the first paragraph of the post).
+//
+// Replace AUTHOR_NAME with your name as you'd like it to be displayed, eg: Laura Cowen
+//
+// Example post: 2020-02-12-faster-startup-Java-applications-criu.adoc
+//
+// If adding image into the post add :
+// -------------------------
+// [.img_border_light]
+// image::img/blog/FILE_NAME[IMAGE CAPTION ,width=70%,align="center"]
+// -------------------------
+// "[.img_border_light]" = This adds a faint grey border around the image to make its edges sharper. Use it around
+// screenshots but not around diagrams. Then double check how it looks.
+// There is also a "[.img_border_dark]" class which tends to work best with screenshots that are taken on dark backgrounds.
+// Once again make sure to double check how it looks
+// Change "FILE_NAME" to the name of the image file. Also make sure to put the image into the right folder which is: img/blog
+// change the "IMAGE CAPTION" to a couple words of what the image is
+// // // // // // // //
+
+== Which Feature do I use?
+
+With the 24.0.0.8 release, Open Liberty adds a new function called Versionless Features.
+
+As you may well know, Open Liberty is a composable server in which you only configure necessary features at the specific versions that your application needs.  This composable design pattern minimizes the features used by the server, keeping startup times short and memory footprints low.  But, this adds a burden on the developer: Picking feature versions.  Developers can struggle to determine which version of a feature is compatible with the other features utilized by their application.  Determining the correct version typically requires that the developer experiment, plugging in different versions of features until they find one that works, or requires that they dig deep into feature documentation.  Either way, it’s not an ideal experience, and Versionless Features are here to make life easier.
+
+== What are Versionless Features?  And why do I need a Platform?
+
+Versionless features are platform-specific generic features which have no version number.   When you use versionless features, the Open Liberty feature resolver finds the versions of those generic features which are compatible with your other configured features.  
+
+Other than having no version number, versionless features are used in the server configuration the same as versioned features are used.  Except, there is one added requirement: At least one platform must be specified.  
+
+(*) More precisely: Two platforms are currently available: javaee/jakartaee and microProfile.  When a versionless javaee/jakartaee feature is used, a javaee/jakarta platform must be specified.  When a versionless microProfile feature is used, a microProfile platform must be specified.
+
+A platform is most often specified using a platform element.  Platforms elements are new elements of the server configuration which are placed alongside feature elements.
+
+Platform elements and feature elements may be placed in any order.  The order of these elements does not affect feature resolution.  However, our suggestion is that platform elements should be placed before feature elements.
+
+In addition to platform elements, there are two ways of specifying a platform.  First, the platform may be determined by a versioned feature which is associated with a particular platform version.  Second, the platform may be specified using the environment variable #PREFERRED_PLATFORM_VERSIONS#.
+
+Versionless features are available for almost all versioned features which are associated with a platform.  For example, because the Servlet specification is associated with javaee/jakartaee, a versionless servlet feature is available.
+
+(**) To ensure that the choice of version for a versionless feature is meaningful and correct, only those features which have a clear association with an API Platform are provided as versionless features.  Features which don’t have a clear association with an API Platform do not have a versionless feature.  Also, there are features which are associated with an API Platform but which are usually not used.  These features are not provided as versionless features.
+
+For example, because  link:https://openliberty.io/docs/latest/reference/feature/restConnector-2.0.html[restConnector-2.0] is not clearly associated with either MicroProfile or JakartaEE/JavaEE, there is no restConnector versionless feature.  Similarly, springboot features do not have a clear association with an API Platform.  No springboot versionless feature exists for #springboot-1.5#, #springboot-2.0#, and #springboot-3.0#.
+
+One may notice that platforms and convenience features have the same names.  That sharing of names is deliberate.  Both have the same association with a specific technology at a specific specification level.  The difference is in how the association is used.  Convenience features bring in all of the features related to a platform, where-as platforms determine what versions of versionless features are to be used.  That is, a platform, by itself, brings in no features.  A platform plus a versionless feature brings in a compatible version of the versionless feature.
+
+Read more about link:https://openliberty.io/docs/latest/reference/feature/feature-overview.html#conv[platform convenience features].
+
+== Best practices:
+
+As a new *best practice*, when specifying features within a server configuration, specify a platform elements based on the platform and platform version that of applications which are to be run by the server, and specify as versionless features only those features which are needed by the applications.
+
+(Up to 2 platform elements may be specified, one for MicroProfile, another for JakartaEE/JavaEE.)
+
+For example, this configuration uses versionless features with the #MicroProfile-5.0# platform:  
+```
+    <!-- Enable features -->
+    <featureManager>
+        <platform>microProfile-5.0</platform>
+	<feature>mpHealth</feature>
+	<feature>mpMetrics</feature>
+    </featureManager>
+```
+This configuration uses versionless features with #javaee-8.0#:
+```
+    <!-- Enable features -->
+    <featureManager>
+    	<platform>javaee-8.0</platform>
+	<feature>servlet</feature>
+	<feature>jpa</feature>
+	<feature>jaxrs</feature>
+    </featureManager>
+```
+
+== Platforms and platform versions
+
+As of Open Liberty version 24.0.0.8, two platforms are available: jakartaee/javaee, and microProfile.  Altogether, these platform versions are available.  (The actual presence a particular platform versions depends on the particular server package.)
+
+=== Platform versions:
+
+==== JakartaEE/JavaEE
+
+* javaee-6.0
+* javaee-7.0
+* javaee-8.0 
+* jakartaee-9.1
+* jakartaee-10.0
+
+==== MicroProfile
+
+* microProfile-1.2
+* microProfile-1.3
+* microProfile-1.4
+* microProfile-2.0
+* microProfile-2.1
+* microProfile-2.2
+* microProfile-3.0
+* microProfile-3.2
+* microProfile-3.3
+* microProfile-4.0
+* microProfile-4.1
+* microProfile-5.0
+* microProfile-6.0
+* microProfile-6.1
+
+== Versionless features
+
+These versionless features are available.  Many are available with two names, since most of these were renamed within the transition from javaee to jakartaee.  When two names are given, the format is jakartaee-name / javaee-name.
+
+* jakartaee/javaee versionless features:
+* appAuthentication / jaspic
+* appAuthorization / jacc
+* appClientSupport
+* appSecurity
+* batch
+* beanValidation
+* cdi
+* concurrent
+* connectors / jca
+* connectorsInboundSecurity / jcainboundsecurity
+* data
+* enterpriseBeans / ejb
+* enterpriseBeansHome / ejbhome
+* enterpriseBeansLite / ejblite
+* expressionLanguage / el
+* enterpriseBeansPersistentTimer / ejbpersistenttimer
+* enterpriseBeansRemote / ejbremote
+* faces / jsf
+* j2eeManagement
+* mail / javaMail
+* jdbc
+* jsonb
+* jsonp
+* managedBeans
+* mdb
+* messaging / jms
+* messagingClient / wasjmsclient
+* messagingSecurity / wasjmssecurity
+* messagingServer / wasjmsserver
+* pages / jsp
+* persistence / jpa
+* restfulWS / jaxrs
+* restfulWSClient / jaxrsclient
+* servlet
+* websocket
+* xmlBinding / jaxb
+* xmlWS / jaxws
+* microProfile versionless features:
+* mpConfig
+* mpFaultTolerance 
+* mpHealth
+* mpJwt
+* mpMetrics
+* mpOpenAPI
+* mpOpenTracing
+* mpRestClient
+* mpTelemetry
+
+==== Non-versionless features:
+
+Not all public features are available as versionless features.
+
+These features have an association with jakartaee/javaee, but are not available as versionless features:
+
+* facesContainer / jsfcontainer
+* persistenceContainer / jpacontainer
+
+facesContainer and persistenceContainer enable third party faces and persistence implementations, and are not used unless a third party implementation is being used.
+
+These features are weakly associated with jakartaee/javaee, but are not available as versionless features:
+
+* distributedMap
+* jndi
+* jpaContainer
+* json
+* jwt
+* monitor
+* opentracing
+* persistenceContainer
+* restConnector
+* ssl
+
+== Specifying Platforms
+
+Now that we’ve discussed Versionless Features and Platforms at a high level, let’s talk a little bit more in depth about the configuration options.
+
+As mentioned previously, there are 3 ways to specify the platform. 
+
+1. In the server.xml with a platform element.
+
+Configuring platform elements in the server.xml file is the best practice. Simply add a #<platform># element under the #<featureManager># configuration, similar to the following:
+```
+    <!-- Enable features -->
+    <featureManager>
+    	<platform>microProfile-6.1</platform>
+	<feature>mpHealth</feature>
+	<feature>mpMetrics</feature>
+    </featureManager>
+```
+
+2. In the server.xml with a versioned feature instead of a platform.
+
+In many cases, a platform may be determined from versioned features.  Sometimes, just one versioned feature is sufficient, however, and in particular for microProfile, more than one versioned feature may be needed.  A Platform version will only be chosen when 1 or more versioned features defined have a single shared platform version.
+
+For example, because #mpHealth-3.0# is associated with #microProfile-4.0#, the following configurations are equivalent:
+
+===== A server configuration that uses a platform element:
+```
+    <!-- Enable features -->
+    <featureManager>
+        <platform>microProfile-4.0</platform>
+	<feature>mpHealth</feature>
+	<feature>mpMetrics</feature>
+        <feature>mpConfig>/feature>
+    </featureManager>
+```
+===== A server configuration that uses a versioned feature:
+```
+    <!-- Enable features -->
+    <featureManager>
+	<feature>mpHealth-3.0</feature>
+	<feature>mpMetrics</feature>
+        <feature>mpConfig>/feature>
+    </featureManager>
+```
+//Unsure if we want to get this technical about it, feel free to delete the below sentences.
+
+The feature mpHealth is part of MicroProfile-4.0, and no other MicroProfile version, so we can determine the platform version with just this feature. mpMetrics and mpConfig will both resolve to their versions that are part of MicroProfile-4.0. mpMetrics will resolve to #mpMetrics-3.0# and mpConfig will resolve to #mpConfig-2.0#.
+
+3. In an environment variable.
+
+Platforms may be specified using environment variable #PREFERRED_PLATFORM_VERSIONS#.  This variable can be specified in two locations:
+
+a. In the #server.env# configuration file.
+
+```
+# Define the Platform selector values
+PREFERRED_PLATFORM_VERSIONS="microProfile-6.0, jakartaee-10"
+```
+
+b. In the shell environment 
+```
+$ export PREFERRED_PLATFORM_VERSIONS="microProfile-6.0, jakartaee-10"
+```
+
+== Server packaging command
+
+The ‘server package’ command is a command line application that can be utilized by developers to package up their application and all required server related components after development is completed.  This is very useful when moving the application to a new environment or moving it to a container image for the Cloud.
+
+As mentioned above the *best practice* is to use the server.xml to define your Platform selector.  If you do utilize the #PREFERRED_PLATFORM_VERSIONS# environment variable its also a best practice to specify that value in the ‘server.env’ configruation file vs in the actual environment shell.  If you utilize the #PREFERRED_PLATFORM_VERSIONS# variable as a true environment variable in the shell outside of the ‘server.env’ file, and you use the ‘server package’ command the variable will not be retained during packaging.  
+
+If this scenario occurs, the ‘server package’ command will issue a warning as follows:
+
+```
+CWWKE0969W: A manual PREFERRED_PLATFORM_VERSION environment variable was specified during server packaging.
+```
+
+In the new environment where the packaged server will be executed, the user would have to re-create the PREFERRED_PLATFORM_VERSION with the same platform values.
+
+== Download packages
+
+Versionless Features will be included in the various link:https://openliberty.io/start/#downloads-pkg[download packages].  As an example, the microProfile-4 package currently contains the following features:
+```
+<feature>microProfile-4.0</feature>
+<feature>microProfile-4.1</feature>
+<feature>localConnector-1.0</feature>
+```
+As an update to include Versionless Features, the following will be added to the MicroProfile-4 package:
+```
+<feature>appSecurity</feature>
+<feature>cdi</feature>
+<feature>el</feature>
+<feature>jaxrs</feature>
+<feature>jaxrsClient</feature>
+<feature>jndi</feature>
+<feature>jsonb</feature>
+<feature>jsonp</feature>
+<feature>mpJwt</feature>
+<feature>mpFaultTolerance</feature>
+<feature>mpOpenAPI</feature>
+<feature>mpOpenTracing</feature>
+<feature>mpRestClient</feature>
+<feature>mpHealth</feature>
+<feature>mpMetrics</feature>
+<feature>mpConfig</feature>
+<feature>servlet</feature>
+```
+Other existing packages will follow in similar fashion by adding the versionless features corresponding to the included versioned features.
+
+== We welcome your feedback
+
+We hope that versionless features gives you a better developer experience with choosing Open Liberty features.  Please let us know what you think on link:https://groups.io/g/openliberty[our mailing list]. If you hit a problem, link:https://stackoverflow.com/questions/tagged/open-liberty[post a question on StackOverflow]. If you hit a bug, link:https://github.com/OpenLiberty/open-liberty/issues[please raise an issue].
+
+
+// // // // // // // //
+// LINKS
+//
+// OpenLiberty.io site links:
+// link:{url-prefix}/guides/microprofile-rest-client.html[Consuming RESTful Java microservices]
+// 
+// Off-site links:
+// link:https://openapi-generator.tech/docs/installation#jar[Download Instructions]
+//
+// // // // // // // //
