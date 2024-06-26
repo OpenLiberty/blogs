@@ -41,7 +41,9 @@ The source code for this post is in the link:https://github.com/benjamin-confino
 
 One of the trickiest things about packaging a liberty user feature with maven is ensuring variable names are constant across multiple XML files. To make this clearer, any variable that appears in two or more files will be set as a property in the root XML file.
 
-The only exception is is the `BOM/pom.xml` file, which must be a raw string. This exception is clearly labelled. 
+There is one exception in BOM/pom.xml which has to be a raw string, it is clearly labelled.
+
+The feature names in an OpenLiberty server.xml file need to match an IBM-ShortName; in this case the one defined in esa/pom.xml. It the vast majority of cases the server.xml will be configured outside maven so I have done the same and left labels.
 
 === Example Libraries
 
@@ -189,7 +191,23 @@ ${new.integration.code.api.package};version="1.0.0",
 ${new.integration.code.private.package};version="1.0.0"
 ```
 
-These classes will not be registered correctly without a version number.
+These classes will not be registered correctly without a version number. 
+
+The instructions section of `integration/pom.xml` should now look something like this: 
+
+```
+<instructions>
+    <Export-Package>
+        ${new.integration.code.api.package};version="1.0.0", 
+        ${new.integration.code.private.package};version="1.0.0", 
+    </Export-Package>
+    <Bundle-SymbolicName>
+        example.user.feature.integration.machine.name
+    </Bundle-SymbolicName>
+    <Bundle-Name>example.user.feature.human.name</Bundle-Name> 
+    <Bundle-Version>1.0.0</Bundle-Version>
+</instructions>
+```
 
 Going back to the parent `pom.xml` set these properties:
 
@@ -207,7 +225,7 @@ The first thing we need to do is ensure our ESA will have a `manifest.mf` file. 
 
 Now, in instructions we will set a subystem symbolic name `<Subsystem-SymbolicName>example.user.feature.esa.machine.name;visibility:=public</Subsystem-SymbolicName>`. Setting the visibility to `public` is required.
 
-We will also need an IBM shortname. Add `<IBM-ShortName>${feature.name}</IBM-ShortName>` inside instructions, and set ${feature.name} to `example-feature` in the root pom.xml
+We will also need an IBM shortname. Add `<IBM-ShortName>${feature.name}</IBM-ShortName>` inside instructions, and set ${feature.name} to `example-feature-1.0` in the root pom.xml
 
 Finally add
 
@@ -241,9 +259,9 @@ Open bom/pom.xml and add the following dependency.
 
 === Step four: Add your Liberty user feature to a liberty server
 
-Go to demo/src and add the line `<feature>usr:example-feature</feature>` inside `<featureManager>`. The format is `usr:${IBM-ShortName}` but naturally a liberty server.xml cannot use properties from a pom.xml
+Go to demo/src and add the line `<feature>usr:example-feature-1.0</feature>` inside `<featureManager>`. `usr:` is prepended for all user features, and the second part of the feature name is the `IBM-ShortName` for the feature. 
 
-Try compiling and testing your liberty feature.
+Naturally a liberty server.xml cannot read properties from a pom.xml, so we have to put `usr:example-feature-1.0` in as a raw string
 
 === Gotchas
 
