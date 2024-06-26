@@ -1,0 +1,256 @@
+---
+layout: post
+title: "How to package a library as an Open Liberty user feature"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/benjamin-confino
+author_github: https://github.com/benjamin-confino
+seo-title: How to package a library as an Open Liberty user feature - OpenLiberty.io
+seo-description: A step by step guide on how to package a library as an OpenLiberty user feature.
+blog_description: "A step by step guide on how to package a library as an OpenLiberty user feature."
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+---
+= How to package a library as an Open Liberty user feature
+Benjamin Confino
+:imagesdir: /
+:url-prefix:
+:url-about: /
+
+== Learn how to integrate pre-existing software libraries into Open Liberty
+
+Recently, a customer asked me how to package their library as a user feature in Open Liberty so that applications could use it without packaging it directly. If you wish to do something similar, or have some other reason to create an Open Liberty user feature, this guide will walk you through doing so step by step. In this tutorial, you will learn the following skills:
+
+    • How to import a maven artifact as a dependency and repackage it into an Open Liberty user feature.
+    • How to expose parts of your library as an API that can be imported
+    • How to expose parts of your library to CDI so it can be injected into user applications
+
+=== Prerequisites
+
+Maven version 3.8.6 or later
+
+=== Source code
+
+The source code for this post is in the link:https://github.com/benjamin-confino/liberty-user-feature-guide[liberty-user-feature-guide] repository, where you will find the following resources: 
+
+- `finish` This directory contains the completed project you should have at the conclusion of this guide. You can use it as a reference.
+- `start` This directory contains a skeleton you will modify to create the user feature.
+- `scripts` You can ignore this directory. 
+
+=== XML Variables
+
+One of the trickiest things about packaging a liberty user feature with maven is ensuring variable names are constant across multiple XML files. To make this clearer, any variable that appears in two or more files will be set as a property in the root XML file.
+
+The only exception is is the `BOM/pom.xml` file, which must be a raw string. This exception is clearly labelled. 
+
+=== Example Libraries
+
+For the purpose of this tutorial, Apache Commons is used as an example library that stands in for the library you wish to package as a user feature.
+
+=== Structure
+
+The project has the following structure:
+
+```
+root
+   ├── BOM
+   ├── demo
+   ├── ESA
+   └── integration
+```
+
+`BOM` is the Bill of Materials. It tells Open Liberty which Maven artifacts are part of the feature.
+
+`demo` is a simple demo application.
+
+`integration` is an OSGi bundle containing new code written to integrate the pre-existing libraries into Open Liberty, in this case by exposing library classes to CDI.
+
+`ESA` is an OSGi Enterprise Subsystem Archive that packages up integration and the pre-existing libraries.
+
+Depending on your needs, the  `integration` bundle might not be required. If you expect developers to use your library with plain old java syntax like `new LibraryClas()s`, static accessors, or if it already has CDI producers or annotations, you might be able to ignore integration.
+
+=== Try what you will build
+
+The `finish` directory contains a completed version of this tutorial. Inside `finish`, have a look at `demo/src/main/java/example/app/TestServlet.java`. You will see that this class uses a class from our pre-existing library in two separate ways, once by injecting it via CDI and once as a plain old java class.
+
+Next have a look at `integration/src/main/java/com/ibm/example/cdi/CDIProducer.java` and you will see the `@Producer` method that turns a pre-existing class into an injectable bean.
+
+Lets compile it and give it a try, return to the `finish` directory and run the following commands:
+
+```
+mvn install
+cd demo
+mvn liberty:create
+mvn liberty:prepare-feature
+mvn liberty:install-feature
+```
+
+- `mvn liberty:create` creates a server locally.
+- `mvn liberty:prepare-feature` populates your maven repository with details about Liberty features so the Liberty feature manager can install them.
+- `mvn liberty:install-feature` instructs that feature manager to install our new feature.
+
+Have a quick look inside `target/open-liberty-integration.war`. You will see that it does not contain `Apache Commons`. Thanks to our integration code, `Apache Commons` is now provided by Liberty.
+
+Now use `mvn liberty:run` to start the server. Visit the http://localhost:8080/open-liberty-integration/  URL and you will see the two `ConstantInitializer` objects output Hello World.
+
+
+=== Step one: Create the integration bundle
+
+The integration bundle will become an extension to Open Liberty, exposing new options to hosted applications. You can write a bundle that simply repackages an existing library as an Open Liberty feature. However, ours will go further by registering classes with the CDI subsystem so that applications can inject them.
+
+==== Write the Java code
+
+Navigate to the `start/integration/src/main/java/com/ibm/example/cdi/` directory. You will see two packages: `internal` and `api`. When you are finished, the contents of `api` will be available to import into application code. The contents of `internal` will not be, even though they can affect application classes.
+
+It is unlikely that a real integration glue package will need to be exposed as an API. You will see a more realistic example of exposing a pre-existing API in the next section.
+
+`api` has one file: `ExampleQualifier.java`. This is a normal CDI qualifier that you can ignore.
+
+`internal` has two files:  `CDIProducer.java` and `CDIIntegrationMetaData.java`.
+
+    • `CDIIntegrationMetaData.java` will implement an Open Liberty SPI that can register new beans.
+    • `CDIProducer.java` will be the new bean that produces other beans after constructing the contained object. In a real feature, it might read configuration and construct the bean using a factory object or the builder pattern.
+
+Open `CDIProducer.java` and add a producer method by adding the following code:
+
+[source,java]
+----
+	public ConstantInitializer<String> getConstantInitializer()
+	{
+            return new ConstantInitializer<String>("Hello");
+        }
+----
+
+This method will do everything you need to create and return a fully configured object. However, CDI will not yet be aware it should invoke this method without the proper annotations. Add the following:
+
+    • `@Produces` - so CDI knows this method is a source of an injectable bean, the bean’s type will come from the method’s return type.
+    • `@Dependent` - This will be the scope of the bean. We are using `@Dependent` because ConstantInitializer’s only constructor needs a parameter to make it non-proxiable.
+    • `@ExampleQualifier` - We’re adding a qualifier to the bean only so we have an example of an API class.
+
+Finally, since `CDIProducer` is itself a bean, it needs a scope. As `CDIProducer` has no state, add `@ApplicationScoped` to the class. All together, `CDIProducer` should look like the following example:
+
+[source,java]
+----
+package com.ibm.example.cdi.internal;
+
+import jakarta.enterprise.inject.Produces;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.context.Dependent;
+
+import org.apache.commons.lang3.concurrent.ConstantInitializer;
+
+import com.ibm.example.cdi.api.ExampleQualifier;
+@ApplicationScoped
+public class CDIProducer
+{
+	@Produces
+	@Dependent
+        @ExampleQualifier
+	public ConstantInitializer<String> getConstantInitializer()
+	{
+            return new ConstantInitializer<String>("Hello");
+        }
+}
+----
+
+Next, open the  `CDIIntegrationMetaData.java` file. To complete this class, register it as an OSGi component so that Open Liberty will provide it to the CDI framework when it looks for its lists of extensions. And then we’ll have to register `CDIProducer` as a bean.
+
+Add `@Component(service = CDIExtensionMetadata.class, configurationPolicy = IGNORE)` and `implements CDIExtensionMetadata` to the class to make it an OSGi component.
+
+Then add the following method
+
+[source,java]
+----
+	public Set<Class<?>> getBeanClasses() {
+		return Set.of(CDIProducer.class);
+	}
+----
+
+Before proceeding to the next step, review the Javadoc for https://openliberty.io/docs/latest/reference/javadoc/spi/cdi-1.2.html[CDIExtensionMetadata]. 
+
+It is also important to be aware that `getBeanClasses()` is a unique Open Liberty idiom. The normal way to add a new bean would be to make a class that implements `javax.enterprise.inject.spi.Extension` and register it via `META-INF/services`.
+
+If you wish to use `Extension` for compatibility with other Jakarta EE servers or because your integration requires the power of a full `Extension`, then `CDIExtensionMetadata` has a different method you can use for this purpose. If you want to register your extension via `META-INF/services` rather than ` CDIExtensionMetadata`, see the link:https://openliberty.io/docs/latest/reference/feature/bells-1.0.html[BELL feature] documentation. 
+
+==== Write the pom.xml
+
+Open the `start/integration/pom.xml` file.
+
+The `pom.xml` already contains all the dependencies we need to compile and build an unconfigured Maven bundle plugin. That is the next step.
+
+The bundle needs a human readable `<Bundle-Name>`, a machine readable `<Bundle-SymbolicName>`, and we need to provide a list of packages to include in the bundle.
+
+Inside `<instructions>` add the line `<Bundle-Name>example.user.feature.human.name</Bundle-Name>` and `<Bundle-SymbolicName>example.user.feature.integration.machine.name</Bundle-SymbolicName>`.
+
+Also inside `<instructions>` you will find the tag `<Export-Package>`, populate it with.
+
+```
+${new.integration.code.api.package};version="1.0.0",
+${new.integration.code.private.package};version="1.0.0"
+```
+
+These classes will not be registered correctly without a version number.
+
+Going back to the parent `pom.xml` set these properties:
+
+```
+<new.integration.code.private.package>com.ibm.example.cdi.internal</new.integration.code.private.package>    <new.integration.code.api.package>com.ibm.example.cdi.api</new.integration.code.api.package>
+```
+
+=== Step two: Create the ESA
+
+Open Liberty features are packaged as an Enterprise Subsystem Archive (ESA).  We will create one that includes both our new integration code and the pre-existing library.
+
+Open `esa/pom.xml`
+
+The first thing we need to do is ensure our ESA will have a `manifest.mf` file. Set `<generateManifest>true</generateManifest>` in the configuration of `esa-maven-plugin`.
+
+Now, in instructions we will set a subystem symbolic name `<Subsystem-SymbolicName>example.user.feature.esa.machine.name;visibility:=public</Subsystem-SymbolicName>`. Setting the visibility to `public` is required.
+
+We will also need an IBM shortname. Add `<IBM-ShortName>${feature.name}</IBM-ShortName>` inside instructions, and set ${feature.name} to `example-feature` in the root pom.xml
+
+Finally add
+
+```
+${pre.existing.library.package};version="3.14.0",
+${new.integration.code.api.package};version="1.0.0"
+```
+
+Under IBM-API-Package. This will make those two packages visible to applications at runtime.
+
+The ESA is now complete. But there is one final step, set `${pre.existing.library.package}` to `org.apache.commons.lang3.concurrent` in the parent pom.xml
+
+=== Step three: Create the Bill of Materials
+
+The `liberty-maven-plugin` requires a bill of materials to find and install features. In the real world, the Bill of Materials might be defined in the ESA `pom.xml` file, but this tutorial will keep them separate for clarity.
+
+Open bom/pom.xml and add the following dependency.
+
+[source.xml]
+----
+      <dependency>
+        <groupId>com.ibm.example.user.feature</groupId>
+        <!-- This is ${esa.artefact.id}. A variable cannot be used here -->
+        <!-- As this needs to be readable outside this project. -->
+        <artifactId>liberty-feature</artifactId>
+        <version>1.0-SNAPSHOT</version>
+        <type>esa</type>
+        <scope>provided</scope>
+      </dependency>
+----
+
+=== Step four: Add your Liberty user feature to a liberty server
+
+Go to demo/src and add the line `<feature>usr:example-feature</feature>` inside `<featureManager>`. The format is `usr:${IBM-ShortName}` but naturally a liberty server.xml cannot use properties from a pom.xml
+
+Try compiling and testing your liberty feature.
+
+=== Gotchas
+
+Here are a few non-obvious risks and things to be aware off.
+
+- The use of injection for libraries is limited. You can take classes found in the library and inject them into application classes, but you can't take classes provided by Open Liberty itself, or application code, and inject them into your library’s classes. Incidentally, the way to get a Config object from MicroProfile Config in OpenLiberty without injection is `org.eclipse.microprofile.config.ConfigProvider.getConfig(Thread.currentThread().getContextClassLoader());`
+
+- The `<Export-Package>` tag in the `integration/pom.xml` file controls what packages are included in the bundle. Make sure you get everything you need.
+
+- If a package isn’t listed as `IBM-API-PACKAGE`, applications will not be able to access classes from that package. This means trying to `@Inject` those classes will fail.
