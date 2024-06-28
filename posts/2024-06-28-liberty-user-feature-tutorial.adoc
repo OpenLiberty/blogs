@@ -31,19 +31,21 @@ Maven version 3.8.6 or later
 
 === Source code
 
-The source code for this post is in the link:https://github.com/benjamin-confino/liberty-user-feature-guide[liberty-user-feature-guide] repository, where you will find the following resources: 
+The source code for this post is in the link:https://github.com/benjamin-confino/liberty-user-feature-guide[liberty-user-feature-guide] repository, where you will find the following resources:
 
 - `finish` This directory contains the completed project you should have at the conclusion of this guide. You can use it as a reference.
 - `start` This directory contains a skeleton you will modify to create the user feature.
-- `scripts` You can ignore this directory. 
+- `scripts` You can ignore this directory.
 
-=== XML Variables
+=== XML variables
 
 One of the trickiest things about packaging a liberty user feature with maven is ensuring variable names are constant across multiple XML files. To make this clearer, any variable that appears in two or more files will be set as a property in the root XML file.
 
-The only exception is is the `BOM/pom.xml` file, which must be a raw string. This exception is clearly labelled. 
+There is one exception in BOM/pom.xml which has to be a raw string, it is clearly labelled in the example `finish/bom/pom.xml` file.
 
-=== Example Libraries
+The feature names in an OpenLiberty `server.xml` file need to match an IBM-ShortName; in this case the one defined in the `esa/pom.xml` file. In the vast majority of cases, the `server.xml` is configured outside maven, so I have done the same and left labels.
+
+=== Example libraries
 
 For the purpose of this tutorial, Apache Commons is used as an example library that stands in for the library you wish to package as a user feature.
 
@@ -51,23 +53,20 @@ For the purpose of this tutorial, Apache Commons is used as an example library t
 
 The project has the following structure:
 
-```
+----
 root
    ├── BOM
    ├── demo
    ├── ESA
    └── integration
-```
+----
 
-`BOM` is the Bill of Materials. It tells Open Liberty which Maven artifacts are part of the feature.
+- `BOM` is the Bill of Materials. It tells Open Liberty which Maven artifacts are part of the feature.
+- `demo` is a simple demo application.
+- `integration` is an OSGi bundle containing new code written to integrate the pre-existing libraries into Open Liberty, in this case by exposing library classes to CDI.
+- `ESA` is an OSGi Enterprise Subsystem Archive that packages up integration and the pre-existing libraries.
 
-`demo` is a simple demo application.
-
-`integration` is an OSGi bundle containing new code written to integrate the pre-existing libraries into Open Liberty, in this case by exposing library classes to CDI.
-
-`ESA` is an OSGi Enterprise Subsystem Archive that packages up integration and the pre-existing libraries.
-
-Depending on your needs, the  `integration` bundle might not be required. If you expect developers to use your library with plain old java syntax like `new LibraryClas()s`, static accessors, or if it already has CDI producers or annotations, you might be able to ignore integration.
+Depending on your needs, the  `integration` bundle might not be required. If you expect developers to use your library with plain old java syntax like `new LibraryClass()`, static accessors, or if it already has CDI producers or annotations, you might be able to ignore integration.
 
 === Try what you will build
 
@@ -77,13 +76,13 @@ Next have a look at `integration/src/main/java/com/ibm/example/cdi/CDIProducer.j
 
 Lets compile it and give it a try, return to the `finish` directory and run the following commands:
 
-```
+----
 mvn install
 cd demo
 mvn liberty:create
 mvn liberty:prepare-feature
 mvn liberty:install-feature
-```
+----
 
 - `mvn liberty:create` creates a server locally.
 - `mvn liberty:prepare-feature` populates your maven repository with details about Liberty features so the Liberty feature manager can install them.
@@ -153,7 +152,7 @@ public class CDIProducer
 }
 ----
 
-Next, open the  `CDIIntegrationMetaData.java` file. To complete this class, register it as an OSGi component so that Open Liberty will provide it to the CDI framework when it looks for its lists of extensions. And then we’ll have to register `CDIProducer` as a bean.
+Next, open the `CDIIntegrationMetaData.java` file. To complete this class, register it as an OSGi component so that Open Liberty will provide it to the CDI framework when it looks for its lists of extensions. And then we’ll have to register `CDIProducer` as a bean.
 
 Add `@Component(service = CDIExtensionMetadata.class, configurationPolicy = IGNORE)` and `implements CDIExtensionMetadata` to the class to make it an OSGi component.
 
@@ -166,11 +165,11 @@ Then add the following method
 	}
 ----
 
-Before proceeding to the next step, review the Javadoc for https://openliberty.io/docs/latest/reference/javadoc/spi/cdi-1.2.html[CDIExtensionMetadata]. 
+Before proceeding to the next step, review the Javadoc for https://openliberty.io/docs/latest/reference/javadoc/spi/cdi-1.2.html[CDIExtensionMetadata].
 
 It is also important to be aware that `getBeanClasses()` is a unique Open Liberty idiom. The normal way to add a new bean would be to make a class that implements `javax.enterprise.inject.spi.Extension` and register it via `META-INF/services`.
 
-If you wish to use `Extension` for compatibility with other Jakarta EE servers or because your integration requires the power of a full `Extension`, then `CDIExtensionMetadata` has a different method you can use for this purpose. If you want to register your extension via `META-INF/services` rather than ` CDIExtensionMetadata`, see the link:https://openliberty.io/docs/latest/reference/feature/bells-1.0.html[BELL feature] documentation. 
+If you wish to use `Extension` for compatibility with other Jakarta EE servers or because your integration requires the power of a full `Extension`, then `CDIExtensionMetadata` has a different method you can use for this purpose. If you want to register your extension via `META-INF/services` rather than ` CDIExtensionMetadata`, see the link:https://openliberty.io/docs/latest/reference/feature/bells-1.0.html[BELL feature] documentation.
 
 ==== Write the pom.xml
 
@@ -182,68 +181,142 @@ The bundle needs a human readable `<Bundle-Name>`, a machine readable `<Bundle-S
 
 Inside `<instructions>` add the line `<Bundle-Name>example.user.feature.human.name</Bundle-Name>` and `<Bundle-SymbolicName>example.user.feature.integration.machine.name</Bundle-SymbolicName>`.
 
-Also inside `<instructions>` you will find the tag `<Export-Package>`, populate it with.
+[source,xml]
+----
+<Bundle-SymbolicName>
+    example.user.feature.integration.machine.name
+</Bundle-SymbolicName>
+<Bundle-Name>example.user.feature.human.name</Bundle-Name>
+----
 
-```
+
+Also inside `<instructions>` you will find the tag `<Export-Package>`, populate it with the following code:
+
+[source,xml]
+----
 ${new.integration.code.api.package};version="1.0.0",
 ${new.integration.code.private.package};version="1.0.0"
-```
+----
 
 These classes will not be registered correctly without a version number.
 
-Going back to the parent `pom.xml` set these properties:
+The instructions section of `integration/pom.xml` should now look something like this:
 
-```
-<new.integration.code.private.package>com.ibm.example.cdi.internal</new.integration.code.private.package>    <new.integration.code.api.package>com.ibm.example.cdi.api</new.integration.code.api.package>
-```
+[source,xml]
+----
+<instructions>
+    <Export-Package>
+        ${new.integration.code.api.package};version="1.0.0",
+        ${new.integration.code.private.package};version="1.0.0",
+    </Export-Package>
+    <Bundle-SymbolicName>
+        example.user.feature.integration.machine.name
+    </Bundle-SymbolicName>
+    <Bundle-Name>example.user.feature.human.name</Bundle-Name>
+    <Bundle-Version>1.0.0</Bundle-Version>
+</instructions>
+----
+
+Going back to the parent `pom.xml`, set these properties:
+
+[source,xml]
+----
+<new.integration.code.private.package>com.ibm.example.cdi.internal</new.integration.code.private.package>
+<new.integration.code.api.package>com.ibm.example.cdi.api</new.integration.code.api.package>
+----
 
 === Step two: Create the ESA
 
 Open Liberty features are packaged as an Enterprise Subsystem Archive (ESA).  We will create one that includes both our new integration code and the pre-existing library.
 
-Open `esa/pom.xml`
+Open the `esa/pom.xml` file.
 
-The first thing we need to do is ensure our ESA will have a `manifest.mf` file. Set `<generateManifest>true</generateManifest>` in the configuration of `esa-maven-plugin`.
+The first thing we need to do is ensure our ESA will have a `manifest.mf` file. Set `<generateManifest>true</generateManifest>` in the `<configuration>` section of the `esa-maven-plugin`.
 
 Now, in instructions we will set a subystem symbolic name `<Subsystem-SymbolicName>example.user.feature.esa.machine.name;visibility:=public</Subsystem-SymbolicName>`. Setting the visibility to `public` is required.
 
-We will also need an IBM shortname. Add `<IBM-ShortName>${feature.name}</IBM-ShortName>` inside instructions, and set ${feature.name} to `example-feature` in the root pom.xml
+We will also need an IBM shortname. Add `<IBM-ShortName>${feature.name}</IBM-ShortName>` inside `instructions`. Then, in the `properties` section of the root `pom.xml` file, set `${feature.name}` to `example-feature-1.0` .
 
-Finally add
+Finally, in `esa/pom.xml`,  add the following code under `<IBM-API-Package>`.
 
-```
+[source,xml]
+----
 ${pre.existing.library.package};version="3.14.0",
 ${new.integration.code.api.package};version="1.0.0"
-```
+----
 
-Under IBM-API-Package. This will make those two packages visible to applications at runtime.
+This will make those two packages visible to applications at runtime.
 
-The ESA is now complete. But there is one final step, set `${pre.existing.library.package}` to `org.apache.commons.lang3.concurrent` in the parent pom.xml
+When you finish, the `esa-maven-plugin` `<configuration>` will be similar to the following example:
+
+[source,xml]
+----
+<configuration>
+    <generateManifest>true</generateManifest>
+    <archiveContent>all</archiveContent>
+    <instructions>
+    <Subsystem-SymbolicName>
+        example.user.feature.esa.machine.name;visibility:=public
+    </Subsystem-SymbolicName>
+    <Subsystem-Vendor>IBM</Subsystem-Vendor>
+    <IBM-Feature-Version>2</IBM-Feature-Version>
+    <IBM-ShortName>${feature.name}</IBM-ShortName>
+    <Subsystem-Type>osgi.subsystem.feature</Subsystem-Type>
+    <Subsystem-Version>1.0.0</Subsystem-Version>
+    <IBM-API-Package>
+        ${pre.existing.library.package};version="3.14.0",
+        ${new.integration.code.api.package};version="1.0.0"
+    </IBM-API-Package>
+    </instructions>
+</configuration>
+----
+
+
+The ESA is now complete. But there is one final step, set `${pre.existing.library.package}` to `org.apache.commons.lang3.concurrent` by defining the property in the parent `pom.xml` file:
+
+[source.xml]
+----
+<properties>
+  ...
+  <pre.existing.library.package>org.apache.commons.lang3.concurrent</pre.existing.library.package>
+  ...
+</properties>
+----
 
 === Step three: Create the Bill of Materials
 
 The `liberty-maven-plugin` requires a bill of materials to find and install features. In the real world, the Bill of Materials might be defined in the ESA `pom.xml` file, but this tutorial will keep them separate for clarity.
 
-Open bom/pom.xml and add the following dependency.
+Open the `bom/pom.xml` file and add the following dependency.
 
 [source.xml]
 ----
-      <dependency>
-        <groupId>com.ibm.example.user.feature</groupId>
-        <!-- This is ${esa.artefact.id}. A variable cannot be used here -->
-        <!-- As this needs to be readable outside this project. -->
-        <artifactId>liberty-feature</artifactId>
-        <version>1.0-SNAPSHOT</version>
-        <type>esa</type>
-        <scope>provided</scope>
-      </dependency>
+<dependency>
+  <groupId>com.ibm.example.user.feature</groupId>
+  <!-- This is ${esa.artefact.id}. A variable cannot be used here -->
+  <!-- As this needs to be readable outside this project. -->
+  <artifactId>liberty-feature</artifactId>
+  <version>1.0-SNAPSHOT</version>
+  <type>esa</type>
+  <scope>provided</scope>
+</dependency>
 ----
 
-=== Step four: Add your Liberty user feature to a liberty server
+=== Step four: Add your Liberty user feature to a Liberty server
 
-Go to demo/src and add the line `<feature>usr:example-feature</feature>` inside `<featureManager>`. The format is `usr:${IBM-ShortName}` but naturally a liberty server.xml cannot use properties from a pom.xml
+Go to `demo/src/liberty/server.xml` and add the following feature definition inside the `featureManager` element:
 
-Try compiling and testing your liberty feature.
+[source,xml]
+----
+<featureManager>
+   ...
+   <feature>usr:example-feature-1.0</feature>
+</featureManager>
+----
+
+`usr:` is prepended for all user features, and the second part of the feature name is the `IBM-ShortName` for the feature.
+
+Naturally, a liberty `server.xml` cannot read properties from a `pom.xml`, so we have to put `usr:example-feature-1.0` in as a raw string.
 
 === Gotchas
 
