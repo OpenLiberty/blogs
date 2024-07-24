@@ -1,0 +1,753 @@
+---
+layout: post
+title: "Simplify your runtime configuration with versionless features in 24.0.08-beta"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/dmuelle
+author_github: https://github.com/dmuelle
+seo-title: Simplify your runtime configuration with versionless features in 24.0.08-beta - OpenLiberty.io
+seo-description: This release simplifies choosing compatible features for the MicroProfile, Jakarta EE, and Java EE platforms by introducing versionless features. It also includes previews of Jakarta EE 11 and MicroProfile 7.0 beta features.
+blog_description: This release simplifies choosing compatible features for the MicroProfile, Jakarta EE, and Java EE platforms by introducing versionless features. It also includes previews of Jakarta EE 11 and MicroProfile 7.0 beta features.
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+---
+= Simplify your runtime configuration with versionless features in 24.0.08-beta
+David Mueller <https://github.com/dmuelle>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+
+// For every link starting with "https://openliberty.io" in the post make sure to use
+// {url-prefix}. e.g- link:{url-prefix}/guides/GUIDENAME[GUIDENAME]:
+//
+
+
+This release simplifies choosing compatible features for the MicroProfile, Jakarta EE, and Java EE platforms by introducing versionless features. It also includes new previous of Jakarta EE 11 and MicroProfile 7.0 beta features.
+
+// // // // // // // //
+// Change the RELEASE_SUMMARY to an introductory paragraph. This sentence is really
+// important because it is supposed to grab the readers attention.  Make sure to keep the blank lines
+//
+// Throughout the doc, replace 24.0.0.8-beta with the version number of Open Liberty, eg: 22.0.0.2-beta
+// // // // // // // //
+
+The link:{url-about}[Open Liberty] 24.0.0.8-beta includes the following beta features (along with link:{url-prefix}/docs/latest/reference/feature/feature-overview.html[all GA features]):
+
+* <<ft, Fault Tolerance 4.1>>
+* <<rc, MP Rest Client 4.0>>
+* <<mptel, MicroProfile Telemetry 2.0, HTTP Metrics with MP Telemetry 2.0>>
+* <<cookie, Partition Cookies>>
+* <<data, Preview of container feature for external Jakarta Data providers>>
+* <<faces, Jakarta EE11 facesContainer-4.1>>
+* <<websocket, Jakarta EE11 WebSocket 2.2>>
+* <<versionless, Versionless Jakarta EE and MicroProfile features>>
+
+// // // // // // // //
+// In the preceding section:
+// Change SUB_FEATURE_TITLE to the feature that is included in this release and
+// change the SUB_TAG_1/2/3 to the heading tags
+//
+// However if there's only 1 new feature, delete the previous section and change it to the following sentence:
+// "The link:{url-about}[Open Liberty] 24.0.0.8-beta includes SUB_FEATURE_TITLE"
+// // // // // // // //
+
+See also link:{url-prefix}/blog/?search=beta&key=tag[previous Open Liberty beta blog posts].
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/29122
+// Contact/Reviewer: benjamin-confino
+// // // // // // // //
+[#ft]
+== Fault Tolerance 4.1
+
+MicroProfile Fault Tolerance allows users to easily apply strategies for mitigating failures in their code. It provides annotations that you can add to methods to use bulkhead, circuit breaker, retry, timeout, and fallback strategies.
+
+The new `mpFaultTolerance-4.1` feature integrates with the `mpTelemetry-2.0` feature, so that Fault Tolerance can export metric data to Open Telemetry. With this change, and other changes in `mpTelemetry-2.0`, you can use Open Telemetry as the single source for logging, metrics, and tracing, making it easier to manage and configure your application observability.
+
+To enable this functionality, enable `mpFaultTolerance-4.1` and `mpTelemetry-2.0` in your `server.xml` file and then configure `mpTelemetry-2.0` to export metrics. The following examples show a minimal configuration for Open Telemetry to export to your `messages.log` file and a class that generates Fault Tolerance metrics (it must be accessed as a CDI bean).
+
+=== server.xml file configuration
+
+[source,xml]
+----
+<featureManager>
+  <feature>mpFaultTolerance-4.1</feature>
+  <feature>mpTelemetry-2.0</feature>
+</featureManager>
+----
+
+=== bootstrap.properties file configuration
+
+The following example configures Open Telemetry to only output metrics to the `messages.log` file.
+
+[source,xml]
+----
+otel.sdk.disabled=false
+otel.metrics.exporter=logging
+otel.logs.exporter=none
+otel.traces.exporter=none
+
+TODO; set the timeout to a low number so people will see the metrics quickly. Then mention why you did so in the paragraph apart
+----
+
+=== Example application class
+
+Ensure that this class is injected as a CDI bean and invoked by the user in whatever way you prefer.
+
+[source,xml]
+----
+import org.eclipse.microprofile.faulttolerance.Retry;
+import jakarta.enterprise.context.ApplicationScoped;
+
+@ApplicationScoped
+public class Example Class {
+
+    @Retry
+    public int exampleMethod(String name) {
+        return 1;
+    }
+}
+----`
+
+
+You can read more detail about the changes in the new version in the link:https://download.eclipse.org/microprofile/microprofile-fault-tolerance-4.1-RC2/microprofile-fault-tolerance-spec-4.1-RC2.html[Microprofile Fault Tolerance 4.1 RC2 specification] and link:https://download.eclipse.org/microprofile/microprofile-fault-tolerance-4.1-RC2/apidocs/[API Javadoc].
+
+You can learn more about how to use MicroProfile OpenAPI from our link:https://openliberty.io/docs/latest/fault-tolerance.html[documentation] and link:https://openliberty.io/guides/#fault_tolerance[guide].
+
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/29110
+// Contact/Reviewer: WhiteCat22
+// // // // // // // //
+[#rc]
+== MP Rest Client 4.0
+
+MicroProfile Rest Client provides a type-safe approach to invoke RESTful services over HTTP. As much as possible, the MP Rest Client attempts to use APIs for consistency and easier re-use.
+
+The MicroProfile Rest Client 4.0 feature (`mpRestClient-4.0`) aligns with link:https://jakarta.ee/specifications/restful-ws/3.1/[Jakarta RESTful Web Services 3.1] as part of the greater effort to align MicroProfile 7.0 with Jakarta EE10. The beta release of this feature includes the following updates:
+
+* Added a new `RestClientBuilder.header(String, Object)` method to add dynamic headers to the request.
+* Added a new `RestClientBuilder.baseUri(String)` overload method so user's don't have to call `URI.create(String)`.
+* Added clarification in the spec on how to use Jakarta RESTful Web Services `EntityPart` API for multipart requests.
+
+For more information, see the following resources:
+
+* link:https://github.com/eclipse/microprofile-rest-client[Rest Client for MicroProfile] on GitHub
+* link:https://download.eclipse.org/microprofile/microprofile-rest-client-4.0-RC2/microprofile-rest-client-spec-4.0-RC2.html[Rest Client for MicroProfile 4.0 RC2 specification document] (note that this is a release candidate link, the final release link should contain the same content but will have a different URL)
+* link:http://download.eclipse.org/microprofile/microprofile-rest-client-4.0-RC2/apidocs/[API Javadoc] (also release candidate link)
+
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/29050
+// Contact/Reviewer: Channyboy
+// // // // // // // //
+
+[#mptel]
+==
+== HTTP Metrics with MP Telemetry 2.0
+
+In the previous beta (24.0.0.7-beta), we've introduced "Enhanced HTTP Request Monitoring with Monitor 1.0". This introduced the capability to track HTTP requests made to the server and record the request method, response status, duration, HTTP route, and other attributes that align with the Open Telemetry HTTP metric semantic convention. This information was recorded into an `HttpStatsMXBean` and if MicroProfile Metrics v5 runtime was active (`mpMetrics-5.x`) then the HTTP metrics would be reported by the MicroProfile Metrics on the `/metrics` endpoint. Now in this beta release, we will be able to support registering HTTP Metrics with the MicroProfile Telemetry v2 runtime (`mpTelemetry-2.0`). This metric data can then be exported to a compatible OTLP metrics consumer. This enhancement is an auto-feature that activates with `mpTelemetry-2.0` `monitor-1.0` and any feature that uses the servlet engine currently supporting Jakarta EE 10 features like `servlet-6.0`, `pages-3.1`, and `restfulWS-3.1`.
+
+   - The Human-readable name and short feature name for your feature- eg WebSockets feature (websockets-1.0).
+   > N/A -> auto feature that will start with `monitor-1.0` and any feature using the servlet engine + `mpTelemetry-2.0`. Currently only supports JEE 10 features.
+   - Who is the target persona? Who do you expect to use the update? eg application developer, operations.
+   > Operations to track http requests made to the server, duration and response type. (Specifically if they use with mpTelemetry-2.0)
+   - What was the problem before and how does your update make their life better? (Why should they care?)
+   > Open Liberty can currently track servlet requests and JAX-RS/RESTful resource requests to the server as their own respective MBeans (i.e., servlet MBeans and REST Mbeans). Now introduced in the previous 24.0.0.7-beta, HTTP requests to the server can be tracked in their own MBeans and that data used to create metrics with `mpMetrics-5.x`. Now the creation and reporting of HTTP metrics is supported for `mpTelemetry-2.0`. Users can then export the metric data to an OTLP compatible metric consumer.
+   - Briefly explain how to make your update work. Include screenshots, diagrams, and/or code snippets, and provide a `server.xml` snippet.
+   > Auto-feature that will start with `monitor-1.0` and any feature that uses the servlet engine. Currently only supports JEE 10 features. For example: `servlet-6.0`, `pages-3.1`, `restfulWS-3.1`. Currently supports registering of HTTP metrics with `mpMetrics-5.x` features (from previous beta). Now can support creating metrics with `mpTelemetry-2.0`
+   - Where can they find out more about this specific update (eg Open Liberty docs, Javadoc) and/or the wider technology?
+  >  link:https://opentelemetry.io/docs/specs/semconv/http/http-metrics/#metric-httpserverrequestduration[Open Telemetry HTTP semantic convention]
+
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/29019
+// Contact/Reviewer: yasmin-aumeeruddy
+// // // // // // // //
+[#mptel]
+== MicroProfile Telemetry 2.0
+
+
+MicroProfile Telemetry 2.0 (`mpTelemetry-2.0`) provides developers with the latest Open Telemetry technology; the feature now consumes OpenTelemetry-1.34.0. In addition to distributed tracing, the feature now allows OpenTelemetry to collect and export metrics and logs.
+
+=== HTTP Metrics
+
+In the 24.0.0.7-beta release, we introduced link:/blog/2024/07/02/24.0.0.7-beta.html#monitor10[Enhanced HTTP Request Monitoring with Monitor 1.0]. This update introduced the capability to track HTTP requests made to the server and record the following data:
+
+* Request method
+* Response status
+* Duration
+* HTTP route
+* Other attributes that align with the link:https://opentelemetry.io/docs/specs/semconv/general/metrics/[ Open Telemetry HTTP metric semantic conventions. ]
+
+This information is recorded into an `HttpStatsMXBean`. If the MicroProfile Metrics 5.0 or later feature (`mpMetrics-5.x`) is enabled, then the HTTP metrics are reported on the `/metrics` REST endpoint.
+
+In this beta release, we can now register HTTP Metrics with the `mpTelemetry-2.0` feature. This metric data can then be exported to a compatible OTLP metrics consumer. This enhancement is an auto-feature that activates with `mpTelemetry-2.0`, `monitor-1.0`, and any feature that uses the servlet engine that currently supporting Jakarta EE 10 features, such as `servlet-6.0`, `pages-3.1`, and `restfulWS-3.1`.
+
+=== Logs
+
+Logs generated by the `java.util.logging` (JUL) package and message logs can now be collected with OpenTelemetry with the `mpTelemetry-2.0` feature.
+
+To enable the `mpTelemetry-2.0` feature to collect metrics, logs, and traces, add the following configuration to your `server.xml` file:
+
+[source,xml]
+----
+<features>
+   <feature>mpTelemetry-2.0</feature>
+</features>
+----
+
+Additionally, you must add the following configuration to your `server.xml` file to make third-party APIs visible for your application:
+
+[source,xml]
+----
+<webApplication location="application-name.war" contextRoot="/">
+    <!-- enable visibility to third party apis -->
+    <classloader apiTypeVisibility="+third-party"/>
+</webApplication>
+----
+
+To collect and export runtime-level logs and metrics, enable OpenTelemetry by using the following system property or environment variable:
+
+* System property: `otel.sdk.disabled=false`
+* Environment variable: `OTEL_SDK_DISABLED=false`
+
+To separately configure for multiple applications on a server, you can configure OpenTelemetry at the application level. However, you cannot collect runtime-level logs and metrics with this configuration.
+
+By default, all OpenTelemetry data is exported to the link:https://opentelemetry.io/docs/languages/java/exporters/#otlp[OTLP]. You can change each exporter with the following system properties and variables.
+
+System properties:
+
+* `otel.metrics.exporter`
+* `otel.logs.exporter`
+* `otel.traces.exporter`
+
+Environment variables:
+
+* `OTEL_METRICS_EXPORTER`
+* `OTEL_LOGS_EXPORTER`
+* `OTEL_TRACES_EXPORTER`
+
+=== MicroProfile Telemetry 2.0 beta known issues
+
+Tracing context is not transferred through threads in REST Client async requests. Therefore, context values are inconsistent with parent and child spans.
+
+
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/28921
+// Contact/Reviewer: volosied,pnicolucci
+// // // // // // // //
+
+[#cookies]
+== Partition Cookies
+
+To increase privacy and reduce tracking, link:https://developers.google.com/privacy-sandbox/3pcd/[Google Chrome announced it would phase out third-party cookies in 2025]. However, as sites that are designed with third-party cookies in mind are broken by this change. Chrome provides link:https://developers.google.com/privacy-sandbox/3pcd/prepare/test-for-breakage[documentation] to help you test whether your sites are affected. If one is affected, there are a handful of options that are provided to mitigate this change. One such option is called CHIPS: Cookies Having Independent Partitioned State.
+
+First, some background information regarding third-party (cross-site) cookies.
+Currently, if a top-level site `X` embeds another site `Z`, such as an iframe, then any cookies set by the embedded site `Z` might be shared with any other site that embeds site `Z`, such as top-level site `Y`. This vulnerability is due to cookies placed in a cookie jar under the `Z` site key. This scenario assumes that the cookie is labeled as `SameSite=None`, because it isn't shared when set to `Lax` or `Strict`. For more information, including a visual example, see link:https://github.com/privacycg/CHIPS?tab=readme-ov-file#chips-cookies-having-independent-partitioned-state[CHIPS (Cookies Having Independent Partitioned State)] on GitHub.
+
+<img width="657" alt="image" src="https://github.com/OpenLiberty/open-liberty/assets/5934310/c82299d7-bf3d-4d11-93d2-cfa511755ad0">
+
+Chrome provides a `Partitioned` cookie attribute as a workaround for third-party cookies with limitations. This new "Partitioned" attribute divides the cookie jar, as the name indicates. Instead of saving the cookies within the Z site key, they will also be keyed under the top-level site, such as X and Y.  In this way, if X embeds Z and Y embeds Z, the Z's cookies will not be shared between X and Y.
+>
+<img width="654" alt="image" src="https://github.com/OpenLiberty/open-liberty/assets/5934310/a32e7f80-11aa-4ab0-a696-b94bf521e544">
+
+You can use this new attribute to specify whether a cookie is partitioned. If the `SameSite=None` attribute is missing from the cookie, it is blocked by Chrome and any Chromium-based browsers because it is treated as `Lax`.
+
+The partitioned attribute configuration is opt-in and behaves much like the SameSite configuration. The `samesite` channel configuration applies to all cookies, while the `httpSession` and `webAppSecurity` configurations apply to their respective cookies. It's important to note that the the `httpSession` and `webAppSecurity` configuration take precedence over the channel configuration. The default values for these two are `defer`, which means they defer to the channel configuration. As for channel configuration, its default value is `false` meaning "Partitioned" is not added.
+
+
+The following example shows how to set the `cookiePartitioned` attribute for the HTTP session cookie:
+
+[source,xml]
+----
+<httpSession cookieSameSite="None" cookiePartitioned="defer|true|false"/>`
+----
+
+The following example shows how to set the `partitionedCookie` attribute for LTPA and JWT security cookies:
+
+[source,xml]
+----
+<webAppSecurity sameSiteCookie="None" partitionedCookie="defer|true|false"/>`
+----
+
+The following example shows how to set the `partitioned` attribute for other cookies:
+
+[source,xml]
+----
+<httpEndpoint id="defaultHttpEndpoint"
+              httpPort="9080"
+              httpsPort="9443" >
+   <samesite none="*" partitioned="true|false"/>
+</httpEndpoint>
+----
+
+
+Alternatively, you can set `Partitioned` by using the `Set-Cookie` header with the following two `HttpServletResponse` APIs:
+
+* link:https://openliberty.io/docs/ref/javaee/8/#package=javax/servlet/http/package-frame.html&class=javax/servlet/http/HttpServletResponse.html#setHeader-java.lang.String-java.lang.String-[HttpServletResponse.setHeader]
+* link:https://openliberty.io/docs/ref/javaee/8/#package=javax/servlet/http/package-frame.html&class=javax/servlet/http/HttpServletResponse.html#addHeader-java.lang.String-java.lang.String-[HttpServletResponse.addHeader]
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/28869
+// Contact/Reviewer: KyleAure,njr-11
+// // // // // // // //
+
+[#Data]
+== Preview of the container feature for external Jakarta Data providers
+
+Jakarta Data 1.0 is a new Jakarta EE specification that standardizes a repository-based programming model for data access across relational and non-relational databases.
+
+The Jakarta Data API (dataContainer-1.0) feature enables you to use third-party Jakarta Data providers in Open Liberty without including the built-in provider for EclipseLink. This configuration is useful if you want to use a different Jakarta Persistence-based Jakarta Data provider, such as Hibernate, without colliding on the Jakarta Persistence Entity annotation. Or if you want to use Jakarta NoSQL exclusively and do not want the overhead of the built-in provider for relational databases.
+
+The `dataContainer-1.0` feature provides the Jakarta Data API to applications deployed to Open Liberty.
+
+To use a third-party Jakarta Data provider, enable the `dataContainer-1.0` feature in your `server.xml` file. You can then include a third-party Jakarta Data provider in your server configuration by using the `library` element.
+
+The following `server.xml` file example shows the configuration to use the Eclipse jNoSQL Jakarta Data provider and a MongoDB database:
+
+[source,xml]
+----
+  <featureManager>
+    <feature>dataContainer-1.0</feature>
+
+    <!-- Features needed for jNoSQL config / processing -->
+    <feature>mpConfig-3.1</feature>
+    <feature>jsonb-3.0</feature>
+  </featureManager>
+
+  <library id="jnosql">
+  	<!-- Jakarta NoSQL API -->
+  	<fileset dir="${shared.resource.dir}/nosql" includes="jakarta.nosql-api.jar" />
+  	<!-- Eclipse jNoSQL Implementation of Jakarta NoSQL and Jakarta Data -->
+    <fileset dir="${shared.resource.dir}/jnosql"
+    	includes="jnosql-communication-core.jar jnosql-mapping-core.jar jnosql-mongodb.jar *.jar" />
+    <!-- Mongo java driver -->
+    <fileset dir="${shared.resource.dir}/mongodb"
+    	includes="mongodb-driver-core.jar mongodb-driver-sync.jar" />
+  </library>
+
+  <!-- MongoDB connection configuration -->
+  <variable name="jnosql.mongodb.host" value="${MONGO_HOST}"/>
+  <variable name="jnosql.document.database" value="${MONGO_DBNAME}"/>
+
+  <application location="MyApplication.war">
+    <classloader commonLibraryRef="jnosql" />
+  </application>
+----
+
+To use a third-party Jakarta Persistence-based Jakarta Data provider, include the `dataContainer-1.0` and `persistenceContainer-3.2` features. You can then include the third-party Jakarta Data provider in your server configuration by using a `library` element.
+
+The following `server.xml` file example shows the configuration to use the Hibernate ORM Jakarta Data provider and a PostgreSQL database:
+
+[source,xml]
+----
+  <featureManager>
+    <feature>dataContainer-1.0</feature>
+    <feature>persistenceContainer-3.2</feature>
+
+    <!-- Features needed for Hibernate config / processing -->
+    <feature>xmlBinding-4.0</feature>
+  </featureManager>
+
+  <!-- Hibernate Implementation of Jakarta Persistence and Jakarta Data -->
+  <library id="hibernate">
+      <fileset dir="${shared.resource.dir}/hibernate"
+        includes="hibernate-core.jar hibernate-models.jar *.jar"/>
+  </library>
+
+  <!-- PostgreSQL JDBC driver -->
+  <library id="postgresql">
+      <fileset dir="${shared.resource.dir}/postgresql" includes="*.jar"/>
+  </library>
+
+  <!-- Datasource used to create a Persistence Unit -->
+  <dataSource jndiName="jdbc/postgresql" >
+    <jdbcDriver libraryRef="postgresql"/>
+    <properties.postgresql URL="${POSTGRESQL_URL}"/>
+  </dataSource>
+
+  <application location="MyApplication.war">
+    <classloader commonLibraryRef="hibernate, postgresql" />
+  </application>
+
+----
+
+Hibernate ORM uses a persistence unit to persist entities that are defined on a Jakarta Data `repository` interface. To create a persistence unit, add a `META-INF/persistence.xml` deployment descriptor file to your application, similar to the following example.
+
+[source,xml]
+----
+  <persistence xmlns="https://jakarta.ee/xml/ns/persistence"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="https://jakarta.ee/xml/ns/persistence https://jakarta.ee/xml/ns/persistence/persistence_3_2.xsd"
+         version="3.2">
+
+  <persistence-unit name="postgresql-pu">
+	<provider>org.hibernate.jpa.HibernatePersistenceProvider</provider>
+    <jta-data-source>jdbc/postgresql</jta-data-source>
+    <properties>
+      <property name="jakarta.persistence.schema-generation.database.action" value="create"/>
+    </properties>
+  </persistence-unit>
+
+  </persistence>
+----
+
+For more information, see the following resources:
+
+- link:https://jakarta.ee/specifications/data/1.0/jakarta-data-1.0[Jakarta Data specification document]
+- link:https://jakarta.ee/specifications/data/1.0/apidocs/jakarta.data/module-summary.html[Jakarta Data Javadoc ]
+- link:https://openliberty.io/blog/2024/06/04/24.0.0.6-beta.html#data[Open Liberty blog: Preview of Jakarta Data (Release Candidate 1)]
+- link:https://docs.jboss.org/hibernate/orm/7.0/repositories/html_single/Hibernate_Data_Repositories.html[Hibernate support]
+- link:https://github.com/jakartaee/nosql[Eclipse jNoSQL support]
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/28770
+// Contact/Reviewer: volosied,pnicolucci
+// // // // // // // //
+
+[#faces]
+== Jakarta EE11 facesContainer-4.1
+
+Jakarta Faces is a Model-View-Controller (MVC) framework for building web applications. It offers many convenient features, such as state management and input validation.
+
+The Jakarta Faces Container 4.1 (`facesContainer-4.1`) enables you to bring your own Jakarta Faces API and implementation to Liberty. The alternative is to use the Liberty-provided `faces-4.1` feature, which provides the MyFaces 4.1 API and implementation.
+
+The Faces Container feature is updated in this beta release to support the 4.1 API and implementation JARs. If the 4.1 JARs were used with earlier features, errors occurred because the feature checks against the specification version listed within the jars.
+
+To use the `facesContainer-4.1` feature, add the following code to your `server.xml` file
+
+[source,xml]
+----
+<featureManager>
+   <feature>facesContainer-4.1</feature>
+</featureManager>
+----
+
+For more information, see the following resources:
+
+* link:https://openliberty.io/docs/latest/reference/feature/facesContainer-4.0.html[Jakarta Faces Container 4.0] feature
+* link:https://openliberty.io/blog/2024/07/02/24.0.0.7-beta.html#faces41[Faces 4.1 beta blog announcement]
+* link:https://jakarta.ee/specifications/faces/4.1/[Faces 4.1 Javadocs and specification document].
+
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/28769
+// Contact/Reviewer: volosied,pnicolucci
+// // // // // // // //
+
+[#websocket]
+== Jakarta EE11 WebSocket 2.2
+
+The Jakarta WebSocket 2.2 (`websocket-2.2`) feature enables communication for endpoints by using the Websocket protocol. It is an implementation of the Jakarta EE 11 Websocket 2.2 Specification.
+
+Although very few specification changes were listed for the 2.2 release, the main change from 2.1 is the introduction of the link:https://jakarta.ee/specifications/websocket/2.2/apidocs/server/jakarta/websocket/sendresult#getSession[(getSession)] method on the `SendResult` class. This method enables you to retrieve the original session that was used in the asynchronous remote call. This capability is useful for broadcasting messages to numerous listening clients.
+
+The next beta release of websocket-2.2 will limit the link:https://jakarta.ee/specifications/websocket/2.2/apidocs/server/jakarta/websocket/onmessage#maxMessageSize([MaxMessageSize]) to `Integer#MAX_VALUE` for the `OnMessage` annotation to avoid type errors.
+
+To enable this feature, add the following code to your `server.xml` file.
+
+[source,xml]
+----
+      <featureManager>
+           <feature>websocket-2.2</feature>
+      </featureManager>
+----
+
+For more information, such as the Javadocs, specification documents, and other details,see link:https://jakarta.ee/specifications/websocket/2.2/[Jakarta WebSocket 2.2].
+
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/28656
+// Contact/Reviewer: hlhoots
+// // // // // // // //
+
+[#versionless]
+== Versionless Jakarta EE andMicroProfile features
+
+Versionless features simplify your server configuration by providing are a generic way to specify Open Liberty features in the `server.xml` file without having to specify a feature version. These new features are available for the MicroProfile, JakarataEE, and Java EE platforms. A matching versioned platform element must be specified when you use versionless features.
+
+With Open Liberty, you can configure only the features at the specific versions that your application needs. This composable design pattern minimizes the resources the runtime needs, keeping application startup times short and memory footprints low. However, you might not always know which version of a feature is compatible with the other features your application needs. Determining the correct version typically requires a mix of experimentation, guesswork, and digging deep into feature documentation. Versionless features alleviate this burden by automating feature version selection, so you can focus on building your applications instead of picking feature versions.
+
+For example, instead of specifying `<feature>servlet-6.1</feature>` in your `server.xml` file and having to figure out which other feature versions are compatible with Servlet 6.1, you can specify a platform version and `<feature>servlet</feature>`. The platform that you specify resolves all versionless features to a compatible version.
+
+For example, the following `server.xml` file configuration uses versionless features with MicroProfile-5.0 specified as the platform element.
+
+[source,xml]
+----
+    <!-- Enable features -->
+    <featureManager>
+        <platform>microProfile-5.0</platform>
+        <feature>mpHealth</feature>
+        <feature>mpMetrics</feature>
+    </featureManager>
+----
+
+Another example is specifying a Java EE platform of `javaee-8.0` with associated versionless features that are defined for `servlet`, `jpa`, and `jaxrs`:
+
+[source,xml]
+----
+    <!-- Enable features -->
+    <featureManager>
+        <platform>javaee-8.0</platform>
+        <feature>servlet</feature>
+        <feature>jpa</feature>
+        <feature>jaxrs</feature>
+    </featureManager>
+----
+
+=== Platform and related versionless features reference list
+
+The following platform features are available in this beta release. You can specify up to 2 platform elements, one for MicroProfile, another for either Jakarta EE or Java EE.
+
+==== MicroProfile
+
+Platforms:
+
+* `microProfile-1.2`
+* `microProfile-1.3`
+* `microProfile-1.4`
+* `microProfile-2.0`
+* `microProfile-2.1`
+* `microProfile-2.2`
+* `microProfile-3.0`
+* `microProfile-3.2`
+* `microProfile-3.3`
+* `microProfile-4.0`
+* `microProfile-4.1`
+* `microProfile-5.0`
+* `microProfile-6.0`
+* `microProfile-6.1`
+
+MicroProfile versionless features:
+
+* `mpConfig`
+* `mpFaultTolerance`
+* `mpHealth`
+* `mpJwt`
+* `mpMetrics`
+* `mpOpenAPI`
+* `mpOpenTracing`
+* `mpRestClient`
+* `mpTelemetry`
+
+
+==== Jakarta EE
+
+Platforms:
+
+* `jakartaee-9.1`
+* `jakartaee-10.0`
+
+Jakarta EE versionless features:
+
+* `appAuthentication`
+* `appAuthorization`
+* `appClientSupport`
+* `appSecurity`
+* `batch`
+* `beanValidation`
+* `cdi`
+* `concurrent`
+* `connectors`
+* `connectorsInboundSecurity`
+* `data`
+* `enterpriseBeans`
+* `enterpriseBeansHome`
+* `enterpriseBeansLite`
+* `expressionLanguage`
+* `enterpriseBeansPersistentTimer`
+* `enterpriseBeansRemote`
+* `faces`
+* `j2eeManagement`
+* `jdbc`
+* `jsonb`
+* `jsonp`
+* `mail`
+* `managedBeans`
+* `mdb`
+* `messaging`
+* `messagingClient`
+* `messagingSecurity`
+* `messagingServer`
+* `pages`
+* `persistence`
+* `restfulWS`
+* `restfulWSClient`
+* `servlet`
+* `websocket`
+* `xmlBinding`
+* `xmlWS`
+
+==== Java EE
+
+Platforms:
+
+* `javaee-6.0`
+* `javaee-7.0`
+* `javaee-8.0`
+
+Java EE versionless features:
+
+* `appClientSupport`
+* `appSecurity`
+* `batch`
+* `beanValidation`
+* `cdi`
+* `concurrent`
+* `jca`
+* `jcainboundsecurity`
+* `data`
+* `ejb`
+* `ejbhome`
+* `ejblite`
+* `el`
+* `ejbpersistenttimer`
+* `ejbremote`
+* `jacc`
+* `jaspic`
+* `javaMail`
+* `jaxb`
+* `jaxws`
+* `jaxrs`
+* `jaxrsclient`
+* `jpa`
+* `jsf`
+* `jsp`
+* `j2eeManagement`
+* `jdbc`
+* `jms`
+* `jsonb`
+* `jsonp`
+* `managedBeans`
+* `mdb`
+* `servlet`
+* `websocket`
+* `wasjmsclient`
+* `wasjmssecurity`
+* `wasjmsserver`
+
+=== Known limitations
+
+* Error handling scenarios return generic messages.
+* Feature installation scenarios that use  command-line tools, including Maven and Gradle plug-ins, are not supported.
+
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+
+
+To enable the new beta features in your app, add them to your `server.xml`:
+
+
+[#run]
+=== Try it now
+
+To try out these features, update your build tools to pull the Open Liberty All Beta Features package instead of the main release. The beta works with Java SE 22, Java SE 21, Java SE 17, Java SE 11, and Java SE 8.
+// // // // // // // //
+// In the preceding section:
+// Check if a new non-LTS Java SE version is supported that needs to be added to the list (21, 17, 11, and 8 are LTS and will remain for a while)
+// https://openliberty.io/docs/latest/java-se.html
+//
+// In the following section:
+// Check if a new MicroProfile or Jakarta version is in beta that could replace the example values in the codeblock
+// // // // // // // //
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], you can install the All Beta Features package using:
+
+[source,xml]
+----
+<plugin>
+    <groupId>io.openliberty.tools</groupId>
+    <artifactId>liberty-maven-plugin</artifactId>
+    <version>3.10.3</version>
+    <configuration>
+        <runtimeArtifact>
+          <groupId>io.openliberty.beta</groupId>
+          <artifactId>openliberty-runtime</artifactId>
+          <version>24.0.0.8-beta</version>
+          <type>zip</type>
+        </runtimeArtifact>
+    </configuration>
+</plugin>
+----
+
+You must also add dependencies to your pom.xml file for the beta version of the APIs that are associated with the beta features that you want to try. For example, the following block adds dependencies for two example beta APIs:
+
+[source,xml]
+----
+<dependency>
+    <groupId>org.example.spec</groupId>
+    <artifactId>exampleApi</artifactId>
+    <version>7.0</version>
+    <type>pom</type>
+    <scope>provided</scope>
+</dependency>
+<dependency>
+    <groupId>example.platform</groupId>
+    <artifactId>example.example-api</artifactId>
+    <version>11.0.0</version>
+    <scope>provided</scope>
+</dependency>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'io.openliberty.tools:liberty-gradle-plugin:3.8.3'
+    }
+}
+apply plugin: 'liberty'
+dependencies {
+    libertyRuntime group: 'io.openliberty.beta', name: 'openliberty-runtime', version: '[24.0.0.8-beta,)'
+}
+----
+// // // // // // // //
+// In the preceding section:
+// Replace the Maven `3.8.2` with the latest version of the plugin: https://search.maven.org/artifact/io.openliberty.tools/liberty-maven-plugin
+// Replace the Gradle `3.6.2` with the latest version of the plugin: https://search.maven.org/artifact/io.openliberty.tools/liberty-gradle-plugin
+// TODO: Update GHA to automatically do the above.  If the maven.org is problematic, then could fallback to using the GH Releases for the plugins
+// // // // // // // //
+
+Or if you're using link:{url-prefix}/docs/latest/container-images.html[container images]:
+
+[source]
+----
+FROM icr.io/appcafe/open-liberty:beta
+----
+
+Or take a look at our link:{url-prefix}/downloads/#runtime_betas[Downloads page].
+
+If you're using link:https://plugins.jetbrains.com/plugin/14856-liberty-tools[IntelliJ IDEA], link:https://marketplace.visualstudio.com/items?itemName=Open-Liberty.liberty-dev-vscode-ext[Visual Studio Code] or link:https://marketplace.eclipse.org/content/liberty-tools[Eclipse IDE], you can also take advantage of our open source link:https://openliberty.io/docs/latest/develop-liberty-tools.html[Liberty developer tools] to enable effective development, testing, debugging and application management all from within your IDE.
+
+For more information on using a beta release, refer to the link:{url-prefix}docs/latest/installing-open-liberty-betas.html[Installing Open Liberty beta releases] documentation.
+
+[#feedback]
+== We welcome your feedback
+
+Let us know what you think on link:https://groups.io/g/openliberty[our mailing list]. If you hit a problem, link:https://stackoverflow.com/questions/tagged/open-liberty[post a question on StackOverflow]. If you hit a bug, link:https://github.com/OpenLiberty/open-liberty/issues[please raise an issue].
