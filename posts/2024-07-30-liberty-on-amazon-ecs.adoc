@@ -45,13 +45,11 @@ To use this 'getting started' image it needs to be uploaded to a internet access
 To create your Amazon ECS cluster follow step 1. in https://docs.aws.amazon.com/AmazonECS/latest/developerguide/getting-started-fargate.html[Getting started with the console using Linux containers on AWS Fargate].
 
 === Step 5: Create your Task Definition using JSON
-Amazon ECS runs either Services or Jobs that use https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_definitions.html[Task Definitions] to define the runtime configuration for the task. The task definition includes some of the following properties: Container Image URL, CPU & Memory, Port Mappings, Environment variables, and Compatibilities. A full list of task definition parameters can be found https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_definition_parameters.html[here].
+Amazon ECS runs either services or jobs that use https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_definitions.html[task definitions] to define the runtime configuration for the task. Task definition are required to define the following properties: container image URL, CPU & memory, port mappings, environment variables, and compatibilities. The values of these properties cannot be overridden by the service or job definition that execute the task definition. For example, if the same task definition was used in Development and Production deployments, then they would use the same amount of CPU. As such it is recommended that separate task definitions are defined for each environment.
 
-__Note: The values of these properties cannot be overridden by the service or job definition that execute the task definition. For example, if the same task definition was used in Development and Production deployments, then they would use the same amount of CPU. As such it is recommended that separate task definitions are defined for each environment.__
+It is possible to create the task definition using the UI or by uploading JSON, but for this blog the JSON is provided. The provided JSON helps to highlight key aspects important when defining task definitions. To apply the below example task definition to create a new Task definition follow Step 2. in https://docs.aws.amazon.com/AmazonECS/latest/developerguide/getting-started-fargate.html[Getting started with the console using Linux containers on AWS Fargate]. Before applying, ensure that the `logConfiguration.options.awslogs-region` setting matches the region you are planning on deploying into.
 
-It is possible to create the Task Definition using the UI or by uploading JSON, but for this blog the JSON is provided. The provided JSON helps to highlight key aspects important when defining task definitions. To apply the below example task definition to create a new Task definition follow Step 2. in https://docs.aws.amazon.com/AmazonECS/latest/developerguide/getting-started-fargate.html[Getting started with the console using Linux containers on AWS Fargate]. Before applying, ensure that the `logConfiguration.options.awslogs-region` setting matches the region you are planning on deploying into.
-
-[.underline]Example Open Liberty Amazon ECS Task Definition:
+Example Open Liberty Amazon ECS Task Definition:
 
 [source]
 ----
@@ -120,39 +118,35 @@ It is possible to create the Task Definition using the UI or by uploading JSON, 
 
 By default, Open Liberty exposes ports 9080 and 9443 for HTTP and HTTPS traffic respectively. The server.xml exposes two variables: `default.http.port` and `default.https.port` that allow the overriding of the default port values. By setting the environment variables to 80 and 443 respectively the service is exposed on those ports instead.
 
-Now that have a Task definition, the next step needed is to create a Service that uses this definition.
+Now that we have a Task definition, the next step is to create a Service that uses this definition.
 
 === Step 6: Create the Service
 For the purposes of this blog you'll create a Service that uses HTTP.
 
 .To Create the Service
 . In the Amazon ECS Service, under `Clusters`, select the Cluster you created earlier
-. Under the Services Tab for this cluster, click `Create`
-. Under `Environment`
-.. Update Compute Options from `Capacity provider strategy` to `Launch Type`
-.. Ensure Launch type is `Fargate`
-. Under `Deployment Configuration`
-.. For Family, set to the Task Definition created earlier
-.. Provide the service a name e.g. ol-getting-started-service-1
-.. Set the desired count to `0`*
-. Under `Networking`
-.. Leave VPC and subnets as is
-.. Select `Create a new security group`
-... Add rules set out in <<_security_group_rules, Security Group rules>>
-. Under `Load Balancing`
-.. Set `Load balancer type` to `Application Load Balancer`
-.. Select `Create a new load balancer`
-.. Provide a name
-.. Ensure the mapping is to the HTTP port for the Task Definition
-.. Select Create a new listener
-... Select the Listener for Port 80
-.. Select `Create a new target group`
-.. Update the `Health check path` to use `/health`**
-. Click `Create`
-
-&#42; This prevents the immediate starting of the Service until you are ready.
-
-&#42;&#42; The `/health` endpoint is provided by MicroProfile Health and is ideal for reporting health in containerized deployments.
+. Under the Services Tab for this cluster, click `Create`.
+. Under `Environment`.
+.. Update Compute Options from `Capacity provider strategy` to `Launch Type`.
+.. Ensure Launch type is `Fargate`.
+. Under `Deployment Configuration`.
+.. For Family, set to the Task Definition created earlier.
+.. Provide the service a name e.g. ol-getting-started-service-1.
+.. Set the desired count to `0` (This prevents the immediate starting of the Service until you are ready.)
+. Under `Networking`.
+.. Leave VPC and subnets as is.
+.. Select `Create a new security group`.
+... Add rules set out in <<_security_group_rules, Security Group rules>>.
+. Under `Load Balancing`.
+.. Set `Load balancer type` to `Application Load Balancer`.
+.. Select `Create a new load balancer`.
+.. Provide a name.
+.. Ensure the mapping is to the HTTP port for the Task Definition.
+.. Select Create a new listener.
+... Select the Listener for Port 80.
+.. Select `Create a new target group`.
+.. Update the `Health check path` to use `/health`(The `/health` endpoint is provided by MicroProfile Health and is ideal for reporting health in containerized deployments.)
+. Click `Create`.
 
 === Step 7: Create appropriate Security Group rules
 
@@ -228,7 +222,7 @@ ECS Scaling policies are split into 2 alarms:
 * Scaling out
 * Scaling in
 
-'Sacling out' is the primary alarm that we set and AWS will provide a metric definition for 'scaling in' that is matched to the 'scaling out' definition, Though both can be adjusted independently of the Service definition.
+'Scaling out' is the primary alarm that we set and AWS will provide a metric definition for 'scaling in' that is matched to the 'scaling out' definition, Though both can be adjusted independently of the Service definition.
 
 To try and prevent accidental scaling events, the alarms gather Amazon CloudWatch data based on their metric over time. For example, if an instance were to experience just a *short* high load period, then when we compare this to corresponding data points where we are at typical workload, then the alarm is *not* triggered and we don't spin up unneeded instances for just this short spike. On the other hands, for scaling in, this is the reverse - we ideally don't want to terminate instances that might be handling workload.
 
