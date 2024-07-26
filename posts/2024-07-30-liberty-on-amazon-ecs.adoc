@@ -17,28 +17,41 @@ Alex Butcher <https://github.com/abutch3r>
 :url-prefix:
 :url-about: /
 
-Serverless applications rapidly scale according to workload but with minimal resource costs through pay per usage models. link:https://aws.amazon.com/ecs/[Amazon Elastic Container Service (Amazon ECS)] with link:https://aws.amazon.com/fargate/[AWS Fargate], a link:https://www.ibm.com/topics/containers-as-a-service[Container as a Service (CaaS)] offering, provides a fully-managed container orchestration service to help you easily deploy, manage, and scale containerized applications in a serverless manner. This post describes how to run serverless MicroProfile applications in Amazon ECS.
+Serverless applications rapidly scale according to workload but with minimal resource costs through pay per usage models. link:https://aws.amazon.com/ecs/[Amazon Elastic Container Service (Amazon ECS)] with link:https://aws.amazon.com/fargate/[AWS Fargate], a link:https://www.ibm.com/topics/containers-as-a-service[Container as a Service (CaaS)] offering, provides a fully-managed container orchestration service to help you easily deploy, manage, and scale containerized applications in a serverless manner. This post describes how to run serverless MicroProfile applications in Amazon ECS in just 10 steps:
+
+* <<Step 1: Ensure you have the correct pre-requisites>>
+* <<Step 2: Ensure you have a suitable containerized application>>
+* <<Step 3: Upload the container to a registry>>
+* <<Step 4: Create your Amazon ECS Cluster>>
+* <<Step 5: Create your Task Definition using JSON>>
+* <<Step 6: Create the Service>>
+* <<Step 7: Create appropriate Security Group rules>>
+* <<Step 8: Start the Service>>
+* <<Step 9: Access the Service>>
+* <<Step 10: Scale the application via auto-scaling policies>>
 
 == Deploying an Open Liberty Container to Amazon ECS
 
-To run a MicroProfile application on Amazon ECS we need to be able to create AWS resources and have an application to run. For this, you'll need to ensure you have an link:https://aws.amazon.com/[AWS] Administrator account. You'll also need link:https://www.docker.com/[Docker], link:https://git-scm.com/book/en/v2/Getting-Started-The-Command-Line[Git CLI], link:https://maven.apache.org/[Maven], and an externally accessible container registry that can host your images such as link:https://aws.amazon.com/ecr/[Amazon Elastic Container Registry(Amazon ECR)] or link:https://docs.docker.com/docker-hub/[Dockerhub].
+=== Step 1: Ensure you have the correct pre-requisites
+To run a MicroProfile application on Amazon ECS we need to be able to create AWS resources and have an application to run. For this, you'll need to ensure you have an link:https://aws.amazon.com/[AWS] Administrator account. You'll also need link:https://www.docker.com/[Docker], link:https://git-scm.com/book/en/v2/Getting-Started-The-Command-Line[Git CLI], link:https://maven.apache.org/[Maven], and an externally accessible container registry that can host your images such as link:https://aws.amazon.com/ecr/[Amazon Elastic Container Registry (Amazon ECR)] or link:https://docs.docker.com/docker-hub/[Dockerhub].
 
-If you don't already have a MicroProfile application of your own to use to try these steps out, then you can use the application provided in the 'finish' directory of the Open Liberty Getting Started guide: link:https://github.com/OpenLiberty/guide-getting-started/tree/prod/finish. A publicly accessible copy of the containerized application is available from: `icr.io/appcafe/open-liberty/samples/getting-started`.
+=== Step 2: Ensure you have a suitable containerized application
+If you don't already have a MicroProfile application of your own to use to try these steps out, then you can use the application provided in the 'finish' directory of the Open Liberty link:https://github.com/OpenLiberty/guide-getting-started/tree/prod/finish['Getting Started' guide]. A publicly accessible copy of the containerized application is available from: `icr.io/appcafe/open-liberty/samples/getting-started`.
 
-=== Uploading the container to a registry
+=== Step 3: Upload the container to a registry
 To use this 'getting started' image it needs to be uploaded to a internet accessible container registry. Amazon ECS supports a range of container registries outlined in their https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_definition_parameters.html#container_definition_image[Image Registry requirements]. As this blog requires an AWS account, you most likely already have access to link:https://aws.amazon.com/ecr/[Amazon ECR] to act as your registry. To upload the image use the https://docs.aws.amazon.com/AmazonECR/latest/userguide/getting-started-console.html[Get Started] instructions for Amazon ECR.
 
-=== Creating your Amazon ECS Cluster
+=== Step 4: Create your Amazon ECS Cluster
 To create your Amazon ECS cluster follow step 1. in https://docs.aws.amazon.com/AmazonECS/latest/developerguide/getting-started-fargate.html[Getting started with the console using Linux containers on AWS Fargate].
 
-=== Creating your Task Definition using JSON
+=== Step 5: Create your Task Definition using JSON
 Amazon ECS runs either Services or Jobs that use https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_definitions.html[Task Definitions] to define the runtime configuration for the task. The task definition includes some of the following properties: Container Image URL, CPU & Memory, Port Mappings, Environment variables, and Compatibilities. A full list of task definition parameters can be found https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_definition_parameters.html[here].
 
 __Note: The values of these properties cannot be overridden by the service or job definition that execute the task definition. For example, if the same task definition was used in Development and Production deployments, then they would use the same amount of CPU. As such it is recommended that separate task definitions are defined for each environment.__
 
 It is possible to create the Task Definition using the UI or by uploading JSON, but for this blog the JSON is provided. The provided JSON helps to highlight key aspects important when defining task definitions. To apply the below example task definition to create a new Task definition follow Step 2. in https://docs.aws.amazon.com/AmazonECS/latest/developerguide/getting-started-fargate.html[Getting started with the console using Linux containers on AWS Fargate]. Before applying, ensure that the `logConfiguration.options.awslogs-region` setting matches the region you are planning on deploying into.
 
-Example Open Liberty Amazon ECS Task Definition:
+[.underline]Example Open Liberty Amazon ECS Task Definition:
 
 [source]
 ----
@@ -109,7 +122,7 @@ By default, Open Liberty exposes ports 9080 and 9443 for HTTP and HTTPS traffic 
 
 Now that have a Task definition, the next step needed is to create a Service that uses this definition.
 
-=== Creating the Service
+=== Step 6: Create the Service
 For the purposes of this blog you'll create a Service that uses HTTP.
 
 .To Create the Service
@@ -137,11 +150,11 @@ For the purposes of this blog you'll create a Service that uses HTTP.
 .. Update the `Health check path` to use `/health`**
 . Click `Create`
 
-&#42; This prevents the immediate starting of the Service until you are ready
-&#42;&#42; the `/health` endpoint is provided by MicroProfile Health and is ideal for reporting health in containerized deployments.
+&#42; This prevents the immediate starting of the Service until you are ready.
 
-[#_security_group_rules]
-==== Security Group rules
+&#42;&#42; The `/health` endpoint is provided by MicroProfile Health and is ideal for reporting health in containerized deployments.
+
+=== Step 7: Create appropriate Security Group rules
 
 Next, you'll need to define some new security rules to allow for HTTP and HTTPS traffic on both Open Liberty and HTTP/S default ports. This is because the default security group rules are deliberately restrictive to prevent unintended exposure, so rules need to be defined that allow for the communication on a set of ports.
 
@@ -174,42 +187,43 @@ Next, you'll need to define some new security rules to allow for HTTP and HTTPS 
 |0.0.0.0/0, ::/0
 |===
 
-The above rules will generate a security policy that looks like this
+The rules in the table above will generate a security policy that looks like this:
 
 image::/img/blog/amazon-ec2-security-group-port-mapping.png[,width=90%,align="center"]
 
-=== Starting the Service.
+=== Step 8: Start the Service
 Now that the Service has been created with its required assets and the security group has been updated so that we will be able to communicate with it, we can start it. To start the service we need to update it by changing the value of `Desired tasks` to `1` - remember to click `Save` when you change this! This will start an instance of our container in ECS. Once it has reported as running and healthy we can look at how to access it.
 
-=== Accessing the Service
+=== Step 9: Access the Service
 With the service now running we can start to make requests against it. The first step for this is to get the DNS name for the Load Balancer, which we can get either from the load balancer itself or from the target Service. In this blog, to keep things simple, we're going to go back to our service and get the DNS name from this.
 
 To obtain the DNS name of your Load Balancer from the Service, you'll once more need to navigate to your cluster and select your Service. Once here, click the `Networking tab` and either copy or click `open address`.
 
 __Note: If you have exposed the service on the non-protocol port, you will need to add the port to the URL.__
 
-image::/img/blog/amazon_ecs_host_page.png[,width=90%,align="center"]
+image::/img/blog/amazon_ecs_hosted_page.png[,width=90%,align="center"]
 
-=== Monitoring our service
+=== Step 10: Scale the application via auto-scaling policies
 
+*Monitoring the service:*
 With the Service started, we can start to monitor it using the Amazon ECS tooling and link:https://aws.amazon.com/cloudwatch/[Amazon CloudWatch]. This monitoring data can help enable effective autoscaling that is such a critical component of serverless applications, enabling more efficient resource usage and lower costs.
 
 For CPU and memory usage, we can access the service definition to see this usage.
 
 image::/img/blog/amazon_ecs_service_health.png[Amazon ECS Service health ,width=90%,align="center"]
 
-=== Scaling your application via auto-scaling policies
-
+*Enabling auto-scaling:*
 To enable autoscaling, we can set up scaling policies that dictate as and when we want the components of our application to be scaled. Scaling policies can be applied and adjusted after the Service has been created. The policy that you use should best reflect the expected bottlenecks of your application. *If your application handles complex workloads the CPU or Memory....* It is possible to define more than one scaling policy per service
 
 The policy allows the number of tasks (instances of your application) to be defined and, enables you to use a variety of scaling metrics and set thresholds for these. These metrics use Amazon CloudWatch data and associated "alarms" to trigger automated scale actions and reviews them based on the periods it is set to. They include:
+
 * Percentage of CPU used
 * Percentage of Memory used
 * Number of Application Load Balancer (ALB) requests over a period of time
 
 For Open Liberty, all of these 3 scaling metrics can be used. The decision as to which metric to use is dependant on the nature of your application. For example, if you have requests that are CPU heavy, then CPU based alarms would be the recommendation, however if you have high volume, but low CPU requests then ALB requests* might be a better fit.
 
- ECS Scaling policies are split into 2 alarms:
+ECS Scaling policies are split into 2 alarms:
 
 * Scaling out
 * Scaling in
@@ -221,6 +235,7 @@ To try and prevent accidental scaling events, the alarms gather Amazon CloudWatc
 For this blog, as the application is not CPU or memory intensive, we will use the amount of requests hitting the ALB we receive to trigger scaling events.
 
 To create an ALB request Scaling policy, you can edit the instances scaling policy. To do this, once more revisit your cluster and select your Service. Then select `Update service` and set the `Desired tasks` to `1`. Expand `Service auto scaling` and you'll be presented with a form like the one in the diagram below. In this form:
+
 . Set the minimum number of tasks to `1` and the maximum to `2`
 . Click `+ Add scaling policy`
 . Give your policy a name e.g. `mp-sp`
@@ -233,9 +248,7 @@ The target value is set to a very low value so that it is easier to cause a scal
 
 image::../img/blog/amazon_ecs_scaling_policy.png[Amazon ECS scaling policy, width=70%,align="center"]
 
-Having created our policy we can now test it by attempting to trigger the alarm and cause our service to increase the number of instances available. As our alarm is focused on requests against the ALB, to test it, we should invoke our applications URL to generate some traffic.
-
-Given our alarm requires 3 datapoints above our target threshold in a given period, we just need to invoke it 3 times in the period being measured. After the trigger has been activated you will see the number of instances scale out, showing that autoscaling is working as expected.
+Having created our policy we can now test it by attempting to trigger the alarm and cause our service to increase the number of instances available. As our alarm is focused on requests against the ALB, to test it, we should invoke our applications URL to generate some traffic. Given our alarm requires 3 datapoints above our target threshold in a given period, we just need to invoke it 3 times in the period being measured. After the trigger has been activated you will see the number of instances scale out, showing that autoscaling is working as expected.
 
 image::/img/blog/amazon_ecs_scaled_instances.png[Amazon ECS scaled out service,width=90%,align="center"]
 
@@ -243,7 +256,7 @@ You have now run and scaled your own MicroProfile Application on Amazon ECS with
 
 == Summary:
 
-Through this blog you've gained an understanding of the steps required to take a MicroProfile application running with Open Liberty and run and effectively scale it with Amazon ECS with AWS Fargate. 
+Through this blog you've gained an understanding of the steps required to take a MicroProfile application running with Open Liberty and run and effectively scale it with Amazon ECS with AWS Fargate. Continue your learning by checking out some of the additional resources listed below.
 
 == Additional Resources
 * https://aws.amazon.com/ecs/[Amazon Elastic Container Service]
