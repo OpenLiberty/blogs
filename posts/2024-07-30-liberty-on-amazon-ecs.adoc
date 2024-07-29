@@ -25,9 +25,9 @@ Serverless applications rapidly scale according to workload but with minimal res
 * <<Step 4: Create your Amazon ECS Cluster>>
 * <<Step 5: Create your Task Definition using JSON>>
 * <<Step 6: Create the Service>>
-* <<Step 7: Create appropriate Security Group rules>>
-* <<Step 8: Start the Service>>
-* <<Step 9: Access the Service>>
+* <<Step 7: Start the Service>>
+* <<Step 8: Access the Service>>
+* <<Step 9: Monitor the service>>
 * <<Step 10: Scale the application via auto-scaling policies>>
 
 == Deploying an Open Liberty Container to Amazon ECS
@@ -45,11 +45,9 @@ To use this 'getting started' image it needs to be uploaded to a internet access
 To create your Amazon ECS cluster follow step 1. in https://docs.aws.amazon.com/AmazonECS/latest/developerguide/getting-started-fargate.html[Getting started with the console using Linux containers on AWS Fargate].
 
 === Step 5: Create your Task Definition using JSON
-Amazon ECS runs either services or jobs that use https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_definitions.html[task definitions] to define the runtime configuration for the task. Task definition are required to define the following properties: container image URL, CPU & memory, port mappings, environment variables, and compatibilities. The values of these properties cannot be overridden by the service or job definition that execute the task definition. For example, if the same task definition was used in Development and Production deployments, then they would use the same amount of CPU. As such it is recommended that separate task definitions are defined for each environment.
+Amazon ECS runs services or jobs, using https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_definitions.html[task definitions] to define the runtime configuration for the task. Task definitions define the following properties: container image URL, CPU & memory, port mappings, environment variables, and compatibilities. It's important to note that the values of these properties cannot be overridden by the service or job definition that execute said task definition. For example, if the same task definition was used in Development and Production deployments, then they would use the same amount of CPU. As such, it is recommended that separate task definitions are defined for each environment.
 
-It is possible to create the task definition using the UI or by uploading JSON, but for this blog the JSON is provided. The provided JSON helps to highlight key aspects important when defining task definitions. To apply the below example task definition to create a new Task definition follow Step 2. in https://docs.aws.amazon.com/AmazonECS/latest/developerguide/getting-started-fargate.html[Getting started with the console using Linux containers on AWS Fargate]. Before applying, ensure that the `logConfiguration.options.awslogs-region` setting matches the region you are planning on deploying into.
-
-Example Open Liberty Amazon ECS Task Definition:
+It is possible to create a task definition using the UI or by uploading JSON, but for this blog the JSON is provided below. To apply the below example, create a new task definition follow Step 2. in https://docs.aws.amazon.com/AmazonECS/latest/developerguide/getting-started-fargate.html[Getting started with the console using Linux containers on AWS Fargate]. Before applying, ensure that the `logConfiguration.options.awslogs-region` setting matches the region you are planning on deploying into.
 
 [source]
 ----
@@ -116,74 +114,21 @@ Example Open Liberty Amazon ECS Task Definition:
 }
 ----
 
-By default, Open Liberty exposes ports 9080 and 9443 for HTTP and HTTPS traffic respectively. The server.xml exposes two variables: `default.http.port` and `default.https.port` that allow the overriding of the default port values. By setting the environment variables to 80 and 443 respectively the service is exposed on those ports instead.
+The provided JSON helps to highlight key aspects important when defining task definitions. By default, Open Liberty exposes ports 9080 and 9443 for HTTP and HTTPS traffic respectively. The `server.xml` exposes two variables: `default.http.port` and `default.https.port` that allow the overriding of the default port values. By setting the environment variables to 80 and 443 respectively the service is exposed on those ports instead.
 
-Now that we have a Task definition, the next step is to create a Service that uses this definition.
+Now that we have a task definition set up, the next step is to create a Service that uses this definition.
 
 === Step 6: Create the Service
 For the purposes of this blog you'll create a Service that uses HTTP.
 
 .To Create the Service
-. In the Amazon ECS Service, under `Clusters`, select the Cluster you created earlier
-. Under the Services Tab for this cluster, click `Create`.
-. Under `Environment`.
-.. Update Compute Options from `Capacity provider strategy` to `Launch Type`.
-.. Ensure Launch type is `Fargate`.
-. Under `Deployment Configuration`.
-.. For Family, set to the Task Definition created earlier.
-.. Provide the service a name e.g. ol-getting-started-service-1.
-.. Set the desired count to `0` (This prevents the immediate starting of the Service until you are ready.)
-. Under `Networking`.
-.. Leave VPC and subnets as is.
-.. Select `Create a new security group`.
-... Add rules set out in <<_security_group_rules, Security Group rules>>.
-. Under `Load Balancing`.
-.. Set `Load balancer type` to `Application Load Balancer`.
-.. Select `Create a new load balancer`.
-.. Provide a name.
-.. Ensure the mapping is to the HTTP port for the Task Definition.
-.. Select Create a new listener.
-... Select the Listener for Port 80.
-.. Select `Create a new target group`.
-.. Update the `Health check path` to use `/health`(The `/health` endpoint is provided by MicroProfile Health and is ideal for reporting health in containerized deployments.)
+. In the Amazon ECS Service, under `Clusters`, select the cluster you created earlier
+. Under the `Services` tab for this cluster, click `Create`.
+. Under `Environment`, update `Compute Options` from `Capacity provider strategy` to `Launch Type` and ensure `Launch Type` is `Fargate`.
+. Under `Deployment Configuration`, set the value for `Family` to the task definition created earlier, provide the service a name e.g. ol-getting-started-service-1 and set the desired count to `0` (This prevents the immediate starting of the Service until you are ready).
+. Under `Networking`, leave VPC and subnets as is, select `Create a new security group` and within this Set the type to `HTTP` and set the source to `Anywhere`.
+. Under `Load Balancing` set `Load balancer type` to `Application Load Balancer`, select `Create a new load balancer`, provide a name, check that the mapping corresponds to the HTTP port for the task definition, select `Create a new listener` and within this set the Listener to port 80, select `Create a new target group` and update the `Health check path` to use `/health` (The `/health` endpoint is provided by MicroProfile Health and is ideal for reporting health in containerized deployments).
 . Click `Create`.
-
-=== Step 7: Create appropriate Security Group rules
-
-Next, you'll need to define some new security rules to allow for HTTP and HTTPS traffic on both Open Liberty and HTTP/S default ports. This is because the default security group rules are deliberately restrictive to prevent unintended exposure, so rules need to be defined that allow for the communication on a set of ports.
-
-.ECS Security Group Rules
-|===
-|Type |Protocol |Port Range |Source |Values
-
-|HTTP
-|TCP
-|80
-|Anywhere
-|0.0.0.0/0, ::/0
-
-|Custom TCP
-|TCP
-|9080
-|Anywhere
-|0.0.0.0/0, ::/0
-
-|HTTPS
-|TCP
-|443
-|Anywhere
-|0.0.0.0/0, ::/0
-
-|Custom TCP
-|TCP
-|9443
-|Anywhere
-|0.0.0.0/0, ::/0
-|===
-
-The rules in the table above will generate a security policy that looks like this:
-
-image::/img/blog/amazon-ec2-security-group-port-mapping.png[,width=90%,align="center"]
 
 === Step 8: Start the Service
 Now that the Service has been created with its required assets and the security group has been updated so that we will be able to communicate with it, we can start it. To start the service we need to update it by changing the value of `Desired tasks` to `1` - remember to click `Save` when you change this! This will start an instance of our container in ECS. Once it has reported as running and healthy we can look at how to access it.
@@ -197,38 +142,21 @@ __Note: If you have exposed the service on the non-protocol port, you will need 
 
 image::/img/blog/amazon_ecs_hosted_page.png[,width=90%,align="center"]
 
-=== Step 10: Scale the application via auto-scaling policies
+=== Step 9: Monitor the service
 
-*Monitoring the service:*
 With the Service started, we can start to monitor it using the Amazon ECS tooling and link:https://aws.amazon.com/cloudwatch/[Amazon CloudWatch]. This monitoring data can help enable effective autoscaling that is such a critical component of serverless applications, enabling more efficient resource usage and lower costs.
 
 For CPU and memory usage, we can access the service definition to see this usage.
 
 image::/img/blog/amazon_ecs_service_health.png[Amazon ECS Service health ,width=90%,align="center"]
 
-*Enabling auto-scaling:*
-To enable autoscaling, we can set up scaling policies that dictate as and when we want the components of our application to be scaled. Scaling policies can be applied and adjusted after the Service has been created. The policy that you use should best reflect the expected bottlenecks of your application. *If your application handles complex workloads the CPU or Memory....* It is possible to define more than one scaling policy per service
+=== Step 10: Scale the application via auto-scaling policies
 
-The policy allows the number of tasks (instances of your application) to be defined and, enables you to use a variety of scaling metrics and set thresholds for these. These metrics use Amazon CloudWatch data and associated "alarms" to trigger automated scale actions and reviews them based on the periods it is set to. They include:
+To enable autoscaling, we can set up scaling policies that can use various metrics to determine whether to scale applications in or out, including metrics collected through monitoring, as we covered above. A common metric that is used to scale HTTP Serverless applications is the number of requests that a service receives over a period of time. This is referred to as Application Load Balancer (ALB) requests, and this is what we'll be using for our example application.
 
-* Percentage of CPU used
-* Percentage of Memory used
-* Number of Application Load Balancer (ALB) requests over a period of time
+To create an ALB request scaling policy, you can edit the instances scaling policy. To do this, once more revisit your cluster and select your service. Then select `Update service` and set the `Desired tasks` to `1`. Expand `Service auto scaling` and you'll be presented with a form like the one in the diagram below. 
 
-For Open Liberty, all of these 3 scaling metrics can be used. The decision as to which metric to use is dependant on the nature of your application. For example, if you have requests that are CPU heavy, then CPU based alarms would be the recommendation, however if you have high volume, but low CPU requests then ALB requests* might be a better fit.
-
-ECS Scaling policies are split into 2 alarms:
-
-* Scaling out
-* Scaling in
-
-'Scaling out' is the primary alarm that we set and AWS will provide a metric definition for 'scaling in' that is matched to the 'scaling out' definition, Though both can be adjusted independently of the Service definition.
-
-To try and prevent accidental scaling events, the alarms gather Amazon CloudWatch data based on their metric over time. For example, if an instance were to experience just a *short* high load period, then when we compare this to corresponding data points where we are at typical workload, then the alarm is *not* triggered and we don't spin up unneeded instances for just this short spike. On the other hands, for scaling in, this is the reverse - we ideally don't want to terminate instances that might be handling workload.
-
-For this blog, as the application is not CPU or memory intensive, we will use the amount of requests hitting the ALB we receive to trigger scaling events.
-
-To create an ALB request Scaling policy, you can edit the instances scaling policy. To do this, once more revisit your cluster and select your Service. Then select `Update service` and set the `Desired tasks` to `1`. Expand `Service auto scaling` and you'll be presented with a form like the one in the diagram below. In this form:
+In this form:
 
 . Set the minimum number of tasks to `1` and the maximum to `2`
 . Click `+ Add scaling policy`
@@ -238,7 +166,7 @@ To create an ALB request Scaling policy, you can edit the instances scaling poli
 . Set both the `Scale *out* cooldown period` and `Scale *in* cooldown period` to `30`
 . Click `Update`
 
-The target value is set to a very low value so that it is easier to cause a scaling out alarm to trigger and create new instances. This value should be scoped to the requirements of the application and also that the amount of other resources provided are capable of handling that type of workload.
+The target value is set to a very low value so that it is easier to cause an alarm to trigger and create new instances. This value should be scoped to the requirements of the application and also that the amount of other resources provided are capable of handling that type of workload.
 
 image::../img/blog/amazon_ecs_scaling_policy.png[Amazon ECS scaling policy, width=70%,align="center"]
 
@@ -253,13 +181,10 @@ You have now run and scaled your own MicroProfile Application on Amazon ECS with
 Through this blog you've gained an understanding of the steps required to take a MicroProfile application running with Open Liberty and run and effectively scale it with Amazon ECS with AWS Fargate. Continue your learning by checking out some of the additional resources listed below.
 
 == Additional Resources
+
 * https://aws.amazon.com/ecs/[Amazon Elastic Container Service]
 * https://aws.amazon.com/fargate/[AWS Fargate]
-
 * https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_definitions.html[Amazon ECS Task Definitions]
 * https://docs.aws.amazon.com/AmazonECS/latest/bestpracticesguide/intro.html[Amazon ECS Best Practices]
-* https://docs.aws.amazon.com/elasticloadbalancing/latest/application/introduction.html[Amazon Elastic Load Balancing]
-* https://docs.aws.amazon.com/elasticloadbalancing/latest/application/create-https-listener.html#https-listener-certificates[Create an HTTPS listener for your Application Load Balancer]
-* https://aws.permissions.cloud/[AWS Permissions]
 * https://docs.aws.amazon.com/AmazonECS/latest/developerguide/service-autoscaling-targettracking.html?icmpid=docs_ecs_hp-deploy-failure-detection[Scale your Amazon ECS service using a target metric value].
 
