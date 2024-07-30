@@ -42,7 +42,7 @@ The link:{url-about}[Open Liberty] 24.0.0.8-beta includes the following beta fea
 MicroProfile 7.0 beta features:
 
 * <<mp7, Enable the full set of MicroProfile 7.0 beta features with the MicroProfile 7.0 convenience feature>>
-* <<ft, Integrate fault tolerance and Open Telemetry with MicroProfile Fault Tolerance 4.1>>
+* <<ft, Integrate fault tolerance and OpenTelemetry with MicroProfile Fault Tolerance 4.1>>
 * <<openapi, Document APIs in OpenAPI 3.1 format with MicroProfile OpenAPI 4.0>>
 * <<rc, Align your REST client with Jakarta RESTful Web Services with MicroProfile Rest Client 4.0 >>
 * <<mptel, Collect and export HTTP metrics and logs with MicroProfile Telemetry 2.0>>
@@ -70,26 +70,16 @@ See also link:{url-prefix}/blog/?search=beta&key=tag[previous Open Liberty beta 
 [#versionless]
 == Streamline feature selection with versionless Jakarta EE and MicroProfile features
 
-With Open Liberty, you can configure only the features at the specific versions that your application needs. This composable design pattern minimizes the resources the runtime needs, keeping application startup times short and memory footprints low. However, you might not always know which version of a feature is compatible with the other features your application needs. Determining the correct version typically requires a mix of experimentation, guesswork, and digging deep into feature documentation. Versionless features alleviate this burden by automating feature version selection, so you can focus on building your applications instead of picking feature versions.
+With Open Liberty, you configure only the features at the specific versions that your application needs. This composable design pattern minimizes runtime resource requirements and accelerates application startup times. However, you might not always know which version of a feature is compatible with the rest of your application configuration. Determining the correct version typically requires a mix of experimentation, guesswork, and digging deep into feature documentation. Versionless features automate version selection, enabling you to focus on application development without worrying about compatibility issues.
 
-Versionless features simplify your server configuration by providing a generic way to specify Open Liberty features without having to specify a feature version. These new features are available for the MicroProfile, Jakarta EE, and Java EE platforms. When you use versionless features, you must specify a corresponding versioned platform element in your `server.xml` file.
+Versionless features provide a generic way to specify Open Liberty features without having to specify a feature version. These new features are available for the MicroProfile, Jakarta EE, and Java EE platforms. When you use versionless features, you must specify a corresponding versioned platform element in your `server.xml` file.
 
 
 For example, instead of specifying `servlet-6.0` in your `server.xml` file and having to figure out which other feature versions are compatible with Servlet 6.0, you can specify a platform version and `servlet`. The platform that you specify resolves all versionless features to a compatible version.
 
-The following `server.xml` file configuration uses versionless features with `microProfile-5.0` specified as the platform element.
+The following `server.xml` file configuration uses a Java EE platform of `javaee-8.0` with associated versionless features that are defined for `servlet`, `jpa`, and `jaxrs`:
 
-[source,xml]
-----
-    <!-- Enable features -->
-    <featureManager>
-        <platform>microProfile-5.0</platform>
-        <feature>mpHealth</feature>
-        <feature>mpMetrics</feature>
-    </featureManager>
-----
-
-Another example is specifying a Java EE platform of `javaee-8.0` with associated versionless features that are defined for `servlet`, `jpa`, and `jaxrs`:
+Another example is specifying
 
 [source,xml]
 ----
@@ -99,6 +89,18 @@ Another example is specifying a Java EE platform of `javaee-8.0` with associated
         <feature>servlet</feature>
         <feature>jpa</feature>
         <feature>jaxrs</feature>
+    </featureManager>
+----
+
+This example enables versionless MicroProfile features with `microProfile-5.0` specified as the platform element:
+
+[source,xml]
+----
+    <!-- Enable features -->
+    <featureManager>
+        <platform>microProfile-5.0</platform>
+        <feature>mpHealth</feature>
+        <feature>mpMetrics</feature>
     </featureManager>
 ----
 
@@ -120,23 +122,24 @@ Check out the full collection of available platforms and versionless features in
 [#cookie]
 == Keep using third party cookies with CHIPS
 
-To increase privacy and reduce tracking, link:https://developers.google.com/privacy-sandbox/3pcd/[Google Chrome announced it would phase out third-party cookies in 2025]. Although, as of July 22, 2024, link:https://privacysandbox.com/news/privacy-sandbox-update/[Chrome stated they might scrap the phase-out plan] due to regulatory concerns. Users instead could opt to block third party cookies via their browser. Some sites that are designed with third-party cookies in mind are broken by browsers that opt-in to block third party cookies. Chrome provides link:https://developers.google.com/privacy-sandbox/3pcd/prepare/test-for-breakage[documentation] to help you test whether your sites are affected. If you are, a handful of options are provided to mitigate this change. One such option is called CHIPS: Cookies Having Independent Partitioned State.
-
+To increase privacy and reduce tracking, link:https://developers.google.com/privacy-sandbox/3pcd/[Google Chrome announced it would phase out third-party cookies in 2025]. Then, as of July 22, 2024, link:https://privacysandbox.com/news/privacy-sandbox-update/[Chrome stated they might scrap the phase-out plan] due to regulatory concerns. Users instead could opt to block third party cookies via their browser. Some sites that are designed with third-party cookies in mind are broken by browsers that opt-in to block third party cookies. Chrome provides link:https://developers.google.com/privacy-sandbox/3pcd/prepare/test-for-breakage[documentation] to help you test whether your sites are affected. If you are, one option to mitigate this change is called CHIPS: Cookies Having Independent Partitioned State.
 
 First, some background information regarding third-party (cross-site) cookies.
-Currently, if a top-level site X embeds another site Z, such as an iframe, then any cookies set by the embedded site Z might be shared with any other site that embeds site Z, such as top-level site Y. This vulnerability is due to cookies placed in a cookie jar under the Z site key. This scenario assumes that the cookie is labeled as `SameSite=None`, because it isn't shared when set to `Lax` or `Strict`.
+
+If a top-level site X embeds another site Z, such as an iframe, then any cookies set by the embedded site Z might be shared with any other site that embeds site Z, such as top-level site Y. This vulnerability is due to cookies placed in a cookie jar under the Z site key. This scenario assumes that the cookie is labeled as `SameSite=None`, because it isn't shared when set to `Lax` or `Strict`.
 
 image::/img/blog/cookie1.png[multisite cookie diagram,width=70%,align="center"]
 
 
-Chrome provides a `Partitioned` cookie attribute as a workaround for third-party cookies with limitations. This new "Partitioned" attribute divides the cookie jar, as the name indicates. Instead of saving the cookies within the Z site key, they will also be keyed under the top-level site, such as X and Y.  In this way, if X embeds Z and Y embeds Z, the Z's cookies will not be shared between X and Y.
+Chrome provides a `Partitioned` cookie attribute, which divides the cookie jar, as a workaround for third-party cookies with limitations. Instead of saving the cookies within the Z site key, they will also be keyed under the top-level site, such as X and Y.  In this way, if X embeds Z and Y embeds Z, the Z's cookies will not be shared between X and Y.
 
 image::/img/blog/cookie2.png[partitioned cookie diagram,width=70%,align="center"]
 
-You can use this new attribute to specify whether a cookie is partitioned. If the `SameSite=None` attribute is missing from the cookie, it is blocked by Chrome and any Chromium-based browsers because it is treated as `Lax`.
+You can use the `Partitioned` attribute to specify whether a cookie is partitioned. If the `SameSite=None` attribute is missing from the cookie, it is blocked by Chrome and any Chromium-based browsers because it is treated as `Lax`.
 
-The partitioned attribute configuration is opt-in and behaves much like the SameSite configuration. The `samesite` channel configuration applies to all cookies, while the `httpSession` and `webAppSecurity` configurations apply to their respective cookies. It's important to note that the `httpSession` and `webAppSecurity` configurations take precedence over the channel configuration. The default values for these two are `defer`, which means they defer to the channel configuration. As for channel configuration, its default value is `false` meaning `Partitioned` is not added.
+The partitioned attribute configuration is opt-in and behaves much like the SameSite configuration. The `samesite` channel configuration applies to all cookies, while the `httpSession` and `webAppSecurity` configurations apply to their respective cookies. It's important to note that the `httpSession` and `webAppSecurity` configurations take precedence over the channel configuration. The default value for these two attributes is `defer`, which means they defer to the channel configuration. As for channel configuration, its default value is `false`, which means the `Partitioned` attribute is not added.
 
+Depending on which configuration you use to declare the `Partitioned` attribute, Liberty uses one of three attributes.
 
 The following example shows how to set the `cookiePartitioned` attribute for the HTTP session cookie on the `httpSession` attribute in your `server.xml` file:
 
@@ -201,7 +204,7 @@ The following 4 specifications have updates while the other 3 specifications rem
 * <<rc, MicroProfile Rest Client 4.0>>
 * <<mptel, MicroProfile Telemetry 2.0>>
 
-MicroProfile Telemetry 2.0 now provides support for OpenTelemetry logs and metrics. Consequently, MicroProfile Metrics is not part of MicroProfile 7.0. However, the MicroProfile Metrics 5.1 feature is still compatible with MicroProfile 7.0 features.
+MicroProfile Telemetry 2.0 now provides support for link:https://opentelemetry.io/[OpenTelemetry] logs and metrics. Consequently, MicroProfile Metrics is not part of MicroProfile 7.0. However, the MicroProfile Metrics 5.1 feature is still compatible with MicroProfile 7.0 features.
 
 To enable MicroProfile 7.0 and all its constituent features, add the `microProfile-7.0` convenience feature to your `server.xml` file:
 
@@ -216,13 +219,13 @@ To enable MicroProfile 7.0 and all its constituent features, add the `microProfi
 
 
 [#ft]
-== Integrate fault tolerance and Open Telemetry with MicroProfile Fault Tolerance 4.1
+== Integrate fault tolerance and OpenTelemetry with MicroProfile Fault Tolerance 4.1
 
-MicroProfile Fault Tolerance helps you easily identify and mitigate failures in your code. It provides annotations that you can add to methods to use bulkhead, circuit breaker, retry, timeout, and fallback strategies.
+link:{url-prefix}/docs/latest/fault-tolerance.html[MicroProfile Fault Tolerance] helps you easily identify and mitigate failures in your code. It provides annotations that you can add to methods to use bulkhead, circuit breaker, retry, timeout, and fallback strategies.
 
-The new `mpFaultTolerance-4.1` feature integrates with the `mpTelemetry-2.0` feature, so that Fault Tolerance can export metric data to Open Telemetry. With this change, and other changes in `mpTelemetry-2.0`, you can simplify the configuration and management of your application observability by using Open Telemetry as the single source for logging, metrics, and tracing.
+The new `mpFaultTolerance-4.1` feature integrates with the `mpTelemetry-2.0` feature, so that Fault Tolerance can export metric data to OpenTelemetry. With this change, and other changes in `mpTelemetry-2.0`, you can simplify the configuration and management of your application observability by using OpenTelemetry as the single source for logging, metrics, and tracing.
 
-To enable this functionality, enable `mpFaultTolerance-4.1` and `mpTelemetry-2.0` in your `server.xml` file and then configure `mpTelemetry-2.0` to export metrics. The following examples show a minimal configuration for Open Telemetry to export to your `messages.log` file and a class that generates Fault Tolerance metrics (it must be accessed as a CDI bean).
+To enable this functionality, enable `mpFaultTolerance-4.1` and `mpTelemetry-2.0` in your `server.xml` file and then link:{url-prefix}/docs/latest/microprofile-telemetry.html[configure mpTelemetry-2.0 to export metrics]. The following examples show a minimal configuration for OpenTelemetry to export to your `messages.log` file and a class that generates Fault Tolerance metrics (it must be accessed as a CDI bean).
 
 === server.xml file configuration
 
@@ -236,7 +239,7 @@ To enable this functionality, enable `mpFaultTolerance-4.1` and `mpTelemetry-2.0
 
 === bootstrap.properties file configuration
 
-The following example configures Open Telemetry to only output metrics to the `messages.log` file.
+The following example configures OpenTelemetry to only output metrics to the `messages.log` file.
 It also sets a very low interval for exporting metrics so you can see the results quickly.
 
 [source,xml]
@@ -266,6 +269,8 @@ public class ExampleClass {
     }
 }
 ----
+
+=== Learn more
 
 You can read more details about the changes in the new version in the link:https://download.eclipse.org/microprofile/microprofile-fault-tolerance-4.1-RC2/microprofile-fault-tolerance-spec-4.1-RC2.html[Microprofile Fault Tolerance 4.1 RC2 specification] and link:https://download.eclipse.org/microprofile/microprofile-fault-tolerance-4.1-RC2/apidocs/[API Javadoc].
 
@@ -300,7 +305,7 @@ This is an early beta release to support the ratification of MicroProfile 7.0. A
 - Documenting more than one web module as link:https://openliberty.io/docs/latest/documentation-openapi.html#multi-module[can be configured in previous versions]
 - Validation of the produced OpenAPI document
 
-=== Further resources:
+=== Learn more
 
 For more information, see the following resources:
 
@@ -325,6 +330,8 @@ The MicroProfile Rest Client 4.0 feature (`mpRestClient-4.0`) aligns with Jakart
 * Added a new `RestClientBuilder.header(String, Object)` method to add dynamic headers to the request.
 * Added a new `RestClientBuilder.baseUri(String)` overload method so users don't have to call `URI.create(String)`.
 * Added clarification in the spec on how to use Jakarta RESTful Web Services `EntityPart` API for multipart requests.
+
+=== Learn more
 
 For more information, see the following resources:
 
@@ -351,7 +358,7 @@ For more information, see the following resources:
 == Collect and export HTTP metrics and logs with MicroProfile Telemetry 2.0
 
 
-MicroProfile Telemetry 2.0 (`mpTelemetry-2.0`) provides developers with the latest Open Telemetry technology. The feature now consumes `OpenTelemetry-1.34.0`. In addition to distributed tracing, the feature now allows OpenTelemetry to collect and export HTTP metrics and logs.
+MicroProfile Telemetry 2.0 (`mpTelemetry-2.0`) provides developers with the latest OpenTelemetry technology. The feature now consumes `OpenTelemetry-1.34.0`. In addition to distributed tracing, the feature now allows OpenTelemetry to collect and export HTTP metrics and logs.
 
 To enable the `mpTelemetry-2.0` feature to collect metrics, logs, and traces, add the following configuration to your `server.xml` file:
 
@@ -380,15 +387,15 @@ In the 24.0.0.7-beta release, we introduced link:{url-prefix}/blog/2024/07/02/24
 * Response status
 * Duration
 * HTTP route
-* Other attributes that align with the link:https://opentelemetry.io/docs/specs/semconv/general/metrics/[ Open Telemetry HTTP metric semantic conventions. ]
+* Other attributes that align with the link:https://opentelemetry.io/docs/specs/semconv/general/metrics/[ OpenTelemetry HTTP metric semantic conventions. ]
 
 This information is recorded into an `HttpStatsMXBean`. If the MicroProfile Metrics 5.0 or later feature (`mpMetrics-5.x`) is enabled, then the HTTP metrics are reported on the `/metrics` REST endpoint.
 
-In this beta release, we can now register HTTP Metrics with the `mpTelemetry-2.0` feature. This metric data can then be exported to a compatible OTLP metrics consumer. This enhancement is an auto-feature that activates with `mpTelemetry-2.0`, `monitor-1.0`, and any feature that uses the servlet engine that currently supporting Jakarta EE 10 features, such as `servlet-6.0`, `pages-3.1`, and `restfulWS-3.1`.
+In this beta release, we can now register HTTP Metrics with the `mpTelemetry-2.0` feature. This metric data can then be exported to a compatible OpenTelemetry metrics consumer. This enhancement is an auto-feature that activates with `mpTelemetry-2.0`, `monitor-1.0`, and any feature that uses the servlet engine that currently supports Jakarta EE 10 features, such as `servlet-6.0`, `pages-3.1`, and `restfulWS-3.1`.
 
 === Logs
 
-Logs generated by the `java.util.logging` (JUL) package and message logs can now be collected with OpenTelemetry with the `mpTelemetry-2.0` feature.
+Logs generated by the `java.util.logging` (JUL) package and message logs can now be collected by OpenTelemetry with the `mpTelemetry-2.0` feature.
 
 To collect and export runtime-level logs and metrics, enable OpenTelemetry by using the following system property or environment variable:
 
@@ -522,6 +529,8 @@ Hibernate ORM uses a persistence unit to persist entities that are defined on a 
   </persistence>
 ----
 
+=== Learn more
+
 For more information, see the following resources:
 
 - link:https://jakarta.ee/specifications/data/1.0/jakarta-data-1.0[Jakarta Data specification document]
@@ -555,6 +564,8 @@ To use the `facesContainer-4.1` feature, add the following configuration to your
 </featureManager>
 ----
 
+=== Learn more
+
 For more information, see the following resources:
 
 * link:https://openliberty.io/docs/latest/reference/feature/facesContainer-4.0.html[Jakarta Faces Container 4.0] feature
@@ -585,7 +596,9 @@ To enable this feature, add the following configuration to your `server.xml` fil
 </featureManager>
 ----
 
-For more information, such as the Javadocs, specification documents, and other details, see link:https://jakarta.ee/specifications/websocket/2.2/[Jakarta WebSocket 2.2].
+=== Learn more
+
+For more information, such as the Javadocs, specification documents, and other details, see the link:https://jakarta.ee/specifications/websocket/2.2/[Jakarta WebSocket 2.2 specification document] and link:{url-prefix}/docs/latest/web-socket.html[Send bidirectional messages between services with WebSocket] in the Open Liberty docs.
 
 // DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
 
@@ -597,14 +610,14 @@ For more information, such as the Javadocs, specification documents, and other d
 [#jpa]
 == Use Jakarta Persistence with improved type safety and other enhancements with Jakarta Persistence 3.2
 
-The Jakarta Persistence feature provides a richly featured API that includes an object-model approach to persist, fetch, and modify data that is stored on a relational database system.
+The Jakarta Persistence feature (`persistence-3.2`) provides an object-model approach to persist, fetch, and modify data that is stored on a relational database system.
 
-Jakarta Persistence 3.2 (`persistence-3.2`) includes the following updates:
+Jakarta Persistence 3.2  includes the following updates:
 
-* Improve type safety of the find() and refresh() methods
-* Provide programmatic way to provide Schema Management
-* Allow Java records as Embeddable Types
-* Additional functions and operators to the JPQL/Criteria API,  such as `left`, `right`, `replace`, `||` operator, `cast`, `union`, `union all`, `intersect`, `intersect all`, `except`, and  `except all`
+* Improve type safety of the `find()` and `refresh()` methods
+* Provide schema management programmatically
+* Allow Java records as embeddable types
+* Add functions and operators to the JPQL/Criteria API,  such as `left`, `right`, `replace`, `||` operator, `cast`, `union`, `union all`, `intersect`, `intersect all`, `except`, and  `except all`
 
 * Support for subqueries in the `select`, `from`,  and `join` clauses.
 
@@ -617,7 +630,7 @@ To use the `persistence-3.2` feature, add the following configuration to your `s
 </featureManager>
 ----
 
-This feature uses Eclipselink 5.0 beta release as the Jakarta Persistence provider. If you wish to bring your own 3rd party persistence provider, enable the `persistenceContainer-3.2` feature instead:
+This feature uses Eclipselink 5.0 beta release as the Jakarta Persistence provider. To bring your own 3rd party persistence provider, enable the `persistenceContainer-3.2` feature instead:
 
 [source,xml]
 ----
@@ -625,6 +638,8 @@ This feature uses Eclipselink 5.0 beta release as the Jakarta Persistence provid
    <feature>persistenceContainer-3.2</feature>
 </featureManager>
 ----
+
+=== Learn more
 
 For more information, see the link:{url-prefix}/docs/latest/data-persistence-jpa.html[Data persistence with the Jakarta Persistence API] in the Open Liberty docs and the link:https://jakarta.ee/specifications/persistence/3.2/[Jakarta Persistence 3.2 specification document].
 
