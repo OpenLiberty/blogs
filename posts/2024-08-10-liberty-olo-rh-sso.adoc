@@ -55,7 +55,7 @@ Security is paramount in today's world, and it is important to ensure your cloud
 Why use OIDC? The main benefit of using OpenID Connect is that it provides a completely standardized setup. OIDC also adds an extra layer of protection via JSON Web Tokens (JWTs). 
 
 This blog will show you step by step how to configure your Liberty application deployed in OpenShift to use a specific type of OIDC - RedHat Single SignOn (RH-SSO). We used RH-SSO since it is an integrated sign-on solution available within Open Shift.
-You will deploy the Liberty application using the Open Liberty Operator (OLO) in OpenShift, with special configuration to be able to connect to RH-SSO. The Open Liberty Operator (OLO) is being used here to help simplify the deployment process in Open Shift. After you have deployed the Liberty application, you will need to configure the RH-SSO to create a client specifically for your liberty application. Once configuration is complete, when you login to your application, you will first be re-directed to RH-SSO, and once you authenticate successfully, it will redirect you back to your application.
+You will deploy the Liberty application using the Open Liberty Operator (OLO) in OpenShift, with special configuration to be able to connect to RH-SSO. The Open Liberty Operator (OLO) is being used here to help simplify the deployment process in OpenShift. After you have deployed the Liberty application, you will need to configure the RH-SSO to create a client specifically for your liberty application. Once configuration is complete, when you login to your application, you will first be re-directed to RH-SSO, and once you authenticate successfully, it will redirect you back to your application.
 
 
 == Overview of steps
@@ -63,7 +63,6 @@ You will deploy the Liberty application using the Open Liberty Operator (OLO) in
 To show how to configure your Liberty application to use RH-SSO, we'll take a simple Java application running on Liberty, deploy it to OpenShift and configure it to use RH-SSO. Below is an overview of the steps we'll be taking to do this that you can follow:
 
 1) <<prepareApp, Set up, build and containerize the sample application>>
-
 
 2) <<installRHSSO, Configure the Red Hat OpenShift cluster to make use of RH-SSO>>
 
@@ -79,14 +78,14 @@ To show how to configure your Liberty application to use RH-SSO, we'll take a si
 
 
 [#prepareApp]
-== Set up the example application project from Social Media Guide
+== Set up the example application project from our Social Media Guide
 
 Before we get into the details of configuring Security, we first need to set up an example application to apply this security to. For this example, we will have a look at the application used in the Open Liberty guide -  link:/guides/social-media-login.html[Authenticating users through social media providers]
 
 //https://openliberty.io/guides/social-media-login.html
 
 
-Start by cloning the link:https://github.com/OpenLiberty/guide-social-media-login.git[Git repository] for this guide and use the projects that are provided inside:
+Start by cloning the link:https://github.com/OpenLiberty/guide-social-media-login.git[Git repository] for this guide:
 [source]
 ----
 
@@ -98,9 +97,9 @@ The guide "Authenticating users through social media providers" mentioned above 
 
 Our first task will be to run the application on our machine, before we attempt to put it in a container.
 
-We will work within the link:https://github.com/OpenLiberty/guide-social-media-login/start/[start/] directory for this demonstration. However, before we run the application, we will need to make some changes to the server.xml.
+However, before we run the application, we will need to make some changes to the server.xml. First, navigate to the link:https://github.com/OpenLiberty/guide-social-media-login/start/[start/] directory. Update the server.xml to the following:
 
-Here is the updated server.xml that you will need to use:
+
 
 [source]
 ----
@@ -149,16 +148,17 @@ This edited server.xml provides the feature socialLogin-1.0 to your application'
 == Build and run the updated Application
 After updating the server.xml file, you're now ready to build and then run the application.
 
-To build the WAR for the application run the following :
+Before you can deploy this application to OCP, you first need to build the WAR for the application. Later on, you can use this WAR file in a container image and use that to deploy this application in OCP.
+ To build the application, run the following command:
 [source]
 ----
 mvn package
 ----
 
 This command builds a target/guide-social-login.war archive.
-Later on, you can use this WAR file in a container image that will be used to deploy this application in OCP.
 
-For now, run the application in your machine.
+
+In order to test that your application is working correctly, run the application in your local machine first.
 Use the following commands:
 
 [source]
@@ -167,7 +167,7 @@ cd start
 mvn liberty:run
 ----
 
-You should see the line that says 
+This will install the application you built above in a Liberty server, and then start the Liberty server and the application. If everything completes successfully, you should see the line that says 
 [source]
 ----
  Application guide-social-login started ..
@@ -192,11 +192,9 @@ We can now include the WAR file you built above in a container image so it can b
 
 == Containerizing the application
 
-For the application to be deployed on Open Shift using the Open Liberty Operator, it must first be containerized using the Open Liberty image.
+To deploy the application on Open Shift using the Open Liberty Operator, you must first containerize this using the Open Liberty image. For this example, we will use an official image from the IBM Container Registry (ICR), `icr.io/appcafe/open-liberty:full-java17-openj9-ubi`, as the parent image. 
 
-For this example, we will use an official image from the IBM Container Registry (ICR), `icr.io/appcafe/open-liberty:full-java17-openj9-ubi`, as the parent image. 
-
-In the start/ directory create a Dockerfile with these contents
+You can use the Dockerfile shown below to build the application image.
 
 [#dockerfile]
 === Create the Dockerfile for the application
@@ -225,11 +223,11 @@ COPY --chown=1001:0  src/main/liberty/config/server.xml /config/
 COPY --chown=1001:0  target/guide-social-login.war /config/apps
 
 
-# This script will add the requested XML snippets and gow image to be fit-for-purpose
+# This script will add the requested XML snippets and grow image to be fit-for-purpose
 RUN configure.sh
 
 ----
-Ensure that you have these ENV values set to true.
+Ensure that you have these ENV values set to true, so you can trust all the certificates from within the cluster.
 
 `ENV SEC_TLS_TRUSTDEFAULTCERTS=true`
 
@@ -240,8 +238,8 @@ You can look at all the configuration options as specified in this doc:
 
 By specifying ARG SEC_SSO_PROVIDERS="oidc", you are telling the configuration that the SSO provider you will be using is OIDC.
 
-
-Build the application image using the Docker File shown above, and upload to a repository of your choice (for e.g. dockerhub or artifactory), and note the image location so that you can use it later on for deploying this application to OpenShift using the Open Liberty Operator (OLO)
+To containerize the image, in the start/ directory of the application you checked out from Git, create a Dockerfile with the contents above.
+Build the application image using this Docker File, and upload to a repository of your choice (for e.g. dockerhub or artifactory). You'll need to make a note of the image location so that you can use it later on for deploying this application to OpenShift using the Open Liberty Operator (OLO).
 
 With this step, we have completed the steps needed to successfully set up the application. Now we can move onto the next setp of installing and configuring their openshift cluster for us to deploy this application to.
 
@@ -257,7 +255,6 @@ The first step we'll need to take is to install the Red Hat Single Sign-On Opera
 
 https://access.redhat.com/documentation/en-us/red_hat_single_sign-on/7.6/html/server_installation_and_configuration_guide/operator#doc-wrapper
 
-Install the Operator in the namespace - "rh-sso".
 
 
 Step 2 - Create a KeyCloak instance, and log in to the instance
@@ -340,35 +337,9 @@ For example, in the application used here in the blog, the <app-name> from the y
 [#deployApp]
 == Installing the Open Liberty Operator, and deploying the application to Open Shift using the Open Liberty Operator
 
-Using the OpenShift cluster you have access to, install the Open Liberty Operator (OLO) in your OCP cluster using this doc - https://openliberty.io/docs/latest/open-liberty-operator.html
+Using the OpenShift cluster you have access to, if you don't already have the Open Liberty Operator (OLO) in your OCP cluster, visit this documentation to see how to do this - https://openliberty.io/docs/latest/open-liberty-operator.html
 
-After installing the Open Liberty Operator, use the yaml file given below to deploy the Open Liberty App (guide-social-media-login) - for which you created the image using the Dockerfile mentioned above.
-
-Note the name of the application deployed is `guide-social-media-login`, the same name that was used when creating the secret above.
-
-Point to your image location in this section
-[source]
-----
-applicationImage: >-
-----
-and update the pullSecret needed to access the image here
-[source]
-----
-pullSecret: <secret_to_pull_image>
-----
-
-Also for the oidc: discoveryEndpoint - as shown here
-[source]
-----
-sso:
-    oidc:
-      - discoveryEndpoint: >-
-          https://keycloak-rh-sso.apps.<cluster-name>/auth/realms/sso-realm/.well-known/openid-configuration
-----
-
-point to the OpenID Endpoint Configuration that you configured while configuring the RH-SSO Operator.
-
-Here is the yaml file needed to deploy the application:
+After installing the Open Liberty Operator, use the yaml file given below to deploy the Open Liberty App (guide-social-media-login) - for which you created the image using the Dockerfile mentioned earlier.
 
 [source]
 ----
@@ -396,24 +367,49 @@ spec:
 
 ----
 
+Note the name of the application deployed is `guide-social-media-login`, the same name that was used when creating the secret above.
+
+Point to your image location in this section, where you placed your Application image, in a Container Registrty like DockerHub or Artifactory.
+[source]
+----
+applicationImage: >-
+----
+and update the pullSecret needed to access the Container Registry here
+[source]
+----
+pullSecret: <secret_to_pull_image>
+----
+
+Also for the oidc: discoveryEndpoint - as shown here
+[source]
+----
+sso:
+    oidc:
+      - discoveryEndpoint: >-
+          https://keycloak-rh-sso.apps.<cluster-name>/auth/realms/sso-realm/.well-known/openid-configuration
+----
+
+point to the OpenID Endpoint Configuration that you configured while configuring the RH-SSO Operator.
+
+
+
+
 [#createOIDCClient]
 == Create the OIDC Client in RH-SSO
 
 In order to use Single Sign On for your application using RH-SSO, you will need to register your application as a client in the RH-SSO.
-Since we have already deployed the guide-social-media-login app using the Open Liberty operator, we can now complete the registration for the openid client as shown below.
+Since we have already deployed the guide-social-media-login app using the Open Liberty operator, we can now complete the registration for the OpenID client as shown below.
+Follw these steps to create your application as a RH-SSO client.
 
-Use this url - https://keycloak-rh-sso.apps.<cluster-name>/auth/admin/master/console/
-using credentials from the secret - credential-example-keycloak
+First access the Console for the RH-SSO, using this url - https://keycloak-rh-sso.apps.<cluster-name>/auth/admin/master/console/
+Then log in to the Console using the credentials from the secret - `credential-example-keycloak` defined in your OCP cluster.
 
-Click on Create to create a new client, with clientId as `gsmapp`. (The same value that you put in the secret created called `guide-social-media-login-olapp-sso`).
-
+To create a new Client, click on Create, and specify the clientId as `gsmapp`. (The same value that you put in the secret created called `guide-social-media-login-olapp-sso`).
 Click on Save, which will take you to the next page which has the settings.
-On this page, ensure the default setting on 'Enabled' which needs to be 'ON' to ensure the client is enabled for login, and 'Access Type' as 'public' doesn't require a secret for login.
+On this page, ensure the default setting on 'Enabled' which needs to be 'ON' to ensure the client is enabled for login, and 'Access Type' as 'public' which doesn't require a secret for login.
+Specify the URL for Valid Redirect URIs. In the scenario with 'oidcLogin', the URL will be in the format https://<app-name>-<namespace>.apps.<cluster-name>/ibm/api/social-login/redirect/oidc
 
-Enter the URL for Valid Redirect URIs. In the scenario with 'oidcLogin', the URL will be https://<app-name>-<namespace>.apps.<cluster-name>/ibm/api/social-login/redirect/oidc
-
-For your test, put in this value
-
+Since you have already deployed the application named guide-social-media-login, use this value for the Valid Redirect URI, substituting <cluster-name> with the name of your cluster - 
 https://guide-social-media-login-gsm-test.apps.<cluster-name>/ibm/api/social-login/redirect/oidc
 and click on Save.
 
@@ -449,6 +445,9 @@ Log in using testuser1/testpasswd1, and it will redirect you back to the applica
 image::img/blog/rh_social_media_logged_in.png[Social Media Logged in after Redirect,width=50%,align="center"]
 
 By following the steps mentioned above, you have successfully secured your Liberty Application running in Open Shift, so you can authenticate and authorize your users using OAuth.
+
+We started the blog with an application (which used OAuth) running on-prem. Then we went through the steps that first containerized the application, so that it could be deployed in Open Shift Cluster (OCP). Then we deployed the application to OCP. Then we secured the application by configuring it to use RedHat Single Sign On (RH-SSO), so when you want to login to the app, it will now redirect you to the RH-SSO, where you have to login and authenticate yourself in oder to get access to the application. Finally you have a secure application that is deployed and ready to run in an OpenShift cluster. 
+
 // // // // // // // //
 // LINKS
 //
