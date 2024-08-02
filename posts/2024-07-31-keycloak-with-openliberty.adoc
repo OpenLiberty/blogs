@@ -1,0 +1,166 @@
+---
+layout: post
+title: "Protect your applications with Jakarta Security, MicroProfile JWT, and Keycloak"
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/jimmy1wu
+author_github: https://github.com/jimmy1wu
+seo-title: Protect your applications with Jakarta Security, MicroProfile JWT, and Keycloak - OpenLiberty.io
+seo-description: Open Liberty can easily integrate with Keycloak, which can be used as an OpenID Connect Provider, using Jakarta Security and MicroProfile JWT.
+blog_description: "Open Liberty can easily integrate with Keycloak, which can be used as an OpenID Connect Provider, using Jakarta Security and MicroProfile JWT."
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+additional_authors:
+- name: Grace Jansen
+  github: https://github.com/GraceJansen
+  image: https://avatars0.githubusercontent.com/GraceJansen
+---
+= Protect your applications with Jakarta Security, MicroProfile JWT, and Keycloak
+Jimmy Wu <https://github.com/jimmy1wu>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+As our infrastructure evolves and cloud-native technologies and platforms become ever more popular, it's clear that a security-first approach is crucial for building enterprise Java applications. The link:https://www.ibm.com/topics/log4shell[Log4Shell vulnerability] highlighted the importance of security, which is also emphasized in cloud-native application methodologies like the link:https://developer.ibm.com/articles/15-factor-applications/[15-factor app methodology].
+
+So, we know it's important... but how can we practically apply this to secure our own applications? This post demonstrates how to use Keycloak to secure a Liberty application that uses Jakarta EE and MicroProfile open source standards.
+
+// Assisted by IBM granite-20b-multilingual
+
+image::img/blog/OL-Keycloak-architecture.png[A diagram representing the relationships between Open Liberty, MicroProfile, Jakarta EE and Keycloak,width=60%,align="center"]
+
+
+== An introduction to Keycloak
+
+link:https://www.keycloak.org/[Keycloak] is an open source Identity and Access Management (IAM) tool that provides important capabilities such as single sign-on (SSO), user federation, strong authentication, user management, fine-grained authorization, and more. It helps to streamline the authentication process, removing the need for developers to worry about storing or authenticating users. Keycloak was originally created by Red Hat and is now used for their SSO. It is an enterprise-level tool and so is well suited to enterprise applications and enterprise-focused tools and standards, such as Liberty, MicroProfile, and Jakarta EE.
+
+== Connecting Open Liberty with Keycloak
+
+Open Liberty can easily integrate with Keycloak, which can be used as an OpenID Connect Provider, by using Jakarta Security and MicroProfile JWT. link:https://jakarta.ee/specifications/security/[Jakarta Security] defines a standard for creating secure Jakarta EE applications in modern application paradigms. A JSON Web Token (JWT) is a self-contained token that securely transmits information as a JSON object. The information in this JSON object is digitally signed and can be trusted and verified by the recipient. link:{url-prefix}/docs/latest/reference/feature/mpJwt-1.1.html[MicroProfile JSON Web Token] is a specification that defines the JWT as a bearer token in a microservices request to authenticate users. If you'd like to learn more about this specification, check out our interactive, hands-on Open Liberty guide: link:https://openliberty.io/guides/microprofile-jwt.html[Securing microservices with JSON Web Tokens].
+
+We'll demonstrate how to integrate an Open Liberty application with Keycloak by showing how to obtain access tokens from Keycloak using Jakarta Security. We then show how access tokens can be consumed from Keycloak by using MicroProfile JWT.
+
+image::img/blog/OL_Keycloak_technical_architecture.png[An architectural representation of the use of Keycloak with Open Liberty,width=60%,align="center"]
+
+== Before you begin
+
+Keycloak uses the terms _realm_ and _client_. A _realm_ is a space where you manage objects, including users, applications, roles, and groups. A _client_ is an entity that can request Keycloak to authenticate a user.
+
+In this blog post, the following prerequisites are set:
+
+* A Keycloak server is set up with a realm called `openliberty`, which contains a client that is called `sample-openliberty-keycloak` and the realm roles of `admin` and `user`.
+*  Client authentication is enabled for the `sample-openliberty-keycloak` client.
+* `\http://localhost:9090/Callback` is added as a valid redirect URI.
+* The `microprofile-jwt` client scope is set to `Default`.
+
+[#obtain]
+== Obtaining an access token from Keycloak using Jakarta Security
+
+With the new `@OpenIdAuthenticationMechanismDefinition` annotation introduced in link:https://openliberty.io/docs/latest/reference/feature/appSecurity-5.0.html[Jakarta Security 3.0], you can easily authenticate users with Keycloak and obtain an access token.
+
+This example shows how to configure the `@OpenIdAuthenticationMechanismDefinition` annotation to set up an authentication flow with Keycloak.
+
+[source,java]
+----
+@OpenIdAuthenticationMechanismDefinition(
+        providerURI = "http://localhost:8080/realms/openliberty/.well-known/openid-configuration",
+        clientId = "sample-openliberty-keycloak",
+        clientSecret = "x4fRVAhk49TKDqVlzIt4q9oh8DSWfePt",
+        redirectToOriginalResource = true,
+        logout = @LogoutDefinition(notifyProvider = true))
+----
+
+* The `providerURI` is the discovery endpoint for the `openliberty` realm.
+* The `clientId` is the client ID of the `sample-openliberty-keycloak` client.
+* The `clientSecret` is the secret that belongs to the `sample-openliberty-keycloak` client.
+* By default, the redirect URI is set to `\http://localhost:9090/Callback` and `redirectToOriginalResource` is set to `true` to redirect users from the redirect URI back to the originally requested resource.
+* `notifyProvider` in the `@LogoutDefinition` is set to `true` to also log the user out of Keycloak when a logout occurs in your Open Liberty application.
+
+Now, with this annotation set up, your REST endpoints can be protected by using the `@RolesAllowed` annotation, which triggers the authentication flow when a user tries to access the endpoint.
+After authentication, the user's access token can be obtained by using the `OpenIdContext`.
+
+The following example code shows a JAX-RS resource that contains a `/username` endpoint, which is accessible only by users with the `admin` role, and an `/os` endpoint, which is accessible by users with either the `admin` or `user` role.
+
+[source, java]
+----
+@ApplicationScoped
+@Path("/system/properties")
+public class SystemResource {
+
+    @Inject
+    @RestClient
+    private SystemService systemService;
+
+    @Inject
+    private OpenIdContext openIdContext;
+
+    @GET
+    @Path("/username")
+    @RolesAllowed({ "admin" })
+    public String getUsername() {
+        return systemService.getUsername(openIdContext.getAccessToken().getToken());
+    }
+
+    @GET
+    @Path("/os")
+    @RolesAllowed({ "admin", "user" })
+    public String getOS() {
+        return systemService.getOS(openIdContext.getAccessToken().getToken());
+    }
+
+}
+----
+
+After the requests to these endpoints are authenticated and authorized, the endpoint can use the access token of the authenticated user.
+
+In this example, the access token is used as a bearer token to make a request to another protected resource by including it in the request header in the `Authorization: Bearer <access-token>` format.
+
+The next section demonstrates how this bearer token can be consumed by an Open Liberty application that uses MicroProfile JWT to protect its resources.
+
+== Consuming an access token from Keycloak using MicroProfile JWT
+
+link:https://openliberty.io/docs/latest/reference/feature/mpJwt-2.1.html[MicroProfile JWT] can easily be used to consume access tokens that are sent as bearer tokens.
+
+The following example shows the link:https://openliberty.io/docs/latest/microprofile-config-properties.html#jwt[MicroProfile Config properties] that are required to validate an access token issued by the `openliberty` realm in Keycloak. You can set these properties in your `microprofile-config.properties` file or in any configuration source that is available to link:{url-prefix}/docs/latest/external-configuration.html[MicroPofile config].
+
+[source, text]
+----
+mp.jwt.verify.issuer=http://localhost:8080/realms/openliberty
+mp.jwt.verify.publickey.location=http://localhost:8080/realms/openliberty/protocol/openid-connect/certs
+----
+
+* The `mp.jwt.verify.issuer` is the endpoint of the `openliberty` realm.
+* The `mp.jwt.verify.publickey.location` is the JSON Web Key Sets (JWKS) endpoint of the `openliberty` realm.
+
+By adding these configuration properties to our application, MicroProfile JWT is now set up to validate access tokens issued by the `openliberty` realm sent as bearer tokens to resources that are protected by using the `@RolesAllowed` annotation.
+
+Just as we did in the <<obtain,previous section of this post>>, the following example shows a JAX-RS resource that contains a `/username` endpoint only accessible by users with the `admin` role and an `/os` endpoint accessible by users with either the `admin` role or the `user` role. However, this example expects an access token to be included in the request header as a bearer token. The previous section's example started a new authentication flow to get an access token.
+
+[source,java]
+----
+@RequestScoped
+@Path("/properties")
+public class SystemResource {
+
+    @GET
+    @Path("/username")
+    @RolesAllowed({ "admin" })
+    public String getUsername() {
+        return System.getProperties().getProperty("user.name");
+    }
+
+    @GET
+    @Path("/os")
+    @RolesAllowed({ "admin", "user" })
+    public String getOS() {
+        return System.getProperties().getProperty("os.name");
+    }
+
+}
+----
+
+After the requests to these endpoints are authenticated and authorized, the endpoint returns information about the system properties.
+
+== Summary
+
+This post emphasises the importance of effective security for our cloud-native Java applications. To secure an application, we focused on authentication and authorization, demonstrating how to easily protect your applications using Jakarta Security, MicroProfile JWT, and Keycloak!
+If you're interested to learn more, check out the link:https://github.com/OpenLiberty/sample-keycloak[full sample application].
