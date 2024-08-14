@@ -1,0 +1,270 @@
+---
+layout: post
+title: "24.0.0.6 での Spring Boot 3.x の起動高速化"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/dmuelle
+author_github: https://github.com/dmuelle
+seo-title: 24.0.0.6 での Spring Boot 3.x の起動高速化 - OpenLiberty.io
+seo-description: 24.0.0.6 では Liberty InstantOn を用いた Spring Boot 3.x アプリケーションの起動時間を改善する、Coordinated Restore at Checkpoint が導入されました。また、このリリースでは分散 HTTP セッション・キャッシュと IBM MQ メッセージングを使用するアプリケーションでの InstantOn のサポートも追加されました。
+blog_description: 24.0.0.6 では Liberty InstantOn を用いた Spring Boot 3.x アプリケーションの起動時間を改善する、Coordinated Restore at Checkpoint が導入されました。また、このリリースでは分散 HTTP セッション・キャッシュと IBM MQ メッセージングを使用するアプリケーションでの InstantOn のサポートも追加されました。
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+additional_authors: 
+- name: (翻訳) 馬場 剛
+  github: https://github.com/babatch
+  image: https://avatars.githubusercontent.com/u/29302643
+---
+
+= 24.0.0.6 での Spring Boot 3.x の起動高速化
+David Mueller <https://github.com/dmuelle>
+:imagesdir: /
+:url-prefix: 
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+24.0.0.6 では Liberty InstantOn を用いた Spring Boot 3.x アプリケーションの起動時間を改善する、Coordinated Restore at Checkpoint が導入されました。また、このリリースでは分散 HTTP セッション・キャッシュと IBM MQ メッセージングを使用するアプリケーションでの InstantOn のサポートも追加されました。
+
+link:{url-about}[Open Liberty] 24.0.0.6 では以下が導入されました。
+
+* <<sbcrac, Liberty InstantOn による Spring Boot アプリケーションの起動高速化>>
+* <<mq, IBM® MQ を使用した Jakarta Messaging の InstantOn サポート>>
+* <<jcache, 分散 HTTP セッション・キャッシュの InstantOn サポート>>
+* <<CVEs, セキュリティ脆弱性 (CVE) 修正>>
+
+
+24.0.0.6 で修正されたバグの一覧は link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A24006+label%3A%22release+bug%22[こちら] です。
+
+link:{url-prefix}/blog/?search=release&search!=beta[以前の Open Liberty GA (General Availability) リリース ブログ投稿] もチェックして下さい。
+
+[#run]
+
+== 24.0.0.6 でアプリケーションを開発して実行する
+もし link:{url-prefix}/guides/maven-intro.html[Maven] を使用しているなら、以下を pom.xml に追記します。
+
+[source,xml]
+----
+<plugin>
+    <groupId>io.openliberty.tools</groupId>
+    <artifactId>liberty-maven-plugin</artifactId>
+    <version>3.10.3</version>
+</plugin>
+----
+
+link:{url-prefix}/guides/gradle-intro.html[Gradle] の場合は、以下を build.gradle に追記します。
+
+[source,gradle]
+----
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'io.openliberty.tools:liberty-gradle-plugin:3.8.3'
+    }
+}
+apply plugin: 'liberty'
+----
+
+link:{url-prefix}/docs/latest/container-images.html[コンテナイメージ] の場合は、以下を Container (Docker) ファイルに記載します。
+
+[source]
+----
+FROM icr.io/appcafe/open-liberty
+----
+
+link:{url-prefix}/start/[ダウンロードページ] も参照して下さい。
+
+link:https://plugins.jetbrains.com/plugin/14856-liberty-tools[IntelliJ IDEA], link:https://marketplace.visualstudio.com/items?itemName=Open-Liberty.liberty-dev-vscode-ext[Visual Studio Code] または link:https://marketplace.eclipse.org/content/liberty-tools[Eclipse IDE] を使用している場合、 オープンソースの link:https://openliberty.io/docs/latest/develop-liberty-tools.html[Liberty tools] を使用することで効率的な開発、テスト、デバッグ、アプリケーション管理を IDE 上で実施することができます。
+
+[link=https://stackoverflow.com/tags/open-liberty]
+image::img/blog/blog_btn_stack_ja.svg[Stack Overflow で質問する, align="center"]
+
+[#sbcrac]
+== Spring Boot アプリケーションの起動高速化 (Spring Boot 3.0 InstantOn with CRaC)
+
+Open Liberty InstantOn は MicroProfile と Jakarta EE アプリケーションの高速起動を実現します。link:{url-prefix}/blog/2023/06/29/rapid-startup-instanton.html[InstantOn] を使用することで、スループット、メモリ、開発環境と実働環境の同一性、Java 言語機能に影響を与えることなく、アプリケーションを数ミリ秒で起動することができます。InstantOn は後でリストアする JVM のチェックポイントを取得するために、Linux カーネルの ユーザースペース チェックポイント/リストア (link:https://criu.org/[CRIU]) 機能を使用します。
+
+Spring フレームワーク (バージョン 6.1 以上) は link:https://docs.spring.io/spring-framework/reference/6.1/integration/checkpoint-restore.html[Coordinated Restore at Checkpoint (CRaC) サポート] を含み、Java アプリケーションに対するチェックポイントとリストアを提供する CRIU も使用します。Spring Boot バージョン 3.2 以上では Spring フレームワーク バージョン 6.1 以上を使用し、Spring Boot アプリケーションが CRaC も使用して高速起動を実現できるようにします。
+
+link:docs/latest/reference/feature/springBoot-3.0.html[Open Liberty springBoot-3.0 フィーチャー] は Spring Boot 3.x ベースのアプリケーションを Open Liberty にデプロイすることを可能にします。そしてこれからは、Open Liberty の新フィーチャー link:docs/latest/reference/feature/crac-1.4.html[Coordinated Restore at Checkpoint (CRaC)] (`crac-1.4`) により、Spring Boot 3.2 以上のアプリケーションが Liberty InstantOn と共にデプロイされ、高速起動を実現できるようになります。
+
+CRaC 1.4 を `springBot-3.0` フィーチャーと共に使用するには、Java 17 以上を実行し、`server.xml` ファイル内で `crac-1.4` フィーチャーを有効にする必要があります。さらに、アプリケーションがサーブレットを使用しているなら、`servlet-6.0` フィーチャーも必要です。これらのフィーチャーを `server.xml` ファイルで、以下の例のようにして構成します。
+
+[source,xml]
+----
+<features>
+   <feature>springBoot-3.0</feature>
+   <feature>servlet-6.0</feature>
+   <feature>crac-1.4</feature>
+</features>
+----
+
+これらのフィーチャーを有効化し、link:{url-prefix}/docs/latest/instanton.html[Liberty InstantOn ドキュメンテーション] にある Liberty InstantOn サポートと、link:{url-prefix}/guides/spring-boot.html[Liberty Spring Boot ガイド] にある Spring Boot アプリケーションのコンテナ化に際しての Liberty 推奨事項に従うことで、Spring Boot 3.2 以上のアプリケーションをコンテナ化することができます。
+
+より詳しい情報や Liberty InstantOn `crac-1.4` フィーチャーを使用した Spring Boot アプリケーションの例は、link:/blog/2023/09/26/spring-boot-3-instant-on.html[Spring Boot アプリケーションを高速起動対応のコンテナ化する方法] ブログ記事をご覧下さい。
+
+`crac-1.4` フィーチャーは他の、例えば Jakarta EE や MicroProfile アプリケーションでも使用することができます。それらのアプリケーションはチェックポイントとリストアの通知を受け取るために、CRaC にリソースを登録することができます。これらの通知はアプリケーションがチェックポイントの準備をすることや、リストアされる際に必要な動作の実行を助けます。`org.crac` API の詳しい情報は、link:https://javadoc.io/doc/org.crac/crac/latest/index.html[org.crac] Javadoc を参照して下さい。
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/blogs/issues/3877
+// Contact/Reviewer: 
+// // // // // // // //
+[#mq]
+== IBM® MQ での Jakarta Messaging のための InstantOn サポート
+
+24.0.0.6 リリースでは link:{url-prefix}/docs/latest/reference/feature/messaging-3.0.html[Jakarta Messaging], link:{url-prefix}/docs/latest/reference/feature/connectors-2.1.html[Jakarta Connectors], そして link:{url-prefix}/docs/latest/reference/feature/mdb-4.0.html[Jakarta Enterprise Beans Message-Driven Beans (MDB)] フィーチャーに対する InstantOn サポートが導入されました。InstantOn は現在、IBM® MQ のような外部のメッセージング・システムにアクセスするための Jakarta Messaging API を使用するアプリケーションを含む外部 EIS リソースに対するアクセスのためのリソース・アダプターを使用するアプリケーションに対する超速起動時間を提供します。これらのメッセージング・クライアント・アプリケーションはまた、MDB リスナーにより、エンドポイントへのメッセージの配信を管理することが可能です。
+
+MDB エンドポイントを提供し、IBM® MQ が提供するメッセージング・リソースへアクセスする Jakarta EE 10 メッセージング・アプリケーションでは、`messaging-3.1` と `mdb-4.0` フィーチャーを有効にし、パスを link:https://repo1.maven.org/maven2/com/ibm/mq/wmq.jakarta.jmsra/9.3.5.0/wmq.jakarta.jmsra-9.3.5.0.rar[IBM® MQ リソース・アダプター] に設定します。フィーチャー構成は `resourceAdapter` 構成要素をサポートする `connectors-2.1` フィーチャーを自動的に有効化します。
+
+[source,xml]
+----
+<featureManager>
+   <feature>messaging-3.1</feature>
+   <feature>mdb-4.0</feature>
+   <feature>servlet-6.0</feature>
+<featureManager/>
+
+<resourceAdapter id="mqJms" location="${server.config.dir}/wmq.jakarta.jmsra-9.3.5.0.rar"/>
+----
+
+[sidebar]
+.Developer tip
+--
+以下のリソースを提供する link:https://developer.ibm.com/tutorials/mq-connect-app-queue-manager-containers/[MQ in Container image] IBM® MQ サーバーを使用することができます。
+
+* ポート 1414 を Listen するキューマネージャー `QM1`
+* キュー `DEV.QUEUE.1`
+* チャネル `DEV.APP.SVRCONN`
+
+これらのリソースは単純な point-to-point メッセージング・シナリオをサボートし、下の例に示されるように、メッセージング・フィーチャーの構成要素内で命名されます。
+--
+
+InstantOn は、サーバーがチェックポイントからリストアされたどのような環境においても、外部リソースへの接続を有効化するために、メッセージングとコネクターの構成要素を動的に更新することができます。
+
+例えば、下のメッセージング構成は、IBM® MQ キューマネージャーをホストするシステムのホスト名及び IP ポートを指定する Liberty 変数を宣言します。サーバーのリストア環境内でこれらの変数を定義して下さい。サーバーがリストアされたとき、接続ファクトリーとメッセージ・エンドポイント・アクティベーション構成は、Open Liberty が IBM® MQ キューマネージャーに接続できるよう、環境固有のホスト名及びポート値を更新します。
+
+[source,xml]
+----
+   <jmsQueue id="jms/queue1" jndiName="jms/queue1">
+      <properties.mqJms  baseQueueName="DEV.QUEUE.1"  baseQueueManagerName="QM1"/>
+   </jmsQueue>
+
+   <variable name="MQ_PORT" value="1414"/>
+   <variable name="MQ_HOSTNAME" value="localhost"/>
+
+   <jmsQueueConnectionFactory jndiName="jms/qcf1" connectionManagerRef="ConMgr7">
+      <properties.mqJms  hostName="${MQ_HOSTNAME}"  port="${MQ_PORT}"
+            channel="DEV.APP.SVRCONN"  queueManager="QM1"/>
+   </jmsQueueConnectionFactory>
+
+   <jmsConnectionFactory jndiName="jms/cf1" connectionManagerRef="ConMgr1">
+      <properties.mqJms  hostName="${MQ_HOSTNAME}"  port="${MQ_PORT}"
+            channel="DEV.APP.SVRCONN"  queueManager="QM1"/>
+   </jmsConnectionFactory>
+    <connectionManager id="ConMgr1" maxPoolSize="10"/>
+
+   <jmsActivationSpec id="myapp/mymdb/FVTMessageDrivenBean">
+      <properties.mqJms  destinationRef="jms/queue1"  destinationType="jakarta.jms.Queue"
+            transportType="CLIENT"  hostName="${MQ_HOSTNAME}"  port="${MQ_PORT}"
+            channel="DEV.APP.SVRCONN"  queueManager="QM1"/>
+   </jmsActivationSpec>
+----
+
+Jakarta フィーチャーの InstantOn サポートに関する今後のアナウンスもお見逃しなく。
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/blogs/issues/3877
+// Contact/Reviewer: 
+// // // // // // // //
+[#jcache]
+== 分散 HTTP セッション・キャッシュの InstantOn サポート
+
+24.0.0.6 リリースでは link:{url-prefix}/docs/latest/reference/feature/sessionCache-1.0.html[JCache セッション・パーシスタンス] フィーチャーに対する InstantOn サポートも提供します。このフィーチャーは分散インメモリ・キャッシュを作成するために JCache プロバイダーを使用します。分散セッション・キャッシュは、サーバーがクラスターを構成するために少なくとも他の 1つのサーバーと接続されている場合に使用することができます。Open Liberty サーバーはクラスター内で以下のように構成することができます。
+
+- クライアント・サーバー モデル: Open Liberty サーバーは JCache クライアントとして振る舞い、専用の JCache サーバーに接続します。
+- ピア・ツー・ピア モデル: Open Liberty サーバーは、自分と同様に JCache セッション・パーシスタンス フィーチャーを実行し、同じクラスターの一部として構成された Open Liberty サーバーと接続することができます。
+
+JCache セッション・パーシスタンスを有効にするためには、`sessionCache-1.0` フィーチャーが `server.xml` ファイル内で有効にされていなければなりません。
+
+[source,xml]
+----
+<feature>sessionCache-1.0</feature>
+----
+
+`server.xml` ファイル内で、以下の例のようにしてクライアント・サーバー モデルを構成することができます。
+You can configure the client/server model in the `server.xml` file, similar to the following example.
+
+[source,xml]
+----
+<library id="InfinispanLib">
+    <fileset dir="${shared.resource.dir}/infinispan" includes="*.jar"/>
+</library>
+<httpSessionCache cacheManagerRef="CacheManager"/>
+<cacheManager id="CacheManager">
+    <properties
+        infinispan.client.hotrod.server_list="infinispan-server:11222"
+        infinispan.client.hotrod.auth_username="sampleUser"
+        infinispan.client.hotrod.auth_password="samplePassword"
+        infinispan.client.hotrod.auth_realm="default"
+        infinispan.client.hotrod.sasl_mechanism="PLAIN"
+        infinispan.client.hotrod.java_serial_whitelist=".*"
+        infinispan.client.hotrod.marshaller=
+            "org.infinispan.commons.marshall.JavaSerializationMarshaller"/>
+    <cachingProvider jCacheLibraryRef="InfinispanLib" />
+</cacheManager>
+----
+
+`server.xml` ファイル内で、以下の例のようにしてピア モデルを構成することができます。
+
+[source,xml]
+----
+<library id="JCacheLib">
+    <file name="${shared.resource.dir}/hazelcast/hazelcast.jar"/>
+</library>
+
+<httpSessionCache cacheManagerRef="CacheManager"/>
+
+<cacheManager id="CacheManager" >
+    <cachingProvider jCacheLibraryRef="JCacheLib" />
+</cacheManager>
+----
+
+**注:**
+JCache プロバイダーとして Infinispan を使用してピア・ツー・ピア モデルでの InstantOn サポートを提供する場合、Infinispan 12 またはそれ以降を使用しなければなりません。また JCache セッション・パーシスタンス フィーチャーに加えて、link:{url-prefiux}/docs/latest/reference/feature/mpReactiveStreams-3.0.html[MicroProfile Reactive Streams 3.0] またはそれ以降と、link:{url-prefix}docs/latest/reference/feature/mpMetrics-4.0.html[MicroProfile Metrics 4.0] またはそれ以降を `server.xml` ファイル内で有効にする必要があります。
+
+サーバーがチェックポイントからリストアされた際に、ベンダー固有の JCachee 構成プロパティーを使用することができます。下の構成はサーバー・リスト、ユーザー名、パスワードの値をリストアされた環境で定義された変数として使用しています。
+
+[source,xml]
+----
+<httpSessionCache libraryRef="InfinispanLib">
+    <properties infinispan.client.hotrod.server_list="${INF_SERVERLIST}"/>
+    <properties infinispan.client.hotrod.auth_username="${INF_USERNAME}"/>
+    <properties infinispan.client.hotrod.auth_password="${INF_PASSWORD}"/>
+    <properties infinispan.client.hotrod.auth_realm="default"/>
+    <properties infinispan.client.hotrod.sasl_mechanism="PLAIN"/>
+</httpSessionCache>
+----
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+[#CVEs]
+== このリリースで修正されたセキュリティ脆弱性 (CVE)
+[cols="5*"]
+|===
+|CVE |CVSS スコア |脆弱性評価 |影響を受けるバージョン |備考
+
+|http://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2024-22354[CVE-2024-22354]
+|7.0
+|XML 外部エンティティ (XXE) インジェクション
+|17.0.0.3 - 24.0.0.5
+|
+|===
+
+以前のセキュリティ脆弱性に対する修正は、link:{url-prefix}/docs/latest/security-vulnerabilities.html[セキュリティ脆弱性 (CVE) リスト] を参照して下さい。
+
+== いますぐ Open Liberty 24.0.0.6 を入手
+
+<<run,Maven, Gradle, Docker, またはダウンロード可能なアーカイブとして>> 入手可能です。
