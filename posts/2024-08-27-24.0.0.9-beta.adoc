@@ -1,0 +1,226 @@
+---
+layout: post
+title: "Send logs and metrics to OpenTelemetry in 24.0.0.9-beta"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/dmuelle
+author_github: https://github.com/dmuelle
+seo-title: Send logs and metrics to OpenTelemetry in 24.0.0.9-beta - OpenLiberty.io
+seo-description: In this release, the MicroProfile Telemetry 2.0 beta feature helps improve the observability of your Java applications by using OpenTelemetry to collect and export logs, metrics, and traces in a standardized way. A minor update for the WebSocket 2.2 beta feature is also included.
+blog_description: In this release, the MicroProfile Telemetry 2.0 beta feature helps improve the observability of your Java applications by using OpenTelemetry to collect and export logs, metrics, and traces in a standardized way. A minor update for the WebSocket 2.2 beta feature is also included.
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+---
+= Send logs and metrics to OpenTelemetry in 24.0.0.9-beta
+David Mueller <https://github.com/dmuelle>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//
+
+In this release, the MicroProfile Telemetry 2.0 beta feature helps improve the observability of your Java applications by using OpenTelemetry to collect and export logs, metrics, and traces in a standardized way. A minor update for the WebSocket 2.2 beta feature is also included.
+
+The link:{url-about}[Open Liberty] 24.0.0.9-beta includes the following beta features (along with link:{url-prefix}/docs/latest/reference/feature/feature-overview.html[all GA features]):
+
+* <<metrics, Send Liberty metrics to OpenTelemetry>>
+* <<logs, Send logs to OpenTelemetry>>
+* <<websocket, Jakarta EE11 WebSocket 2.2>>
+
+
+See also link:{url-prefix}/blog/?search=beta&key=tag[previous Open Liberty beta blog posts].
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/29456
+// Contact/Reviewer: Channyboy
+// // // // // // // //
+[#metrics]
+== Send Liberty metrics to OpenTelemetry
+
+MicroProfile Telemetry 2.0 provides the latest OpenTelemetry technology. In addition to link:{url-prefix}/docs/latest/microprofile-telemetry.html[distributed tracing], the feature now allows OpenTelemetry to collect and export metrics and logs.
+
+When the MicroProfile Telemetry 2.0 beta feature (`mpTelemetry-2.0`) is enabled, Open Liberty can now forward runtime component statistics that are captured by the link:{url-prefix}/docs/latest/reference/feature/monitor-1.0.html[Performance Monitoring 1.0] feature (`monitor-1.0`) to the MicroProfile Telemetry 2.0 runtime. This statistical data is registered as metrics in the telemetry runtime and can then be forwarded to any OpenTelemetry Protocol (OTLP) compatible metric consumer to meet your monitoring needs.
+
+The following runtime components are supported:
+
+* `ThreadPool`
+* `Sessions`
+* `RequestTiming`
+* `ConnectionPool`
+
+To collect and export metrics, enable OpenTelemetry by using the following system property or environment variable:
+
+* System property: `otel.sdk.disabled=false`
+* Environment variable: `OTEL_SDK_DISABLED=false`
+
+You can set configuration properties in any of the link:{url-prefix}/docs/latest/external-configuration.html#default[config sources that are available to MicroProfile Config].
+
+
+Enable the `mpTelemetry-2.0` feature and any features that are associated with your chosen supported runtime components. The `mpTelemetry-2.0` feature automatically enables the `monitor-1.0` feature.
+
+For example, the `ConnectionPool` component requires the following configuration:
+
+[source,xml]
+----
+<featureManager>
+   <feature>mpTelemetry-2.0</feature>
+   <feature>jdbc-4.3</feature>
+</featureManager>
+----
+
+
+By default, all OpenTelemetry data is exported to link:https://opentelemetry.io/docs/languages/java/exporters/#otlp[OTLP]. You can set a different exporter by specifying the following system property or environment variable:
+
+* System property: `otel.metrics.exporter`
+* Environment variable: `OTEL_METRICS_EXPORTER`
+
+You can also optionally configure the metric export interval configuration variable. The value is specified in milliseconds and the default is 60000 (60 seconds).
+
+* System property: `otel.metric.export.interval`
+* Environment variable: `OTEL_METRIC_EXPORT_INTERVAL`
+
+For more information about the available configuration properties, see xref:{url-prefix}/docs/latest/microprofile-config-properties.html#telemetry[MicroProfile Config properties: MicroProfile Telemetry].
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/29332
+// Contact/Reviewer: pgunapal
+// // // // // // // //
+[#logs]
+== Send logs to OpenTelemetry
+
+The `mpTelemetry-2.0` feature can now collect Open Liberty runtime log sources (messages, traces, ffdcs) and application logs generated through the `java.util.logging` package (JUL).
+
+To enable the MicroProfile Telemetry 2.0 feature to collect all logs, add the following configuration to your `server.xml` file:
+
+[source,xml]
+----
+<features>
+   <feature>mpTelemetry-2.0</feature>
+</features>
+
+<mpTelemetry source="message, trace, ffdc"/>
+----
+
+If the `mpTelemetry` configuration element or the `source` attribute is not configured, the `message` source is set by default. In this case, only messages are collected. If the `source` attribute is specified empty (`source=""`), no logs are sent to OpenTelemetry.
+
+To collect and export runtime-level logs, enable OpenTelemetry by using the following system property or environment variable:
+
+* System property: `otel.sdk.disabled=false`
+* Environment variable: `OTEL_SDK_DISABLED=false`
+
+You can set configuration properties in any of the link:{url-prefix}/docs/latest/external-configuration.html#default[config sources that are available to MicroProfile Config].
+
+To separately configure multiple applications in a server, you can configure OpenTelemetry with application configuration. However, you cannot collect runtime-level logs this way.
+
+By default, all OpenTelemetry data is exported to link:https://opentelemetry.io/docs/languages/java/exporters/#otlp[OTLP]. You can set a different exporter by specifying the following system property or environment variable:
+
+* System property: `otel.logs.exporter`
+* Environment variable: `OTEL_LOGS_EXPORTER`
+
+For more information about the available configuration properties, see xref:{url-prefix}/docs/latest/microprofile-config-properties.html#telemetry[MicroProfile Config properties: MicroProfile Telemetry].
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/29223
+// Contact/Reviewer: volosied,pnicolucci
+// // // // // // // //
+[#websocket]
+== Avoid type errors with WebSocket 2.2
+
+To avoid type errors, this beta release of the WebSocket 2.2 feature (`websocket-2.2`) limits the link:https://jakarta.ee/specifications/websocket/2.2/apidocs/server/jakarta/websocket/onmessage#maxMessageSize()[MaxMessageSize] to `Integer#MAX_VALUE` for the `OnMessage` annotation. The websocket-2.2 feature was previously released in beta in the 24.0.0.8-beta.
+
+
+To enable this beta feature, add the following code to your `server.xml` file.
+
+[source,xml]
+----
+<featureManager>
+    <feature>websocket-2.2</feature>
+</featureManager>
+----
+For more information, such as the Javadoc, specification documents, and other details, see link:https://jakarta.ee/specifications/websocket/2.2/[Jakarta WebSocket 2.2].
+
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+
+[#run]
+=== Try it now
+
+To try out these features, update your build tools to pull the Open Liberty All Beta Features package instead of the main release. The beta works with Java SE 22, Java SE 21, Java SE 17, Java SE 11, and Java SE 8.
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], you can install the All Beta Features package using:
+
+[source,xml]
+----
+<plugin>
+    <groupId>io.openliberty.tools</groupId>
+    <artifactId>liberty-maven-plugin</artifactId>
+    <version>3.10.3</version>
+    <configuration>
+        <runtimeArtifact>
+          <groupId>io.openliberty.beta</groupId>
+          <artifactId>openliberty-runtime</artifactId>
+          <version>24.0.0.9-beta</version>
+          <type>zip</type>
+        </runtimeArtifact>
+    </configuration>
+</plugin>
+----
+
+You must also add dependencies to your pom.xml file for the beta version of the APIs that are associated with the beta features that you want to try. For example, the following block adds dependencies for two example beta APIs:
+
+[source,xml]
+----
+<dependency>
+    <groupId>org.example.spec</groupId>
+    <artifactId>exampleApi</artifactId>
+    <version>7.0</version>
+    <type>pom</type>
+    <scope>provided</scope>
+</dependency>
+<dependency>
+    <groupId>example.platform</groupId>
+    <artifactId>example.example-api</artifactId>
+    <version>11.0.0</version>
+    <scope>provided</scope>
+</dependency>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'io.openliberty.tools:liberty-gradle-plugin:3.8.3'
+    }
+}
+apply plugin: 'liberty'
+dependencies {
+    libertyRuntime group: 'io.openliberty.beta', name: 'openliberty-runtime', version: '[24.0.0.9-beta,)'
+}
+----
+
+Or if you're using link:{url-prefix}/docs/latest/container-images.html[container images]:
+
+[source]
+----
+FROM icr.io/appcafe/open-liberty:beta
+----
+
+Or take a look at our link:{url-prefix}/downloads/#runtime_betas[Downloads page].
+
+If you're using link:https://plugins.jetbrains.com/plugin/14856-liberty-tools[IntelliJ IDEA], link:https://marketplace.visualstudio.com/items?itemName=Open-Liberty.liberty-dev-vscode-ext[Visual Studio Code] or link:https://marketplace.eclipse.org/content/liberty-tools[Eclipse IDE], you can also take advantage of our open source link:https://openliberty.io/docs/latest/develop-liberty-tools.html[Liberty developer tools] to enable effective development, testing, debugging, and application management all from within your IDE.
+
+For more information on using a beta release, refer to the link:{url-prefix}/docs/latest/installing-open-liberty-betas.html[Installing Open Liberty beta releases] documentation.
+
+[#feedback]
+== We welcome your feedback
+
+Let us know what you think on link:https://groups.io/g/openliberty[our mailing list]. If you hit a problem, link:https://stackoverflow.com/questions/tagged/open-liberty[post a question on StackOverflow]. If you hit a bug, link:https://github.com/OpenLiberty/open-liberty/issues[please raise an issue].
