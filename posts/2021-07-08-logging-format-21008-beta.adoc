@@ -1,0 +1,274 @@
+---
+layout: post
+title: "MicroProfile 4.1 plus more exciting features now in Open Liberty 21.0.0.8-beta"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/jakub-pomykala
+author_github: https://github.com/jakub-pomykala
+seo-title: MicroProfile 4.1 plus more exciting features now in Open Liberty 21.0.0.8-beta - OpenLiberty.io
+seo-description: Open Liberty 21.0.0.8-beta introduces MicroProfile 4.1 with updates to the MicroProfile Health feature. A new logging format (`TBASIC`) is made available. The Stale Connection Identification feature makes it possible to provide additional configuration for a data source. A couple of Jakarta EE 9.1 convenience features are also included in the "All Beta" package.
+blog_description: Open Liberty 21.0.0.8-beta introduces MicroProfile 4.1 with updates to the MicroProfile Health feature. A new logging format (`TBASIC`) is made available. The Stale Connection Identification feature makes it possible to provide additional configuration for a data source. A couple of Jakarta EE 9.1 convenience features are also included in the "All Beta" package.
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+---
+= MicroProfile 4.1 plus more exciting features now in Open Liberty 21.0.0.8-beta
+Jakub Pomykala <https://github.com/jakub-pomykala>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+
+Open Liberty 21.0.0.8-beta introduces MicroProfile 4.1 with updates to the MicroProfile Health feature. A new logging format (`TBASIC`) is made available. The Stale Connection Identification feature makes it possible to provide additional configuration for a data source. A couple of Jakarta EE 9.1 convenience features are also included in the <<allbeta, "All Beta" package>>.
+
+
+We have two beta packages for link:{url-about}[Open Liberty]:
+
+* <<allbeta, All Beta Features>>: a larger package that contains all Open Liberty beta features (including Jakarta EE 9 beta features) and GA features and functions.
+* <<jakarta, Jakarta EE 9 Beta Features>>: a lightweight package that contains only the Jakarta EE 9 features.
+
+This means that you can now try out our in-development Open Liberty features by just adding the relevant coordinates to your build tools.
+
+If you try one of these packages, <<feedback, let us know what you think>>.
+[#allbeta]
+== All Beta Features package
+
+The All Beta Features package includes the following beta features:
+
+* <<mp, MicroProfile Updates>>
+** <<mp4_1, MicroProfile 4.1>>
+** <<mpHealth3_1, MicroProfile Health 3.1>>
+* <<tbasic, TBASIC Logging Format Beta>>
+* <<staleConnectionID, Customizing Stale Connection Identification>>
+* <<JEE9_1, Jakarta EE 9.1 convenience features>>
+
+<<tryitnow, Try it now>>
+
+[#mp]
+=== MicroProfile Updates
+
+In Open Liberty 21.0.0.8-beta we have two updates: MicroProfile 4.1 improves developer experience with updates to the Health feature; MicroProfile Health 3.1 enables you to provide your own Startup health check procedures to be invoked by Open Liberty. Find out more below. 
+
+[#mp4_1]
+==== MicroProfile 4.1
+
+MicroProfile 4.1 improves developer experience with updates to the Health feature. MicroProfile 4.1 also defines compatible implementation requirements for runtimes, which must pass all of the MicroProfile component specification `TCKs` including Config 2.0, Fault Tolerance 3.0, Rest Client 2.0, Health 3.1, Metrics 3.0, Open Tracing 2.0, Open API 2.0, and JWT propagation 1.2. This beta driver will be used as a compatible implementation for releasing MicroProfile 4.1.
+
+
+[source, xml]
+----
+<featureManager>
+    <feature>microProfile-4.1</feature>
+</featureManager>
+----
+
+To find out more take a look at the link:https://github.com/eclipse/microprofile/releases/tag/4.1[MicroProfile 4.1 Release].
+
+[#mpHealth3_1]
+==== MicroProfile Health 3.1
+
+MicroProfile Health enables you to provide your own health check procedures to be invoked by Open Liberty, to verify the health of your microservice. A service checks its own health by performing necessary self-checks and then reports its overall status by implementing the API provided by MicroProfile Health. A self-check can be a check on anything that the service needs, such as a dependency, a successful connection to an endpoint, a system property, a database connection, or the availability of required resources. MicroProfile offers checks for both Liveness and Readiness. MicroProfile Health 3.1 introduces a new Health Check called Startup, which allows applications to define startup probes that are used for initial verification of the application before the Liveness probe takes over. This is useful for applications which require additional startup time on their first initialization.
+
+In the previous versions of MicroProfile Health, there were no unique APIs or endpoints to distinguish the start up status of your microservices. MicroProfile Health 3.1 introduces a new convenient `@Startup` annotation to create your own health check procedures to verify that your microservices have fully initialized. The status of the Startup health checks of your microservices can be viewed with the new REST endpoint `/health/started`. You can now configure the Kubernetes Startup probe with this new endpoint as well. In Open Liberty, you can use the Startup endpoint, `/health/started`, to verify if your deployed applications have started or not.
+
+When deployed application(s) are not started yet, the overall default Startup status will be DOWN, with an empty payload response until all the deployed application(s) have started. A new MicroProfile Config property (`mp.health.default.startup.empty.response=UP`) is available to change the overall default Startup check status to `UP`, during application start up.
+
+Applications are expected to provide health check procedures by implementing the HealthCheck interface with the `@Startup`, `@Liveness`, or `@readiness` annotations. These are used by Open Liberty to verify the respective Startup, Liveness, or Readiness of the application. Add the logic of your health check in the `call()` method, and return the `HealthCheckResponse` object, by using the simple `up()`/`down()` methods from the API:
+
+[source, java]
+----
+**Startup Check**
+@Startup
+@ApplicationScoped
+public class StartupMemUsageCheck implements HealthCheck {
+...
+    @Override
+     public HealthCheckResponse call() {
+       ...
+       if (getMemUsage() < 0.95) {
+           return HealthCheckResponse.up("memUsage");
+       }
+       return HealthCheckResponse.down("memUsage");
+       ...
+     }
+}
+----
+
+To view the status of each health check, access the `http://<hostname>:<port>/health/started` endpoint.
+
+
+To enable the new beta features in your app, add them to your `server.xml`:
+
+[source, xml]
+----
+<feature>mpHealth-3.1</feature>
+----
+
+To find out more viist:
+
+* link:https://github.com/eclipse/microprofile-health/releases/tag/3.1[MicroProfile Health Check 3.1 Release Page]
+* link:https://github.com/eclipse/microprofile-health/blob/3.1/spec/src/main/asciidoc/release_notes.asciidoc[Release Notes]
+
+[#tbasic]
+=== TBASIC Logging Format
+
+A new logging format, `TBASIC`, is added to match the Websphere Application Server basic logging format. This new format option can be used for `consoleFormat`, `messageFormat`, or `traceFormat`. `TBASIC` format matches the existing trace `BASIC` format (so now either `TBASIC` or `BASIC` can be used to refer to this format for trace). Using this new format option will allow users that utilize log parsers that work with the Websphere Application Server basic format to use the same parsers with Open Liberty logs.
+
+The new options can be used in the bootstrap.properties file:
+
+[source, java]
+----
+com.ibm.ws.logging.message.format=tbasic
+com.ibm.ws.logging.console.format=tbasic
+com.ibm.ws.logging.trace.format=tbasic
+----
+
+You can also change the format by editing the server.env and adding the following lines:
+
+[source, java]
+----
+WLP_LOGGING_MESSAGE_FORMAT=TBASIC
+WLP_LOGGING_CONSOLE_FORMAT=TBASIC
+----
+
+
+TBASIC Logs Example:
+
+[source, java]
+----
+[24/03/21 15:04:10:331 EDT] 00000001 FrameworkMana A   CWWKE0001I: The server defaultServer has been launched.
+[24/03/21 15:04:11:338 EDT] 00000001 FrameworkMana I   CWWKE0002I: The kernel started after 1.177 seconds
+[24/03/21 15:04:11:465 EDT] 0000003e FeatureManage I   CWWKF0007I: Feature update started.
+[24/03/21 15:04:11:635 EDT] 00000033 DropinMonitor A   CWWKZ0058I: Monitoring dropins for applications.
+----
+
+
+[#staleConnectionID]
+=== Customizing Stale Connection Identification
+
+Open Liberty maintains a pool of JDBC connections to improve performance. It is necessary for Open Liberty to be able to identify when connections have become stale and are no longer usable so that such connections can be removed from the pool. Open Liberty leverages multiple standards made available by the JDBC and SQL specifications, as well as relying on some built-in knowledge of vendor-specific behavior for some JDBC drivers in order to achieve this.
+
+Not all JDBC drivers completely follow the JDBC/SQL specifications in identifying stale connections. If you are using such a JDBC driver, it is now possible for you to provide additional configuration for a data source that helps identify the vendor-specific SQL states and error codes that are raised by the JDBC driver, enabling Liberty to better maintain the connection pool.
+
+
+Configure one or more `<identifyException>` subelements under `<dataSource>` to provide the `SQLException` identification detail.
+
+[source,xml]
+----
+<featureManager>
+  <feature>jdbc-4.2</feature>
+  <feature>jndi-1.0</feature>
+  ... other features
+</featureManager>
+
+<dataSource id="DefaultDataSource" jndiName="jdbc/myDataSource">
+    <jdbcDriver libraryRef="myJDBCLib"/>
+    <properties databaseName="TESTDB" serverName="localhost" portNumber="1234"/>
+    <!-- identify the following as stale connections, -->
+    <identifyException sqlState="08000" as="StaleConnection"/>
+    <identifyException errorCode="2468" as="StaleConnection"/>
+    <!-- remove built-in identification of SQL state S1000 -->
+    <identifyException sqlState="S1000" as="None"/>
+</dataSource>
+
+<library id="myJDBCLib">
+    <file name="C:/drivers/some-jdbc-driver.jar"/>
+</library>
+----
+
+
+[#JEE9_1]
+=== Jakarta EE 9.1 convenience features
+
+Jakarta EE 9.1 convenience features are included in this beta release in the "all beta" zip file, but not yet in the Jakarta EE 9 beta zip file. The 9.1 convenience features are duplicates of the Jakarta EE 9.0 convenience features. In a future beta release, the 9.0 convenience features will be removed and only the 9.1 ones will remain. Users of the Jakarta EE 9 convenience features should look to transition to use 9.1 in preparation of 9.0 being removed.
+
+To enable Jakarta EE 9.1 convenience features you would add them to your server.xml or client.xml feature list such as:
+
+[source, xml]
+----
+<featureManager>
+    <feature>webProfile-9.1</feature>
+</featureManager>
+----
+
+[source, xml]
+----
+<featureManager>
+    <feature>jakartaee-9.1</feature>
+</featureManager>
+----
+
+[source, xml]
+----
+<featureManager>
+    <feature>jakartaeeClient-9.1</feature>
+</featureManager>
+----
+
+[#tryitnow]
+=== Try it now 
+
+To try out these features, just update your build tools to pull the Open Liberty All Beta Features package instead of the main release. The beta works with Java SE 15, Java SE 11, or Java SE 8.
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], here are the coordinates:
+
+[source,xml]
+----
+<dependency>
+  <groupId>io.openliberty.beta</groupId>
+  <artifactId>openliberty-runtime</artifactId>
+  <version>21.0.0.8-beta</version>
+  <type>pom</type>
+</dependency>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+dependencies {
+    libertyRuntime group: 'io.openliberty.beta', name: 'openliberty-runtime', version: '[20.0.0.8-beta,)'
+}
+----
+
+Or take a look at our link:{url-prefix}/downloads/#runtime_betas[Downloads page].
+
+[#jakarta]
+== Jakarta EE 9 Beta Features package
+
+Open Liberty 21.0.0.2-beta was the first vendor product to be Jakarta EE Web Profile 9.0 compatible. Similarly, Open Liberty 21.0.0.3-beta was the first vendor product to be added to the link:https://jakarta.ee/compatibility/#tab-9[Jakarta EE Platform 9.0 compatibility list].. Open Liberty 21.0.0.8-beta maintains that compatibility while continuing to make quality and performance enhancements.
+
+<<tryitnow, Try it now>>
+
+=== Try it now
+
+To try out these Jakarta EE 9 features on Open Liberty in a lightweight package, just update your build tools to pull the Open Liberty Jakarta EE 9 Beta Features package instead of the main release. The beta works with Java SE 16, Java SE 11, or Java SE 8.
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], here are the coordinates:
+
+[source,xml]
+----
+<dependency>
+    <groupId>io.openliberty.beta</groupId>
+    <artifactId>openliberty-jakartaee9</artifactId>
+    <version>21.0.0.8-beta</version>
+    <type>zip</type>
+</dependency>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+dependencies {
+    libertyRuntime group: 'io.openliberty.beta', name: 'openliberty-jakartaee9', version: '[21.0.0.8-beta,)'
+}
+----
+
+Or take a look at our link:{url-prefix}/downloads/#runtime_betas[Downloads page].
+
+[#feedback]
+== Your feedback is welcomed
+
+Let us know what you think on link:https://groups.io/g/openliberty[our mailing list]. If you hit a problem, link:https://stackoverflow.com/questions/tagged/open-liberty[post a question on StackOverflow]. If you hit a bug, link:https://github.com/OpenLiberty/open-liberty/issues[please raise an issue].
+
+
