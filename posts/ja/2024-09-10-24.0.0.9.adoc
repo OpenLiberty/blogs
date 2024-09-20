@@ -1,0 +1,324 @@
+---
+layout: post
+title: 「24.0.0.9 では MicroProfile Telemetry 2.0 で監視を簡素化します」
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/dmuelle
+author_github: https://github.com/dmuelle
+seo-title: 24.0.0.9 の MicroProfile Telemetry 2.0 で監視を簡素化 - OpenLiberty.io
+seo-description: MicroProfile Telemetry は、OpenTelemetry を使用してログ、メトリック、トレースを収集およびエクスポートすることで、Java アプリケーションの可観測性を標準化します。このリリースには、サードパーティのブラウザ クッキーを管理するためのソリューションと、バージョンレス機能コレクションへの新機能も含まれています。
+blog_description: MicroProfile Telemetry は、OpenTelemetry を使用してログ、メトリック、トレースを収集およびエクスポートすることで、Java アプリケーションの可観測性を標準化します。このリリースには、サードパーティのブラウザ クッキーを管理するためのソリューションと、バージョンレス機能コレクションへの新機能も含まれています。
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+additional_authors: 
+- name: 高宮 裕子 (翻訳)
+  github: https://github.com/una-tapa
+  image: https://avatars0.githubusercontent.com/una-tapa
+blog-available-in-languages:
+- lang: en
+  path: /blog/2024/09/10//2024-09-10-24.0.0.9.html
+---
+= 24.0.0.9 の MicroProfile Telemetry 2.0 などで監視を簡素化
+David Mueller <https://github.com/dmuelle>
+
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+
+このリリースでは、MicroProfile Telemetry は、OpenTelemetry を使用してログ、メトリック、トレースを収集およびエクスポートすることで、Java アプリケーションの可観測性を標準化します。また、このリリースには、サードパーティのブラウザ クッキーを管理するためのソリューションと、バージョンレス機能コレクションへの新機能も含まれています。
+
+
+link:{url-about}[Open Liberty] 24.0.0.9では下記のアップデートが追加されました。
+
+* <<mptelem, MicroProfile Telemetry 2.0 でログ、メトリック、トレースを管理します>>
+
+  ** <<metrics, Liberty メトリックを OpenTelemetry に送信する>>
+
+  ** <<logs, OpenTelemetryにログを送信する>>
+
+* <<cookie, CHIPSでサードパーティのCookieを使い続ける>>
+
+* <<versionless, Java / Jakarta EE コンテナ Liberty 機能のバージョンレス機能>>
+
+* <<CVEs, このリリースでのセキュリティ脆弱性 (CVE) の修正>>
+
+link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A24009+label%3A%22release+bug%22[24.0.0.9] で修正されたバグの一覧をご覧ください。
+
+link:{url-prefix}/blog/?search=release&search!=beta[以前の Open Liberty GA リリースブログ投稿] をチェックしてください。
+
+
+[#run]
+
+== 24.0.0.9 を使用してアプリを開発および実行する
+
+link:{url-prefix}/guides/maven-intro.html[Maven]を使用している場合は、`pom.xml` ファイルに以下を含めます。
+
+[source,xml]
+----
+<plugin>
+    <groupId>io.openliberty.tools</groupId>
+    <artifactId>liberty-maven-plugin</artifactId>
+    <version>3.10.3</version>
+</plugin>
+----
+
+または、link:{url-prefix}/guides/gradle-intro.html[Gradle] の場合は、`build.gradle` ファイルに次の内容を含めます。
+
+[source,gradle]
+----
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'io.openliberty.tools:liberty-gradle-plugin:3.8.3'
+    }
+}
+apply plugin: 'liberty'
+----
+
+または、link:{url-prefix}/docs/latest/container-images.html[コンテナ イメージ] を使用している場合:
+
+[source]
+----
+FROM icr.io/appcafe/open-liberty
+----
+
+または、link:{url-prefix}/start/[ダウンロード・ページ]をご覧ください。
+
+link:https://plugins.jetbrains.com/plugin/14856-liberty-tools[IntelliJ IDEA]、link:https://marketplace.visualstudio.com/items?itemName=Open-Liberty.liberty-dev-vscode-ext[Visual Studio Code]、または link:https://marketplace.eclipse.org/content/liberty-tools[Eclipse IDE]を使用している場合は、オープンソースの link:https://openliberty.io/docs/latest/develop-liberty-tools.html[Liberty 開発者ツール] を活用して、IDE 内から効果的な開発、テスト、デバッグ、アプリケーション管理を行うこともできます。
+
+[link=https://stackoverflow.com/tags/open-liberty]
+image::img/blog/blog_btn_stack_ja.svg[Ask a question on Stack Overflow, align="center"]
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/29558
+// Contact/Reviewer: yasmin-aumeeruddy
+// // // // // // // //
+[#mptelem]
+== MicroProfile Telemetry 2.0 でログ、メトリック、トレースを管理します
+
+このリリースでは、link:{url-prefix}/docs/latest/reference/feature/mpTelemetry-2.0.html[MicroProfile Telemetry 2.0] 機能 (`mpTelemetry-2.0`) により、OpenTelemetryを使用して標準化された方法でログ、メトリクス、トレースを収集およびエクスポートすることで、Javaアプリケーションの可観測性を向上させます。以前のバージョンのMicroProfile Telemetryは、分散トレースのみを管理できました。
+
+利用可能な構成プロパティに関する詳細については、link:{url-prefix}/docs/latest/microprofile-config-properties.html#telemetry[MicroProfile Configプロパティ: MicroProfile Telemetry] を参照してください。
+
+MicroProfile Telemetryを使用して、標準化された方法でメトリクス、ログ、トレースを管理する方法については、link:{url-prefix}/docs/latest/microprofile-telemetry.html[Enable observability with MicroProfile Telemetry] を参照してください。
+
+MicroProfile Telemetry 2.0は最新のOpenTelemetryテクノロジーを提供します。link:{url-prefix}/docs/latest/microprofile-telemetry.html[分散トレース] に加えて、この機能はOpenTelemetryを使用してメトリクスとログを収集およびエクスポートできるようになりました。 管理に関する情報 <<metrics, metrics>> と <<logs, logs>> MicroProfile Telemetry を使用する場合は、次のセクションを参照してください。
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/29563
+// Contact/Reviewer: Channyboy
+// // // // // // // //
+[#metrics]
+=== Liberty メトリックを OpenTelemetry に送信する
+
+MicroProfile Telemetry 2.0機能 (`mpTelemetry-2.0`) が有効になると、Open Libertyは、link:{url-prefix}/docs/latest/reference/feature/monitor-1.0.html[Performance Monitoring 1.0] 機能 ( `monitor-1.0``) によって収集されたランタイムコンポーネントの統計情報をMicroProfile Telemetry 2.0ランタイムに転送できるようになります。この統計データはテレメトリランタイムでメトリクスとして登録され、OpenTelemetry Protocol (OTLP) と互換性のあるメトリクスコンシューマーに転送され、監視のニーズを満たすことができます。
+
+
+次のランタイム コンポーネントがサポートされています。
+
+* `ThreadPool`
+* `Sessions`
+* `RequestTiming`
+* `ConnectionPool`
+
+メトリックを収集してエクスポートするには、次のシステム プロパティまたは環境変数を使用して OpenTelemetry を有効にします。
+
+* システムプロパティ: `otel.sdk.disabled=false`
+* 環境変数: `OTEL_SDK_DISABLED=false`
+
+構成プロパティは、link:{url-prefix}/docs/latest/external-configuration.html#default[MicroProfile Configで使用可能な構成ソース]のいずれかに設定できます。
+
+`mpTelemetry-2.0` 機能と、選択したサポートされているランタイム コンポーネントに関連付けられているすべての機能を有効にします。`mpTelemetry-2.0` 機能により、`monitor-1.0` 機能が自動的に有効になります。
+
+たとえば、`ConnectionPool` コンポーネントには次の構成が必要です。
+
+[source,xml]
+----
+<featureManager>
+   <feature>mpTelemetry-2.0</feature>
+   <feature>jdbc-4.3</feature>
+</featureManager>
+----
+
+デフォルトでは、すべてのOpenTelemetryデータはlink:https://opentelemetry.io/docs/languages/java/exporters/#otlp[OTLP]にエクスポートされます。次のシステムプロパティまたは環境変数を指定することで、別のエクスポーターを設定することができます。
+
+* システムプロパティ: `otel.metrics.exporter`
+* 環境変数: `OTEL_METRICS_EXPORTER`
+
+オプションで、メトリック エクスポート間隔構成変数を構成することもできます。値はミリ秒単位で指定され、デフォルトは 60000 (60 秒) です。
+
+* システムプロパティ: `otel.metric.export.interval`
+* 環境変数: `OTEL_METRIC_EXPORT_INTERVAL`
+
+使用可能な構成プロパティの詳細については、xref:{url-prefix}/docs/latest/microprofile-config-properties.html#telemetry[MicroProfile Config properties: MicroProfile Telemetry] を参照してください。
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/29551
+// Contact/Reviewer: pgunapal
+// // // // // // // //
+[#logs]
+=== OpenTelemetryにログを送信する
+
+`mpTelemetry-2.0` 機能では、Open Liberty ランタイム ログ ソース (メッセージ、トレース、ffdcs) と `java.util.logging` (JUL) パッケージを通じて生成されたアプリケーション ログを収集できるようになりました。
+
+MicroProfile Telemetry 2.0 機能を有効にしてすべてのログを収集するには、`server.xml` ファイルに次の構成を追加します。
+
+[source,xml]
+----
+<featureManager>
+   <feature>mpTelemetry-2.0</feature>
+</featureManager>
+
+<mpTelemetry source="message, trace, ffdc"/>
+----
+
+`mpTelemetry` 構成要素または `source` 属性が構成されていない場合、デフォルトで `message` ソースが設定されます。この場合、メッセージのみが収集されます。`source` 属性が空に指定されている場合 (`source=""`)、ログは OpenTelemetry に送信されません。
+
+ランタイム レベルのログを収集してエクスポートするには、次のシステム プロパティまたは環境変数を使用して OpenTelemetry を有効にします。
+
+* システムプロパティ: `otel.sdk.disabled=false`
+* 環境変数: `OTEL_SDK_DISABLED=false`
+
+構成プロパティは、link:{url-prefix}/docs/latest/external-configuration.html#default[MicroProfile Configで利用可能な構成ソース]のいずれかに設定できます。
+
+サーバー内の複数のアプリケーションを個別に構成するには、アプリケーション構成を使用して OpenTelemetry を構成できます。ただし、この方法ではランタイム レベルのログを収集することはできません。
+
+デフォルトでは、すべてのOpenTelemetryデータはlink:https://opentelemetry.io/docs/languages/java/exporters/#otlp[OTLP]にエクスポートされます。次のシステムプロパティまたは環境変数を指定することで、別のエクスポーターを設定することができます。
+
+* システムプロパティ: `otel.logs.exporter`
+* 環境変数: `OTEL_LOGS_EXPORTER`
+
+使用可能な構成プロパティの詳細については、xref:{url-prefix}/docs/latest/microprofile-config-properties.html#telemetry[MicroProfile Config properties: MicroProfile Telemetry] を参照してください。
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/28443
+// Contact/Reviewer: volosied
+// // // // // // // //
+[#cookie]
+== CHIPSでサードパーティのCookieを使い続ける
+
+
+
+プライバシーを向上させ追跡を減らすために、link:https://developers.google.com/privacy-sandbox/3pcd/[Google Chromeは2025年にサードパーティクッキーを段階的に廃止すると発表しました]。その後、2024年7月22日時点で、link:https://privacysandbox.com/news/privacy-sandbox-update/[Chromeは規制上の懸念から段階的廃止計画を撤回する可能性があると述べました]。代わりに、ユーザーはブラウザでサードパーティクッキーをブロックするオプションを選択できるようになります。サードパーティクッキーを前提に設計されたサイトの一部は、サードパーティクッキーのブロックを選択するブラウザによって正しく動作しなくなることがあります。Chromeは、サイトが影響を受けているかどうかをテストするためのlink:https://developers.google.com/privacy-sandbox/3pcd/prepare/test-for-breakage[ドキュメント]を提供しています。この変更を緩和するためのオプションの1つとして、CHIPS（独立したパーティション状態を持つクッキー）という手法があります。
+
+
+
+まず、サードパーティ (クロスサイト) Cookie に関する背景情報をいくつか紹介します。
+
+トップレベル サイト X が iframe などの別のサイト Z を埋め込む場合、埋め込まれたサイト Z によって設定された Cookie は、トップレベル サイト Y など、サイト Z を埋め込む他のサイトと共有される可能性があります。この脆弱性は、Z サイト キーの下の Cookie jar に配置されている Cookie が原因で発生します。このシナリオでは、Cookie が `SameSite=None` としてラベル付けされていると想定しています。これは、Cookie が `Lax` または `Strict` に設定されている場合は共有されないためです。
+
+image::/img/blog/cookie1.png[multisite cookie diagram,width=70%,align="center"]
+
+
+Chrome は、制限のあるサードパーティ Cookie の回避策として、Cookie jar を分割する「パーティション化」Cookie 属性を提供します。Cookie は Z サイト キー内に保存されるのではなく、X や Y などのトップレベル サイトの下にもキーが付けられます。このように、X が Z を埋め込み、Y が Z を埋め込む場合、Z の Cookie は X と Y の間で共有されません。
+
+image::/img/blog/cookie2.png[partitioned cookie diagram,width=70%,align="center"]
+
+`Partitioned` 属性を使用して、Cookie をパーティション分割するかどうかを指定できます。Cookie に `SameSite=None` 属性がない場合、これは `Lax` として扱われるため、Chrome および Chromium ベースのブラウザによってブロックされます。
+
+パーティション属性の設定はオプトインであり、SameSite 設定とほぼ同じように動作します。`samesite` チャネル設定はすべての Cookie に適用されますが、`httpSession` および `webAppSecurity` 設定はそれぞれの Cookie に適用されます。`httpSession` および `webAppSecurity` 設定はチャネル設定よりも優先されることに注意してください。これら 2 つの属性のデフォルト値は `defer` で、チャネル設定に従うことを意味します。チャネル設定に関しては、デフォルト値は `false` で、`Partitioned` 属性が追加されないことを意味します。
+
+`Partitioned` 属性を宣言するために使用する構成に応じて、Liberty は 3 つの属性のいずれかを使用します。
+
+次の例は、`server.xml` ファイルの `httpSession` 属性で HTTP セッション クッキーの `cookiePartitioned` 属性を設定する方法を示しています。
+
+[source,xml]
+----
+<httpSession cookieSameSite="None" cookiePartitioned="defer|true|false"/>`
+----
+
+次の例は、`server.xml` ファイルの `webAppSecurity` 属性で LTPA および JWT セキュリティ クッキーの `partitionedCookie` 属性を設定する方法を示しています。
+
+[source,xml]
+----
+<webAppSecurity sameSiteCookie="None" partitionedCookie="defer|true|false"/>`
+----
+
+次の例は、`server.xml` ファイルの `httpEndpoint` 属性で他の Cookie の `partitioned` 属性を設定する方法を示しています。
+
+[source,xml]
+----
+<httpEndpoint id="defaultHttpEndpoint"
+              httpPort="9080"
+              httpsPort="9443" >
+   <samesite none="*" partitioned="true|false"/>
+</httpEndpoint>
+----
+
+
+あるいは、次の 2 つの `HttpServletResponse` API で `Set-Cookie` ヘッダーを使用して `Partitioned` を設定することもできます。
+
+* link:https://openliberty.io/docs/latest/reference/javadoc/liberty-jakartaee10-javadoc.html?path=liberty-jakartaee10-javadoc/jakarta/servlet/http/HttpServletResponse.html[HttpServletResponse.setHeader]
+* link:https://openliberty.io/docs/latest/reference/javadoc/liberty-jakartaee10-javadoc.html?path=liberty-jakartaee10-javadoc/jakarta/servlet/http/HttpServletResponse.html[HttpServletResponse.addHeader]
+
+詳しい情報やビジュアル例については、GitHubのlink:https://github.com/privacycg/CHIPS?tab=readme-ov-file#chips-cookies-having-independent-partitioned-state[CHIPS (Cookies Having Independent Partitioned State)] をご覧ください。
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/29571
+// Contact/Reviewer: jhanders34
+// // // // // // // //
+[#versionless]
+== Java / Jakarta EE コンテナ Liberty 機能のバージョンレス機能
+
+24.0.0.8 では、Open Liberty にバージョンレス Java EE および Jakarta EE 機能が導入されました。これらの新しいバージョンレス機能により、どの機能バージョンを使用するかを知らなくても、機能を簡単に使用できます。バージョンレス機能の最初のリリースには、特定の Java EE または Jakarta EE コンポーネント仕様の独自の実装を提供できる `Container` 機能は含まれていませんでした。このような機能の例として、`facesContainer-4.0` があります。
+
+
+24.0.0.9 では、Open Liberty は不足している `Container` 機能に対してバージョンレス機能を追加します。次のバージョンレス機能が追加されました。
+
+- `jpaContainer` / `persistenceContainer`
+- `jsfContainer` / `facesContainer`
+- `jsonbContainer`
+- `jsonpコンテナ`
+
+次の `server.xml` 構成ファイルは、バージョンレス機能 `jpaContainer`、`jsfContainer`、`jsonbContainer`、および `jsonpContainer` を備えた Java EE プラットフォーム `javaee-8.0` を使用します。
+
+[source,xml]
+----
+    <!-- Enable features -->
+    <featureManager>
+        <platform>javaee-8.0</platform>
+        <feature>jpaContainer</feature>
+        <feature>jsfContainer</feature>
+        <feature>jsonbContainer</feature>
+        <feature>jsonpContainer</feature>
+    </featureManager>
+----
+
+詳細を学び、利用可能なプラットフォームやバージョンレス機能の完全なコレクションについては、link:{url-prefix}/docs/latest/reference/feature/versionless-features.html[Open Liberty ドキュメント]をご覧ください。今後のリリースでは、さらに多くのバージョンレス機能やプラットフォームが登場予定です。
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+[#CVEs]
+== このリリースでのセキュリティ脆弱性 (CVE) の修正
+[cols="5*"]
+|===
+|CVE |CVSS スコア |脆弱性評価 |影響を受けるバージョン |注記
+
+|http://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2023-50314[CVE-2023-50314]
+|5.3
+|Information disclosure
+|17.0.0.3 - 24.0.0.8
+|
+|===
+
+過去のセキュリティ脆弱性修正の一覧については、link:{url-prefix}/docs/latest/security-vulnerabilities.html[セキュリティ脆弱性 (CVE) リスト] を参照してください。
+
+== Open Liberty 24.0.0.9 を今すぐ入手
+
+Open Liberty 24.0.0.9は、<<run,Maven, Gradle, Docker, and as a downloadable archive>>のリンクからお試しいただけます。
+
