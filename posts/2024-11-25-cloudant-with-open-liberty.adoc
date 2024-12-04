@@ -20,6 +20,47 @@ Cloudant, an IBM-managed NoSQL database built on top of Apache CouchDB, provides
 
 Previously, using Cloudant with Open Liberty previously meant enabling the `cloudant-1.0` feature and configuring several elements in ``server.xml``.  The `cloudant-1.0` feature was implemented using Java Cloudant Client library, which is no longer supported, so in this demonstration we are using the new Cloudant SDK for Java. With CDI and MicroProfile Config,  you can easily configure access to Cloudant with a CDI producer (for an introduction to using CDI producers, see the https://openliberty.io/guides/cdi-intro.html[Injecting Dependencies into Microservices guide]).
 
+== Bundle the  Cloudant SDK for Java
+
+Prior to implementing the functionality, make sure to configure the essential dependencies in your application. Depending on your build tool (Maven or Gradle), you can include the necessary Cloudant SDK libraries by adding the corresponding dependency.
+
+* For Maven: Add the below dependency in pom.xml file:
+
+[source, xml]
+----
+<dependency>
+    <groupId>com.ibm.cloud</groupId>
+    <artifactId>cloudant</artifactId>
+    <version>x.x.x</version>
+</dependency> 
+----
+Be sure to check for the latest version on link:https://central.sonatype.com/?smo=true[Maven Central].
+
+* For Gradle: In your build.gradle file, add the following inside the dependencies block:
+
+[source, groovy]
+----
+dependencies {
+    implementation 'com.ibm.cloud:ibm-cloud-sdk-core:x.x.x'
+}
+----
+
+If you have multiple applications accessing Cloudant, instead of bundling the Cloudant SDK for Java with each application, you can configure a shared library in your `server.xml` like this:
+[source, xml]
+----
+<library id="cloudantLib">
+  <file name="${shared.resource.dir}/cloudant-x.x.x.jar" />
+</library>
+
+<application contextRoot="/" location="app1.war">
+    <classloader sharedLibraryRef="cloudantLib"/>
+</application>
+
+<application contextRoot="/app2" location="app2.war">
+    <classloader sharedLibraryRef="cloudantLib"/>
+</application>
+----
+
 == A CDI producer for Cloudant
 With a CDI producer, you can easily provide a Cloudant client to your application and inject the client into various parts of the application in a type-safe and flexible way, with the benefits of dependency injection (such as lifecycle management and configuration). Also, we are using link:{url-prefix}/guides/microprofile-config-intro.html[MicroProfile Config] to simplify the configuration of the Cloudant driver. 
 This example demonstrates how to create a CDI producer to inject a Cloudant client:
@@ -186,36 +227,14 @@ In the previous example:
 * The `DeleteDocumentOptions` class is used to configure parameters for deleting a document from a Cloudant database. It allows you to specify the database name, the document ID, and the revision (`_rev`) of the document to ensure that the correct version is deleted and prevent race conditions. This class uses the builder pattern to set options before sending the delete request to Cloudant.
 
 == No need for a Cloudant feature
-Previously, using Cloudant required enabling the `cloudant-1.0` feature.  Even if the Cloudant SDK for Java's API changes, simple updates to your CDI producer will allow it to continue to work. You should remove the `cloudant-1.0` feature from your `server.xml` when using the new Cloudant SDK for Java.
+Previously, integrating Cloudant into your application required enabling the `cloudant-1.0` feature in the `server.xml` file.  The CDI producer now automates the integration process, allowing you to inject Cloudant resources directly into your application without needing to explicitly enable the  `cloudant-1.0` feature.
 
-Bundle the  Cloudant SDK for Java in your application. To do this with Maven you can use a dependency:
+What makes this approach even more flexible is that, even if the Cloudant SDK for Java’s API undergoes changes in the future, you won’t need to make extensive updates to your application code, meaning that simple updates to the producer itself will be sufficient to ensure continued compatibility with newer versions of the SDK.
 
-[source, xml]
-----
-<dependency>
-    <groupId>com.ibm.cloud</groupId>
-    <artifactId>cloudant</artifactId>
-    <version>x.x.x</version>
-</dependency> 
-----
-If you have multiple applications accessing Cloudant, instead of bundling the Cloudant SDK for Java with each application, you can configure a shared library in your `server.xml` like this:
-[source, xml]
-----
-<library id="cloudantLib">
-  <file name="${shared.resource.dir}/cloudant-x.x.x.jar" />
-</library>
-
-<application contextRoot="/" location="app1.war">
-    <classloader sharedLibraryRef="cloudantLib"/>
-</application>
-
-<application contextRoot="/app2" location="app2.war">
-    <classloader sharedLibraryRef="cloudantLib"/>
-</application>
-----
+As a result, when migrating to the new Cloudant SDK for Java, it is recommended that you remove the `cloudant-1.0` feature from your server.xml file. This not only streamlines your configuration but also aligns with the new, simplified approach of using the Cloudant CDI producer for integration. 
 
 == Summary
 In this blog post, we explored how easy it is to create a CDI producer for Cloudant, and configure it with MicroProfile Config to help integrate Cloudant into an Open Liberty-based Java application, leveraging the power of Cloudant's NoSQL database with the flexibility of Open Liberty’s lightweight, cloud-native architecture.
-The full sample is available on GitHub here: link:https://github.com/OpenLiberty/sample-cloudant[https://github.com/OpenLiberty/sample-cloudant].
+The full sample is available link:https://github.com/OpenLiberty/sample-cloudant[on GitHub].
 
 By combining the strengths of Cloudant and Open Liberty, developers can create powerful, cloud-native applications that are both flexible and scalable, with minimal infrastructure management. This integration ensures real-time data access, robust data storage, and seamless scaling—all essential for modern, data-driven applications in the cloud.
