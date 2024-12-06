@@ -1,0 +1,235 @@
+---
+layout: post
+title: "Access Cloudant with Open Liberty using CDI"
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/revijay
+author_github: https://github.com/revijay
+seo-title: Access Cloudant with Open Liberty using CDI - OpenLiberty.io
+seo-description: Using Cloudant with Open Liberty previously meant enabling the cloudant-1.0 feature and configuring several elements in server.xml. With CDI and MicroProfile Config, you can easily configure access to Cloudant with a CDI producer. The cloudant-1.0 feature was implemented using Java Cloudant Client library which is no longer supported, so in this demonstration we are using the new Cloudant SDK for Java.
+blog_description: "Using Cloudant with Open Liberty previously meant enabling the cloudant-1.0 feature and configuring several elements in server.xml. With CDI and MicroProfile Config, you can easily configure access to Cloudant with a CDI producer. The cloudant-1.0 feature was implemented using Java Cloudant Client library which is no longer supported, so in this demonstration we are using the new Cloudant SDK for Java."
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+---
+= Access Cloudant client with Open Liberty using CDI
+Reshmi Vijayan <https://github.com/revijay>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+
+Cloudant, an IBM-managed NoSQL database built on top of Apache CouchDB, provides a robust, flexible, and highly scalable NoSQL database solution that is tailor-made for cloud-native applications. Cloudant with Open Liberty offers a seamless way to build, deploy, and scale your Java applications with efficient scalable data storage.
+
+Previously, using Cloudant with Open Liberty meant enabling the `cloudant-1.0` feature and configuring several elements in the `server.xml` file.  The `cloudant-1.0` feature was implemented using Java Cloudant Client library, which is no longer supported, so in this demonstration we are using the new Cloudant SDK for Java. With CDI and MicroProfile Config,  you can easily configure access to Cloudant with a CDI producer (for an introduction to using CDI producers, see the https://openliberty.io/guides/cdi-intro.html[Injecting Dependencies into Microservices guide]).
+
+As a result, if you are migrating from using the `cloudant-1.0` feature to the new Cloudant SDK for Java,  you should remove the `cloudant-1.0` feature from your server.xml file. This not only streamlines your configuration but also aligns with the new simplified approach of using the Cloudant CDI producer for integration.
+
+== Bundle the  Cloudant SDK for Java
+
+Prior to implementing the functionality, make sure to configure the essential dependencies in your application. Depending on your build tool (Maven or Gradle), you can include the necessary Cloudant SDK libraries by adding the corresponding dependency.
+
+* For Maven: Add the following dependency in pom.xml file:
+
+[source, xml]
+----
+<dependency>
+    <groupId>com.ibm.cloud</groupId>
+    <artifactId>cloudant</artifactId>
+    <version>x.x.x</version>
+</dependency>
+----
+Be sure to check for the latest version on link:https://central.sonatype.com/?smo=true[Maven Central].
+
+* For Gradle: In your build.gradle file, add the following inside the dependencies block:
+
+[source, groovy]
+----
+dependencies {
+    implementation 'com.ibm.cloud:ibm-cloud-sdk-core:x.x.x'
+}
+----
+
+If you have multiple applications accessing Cloudant, instead of bundling the Cloudant SDK for Java with each application, you can configure a shared library in your `server.xml` like this:
+[source, xml]
+----
+<library id="cloudantLib">
+  <file name="${shared.resource.dir}/cloudant-x.x.x.jar" />
+</library>
+
+<application contextRoot="/" location="app1.war">
+    <classloader sharedLibraryRef="cloudantLib"/>
+</application>
+
+<application contextRoot="/app2" location="app2.war">
+    <classloader sharedLibraryRef="cloudantLib"/>
+</application>
+----
+
+== A CDI producer for Cloudant
+With a CDI producer, you can easily provide a Cloudant client to your application and inject the client into various parts of the application in a type-safe and flexible way, with the benefits of dependency injection (such as lifecycle management and configuration). Also, we are using link:{url-prefix}/guides/microprofile-config-intro.html[MicroProfile Config] to simplify the configuration of the Cloudant driver.
+This example demonstrates how to create a CDI producer to inject a Cloudant client:
+[source, java]
+----
+@ApplicationScoped
+public class CloudantProducer {
+
+    @Inject
+    @ConfigProperty(name = "cloudant.host", defaultValue = "localhost")
+    String host;
+
+    @Inject
+    @ConfigProperty(name = "cloudant.port", defaultValue = "5984")
+    String port;
+
+    @Inject
+    @ConfigProperty(name = "cloudant.username")
+    String username;
+
+    @Inject
+    @ConfigProperty(name = "cloudant.password")
+    String encodedPassword;
+
+    @Produces
+    public Cloudant createCloudant() {
+        String password = PasswordUtil.passwordDecode(encodedPassword);
+        BasicAuthenticator authenticator = new BasicAuthenticator.Builder()
+                .username(username)
+                .password(password)
+                .build();
+
+        Cloudant service = new Cloudant("cloudant", authenticator);
+        service.setServiceUrl("http://" + host + ":" + port);
+
+        return service;
+    }
+}
+----
+One advantage of using a CDI producer is that you can tailor it to your needs. For improved security, the `createCloudant` method uses Open Liberty's password decoding, which requires the following Maven dependency:
+[source,xml]
+----
+<dependency>
+    <groupId>com.ibm.websphere.appserver.api</groupId>
+    <artifactId>com.ibm.websphere.appserver.api.passwordUtil</artifactId>
+    <version>1.0.95</version>
+</dependency>
+----
+You must also enable the Password Utilities feature in your `server.xml` file:
+[source, xml]
+----
+<feature>passwordUtilities-1.0</feature>
+----
+Now, by placing the following snippet in your ``microprofile-config.properties`` or `server.env` file, the values for user and password will be pulled into the CloudantProducer class:
+[source, text]
+----
+cloudant.user=admin
+cloudant.password={aes}AEEjCqvh7XAwDxrdYC6BUbqYlwqI8NAxRkWWWq7muxZu
+cloudant.dbname=testdb
+----
+
+Instead of using `BasicAuthentication` with a username and password, Cloudant also supports `IAM (Identity and Access Management)` authentication, which allows users and applications to authenticate using secure API keys or IAM tokens. By using IAM authentication, we can avoid the risks associated with managing passwords and ensure that only authorized entities can interact with Cloudant databases.
+Follow the https://cloud.ibm.com/docs/Cloudant?topic=Cloudant-getting-started-with-cloudant[IBM Cloudant Setup] guide to create a Cloudant instance and API key for accessing it.
+
+The following code snippet shows how can we create a CDI Producer to inject a Cloudant client with IAM authentication.
+[source, java]
+----
+@ApplicationScoped
+public class CloudantProducer {
+
+    @Inject
+    @ConfigProperty(name = "cloudant.host")
+    String host;
+
+    @Inject
+    @ConfigProperty(name = "cloudant.apikey")
+    String apikey;
+
+    @Produces
+    public Cloudant createCloudant() {
+        IamAuthenticator authenticator = new IamAuthenticator.Builder()
+    		    .apikey("apikey")
+    		    .build();
+
+        Cloudant service = new Cloudant("cloudant", authenticator);
+        service.setServiceUrl("https://" + host);
+
+        return service;
+    }
+}
+----
+
+== Injecting the Cloudant client
+Here is an example of using the CDI producer to inject a Cloudant client in a JAX-RS application.
+[source, java]
+----
+@Inject
+Cloudant client;
+
+@Inject
+@ConfigProperty(name = "cloudant.dbname")
+String dbname;
+
+@POST
+@Path("/add")
+@Consumes(MediaType.APPLICATION_JSON)
+public void add(CrewMember crewMember) {
+        Document newCrewMember = new Document();
+        newCrewMember.put("Name",crewMember.getName());
+        newCrewMember.put("Rank",crewMember.getRank());
+        newCrewMember.put("CrewID",crewMember.getCrewID());
+
+        PostDocumentOptions createDocumentOptions =
+                    new PostDocumentOptions.Builder()
+                        .db(dbname)
+                        .document(newCrewMember)
+                        .build();
+        DocumentResult createDocumentResponse = client
+                    	.postDocument(createDocumentOptions)
+                        .execute()
+                   	    .getResult();
+}
+----
+
+In this example:
+
+* `@Inject` is used to inject the Cloudant client instance provided by the CDI producer.
+* The `PostDocumentOptions` is a builder class that allows you to specify various options when posting the document. You must provide the db name and the document content.
+* The `postDocument` is the main method that posts the document to the specified database. It returns a DocumentResult object which contains metadata about the inserted document (like its _id and _rev).
+
+Similarly, we can delete a document from Cloudant by using the document `id`.
+[source, java]
+----
+@DELETE
+@Path("/{id}")
+public String remove(@PathParam("id") String id) {
+	GetDocumentOptions documentInfoOptions =
+            new GetDocumentOptions.Builder()
+                .db(dbname)
+                .docId(id)
+                .build();
+
+    Document document = client
+                .getDocument(documentInfoOptions)
+                .execute()
+                .getResult();
+
+    DeleteDocumentOptions deleteDocumentOptions =
+                new DeleteDocumentOptions.Builder()
+                .db(dbname)
+                .docId(id)
+                .rev(document.getRev())
+                .build();
+
+    DocumentResult deleteDocumentResponse = client
+                .deleteDocument(deleteDocumentOptions)
+                .execute()
+                .getResult();
+}
+----
+In the previous example:
+
+* The `GetDocumentOptions` class is used to configure parameters for retrieving a document from a Cloudant database. It allows you to specify the database name, document ID, and optional parameters like the document revision, whether to include attachments, conflicts, or deleted information in the response. The class uses the builder pattern to set these options before making the request to Cloudant.
+* The `DeleteDocumentOptions` class is used to configure parameters for deleting a document from a Cloudant database. It allows you to specify the database name, the document ID, and the revision (`_rev`) of the document to ensure that the correct version is deleted and prevent race conditions. This class uses the builder pattern to set options before sending the delete request to Cloudant.
+
+== Summary
+In this blog post, we explored how easy it is to create a CDI producer for Cloudant, and configure it with MicroProfile Config to help integrate Cloudant into an Open Liberty-based Java application, leveraging the power of Cloudant's NoSQL database with the flexibility of Open Liberty’s lightweight, cloud-native architecture.
+The full sample is available link:https://github.com/OpenLiberty/sample-cloudant[on GitHub].
+
+By combining the strengths of Cloudant and Open Liberty, developers can create powerful, cloud-native applications that are both flexible and scalable, with minimal infrastructure management. This integration ensures real-time data access, robust data storage, and seamless scaling—all essential for modern, data-driven applications in the cloud.
