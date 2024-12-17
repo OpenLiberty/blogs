@@ -1,0 +1,240 @@
+---
+layout: post
+title: "Enhanced message validation for XML Web Services in 24.0.0.12-beta"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/dmuelle
+author_github: https://github.com/dmuelle
+seo-title: Enhanced message validation for XML Web Services in 24.0.0.12-beta - OpenLiberty.io
+seo-description: The 24.0.0.12-beta release enhances inbound SOAP message validation in XML Web Services to simplify message debugging and make your web services and clients more resilient.
+blog_description: The 24.0.0.12-beta release enhances inbound SOAP message validation in XML Web Services to simplify message debugging and make your web services and clients more resilient.
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+---
+= Enhanced message validation for XML Web Services in 24.0.0.12-beta
+David Mueller <https://github.com/dmuelle>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+
+The 24.0.0.12-beta release enhances inbound SOAP message validation in XML Web Services to simplify message debugging and make your web services and clients more resilient.
+
+
+See also link:{url-prefix}/blog/?search=beta&key=tag[previous Open Liberty beta blog posts].
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/29770
+// Contact/Reviewer: neuwerk
+// // // // // // // //
+[#xmlws]
+== Fine-tuning XML Web Services inbound SOAP message validation
+
+Open Liberty's XML Web Services features now support fine-grained message validation for inbound SOAP messages. This enhancement provides more control over message validation options.
+In Open Liberty 24.0.0.12-beta, you can configure message validation using new attributes in the `server.xml` file. These attributes are available for the `webService` and `webServiceClient` elements.
+
+
+[options="header"]
+|=======================
+| Attribute | Description
+| `enableSchemaValidation` | Enable full validation against the XML schema
+| `enableDefaultValidation` | Enable or disable default validation for JAXB
+| `ignoreUnexpectedElements` | Use default validation while ignoring `UnmarshallExceptions: Unknown Element` errors
+|=======================
+
+The default value for `enableDefaultValidation` in the `webServiceClient` element is `true`. The rest of the attributes default to `false` in both the `webServiceClient` and `webService` elements.
+
+These attributes require one of the following XML Web Services features to be enabled in your `server.xml` file:
+
+* xref:{url-prefix}/docs/latest/reference/feature/xmlWS-4.0.html[Jakarta XML Web Services 4.0] (`xmlWS-4.0`)
+* xref:{url-prefix}/docs/latest/reference/feature/xmlWS-3.0.html[Jakarta XML Web Services 4.0] (`xmlWS-3.0`)
+* xref:{url-prefix}/docs/latest/reference/feature/jaxws-2.2.html[Java Web Services 2.2] (`jaxws-2.2`)
+
+By using these attributes, you can tailor message validation to your specific needs and improve the security and reliability of your SOAP-based web services. You can apply the configuration to web services (`webService`) or web service clients (`webServiceClient`), either globally, or to an individual client or web service implementation.
+
+=== XML schema validation
+
+You can set the `enableSchemaValidation=true` attribute to provide more insight into JAXB unmarshalling exceptions and make painful message debugging easier. This option is the highest level of XML validation, which provides faster debugging and the most thorough checks on inbound message contents. But it comes with a tradeoff: higher performance cost.
+
+==== Global XML schema validation
+
+The following example shows how to enable XML schema validation for web services globally for your Open Liberty runtime:
+
+[source,xml]
+----
+<webService enableSchemaValidation="true" />
+----
+
+To enable XML schema validation globally for web service clients, set the same attribute on the `webServiceClient` element:
+
+[source,xml]
+----
+<webServiceClient enableSchemaValidation="true" />
+----
+
+==== Targeted XML schema validation
+
+The following example shows how to enable XML schema validation for a particular web service by using the web service port:
+
+[source,xml]
+----
+<webService portName="<web service port name>"  enableSchemaValidation="true" />
+----
+
+The value of `portName` is the port name of the Web Service implementation you're configuring.  This name comes from your `@WebService(portName=<web service port name>` annotated class.
+Alternatively, you can check the `<wsdl:port ... name="Web Service Port Name">` line in your WSDL file for the port name.
+
+
+The following example shows how to enable XML schema validation for a specific client service:
+
+[source,xml]
+----
+<webServiceClient serviceName="<client service name>"  enableSchemaValidation="true" />
+----
+
+The value of `serviceName` is the name of the Web Service Client you're configuring. This name comes from your `@WebServiceClient(serviceName=<client service name>` annotated stub class for managed clients.
+For unmanaged clients, you can check the `<wsdl:service name="<client service name>"` line in your WSDL file.
+
+
+
+=== Default validation
+
+You can configure the default level of JAXB validation of inbound SOAP Messages with the `enableDefaultValidation=true` attribute. Default validation is much more efficient than XML schema validation, so enabling it provides basic message validation with lower overhead. Disabling it lets you ignore various unmarshalling errors for problematic messages. Default validation is enabled by default for web services, but disabled for web service clients.
+
+==== Global default validation
+
+The following example shows how to enable default validation globally for web services in your Open Liberty runtime:
+
+[source,xml]
+----
+<webService enableDefaultValidation="true"/>
+----
+
+Default validation is enabled by default for web service clients. To disable default validation globally for web service clients, set the `enableDefaultValidation="false"` attribute on the `webServiceClient` element.
+
+[source,xml]
+----
+<webServiceClient enableDefaultValidation="false"/>
+----
+
+==== Targeted default validation
+
+The following example shows how to enable default validation for a specific web service:
+
+[source,xml]
+----
+<webService  portName="SayHelloService" enableDefaultValidation="true"/>
+----
+
+Default validation is enabled by default for web service clients. To disable default validation for a specific web service client, set the `enableDefaultValidation="false"` attribute on the `webServiceClient` element and use the `serviceName` attribute to specify the client service.
+
+[source,xml]
+----
+<webServiceClient serviceName="<client service name>"  enableDefaultValidation="false" />
+----
+
+=== Ignore unexpected elements
+
+Inbound SOAP messages often contain extra elements in the SOAP body when a web service is updated but the client is not. When a message contains an unknown element, Open Liberty throws a `UnmarshallingException: Unknown Element`. By enabling `ignoreUnexpectedElements`, you can keep validation enabled while ignoring unknown elements.
+
+==== Global configuration
+
+The following example shows how to ignore unexpected elements globally for web services on your Open Liberty runtime:
+
+[source,xml]
+----
+<webService  ignoreUnexpectedElements="true"/>
+----
+
+To ignore unexpected elements globally for web service clients, set the `ignoreUnexpectedElements` attribute on the `webServiceClient` element.
+
+==== Targeted configuration
+
+The following example shows how to ignore unexpected elements for a specific web service:
+
+[source,xml]
+----
+<webService  portName="SayHelloService" ignoreUnexpectedElements="true"/>
+----
+
+To ignore unexpected elements for a specific web service client, set the same attribute on the `webServiceClient` element and use the `serviceName` attribute to specify the client service.
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+[#run]
+=== Try it now
+
+To try out these features, update your build tools to pull the Open Liberty All Beta Features package instead of the main release. The beta works with Java SE 23, 21, 17, 11, and 8.
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], you can install the All Beta Features package by using:
+
+[source,xml]
+----
+<plugin>
+    <groupId>io.openliberty.tools</groupId>
+    <artifactId>liberty-maven-plugin</artifactId>
+    <version>3.11.1</version>
+    <configuration>
+        <runtimeArtifact>
+          <groupId>io.openliberty.beta</groupId>
+          <artifactId>openliberty-runtime</artifactId>
+          <version>24.0.0.12-beta</version>
+          <type>zip</type>
+        </runtimeArtifact>
+    </configuration>
+</plugin>
+----
+
+You must also add dependencies to your pom.xml file for the beta version of the APIs that are associated with the beta features that you want to try. For example, the following block adds dependencies for two example beta APIs:
+
+[source,xml]
+----
+<dependency>
+    <groupId>org.example.spec</groupId>
+    <artifactId>exampleApi</artifactId>
+    <version>7.0</version>
+    <type>pom</type>
+    <scope>provided</scope>
+</dependency>
+<dependency>
+    <groupId>example.platform</groupId>
+    <artifactId>example.example-api</artifactId>
+    <version>11.0.0</version>
+    <scope>provided</scope>
+</dependency>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'io.openliberty.tools:liberty-gradle-plugin:3.9.1'
+    }
+}
+apply plugin: 'liberty'
+dependencies {
+    libertyRuntime group: 'io.openliberty.beta', name: 'openliberty-runtime', version: '[24.0.0.12-beta,)'
+}
+----
+
+Or if you're using link:{url-prefix}/docs/latest/container-images.html[container images]:
+
+[source]
+----
+FROM icr.io/appcafe/open-liberty:beta
+----
+
+Or take a look at our link:{url-prefix}/downloads/#runtime_betas[Downloads page].
+
+If you're using link:https://plugins.jetbrains.com/plugin/14856-liberty-tools[IntelliJ IDEA], link:https://marketplace.visualstudio.com/items?itemName=Open-Liberty.liberty-dev-vscode-ext[Visual Studio Code] or link:https://marketplace.eclipse.org/content/liberty-tools[Eclipse IDE], you can also take advantage of our open source link:https://openliberty.io/docs/latest/develop-liberty-tools.html[Liberty developer tools] to enable effective development, testing, debugging, and application management all from within your IDE.
+
+For more information on using a beta release, refer to the link:{url-prefix}docs/latest/installing-open-liberty-betas.html[Installing Open Liberty beta releases] documentation.
+
+[#feedback]
+== We welcome your feedback
+
+Let us know what you think on link:https://groups.io/g/openliberty[our mailing list]. If you hit a problem, link:https://stackoverflow.com/questions/tagged/open-liberty[post a question on StackOverflow]. If you hit a bug, link:https://github.com/OpenLiberty/open-liberty/issues[please raise an issue].

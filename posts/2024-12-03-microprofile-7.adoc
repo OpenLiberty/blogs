@@ -1,0 +1,381 @@
+---
+layout: post
+title: "MicroProfile 7.0 deep dive with Open Liberty"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/Emily-Jiang
+author_github: https://github.com/Emily-Jiang
+seo-title: MicroProfile 7.0 with Open Liberty - OpenLiberty.io
+seo-description: An introduction to MicroProfile 7.0
+blog_description: Everything you need to know about MicroProfile 7.0
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+---
+= MicroProfile 7.0 deep dive with Open Liberty
+Emily Jiang <https://github.com/Emily-Jiang>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+
+MicroProfile provides a set of APIs and tools for developing, deploying, and managing microservices in a lightweight and efficient manner. Open Liberty 24.0.0.12 adds support for the MicroProfile 7.0.
+
+link:https://microprofile.io/compatible/7-0/[MicroProfile 7.0] was released in August 2024. It is a major release and contains the following significant changes.
+
+* MicroProfile 7.0 no longer packages a particular version of Jakarta EE Core Profile. Instead, it declares the minimum version of Jakarta EE, Jakarta EE 10 Core Profile.
+* MicroProfile Telemetry 2.0  brings in logs and metrics and also includes changes that are incompatible with earlier versions.
+* MicroProfile Metrics is not part of MicroProfile 7.0, as the metrics capability is supplied by MicroProfile Telemetry 2.0.
+* MicroProfile Rest Client 4.0 has a major release as it aligned with Jakarta RESTful Web Services 3.1.
+* MicroProfile OpenAPI 4.0 aligns with OpenAPI 3.1.
+* MicroProfile Fault Tolerance 4.1 integrates with MicroProfile Telemetry 2.0.
+
+Let's take a look at the individual specification updates.
+
+* <<SUB_TAG_0, MicroProfile Rest Client 4.0>>
+* <<SUB_TAG_1, MicroProfile Telemetry 2.0>>
+* <<SUB_TAG_2, MicroProfile OpenAPI 4.0>>
+* <<SUB_TAG_3, Fault Tolerance 4.1>>
+
+
+
+[#SUB_TAG_0]
+== Align your REST client with Jakarta RESTful Web Services with MicroProfile Rest Client 4.0
+
+MicroProfile Rest Client provides a type-safe approach to invoke RESTful services over HTTP. As much as possible, the MicroProfile Rest Client 4.0 release attempts to use link:https://jakarta.ee/specifications/restful-ws/3.1/[Jakarta RESTful Web Services 3.1] APIs for consistency and easier re-use.
+
+The MicroProfile Rest Client 4.0 (implemented by the Liberty feature `mpRestClient-4.0`) aligns with Jakarta RESTful Web Services 3.1 as part of the greater effort to align MicroProfile 7.0 with Jakarta EE 10. It also adds the following updates.
+
+* Added a new `RestClientBuilder.header(String, Object)` method to add dynamic headers to the request.
+* Added a new `RestClientBuilder.baseUri(String)` overload method so users don't have to call `URI.create(String)`.
+* Added clarification in the spec on how to use Jakarta RESTful Web Services `EntityPart` API for multipart requests.
+
+=== Learn more
+
+For more information, see the following resources:
+
+* link:https://github.com/eclipse/microprofile-rest-client[Rest Client for MicroProfile] on GitHub
+* link:https://download.eclipse.org/microprofile/microprofile-rest-client-4.0/microprofile-rest-client-spec-4.0.html[Rest Client for MicroProfile 4.0 specification document]
+* link:http://download.eclipse.org/microprofile/microprofile-rest-client-4.0/apidocs/[API Javadoc]
+
+
+[#SUB_TAG_1]
+== MicroProfile Telemetry 2.0 (logs, metrics and tracing)
+
+link:{url-prefix}/docs/latest/reference/feature/mpTelemetry-2.0.html[MicroProfile Telemetry 2.0] (implemented by the  `mpTelemetry-2.0` Liberty feature) helps improve the observability of your Java applications by using OpenTelemetry to collect and export logs, metrics, and traces in a standardized way. Previous versions (1.0, 1.1) of MicroProfile Telemetry could manage only distributed tracing.
+
+MicroProfile Telemetry 2.0 provides the latest OpenTelemetry technology. In addition to link:{url-prefix}/docs/latest/microprofile-telemetry.html[distributed tracing], the feature now allows OpenTelemetry to collect and export metrics and logs.
+For information about managing <<metrics, metrics>> and <<logs, logs>> with MicroProfile Telemetry, see the following sections.
+
+[#metrics]
+=== Send Liberty metrics to OpenTelemetry
+
+When the MicroProfile Telemetry 2.0 feature (`mpTelemetry-2.0`) is enabled, Open Liberty can now forward runtime component statistics that are captured by the link:{url-prefix}/docs/latest/reference/feature/monitor-1.0.html[Performance Monitoring 1.0] feature (`monitor-1.0`) to the MicroProfile Telemetry 2.0 runtime. This statistical data is registered as metrics in the telemetry runtime and can be forwarded to any OpenTelemetry Protocol (OTLP) compatible metric consumer to meet your monitoring needs.
+
+The following runtime components are supported:
+
+* `ThreadPool`
+* `Sessions`
+* `RequestTiming`
+* `ConnectionPool`
+
+To collect and export metrics, enable OpenTelemetry by using the following system property or environment variable:
+
+* System property: `otel.sdk.disabled=false`
+* Environment variable: `OTEL_SDK_DISABLED=false`
+
+You can set configuration properties in any of the link:{url-prefix}/docs/latest/external-configuration.html#default[config sources that are available to MicroProfile Config].
+
+[#manualMetrics]
+=== Use the OpenTelemetry API to mannually create metrics
+
+In addition to the supported runtime metric components, you can also use the OpenTelemetry metrics API to define custom metrics in your application code.
+
+Before instrumenting your code, the following prerequisite is required:
+
+* Third-party APIs must be made visible for your application in the
+link:https://github.com/yasmin-aumeeruddy/mpTelemetry-Demo/blob/main/system/src/main/liberty/config/server.xml#L11-L14[server.xml]:
+
+[source, xml]
+----
+<webApplication location="demo-microprofile-telemetry-inventory.war" contextRoot="/">
+    <!-- enable visibility to third party apis -->
+    <classloader apiTypeVisibility="+third-party"/>
+</webApplication>
+----
+
+You can then use the OpenTelemetry API to create custom metrics.
+
+[source,java]
+```
+class WithCounter {
+    @Inject
+    Meter meter;
+
+    private LongCounter counter;
+
+    @PostConstruct
+    public void init() {
+        counter = meter
+                    .counterBuilder("new_subscriptions")
+                    .setDescription("Number of new subscriptions")
+                    .setUnit("1")
+                    .build();
+    }
+
+    void subscribe(String plan) {
+        counter.add(1,
+            Attributes.of(AttributeKey.stringKey("plan"), plan));
+    }
+}
+```
+
+In this example, `Meter` is used to define an instrument, in this case a Counter. Application code then can record measurement values along with other attributes. Measurement aggregations are computed separately for each unique combination of attributes.
+
+For a full list of available metrics, see the link:https://opentelemetry.io/docs/specs/otel/metrics/api/#meter-operations#default[meter operations] in the OpenTelemetry documentation.
+
+Enable the `mpTelemetry-2.0` feature and any features that are associated with your chosen supported runtime components. The `mpTelemetry-2.0` feature automatically enables the `monitor-1.0` feature.
+
+For example, the `ConnectionPool` component requires the following configuration:
+
+[source,xml]
+----
+<featureManager>
+   <feature>mpTelemetry-2.0</feature>
+   <feature>jdbc-4.3</feature>
+</featureManager>
+----
+
+
+By default, all OpenTelemetry data is exported to link:https://opentelemetry.io/docs/languages/java/configuration/#properties-exporters[OTLP]. You can set a different exporter by specifying the following system property or environment variable:
+
+* System property: `otel.metrics.exporter`
+* Environment variable: `OTEL_METRICS_EXPORTER`
+
+You can also optionally configure the metric export interval configuration variable. The value is specified in milliseconds and the default is 60000 (60 seconds).
+
+* System property: `otel.metric.export.interval`
+* Environment variable: `OTEL_METRIC_EXPORT_INTERVAL`
+
+For more information about the available configuration properties, see xref:{url-prefix}/docs/latest/microprofile-config-properties.html#telemetry[MicroProfile Config properties: MicroProfile Telemetry].
+
+[#logs]
+=== Send logs to OpenTelemetry
+
+The `mpTelemetry-2.0` feature can now collect Open Liberty runtime log sources (messages, traces, ffdcs) and application logs generated through the `java.util.logging` (JUL) package.
+
+To enable the MicroProfile Telemetry 2.0 feature to collect all logs, add the following configuration to your `server.xml` file:
+
+[source,xml]
+----
+<featureManager>
+   <feature>mpTelemetry-2.0</feature>
+</featureManager>
+
+<mpTelemetry source="message, trace, ffdc"/>
+----
+
+If the `mpTelemetry` configuration element or the `source` attribute is not configured, the `message` source is set by default. In this case, only messages are collected. If the `source` attribute is specified empty (`source=""`), no logs are sent to OpenTelemetry.
+
+To collect and export runtime-level logs, enable OpenTelemetry by using the following system property or environment variable:
+
+* System property: `otel.sdk.disabled=false`
+* Environment variable: `OTEL_SDK_DISABLED=false`
+
+You can set configuration properties in any of the link:{url-prefix}/docs/latest/external-configuration.html#default[config sources that are available to MicroProfile Config].
+
+To separately configure multiple applications in a server, you can configure OpenTelemetry with application configuration. However, you cannot collect runtime-level logs this way.
+
+By default, all OpenTelemetry data is exported to link:https://opentelemetry.io/docs/languages/java/configuration/#properties-exporters[OTLP]. You can set a different exporter by specifying the following system property or environment variable:
+
+* System property: `otel.logs.exporter`
+* Environment variable: `OTEL_LOGS_EXPORTER`
+
+For more information about the available configuration properties, see xref:{url-prefix}/docs/latest/microprofile-config-properties.html#telemetry[MicroProfile Config properties: MicroProfile Telemetry].
+
+=== Config OpenTelemetry Backend
+
+The link:https://grafana.com/blog/2024/03/13/an-opentelemetry-backend-in-a-docker-image-introducing-grafana/otel-lgtm/[grafana/otel-lgtm] is a useful OpenTelemetry backend. You can set up the docker image via the following commands.
+
+[source,console]
+----
+git clone https://github.com/grafana/docker-otel-lgtm.git \
+cd docker-otel-lgtm/docker
+podman build . -t grafana/otel-lgtm \
+podman run -p 3000:3000 -p 4317:4317 -p 4318:4318 --rm -ti localhost/grafana/otel-lgtm
+----
+
+The dashboard `localhost:3000` will list the logs, metrics and traces. For more information regarding the Grafana OTEL backend, see link:https://github.com/grafana/docker-otel-lgtm[docker-otel-lgtm].
+
+For more information about using MicroProfile Telemetry to manage your metrics, logs, and traces in a standardized way, see link:{url-prefix}/docs/latest/microprofile-telemetry.html[Collect logs, metrics, and traces with OpenTelemetry].
+
+[#SUB_TAG_2]
+== MicroProfile OpenAPI 4.0
+
+
+link:https://www.openapis.org/[OpenAPI] is a standardised way of documenting REST APIs in a JSON or YAML format. MicroProfile OpenAPI helps you generate and serve OpenAPI documentation for your REST applications built using JAX-RS or Jakarta Restful Web Services. This can be useful for developers to test out the API during development, or for people using the API in production.
+
+The new MicroProfile OpenAPI 4.0 feature (`mpOpenAPI-4.0`) brings support for the latest version of the specification with the following changes:
+
+* Documentation is now produced in link:https://spec.openapis.org/oas/v3.1.0.html[OpenAPI 3.1 format] by default (updated from 3.0 in previous versions). Changes in OpenAPI 3.1 include:
+  ** Use of full JSON Schema 2020-12 draft for data object schemas (updated from a subset of an older JSON schema draft in 3.0)
+  ** Support for documenting webhooks
+  ** Reusable PathItem objects
+* updates to the model API so that it directly reflects the OpenAPI 3.1 format
+* additions to the annotations API to allow users to take advantage of the new features of OpenAPI 3.1
+
+A detailed list of changes can be found in the link:https://download.eclipse.org/microprofile/microprofile-open-api-4.0.2/microprofile-openapi-spec-4.0.2.html#release_notes_40[release notes of the specification].
+
+Although the OpenAPI 3.1 format is now the default,  you can still configure `mpOpenAPI-4.0` to output in OpenAPI 3.0 format by configuring  the`openAPIVersion` attribute in your `server.xml` file:
+
+[source.xml]
+----
+<mpOpenAPI openAPIVersion="3.0" />
+----
+
+This release also includes all deployed applications and modules in the OpenAPI documentation by default. If you need more control over which applications and modules are documented, there's new `server.xml` configuration to include or exclude specific applications and modules and to specify the `info` section of the OpenAPI document.
+
+[source.xml]
+----
+<mpOpenAPI>
+    <excludeApplication>HiddenApplication</excludeApplication>
+    <excludeModule>myApp/adminModule</excludeModule>
+    <info version="1.5"
+          title="Foo API" />
+</mpOpenAPI>
+----
+
+For more information, see link:{url-prefix}/docs/latest/reference/feature/mpOpenAPI-4.0.html[MicroProfile OpenAPI 4.0] and link:{url-prefix}/docs/latest/documentation-openapi.html#multi-module[Multiple application and multi-module application support with MicroProfile OpenAPI].
+
+To start using the MicroProfile OpenAPI 4.0 feature, enable it in your server.xml and deploy one or more applications developed using Jakarta RESTful Web Services:
+
+[source.xml]
+----
+<featureManager>
+    <feature>mpOpenAPI-4.0</feature>
+</featureManager>
+----
+
+Then you can view the generated OpenAPI document. On a local development server this will be at `http://localhost:9080/openapi` and a UI is available to view the documentation in a more human-readable way at `http://localhost:9080/openapi/ui`.
+
+Further resources:
+
+- You can read more detail about the changes in MicroProfile OpenAPI 4.0 in the link:https://download.eclipse.org/microprofile/microprofile-open-api-4.0.2/microprofile-openapi-spec-4.0.2.html[specification] and link:https://download.eclipse.org/microprofile/microprofile-open-api-4.0.2/apidocs/[javadoc].
+- You can learn more about how to use MicroProfile OpenAPI from our link:https://openliberty.io/docs/latest/documentation-openapi.html[docs] and link:https://openliberty.io/guides/microprofile-openapi.html[guide].
+
+
+[#SUB_TAG_3]
+== Integrate fault tolerance and OpenTelemetry with MicroProfile Fault Tolerance 4.1
+
+link:{url-prefix}/docs/latest/fault-tolerance.html[MicroProfile Fault Tolerance] helps you easily identify and mitigate failures in your code. It provides annotations that you can add to methods to use bulkhead, circuit breaker, retry, timeout, and fallback strategies.
+
+The new `mpFaultTolerance-4.1` feature integrates with the `mpTelemetry-2.0` feature, so that Fault Tolerance can export metric data to OpenTelemetry. With this change, and other changes in `mpTelemetry-2.0`, you can simplify the configuration and management of your application observability by using OpenTelemetry as the single source for logging, metrics, and tracing.
+
+To enable this functionality, enable `mpFaultTolerance-4.1` and `mpTelemetry-2.0` in your `server.xml` file and then link:{url-prefix}/docs/latest/microprofile-telemetry.html[configure mpTelemetry-2.0 to export metrics]. The following examples show a minimal configuration for OpenTelemetry to export to your `messages.log` file and a class that generates Fault Tolerance metrics (it must be accessed as a CDI bean).
+
+If you use MicroProfile Fault Tolerance 4.1 with MicroProfile Metrics 5.1 as well as MicroProfile Telemetry 2.0, it will export metrics to both MicroProfile Metrics and MicroProfile Telemetry. For more information, refer to link:https://download.eclipse.org/microprofile/microprofile-fault-tolerance-4.1.1/microprofile-fault-tolerance-spec-4.1.1.html#_integration_with_microprofile_metrics_and_microprofile_telemetry[Integration with MicroProfile Metrics and MicroProfile Telemetry].
+
+=== server.xml file configuration
+
+[source,xml]
+----
+<featureManager>
+  <feature>mpFaultTolerance-4.1</feature>
+  <feature>mpTelemetry-2.0</feature>
+</featureManager>
+----
+
+=== bootstrap.properties file configuration
+
+The following example configures OpenTelemetry to only output metrics to the `messages.log` file.
+It also sets a very low interval for exporting metrics so you can see the results quickly. You can use this configuration to easily demo how OpenTelemetry collects and exports you Fault Tolerance metrics.
+
+[source,xml]
+----
+otel.sdk.disabled=false
+otel.metrics.exporter=logging
+otel.logs.exporter=none
+otel.traces.exporter=none
+otel.metric.export.interval=500
+----
+
+=== Example application class
+
+Ensure that this class is injected as a CDI bean and invoked by the user in whatever way you prefer.
+
+[source,java]
+----
+import org.eclipse.microprofile.faulttolerance.Retry;
+import jakarta.enterprise.context.ApplicationScoped;
+
+@ApplicationScoped
+public class ExampleClass {
+
+    @Retry
+    public int exampleMethod(String name) {
+        return 1;
+    }
+}
+----
+
+=== Learn more
+
+You can read more details about the changes in the new version in the link:https://download.eclipse.org/microprofile/microprofile-fault-tolerance-4.1/microprofile-fault-tolerance-spec-4.1.html[Microprofile Fault Tolerance 4.1 specification] and link:https://download.eclipse.org/microprofile/microprofile-fault-tolerance-4.1/apidocs/[API Javadoc].
+
+You can learn more about how to use MicroProfile Fault Tolerance from our link:https://openliberty.io/docs/latest/fault-tolerance.html[documentation] and link:https://openliberty.io/guides/#fault_tolerance[guides].
+
+== Adopt MicroProfile 7.0 using 24.0.0.12
+
+Open Liberty 24.0.0.12 supports MicroProfile 7.0. If you're using link:{url-prefix}/guides/maven-intro.html[Maven], include the following code in your `pom.xml` file:
+
+[source,xml]
+----
+<plugin>
+    <groupId>io.openliberty.tools</groupId>
+    <artifactId>liberty-maven-plugin</artifactId>
+    <version>3.11.1</version>
+</plugin>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle], include the following in your `build.gradle` file:
+
+[source,gradle]
+----
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'io.openliberty.tools:liberty-gradle-plugin:3.9.1'
+    }
+}
+apply plugin: 'liberty'
+----
+
+
+Or if you're using link:{url-prefix}/docs/latest/container-images.html[container images]:
+
+[source]
+----
+FROM icr.io/appcafe/open-liberty
+----
+
+Or take a look at our link:{url-prefix}/start/[Downloads page].
+
+If you're using link:https://plugins.jetbrains.com/plugin/14856-liberty-tools[IntelliJ IDEA], link:https://marketplace.visualstudio.com/items?itemName=Open-Liberty.liberty-dev-vscode-ext[Visual Studio Code] or link:https://marketplace.eclipse.org/content/liberty-tools[Eclipse IDE], you can also take advantage of our open source link:https://openliberty.io/docs/latest/develop-liberty-tools.html[Liberty developer tools] to enable effective development, testing, debugging and application management all from within your IDE.
+
+In order to enable MicroProfile 7.0 in Open Liberty, all you need to do is specify the following MicroProfile feature.
+[source,xml]
+----
+<featureManager>
+  <feature>microProfile-7.0</feature>
+</featureManager>
+----
+
+That is it! Enjoy MicroPrfoile 7.0 with Open Liberty!
+
+[link=https://stackoverflow.com/tags/open-liberty]
+image::img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="center"]
+
+
+== Get Open Liberty 24.0.0.12 now
+
+Available through <<run,Maven, Gradle, Docker, and as a downloadable archive>>.
