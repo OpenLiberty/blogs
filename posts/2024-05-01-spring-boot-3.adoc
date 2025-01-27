@@ -24,7 +24,7 @@ When you package a Spring Boot app in the WAR format, you can choose from two Li
 
 You can deploy a Spring Boot WAR like any standard Jakarta EE WAR by using the same developer tooling and server configuration, and providing a common DevOps workflow with your other Liberty WAR deployments.
 
-Alternatively, you can use a special https://openliberty.io/docs/latest/deploy-spring-boot.html[optimized Liberty deployment for Spring Boot applications]. This optimization adds some configuration options and provides advantages to efficiently build Docker container images.
+Alternatively, you can use a special https://openliberty.io/docs/latest/deploy-spring-boot.html[optimized Liberty deployment for Spring Boot applications]. This optimization adds Spring Boot-centric configuration and provides advantages to efficiently build Docker container images.
 
 In this blog post, we'll first create a simple app by using the link:https://start.spring.io/[Spring Initializr], and then deploy it as a WAR to Liberty without any modifications, using the same deployment as for any WAR.
 
@@ -85,7 +85,7 @@ The Spring portion of the app is bootstrapped by the web container by using the 
 
 == Part 2: Use the optimized Liberty Spring Boot deployment
 
-This example uses the same Spring app that is created in step 1 of the example in Part 1. By adding some extra configuration in the `pom.xml` and `server.xml`, you can build an efficiently-layered Docker image and also parameterize the app with application arguments.
+This example uses the same Spring app that is created in step 1 of the example in Part 1. By adding some extra configuration in the `pom.xml` and `server.xml`, you can build an efficiently-layered Docker image and also use Spring Boot-centric configuration.
 
 1. Add the `liberty-maven-plugin` plus the configuration for the optimized Spring Boot deployment to your `pom.xml` file.
 +
@@ -111,17 +111,23 @@ mkdir -p src/main/liberty/config/
 cp target/liberty/wlp/usr/servers/defaultServer/server.xml src/main/liberty/config/server.xml
 ----
 +
-3. Add application arguments to your Spring Boot application configuration in the Liberty `server.xml` file.
+3. Configure the context root in your Spring Boot `application.properties` file.
++
+[source,properties]
+----
+server.servlet.context-path=/testpath
+----
++
+4. You can also configure the application in the Liberty `server.xml` file by setting a Spring Boot property as an application argument. The following example sets a logger level for the application.
 +
 [source,xml]
 ----
  <springBootApplication id="spring-liberty" location="thin-spring-liberty-0.0.1-SNAPSHOT.war" name="spring-liberty">
-    <applicationArgument>--server.servlet.context-path=/testpath</applicationArgument>
-    <applicationArgument>--myarg=myval</applicationArgument>
+     <applicationArgument>--logging.level.org.springframework.web=debug</applicationArgument>
  </springBootApplication>
 ----
 +
-4. Add `println` to echo arguments in the output (use the `vi` command here, or your preferred editor).
+5. Add `println` to echo arguments in the output (use the `vi` command here, or your preferred editor).
 +
 [source,sh]
 ----
@@ -136,20 +142,20 @@ vi ./src/main/java/demo/SpringLibertyApplication.java
     }
 ----
 +
-5. Run the application with the Liberty Maven Plugin
+6. Run the application with the Liberty Maven Plugin
 +
-Although the Liberty Maven Plugin doesn't currently support dev mode when you use the optimized deployment, you can still use the lifecycle built into the 'run' goal.  We do need to do a 'package' first to get the Spring Boot `repackage` packaging.
+Although the Liberty Maven Plugin doesn't currently support dev mode when you use the optimized deployment, you can still use the lifecycle built into the `run` goal.  We do need to do a `package` first to get the Spring Boot `repackage` packaging.
 +
 [source,sh]
 ----
 ./mvnw package liberty:run
 ----
 +
-6.  Observe the output:
+7.  Observe the output:
 +
 [source,sh]
 ----
-[INFO] Arguments array = [--server.servlet.context-path=/testpath, --myarg=myval]
+[INFO] Arguments array = [--logging.level.org.springframework.web=debug]
 [INFO]   .   ____          _            __ _ _
 [INFO]  /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
 [INFO] ( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
@@ -159,14 +165,16 @@ Although the Liberty Maven Plugin doesn't currently support dev mode when you us
 [INFO]  :: Spring Boot ::                (v3.2.4)
 ----
 +
-and also
+and also (note the additional DEBUG trace we enabled):
 +
 [source,sh]
 ----
 [INFO] [AUDIT   ] CWWKT0016I: Web application available (default_host): http://localhost:9080/testpath/
+[INFO] 2025-01-17T17:30:47.403-05:00  INFO 38032 --- [ecutor-thread-6] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 1970 ms
+[INFO] 2025-01-17T17:30:47.683-05:00 DEBUG 38032 --- [ecutor-thread-2] s.w.s.m.m.a.RequestMappingHandlerMapping : 3 mappings in 'requestMappingHandlerMapping'
 ----
 +
-7. Test the application by visiting the following URL in a browser: http://localhost:9080/testpath/
+8. Test the application by visiting the following URL in a browser: http://localhost:9080/testpath/
 +
 As before, you should see:
 +
