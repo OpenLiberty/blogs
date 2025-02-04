@@ -29,7 +29,7 @@ This post demonstrates an application consisting of two services which are hoste
 
 * *Car service*: Allows users to create records of cars, given the make of the car and the id of the person who owns the car.
 
-image::img/blog/car_person_service.png[align="center",Diagram of an application with a Car and Person service.]
+image::img/blog/car_person_service.png[align="center",width=50%,Diagram of an application with a Car and Person service.]
 
 When a user interacts with the car service, it is possible that they experience some latency with their response. A developer needs to collect data to work out which part of the distributed system is causing the issue. 
 
@@ -271,8 +271,49 @@ Navigate to the following endpoint to start the aforementioned spans:
 
 `http://localhost:9081/cars/getCar/3131`
 
-You can see the manually created subspan in the dashboard by viewing the most recent trace in the link:http://localhost:3000/explore?schemaVersion=1&panes=%7B%22ycw%22:%7B%22datasource%22:%22tempo%22,%22queries%22:%5B%7B%22refId%22:%22A%22,%22datasource%22:%7B%22type%22:%22tempo%22,%22uid%22:%22tempo%22%7D,%22queryType%22:%22traceqlSearch%22,%22limit%22:20,%22tableType%22:%22traces%22,%22filters%22:%5B%7B%22id%22:%2212776f9b%22,%22operator%22:%22%3D%22,%22scope%22:%22span%22%7D%5D%7D%5D,%22range%22:%7B%22from%22:%22now-5m%22,%22to%22:%22now%22%7D%7D,%22jgh%22:%7B%22datasource%22:%22tempo%22,%22queries%22:%5B%7B%22query%22:%222901b63132e45f7f87c89658da522377%22,%22queryType%22:%22traceql%22,%22refId%22:%22A%22,%22limit%22:20,%22tableType%22:%22traces%22%7D%5D,%22range%22:%7B%22from%22:%221736957206967%22,%22to%22:%221736957506967%22%7D%7D%7D&orgId=1[dashboard].
+You can see the manually created subspan
+ by viewing the most recent trace in the link:http://localhost:3000/explore?schemaVersion=1&panes=%7B%22ycw%22:%7B%22datasource%22:%22tempo%22,%22queries%22:%5B%7B%22refId%22:%22A%22,%22datasource%22:%7B%22type%22:%22tempo%22,%22uid%22:%22tempo%22%7D,%22queryType%22:%22traceqlSearch%22,%22limit%22:20,%22tableType%22:%22traces%22,%22filters%22:%5B%7B%22id%22:%2212776f9b%22,%22operator%22:%22%3D%22,%22scope%22:%22span%22%7D%5D%7D%5D,%22range%22:%7B%22from%22:%22now-5m%22,%22to%22:%22now%22%7D%7D,%22jgh%22:%7B%22datasource%22:%22tempo%22,%22queries%22:%5B%7B%22query%22:%222901b63132e45f7f87c89658da522377%22,%22queryType%22:%22traceql%22,%22refId%22:%22A%22,%22limit%22:20,%22tableType%22:%22traces%22%7D%5D,%22range%22:%7B%22from%22:%221736957206967%22,%22to%22:%221736957506967%22%7D%7D%7D&orgId=1[dashboard].
 
-Notice that the status code `404` and the exact time of this operation is shown on the dashboard. 
+Notice that the status code `404` and the exact time of this operation is shown on the dashboard.
 
 image::img/blog/manual-trace.png[align="center", Manually created trace from Car service.]
+
+=== Observe application logs
+
+Log messages are created in link:https://github.com/yasmin-aumeeruddy/car-person-demo/blob/main/car/src/main/java/io/openliberty/demo/client/PersonClient.java#L43[`PersonClient.java`] to show when events occur. For example, an `INFO` message is created when a new client is built:
+
+[source, java]
+----
+private static final Logger julLogger = Logger.getLogger("jul-logger");
+
+...
+
+private void initHelper(String hostname, int port, Long personId) {
+    this.url = buildUrl(PROTOCOL, hostname, port, PEOPLE + personId);
+    julLogger.log(Level.INFO, "Building client for url " + url);
+    this.clientBuilder = buildClientBuilder(this.url);
+}
+----
+
+You can see the application logs in the link:http://localhost:3000/explore?schemaVersion=1&panes=%7B%224j4%22:%7B%22datasource%22:%22loki%22,%22queries%22:%5B%7B%22refId%22:%22A%22,%22expr%22:%22%7Bservice_name%3D%5C%22car%5C%22%7D%20%7C%3D%20%60%60%22,%22queryType%22:%22range%22,%22datasource%22:%7B%22type%22:%22loki%22,%22uid%22:%22loki%22%7D,%22editorMode%22:%22builder%22%7D%5D,%22range%22:%7B%22from%22:%22now-1h%22,%22to%22:%22now%22%7D%7D%7D&orgId=1[dashboard].
+
+== Analyzing telemetry data
+
+Once traces, metric and logs are collected and exported to a backend system, analyzing the data becomes a crucial step in understanding the behavior of your distributed microservices architecture. It is important to do the following:
+
+* **Identify bottlenecks**
+
+Bottlenecks and evidence of inefficiencies can be highlighted with traces. Spans with long durations can be found by finding the longest path in a trace. Additionally, repeated spans or high failure rates indicate problematic dependencies or transient errors.
+
+* **Diagnose failures**
+
+Traces have multiple attributes that help identify failures such as error codes and exception details.
+
+* **Correlate traces with and metrics**
+
+Performance data from runtime metrics like CPU usage, memory consumption, or request rates can be correlated with traces. For example, if a span indicates high latency, you can check corresponding metrics to identify the underlying cause, such as a resource constraint.
+
+* **Understand service dependencies**
+
+Dependency graphs generated from traces can show the interactions between services. Recognising these interactons can help
+identify how services depend on each other, detect circular dependencies or show excessive coupling.
