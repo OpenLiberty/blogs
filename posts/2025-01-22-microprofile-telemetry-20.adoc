@@ -31,9 +31,9 @@ This post demonstrates an application consisting of two services which are hoste
 
 image::img/blog/car_person_service.png[align="center",width=50%,Diagram of an application with a Car and Person service.]
 
-When a user interacts with the car service, it is possible that they experience some latency with their response. A developer needs to collect data to work out which part of the distributed system is causing the issue. 
+When a user interacts with the car service, they experience some latency with their response but the reason for this is not yet clear. There are numerous possibilities that could cause the latency such as network unreliability, hardware limitations, request timeouts and code complexity. The exact operation that has the problem is not always obvious. Therefore, we would need to collect data to work out which part of the distributed system is causing the issue.
 
-To do this, they can collect: 
+To do this, we can collect:
 
 * *Logs* from the servers and application to be aware of events and the time that they occurred.
 * *Runtime metrics* including numerical data about the infrastructure for the application, for example, CPU utilization and the JVM behaviour including the number of threads and classes.
@@ -44,7 +44,7 @@ Exporters are systems that send data to a backend service so you can visualise a
 
 == Running the monitoring backend
 
-Before running this demo, it is recommended to set up a a backend system to collect the telemetry data from the application. See the link:https://github.com/grafana/docker-otel-lgtm[docker-otel-lgtm] repository and clone the repo:
+Before running this demo, it is recommended to set up a backend system to collect the telemetry data from the application. See the link:https://github.com/grafana/docker-otel-lgtm[docker-otel-lgtm] repository and clone the repo:
 
 [source,sh]
 ----
@@ -115,10 +115,10 @@ Without any code instrumentation, the following components are automatically col
 
 Start the `Person` service:
 
-[source,xml]
+[source, sh]
 ----
 cd person \
-mvn liberty:run
+mvn liberty:dev
 ----
 
 To create a new person with the name Bob and age 21, navigate to:
@@ -157,28 +157,16 @@ View an overview of the HTTP metrics to see graphs that show the duration of HTT
 
 image::img/blog/http-metrics.png[align="center", HTTP metrics from Person service.]
 
-== Manual instrumentation
-
-To enable manual instrumentation in a service, third-party APIs must be made visible for your application in the link:https://github.com/yasmin-aumeeruddy/car-person-demo/blob/main/car/src/main/liberty/config/server.xml#L18[server.xml]:
-
-[source, xml]
-----
-<webApplication location="demo-microprofile-telemetry-car.war" contextRoot="/">
-    <!-- enable visibility to third party apis -->
-    <classloader apiTypeVisibility="+third-party"/>
-</webApplication>
-----
-
 === Use the OpenTelemetry API to manually create metrics
 
 In addition to the supported runtime metric components, you can also use the OpenTelemetry metrics API to define custom metrics in your application code.
 Before instrumenting your code, the following prerequisite is required:
 
-• Third-party APIs must be made visible for your application in the link:https://github.com/yasmin-aumeeruddy/mpTelemetry-Demo/blob/main/system/src/main/liberty/config/server.xml#L11-L14[server.xml]:
+• Third-party APIs must be made visible for your application in the link:https://github.com/yasmin-aumeeruddy/car-person-demo/blob/main/car/src/main/liberty/config/server.xml#L18[server.xml]:
 
 [source, xml]
 ----
-<webApplication location="demo-microprofile-telemetry-inventory.war" contextRoot="/">
+<webApplication location="demo-microprofile-telemetry-car.war" contextRoot="/">
     <!-- enable visibility to third party apis -->
     <classloader apiTypeVisibility="+third-party"/>
 </webApplication>
@@ -208,7 +196,7 @@ carCreatedCounter.add(1);
 
 For a full list of available metrics, see the link:https://opentelemetry.io/docs/specs/otel/metrics/api/#meter-operations#default[meter operations] in the OpenTelemetry documentation.
 
-Start the Car service:
+Start the Car service in another terminal:
 
 [source, sh]
 ----
@@ -220,10 +208,6 @@ Create a car associated with the person that you created using the `Person` serv
 
 http://localhost:9081/cars/createCar?make=skoda&personId=5859008369859564999
 
-Create a car associated with the person that you just created using the `Person` service. To do this, navigate to the following endpoint replacing the `personId` with the id shown in your previous result:
-
-`http://localhost:9081/cars/createCar?make=skoda&personId=5859008369859564999`
-
 When the car has been created, a HTTP request is sent to the `Person` service to return the details of the person with the given id. Consequently, you should see a result like the following 
 
 `Car created with id 3644955172396212837 owned by {"age":21,"id":5859008369859564999,"name":"bob"}`
@@ -232,51 +216,9 @@ To view all the cars you have created, navigate to:
 
 `http://localhost:9081/cars/`
 
-view the graph that shows the custom metric representing the number of cars created in the link:http://localhost:3000/explore/metrics/trail?metric=car_created_total&from=now-5m&to=now&var-ds=prometheus&var-filters=&refresh=&actionView=overview&layout=grid&var-groupby=$__all[dashboard].
+View the graph that shows the custom metric representing the number of cars created in the link:http://localhost:3000/explore/metrics/trail?metric=car_created_total&from=now-5m&to=now&var-ds=prometheus&var-filters=&refresh=&actionView=overview&layout=grid&var-groupby=$__all[dashboard].
 
 image::img/blog/manual-metrics.png[align="center", Manually created metrics from Car service.]
-
-=== Use the OpenTelemetry API to manually create traces
-
-The `CarService.java` class injects a `Tracer`` and `Span` called `carNotFoundSpan`. 
-
-[source, java]
-----
-@Inject
-Tracer tracer;
-
-@Inject
-Span carNotFoundSpan;
-----
-
-The span is started if a car is not found with the Id that is used to query the getCar method:
-
-[source, java]
-----
-@GET
-@Path("/getCar/{carId}")
-public Car getCar(@PathParam("carId") @NotEmpty Long id) {
-    Car foundCar = carRepo.get(id);
-    if (foundCar == null){
-        carNotFoundSpan = tracer.spanBuilder("carNotFound").startSpan();
-        try(Scope scope = carNotFoundSpan.makeCurrent()){
-            carNotFound(id);
-        }
-    ...
-    }
-}
-----
-
-Navigate to the following endpoint to start the aforementioned spans:
-
-`http://localhost:9081/cars/getCar/3131`
-
-You can see the manually created subspan
- by viewing the most recent trace in the link:http://localhost:3000/explore?schemaVersion=1&panes=%7B%22ycw%22:%7B%22datasource%22:%22tempo%22,%22queries%22:%5B%7B%22refId%22:%22A%22,%22datasource%22:%7B%22type%22:%22tempo%22,%22uid%22:%22tempo%22%7D,%22queryType%22:%22traceqlSearch%22,%22limit%22:20,%22tableType%22:%22traces%22,%22filters%22:%5B%7B%22id%22:%2212776f9b%22,%22operator%22:%22%3D%22,%22scope%22:%22span%22%7D%5D%7D%5D,%22range%22:%7B%22from%22:%22now-5m%22,%22to%22:%22now%22%7D%7D,%22jgh%22:%7B%22datasource%22:%22tempo%22,%22queries%22:%5B%7B%22query%22:%222901b63132e45f7f87c89658da522377%22,%22queryType%22:%22traceql%22,%22refId%22:%22A%22,%22limit%22:20,%22tableType%22:%22traces%22%7D%5D,%22range%22:%7B%22from%22:%221736957206967%22,%22to%22:%221736957506967%22%7D%7D%7D&orgId=1[dashboard].
-
-Notice that the status code `404` and the exact time of this operation is shown on the dashboard.
-
-image::img/blog/manual-trace.png[align="center", Manually created trace from Car service.]
 
 === Observe application logs
 
@@ -296,6 +238,62 @@ private void initHelper(String hostname, int port, Long personId) {
 ----
 
 You can see the application logs in the link:http://localhost:3000/explore?schemaVersion=1&panes=%7B%224j4%22:%7B%22datasource%22:%22loki%22,%22queries%22:%5B%7B%22refId%22:%22A%22,%22expr%22:%22%7Bservice_name%3D%5C%22car%5C%22%7D%20%7C%3D%20%60%60%22,%22queryType%22:%22range%22,%22datasource%22:%7B%22type%22:%22loki%22,%22uid%22:%22loki%22%7D,%22editorMode%22:%22builder%22%7D%5D,%22range%22:%7B%22from%22:%22now-1h%22,%22to%22:%22now%22%7D%7D%7D&orgId=1[dashboard].
+
+=== Use the OpenTelemetry API to manually create traces
+
+The `CarService.java` class injects a `Tracer` and `Span` called `carNotFoundSpan`.
+
+[source, java]
+----
+@Inject
+Tracer tracer;[source, java]
+...
+@Inject
+Span carNotFoundSpan;
+----
+
+The span is started if a car is not found with the Id that is used to query the `getCar` method:
+
+[source, java]
+----
+@GET
+@Path("/getCar/{carId}")
+public Car getCar(@PathParam("carId") @NotEmpty Long id) throws InterruptedException {
+    ...
+    if (foundCar == null){
+        carNotFoundSpan = tracer.spanBuilder("carNotFound").startSpan();
+        try(Scope subScope = carNotFoundSpan.makeCurrent()){
+            Thread.sleep(3000);
+            return "Car with id " + id + " not found.";
+        }
+        finally{
+            carNotFoundSpan.end();
+        }
+    }
+    ...
+}
+----
+
+Navigate to the following endpoint to start the aforementioned spans:
+
+`http://localhost:9081/cars/getCar/3131`
+
+You may notice significant latency. See the manually created subspan by viewing the most recent trace in the link:http://localhost:3000/explore?schemaVersion=1&panes=%7B%225md%22:%7B%22datasource%22:%22tempo%22,%22queries%22:%5B%7B%22refId%22:%22A%22,%22datasource%22:%7B%22type%22:%22tempo%22,%22uid%22:%22tempo%22%7D,%22queryType%22:%22traceqlSearch%22,%22limit%22:20,%22tableType%22:%22traces%22,%22filters%22:%5B%7B%22id%22:%22b5bda2a9%22,%22operator%22:%22%3D%22,%22scope%22:%22span%22%7D%5D%7D%5D,%22range%22:%7B%22from%22:%22now-5m%22,%22to%22:%22now%22%7D%7D%7D&orgId=1[dashboard].
+
+image::img/blog/manual-trace.png[align="center", Manually created trace from Car service.]
+
+We can see that the total time taken for the trace is over a minute. This is a significant amount of time. To investigate further, select the TraceID and open the tab labelled `Node Graph`.
+
+image::img/blog/node-graph.png[align="center", Node graph from Car service.]
+
+The graph highlights the `carNotFound` span in red, showing that it was a time consuming process in the request. When looking at the code that is executed during the span, we can see a pause in execution. This would be the cause for the latency that we experienced when interacting with the `Car` service:
+
+[source, java]
+----
+Thread.sleep(3000);
+----
+
+Removing this 
 
 == Analyzing telemetry data
 
