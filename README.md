@@ -50,6 +50,10 @@ These steps are to be completed by the author of the blog post.
       Copy the [post-single-author.adoc](./templates/post-single-author.adoc) file (or [post-multiple-authors.adoc](./templates/post-multiple-authors.adoc) for multiple authors) to the [posts](./posts) directory and rename the file using the format `YYYY-MM-DD-post-title.adoc`, where the date represents the expected publication date (e.g. `2021-11-21-open-liberty-is-awesome.adoc`).
 
       Place any images in [img/blog](./img/blog/). Add a [border to screenshots](#troubleshooting-asciidoc) to neaten the edges.
+
+    * **Third-party blog post** (syndicated/externally-hosted posts only)
+
+      Copy the [third-party-post.adoc](./templates/third-party-post.adoc) file to the [posts](./posts) directory and rename the file using the format `YYYY-MM-DD-post-title.adoc`, where the date represents the expected publication date (e.g. `2021-11-21-open-liberty-is-awesome.adoc`).
   
     * **GA release blog post** (Open Liberty GA release announcements only)
 
@@ -65,9 +69,6 @@ These steps are to be completed by the author of the blog post.
 
       Place any images in [img/blog](./img/blog/).  Add a [border to screenshots](#troubleshooting-asciidoc) to neaten the edges.
 
-    * **Third-party blog post** (externally hosted posts only)
-
-      Copy the [third-party-post.adoc](./templates/third-party-post.adoc) file to the [posts](./posts) directory and rename the file using the format `YYYY-MM-DD-post-title.adoc`, where the date represents the expected publication date (e.g. `2021-11-21-open-liberty-is-awesome.adoc`).
 
 4. If you are not employed by IBM, in at least one of your commits, sign off the commit using [the Developer Certificate process](./CONTRIBUTING.md).
 
