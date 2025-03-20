@@ -6,8 +6,8 @@ categories: blog
 author_picture: https://avatars3.githubusercontent.com/dmuelle
 author_github: https://github.com/dmuelle
 seo-title: FIPS 140-3 support and simplified library configuration in 25.0.0.3 - OpenLiberty.io
-seo-description: This release includes support for the Federal Information Processing Standard (FIPS) 140-3 and a new library configuration option that simplifies the way you manage files and folders
-blog_description: This release includes support for the Federal Information Processing Standard (FIPS) 140-3 and a new library configuration option that simplifies the way you manage files and folders
+seo-description: The 25.0.0.3 release includes support for the Federal Information Processing Standard (FIPS) 140-3 and a new library configuration option that simplifies the way you manage files and folders. This release also includes updates for audit logging and AES and hash encryption algorithms.
+blog_description: The 25.0.0.3 release includes support for the Federal Information Processing Standard (FIPS) 140-3 and a new library configuration option that simplifies the way you manage files and folders. This release also includes updates for audit logging and AES and hash encryption algorithms.
 open-graph-image: https://openliberty.io/img/twitter_card.jpg
 open-graph-image-alt: Open Liberty Logo
 ---
@@ -18,12 +18,14 @@ David Mueller <https://github.com/dmuelle>
 :url-about: /
 //Blank line here is necessary before starting the body of the post.
 
-This release includes support for the Federal Information Processing Standard (FIPS) 140-3 and a new library configuration option that simplifies the way you manage files and folders.
+The 25.0.0.3 release includes support for the Federal Information Processing Standard (FIPS) 140-3 and a new library configuration option that simplifies the way you manage files and folders. This release also includes updates for audit logging and AES and hash encryption algorithms.
 
 In link:{url-about}[Open Liberty] 25.0.0.3:
 
 * <<library, New library configuration for a path that targets a file or a folder>>
 * <<FIPS, Support for FIPS 140-3 in Liberty with IBM JDK 8>>
+* <<audit, Updates to audit logging encryption and signing>>
+* <<hash, Updates for AES and hash passwords>>
 
 
 View the list of fixed bugs in link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A25003+label%3A%22release+bug%22[25.0.0.3].
@@ -123,9 +125,9 @@ Before this update, FIPS 140-2 was supported, but its certification for IBM SDK 
 
 === Enabling FIPS 140-3
 
-To enable FIPS 140-3 in Liberty, complete the following steps. You must use IBM SDK 8.
+To enable FIPS 140-3 in Liberty, complete the following steps. You must use IBM SDK for Java 8.0.8.30 or later.
 
-1. Stop the Liberty server
+1. If your Liberty server is running, stop it.
 2. Set the following system properties in the `jvm.options` file:
 +
 ----
@@ -134,10 +136,13 @@ To enable FIPS 140-3 in Liberty, complete the following steps. You must use IBM 
 -Dcom.ibm.jsse2.usefipsProviderName=IBMJCEPlusFIPS
 ----
 +
-3. If you have LTPA keys, delete the `ltpa.keys` file.
+3. If you have existing LTPA keys, delete the `ltpa.keys` file.
++
+The default location for this file is `${server.output.dir}/resources/security/ltpa.keys`.
+
 4. Restart the Liberty server to enable FIPS 140-3.
 +
-A new `ltpa.keys` file is created when the Liberty server restarts. These new LTPA keys support FIPS 140-3 standards.
+
 
 === TLS Support
 FIPS 140-3 supports only the TLS 1.2 and 1.3 protocols.
@@ -148,7 +153,11 @@ When FIPS 140-3 is enabled, LTPA keys use FIPS 140-3 approved cryptographic algo
 To create LTPA keys with FIPS 140-3 enabled, choose one of the following options:
 
 - Delete the existing `ltpa.keys` file and restart the server after configuring FIPS 140-3.
++
+The default location for this file is `${server.output.dir}/resources/security/ltpa.keys`. A new `ltpa.keys` file is created when the Liberty server restarts. These new LTPA keys support FIPS 140-3 standards.
 - Use the `securityUtility` command with the `createLTPAKeys` option.
++
+If you have LTPA link:{url-prefix}/docs/latest/reference/feature/appSecurity-5.0.html#validationkeys[validation keys], you must also delete these and generate new validation keys after FIPS 140-3 is enabled. You can generate new validation keys by using the `securityUtility createLTPAKeys` command, as demonstrated in the following examples.
 +
 To use the createLTPAKeys command to create LTPA keys that use FIPS 140-3 approved algorithms, export the following system property before you run the command:
 +
@@ -162,11 +171,13 @@ Then, run the `securityUtility createLTPAKeys` command:
 securityUtility createLTPAKeys --password=mypassword --passwordEncoding=aes
 ----
 
-=== Updates to audit logging encryption and signing
-Liberty uses updated algorithms to sign and encrypt audit logs, regardless of whether FIPS 140-3 is enabled. The updated `auditUtility` tool does not read audit logs that were signed or encrypted before version 25.0.0.3. To read logs from these earlier versions, run the auditUtility tool from a Liberty server version 25.0.0.2 or earlier.
+[#audit]
+== Updates to audit logging encryption and signing
+Starting with the 25.0.0.3 release, Liberty uses updated algorithms to sign and encrypt audit logs, regardless of whether FIPS 140-3 is enabled. The updated `auditUtility` command does not read audit logs that were signed or encrypted before version 25.0.0.3. To read logs from these earlier versions, run the `auditUtility` command from a Liberty server version 25.0.0.2 or earlier.
 
-=== AES and HASH Secrets
-Going forward, all new AES, and HASH secrets in Liberty use AES 256 or PBKDF2WithHmacSHA512 algorithms, regardless of whether FIPS 140-3 is enabled. If FIPS 140-3 is not enable, secrets from previous versions are tolerated. With FIPS 140-3 enabled, old secrets must be regenerated by using the link:https://openliberty.io/docs/latest/reference/command/securityUtility-commands.html[securityUtility command].
+[#hash]
+== Updates for AES and hash passwords
+Starting with the 25.0.0.3 release, all new AES passwords in Liberty use `AES 256`algorithms and all new hash passwords use `PBKDF2WithHmacSHA512` algorithms, regardless of whether FIPS 140-3 is enabled. If FIPS 140-3 is not enabled, secrets from previous versions are tolerated. With FIPS 140-3 enabled, old secrets must be regenerated by using the link:https://openliberty.io/docs/latest/reference/command/securityUtility-commands.html[securityUtility command].
 
 
 For more information, see link:https://openliberty.io/docs/latest/enable-fips.html[Run FIPS-compliant applications on Open Liberty]
