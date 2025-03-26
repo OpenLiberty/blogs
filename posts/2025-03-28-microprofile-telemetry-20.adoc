@@ -42,9 +42,11 @@ To do this, we can collect:
 
 Exporters are systems that send data to a backend service so you can visualise and monitor the spans, metrics and logs.
 
+The following section illustrates how to set up a backend service.
+
 == Running the monitoring backend
 
-Before running this demo, it is recommended to set up a backend system to collect the telemetry data from the application. See the link:https://github.com/grafana/docker-otel-lgtm[docker-otel-lgtm] repository and clone the repo:
+The backend system is set up to collect the telemetry data from the application. See the link:https://github.com/grafana/docker-otel-lgtm[docker-otel-lgtm] repository and clone the repo:
 
 [source,sh]
 ----
@@ -60,23 +62,30 @@ podman build . -t grafana/otel-lgtm \
 podman run -p 3000:3000 -p 4317:4317 -p 4318:4318 --rm -ti localhost/grafana/otel-lgtm
 ----
 
+Telemetry data can be visualized in the link:https://grafana.com/grafana/dashboards/[Grafana] dashboard which is provided by starting the backend service. You can navigate to the dashboard with the following url when the services are up and running:
+
+`http://localhost:3000`
+
 The backend system is set up to collect telemetry data via the OTLP protocol which is default behaviour for Open Telemetry. Therefore, additional configuration for the exporter is not required in the application.
 
 image::img/blog/otel-lgtm-car-person.png[align="center",width=50%,Diagram of the otel lgtm backend exporter with the Car and Person service.]
 
-== Start the demo
+== The demo app
 
 Check out the demo repo and clone the repository: 
 
+[source,sh]
+----
 git clone https://github.com/yasmin-aumeeruddy/car-person-demo.git
+----
 
-Each service has `mpTelemetry2.0` and `monitor-1.0` enabled in its link:https://github.com/yasmin-aumeeruddy/car-person-demo/blob/main/car/src/main/liberty/config/server.xml#L8[server]:
+Each service has `mpTelemetry2.0` link:https://github.com/yasmin-aumeeruddy/car-person-demo/blob/main/car/src/main/liberty/config/server.xml#L6[server]:
 
 [source,xml]
 ----
 <featureManager>
+        ...
         <feature>mpTelemetry-2.0</feature>
-        <feature>monitor-1.0</feature>
 </featureManager>
 ----
 
@@ -89,7 +98,7 @@ In the demo, the required configuration is set in link:https://github.com/yasmin
 
 Note that configuration is shared amongst all applications on a single server to allow for telemetry data when system properties or environment variables are used. If you wish to use separate configuration for each application, you can use alternative MicroProfile Configuration properties; however, this will prevent the generation and collection of runtime telemetry data. For more information, see link:https://openliberty.io/docs/latest/microprofile-telemetry.html#global[Collecting and exporting logs, metrics, and traces with OpenTelemetry].
 
-Open Liberty can then forward runtime component statistics that are captured by the Performance Monitoring 1.0 feature (`monitor-1.0`) to the MicroProfile Telemetry 2.0 runtime. This statistical data is registered as metrics in the telemetry runtime and can be forwarded to any OpenTelemetry Protocol (OTLP) compatible metric consumer to meet your monitoring needs.
+The Performance Monitoring 1.0 feature (`monitor-1.0`) is automatically enabled by MicroProfile Telemetry 2.0  to capture runtime component statistics. This statistical data is registered as metrics in the telemetry runtime and can be forwarded to any OpenTelemetry Protocol (OTLP) compatible metric consumer to meet your monitoring needs.
 
 The `server.xml` also contains the following MpTelemetry property to allow MicroProfile Telemetry to collect message logs: 
 
@@ -123,10 +132,7 @@ mvn liberty:dev
 
 To create a new person with the name Bob and age 21, navigate to:
 
-[source,sh]
-----
-http://localhost:9080/people/createPerson?name=bob&age=21
-----
+`http://localhost:9080/people/createPerson?name=bob&age=21`
 
 You will see confirmation that a person has been created with a unique id:
 
@@ -143,7 +149,7 @@ You should see a result like the following, with the unique id shown previously:
 
 `{"age":21,"id":5859008369859564999,"name":"bob"}`
 
-View the traces that were automatically created from your request in the Grafana link:http://localhost:3000/explore?schemaVersion=1&panes=%7B%22xze%22:%7B%22datasource%22:%22tempo%22,%22queries%22:%5B%7B%22refId%22:%22A%22,%22datasource%22:%7B%22type%22:%22tempo%22,%22uid%22:%22tempo%22%7D,%22queryType%22:%22traceqlSearch%22,%22limit%22:20,%22tableType%22:%22traces%22,%22filters%22:%5B%7B%22id%22:%224d7a67f7%22,%22operator%22:%22%3D%22,%22scope%22:%22span%22%7D%5D%7D%5D,%22range%22:%7B%22from%22:%22now-1h%22,%22to%22:%22now%22%7D%7D%7D&orgId=1[dashboard]. 
+View the traces that were automatically created from your request in the Grafana link:http://localhost:3000/explore?schemaVersion=1&panes=%7B%22xze%22:%7B%22datasource%22:%22tempo%22,%22queries%22:%5B%7B%22refId%22:%22A%22,%22datasource%22:%7B%22type%22:%22tempo%22,%22uid%22:%22tempo%22%7D,%22queryType%22:%22traceqlSearch%22,%22limit%22:20,%22tableType%22:%22traces%22,%22filters%22:%5B%7B%22id%22:%224d7a67f7%22,%22operator%22:%22%3D%22,%22scope%22:%22span%22%7D%5D%7D%5D,%22range%22:%7B%22from%22:%22now-1h%22,%22to%22:%22now%22%7D%7D%7D&orgId=1[dashboard].
 
 image::img/blog/person-traces.png[align="center", Traces from Person service.]
 
@@ -162,7 +168,7 @@ image::img/blog/http-metrics.png[align="center", HTTP metrics from Person servic
 In addition to the supported runtime metric components, you can also use the OpenTelemetry metrics API to define custom metrics in your application code.
 Before instrumenting your code, the following prerequisite is required:
 
-• Third-party APIs must be made visible for your application in the link:https://github.com/yasmin-aumeeruddy/car-person-demo/blob/main/car/src/main/liberty/config/server.xml#L18[server.xml]:
+• Third-party APIs must be made visible for your application in the `server.xml`. You can see that this configuration is present link:https://github.com/yasmin-aumeeruddy/car-person-demo/blob/main/car/src/main/liberty/config/server.xml#L13[here].:
 
 [source, xml]
 ----
@@ -172,7 +178,7 @@ Before instrumenting your code, the following prerequisite is required:
 </webApplication>
 ----
 
-The OpenTelemetry API can then be to create custom metrics. In link:https://github.com/yasmin-aumeeruddy/car-person-demo/blob/main/car/src/main/java/io/openliberty/demo/car/CarService.java#L101-L108[`CarService.java`], `Meter` is used to define instruments, in this case, a counter.
+You can the use the OpenTelemetry API to create custom metrics. In link:https://github.com/yasmin-aumeeruddy/car-person-demo/blob/main/car/src/main/java/io/openliberty/demo/car/CarService.java#L101-L108[`CarService.java`], `Meter` is used to define instruments, in this case, a counter.
 
 [source,java]
 ----
@@ -206,7 +212,7 @@ mvn liberty:dev
 
 Create a car associated with the person that you created using the `Person` service. To do this, navigate to the following endpoint replacing the `personId` with the id shown in your previous result from `http://localhost:9080/people`:
 
-http://localhost:9081/cars/createCar?make=skoda&personId=5859008369859564999
+`http://localhost:9081/cars/createCar?make=skoda&personId=5859008369859564999`
 
 When the car has been created, a HTTP request is sent to the `Person` service to return the details of the person with the given id. Consequently, you should see a result like the following 
 
@@ -237,7 +243,7 @@ private void initHelper(String hostname, int port, Long personId) {
 }
 ----
 
-You can see the application logs in the link:http://localhost:3000/explore?schemaVersion=1&panes=%7B%224j4%22:%7B%22datasource%22:%22loki%22,%22queries%22:%5B%7B%22refId%22:%22A%22,%22expr%22:%22%7Bservice_name%3D%5C%22car%5C%22%7D%20%7C%3D%20%60%60%22,%22queryType%22:%22range%22,%22datasource%22:%7B%22type%22:%22loki%22,%22uid%22:%22loki%22%7D,%22editorMode%22:%22builder%22%7D%5D,%22range%22:%7B%22from%22:%22now-1h%22,%22to%22:%22now%22%7D%7D%7D&orgId=1[dashboard].
+You can see the additional custom application logs in the link:http://localhost:3000/explore?schemaVersion=1&panes=%7B%224j4%22:%7B%22datasource%22:%22loki%22,%22queries%22:%5B%7B%22refId%22:%22A%22,%22expr%22:%22%7Bservice_name%3D%5C%22car%5C%22%7D%20%7C%3D%20%60%60%22,%22queryType%22:%22range%22,%22datasource%22:%7B%22type%22:%22loki%22,%22uid%22:%22loki%22%7D,%22editorMode%22:%22builder%22%7D%5D,%22range%22:%7B%22from%22:%22now-1h%22,%22to%22:%22now%22%7D%7D%7D&orgId=1[dashboard].
 
 === Use the OpenTelemetry API to manually create traces
 
