@@ -1,0 +1,326 @@
+---
+layout: post
+title: "Observe microservices using metrics, logs and traces with MicroProfile Telemetry 2.0"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/yasmin-aumeeruddy
+author_github: https://github.com/yasmin-aumeeryddy
+seo-title: Observe microservices using metrics, logs and traces with MicroProfile Telemetry 2.0
+seo-description: Observe microservices using metrics, logs and traces with MicroProfile Telemetry 2.0.
+blog_description: Observe microservices using metrics, logs and traces with MicroProfile Telemetry 2.0.
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+---
+
+= Observe microservices using metrics, logs and traces with MicroProfile Telemetry 2.0
+Yasmin Aumeeruddy <https://github.com/yasmin-aumeeryddy>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+A microservices architecture has many well-known advantages for developers such as scalability, flexibility and improved collaboration. However, having a distributed system is likely to make it harder to find the source of latency or inaccuracy that users may experience. There are multiple ways to increase observability of an application to overcome this problem (e.g. by collecting metrics, traces and logs).
+
+link:https://opentelemetry.io/[OpenTelemetry] contains a set of APIs, SDKs, tooling, and integrations that are designed for the creation and management of telemetry data such as traces, metrics, and logs. link:https://projects.eclipse.org/projects/technology.microprofile/releases/telemetry-2.0[MicroProfile Telemetry 2.0] adopts OpenTelemetry so your MicroProfile applications benefit from both manual and automatic traces and metrics. These can be collectively exported along with runtime and application logs in a standardized way!
+
+This post demonstrates an application consisting of two services which are hosted on separate servers: 
+
+* *Person service*: Allows users to create records of people, given their name and age.
+
+* *Car service*: Allows users to create records of cars, given the make of the car and the id of the person who owns the car.
+
+image::img/blog/car_person_service.png[align="center",width=50%,Diagram of an application with a Car and Person service.]
+
+When a user interacts with the car service, they experience some latency with their response but the reason for this is not yet clear. There are numerous possibilities that could cause the latency such as network unreliability, hardware limitations, request timeouts and code complexity. The exact operation that has the problem is not always obvious. Therefore, we would need to collect data to work out which part of the distributed system is causing the issue.
+
+To do this, we can collect:
+
+* *Logs* from the servers and application to be aware of events and the time that they occurred.
+* *Runtime metrics* including numerical data about the infrastructure for the application, for example, CPU utilization and the JVM behaviour including the number of threads and classes.
+* *Application metrics* for the incoming and outgoing HTTP requests.
+* *Traces* and *spans* to track user operations, including both the requests and responses.
+
+Exporters are systems that send data to a backend service so you can visualise and monitor the spans, metrics and logs.
+
+The following section illustrates how to set up a backend service.
+
+== Running the monitoring backend
+
+The backend system is set up to collect the telemetry data from the application. See the link:https://github.com/grafana/docker-otel-lgtm[docker-otel-lgtm] repository and clone the repo:
+
+[source,sh]
+----
+git clone https://github.com/grafana/docker-otel-lgtm.git
+cd docker-otel-lgtm/docker
+----
+
+Build and run the image containing all services required for gathering traces, metrics and logs:
+
+[source,sh]
+----
+podman build . -t grafana/otel-lgtm
+podman run -p 3000:3000 -p 4317:4317 -p 4318:4318 --rm -ti localhost/grafana/otel-lgtm
+----
+
+Telemetry data can be visualized in the link:https://grafana.com/grafana/dashboards/[Grafana] dashboard which is provided by starting the backend service. You can navigate to the dashboard with the following url when the services are up and running:
+
+`http://localhost:3000`
+
+The backend system is set up to collect telemetry data via the OTLP protocol which is default behaviour for Open Telemetry. Therefore, additional configuration for the exporter is not required in the application.
+
+image::img/blog/otel-lgtm-car-person.png[align="center",width=50%,Diagram of the otel lgtm backend exporter with the Car and Person service.]
+
+== The demo app
+
+Check out the demo repo and clone the repository: 
+
+[source,sh]
+----
+git clone https://github.com/yasmin-aumeeruddy/car-person-demo.git
+----
+
+Each service has `mpTelemetry2.0` link:https://github.com/yasmin-aumeeruddy/car-person-demo/blob/main/car/src/main/liberty/config/server.xml#L6[server]:
+
+[source,xml]
+----
+<featureManager>
+        ...
+        <feature>mpTelemetry-2.0</feature>
+</featureManager>
+----
+
+Due to performance concerns, MicroProfile Telemetry is disabled by default. To collect and export telemetry data, enable OpenTelemetry by using the following system property or environment variable:
+
+* *System property*: otel.sdk.disabled=false
+* *Environment variable*: OTEL_SDK_DISABLED=false
+
+In the demo, the required configuration is set in link:https://github.com/yasmin-aumeeruddy/car-person-demo/blob/main/car/src/main/liberty/config/bootstrap.properties[bootstrap.properties].
+
+Note that configuration is shared amongst all applications on a single server to allow for telemetry data when system properties or environment variables are used. If you wish to use separate configuration for each application, you can use alternative MicroProfile Configuration properties; however, this will prevent the generation and collection of runtime telemetry data. For more information, see link:https://openliberty.io/docs/latest/microprofile-telemetry.html#global[Collecting and exporting logs, metrics, and traces with OpenTelemetry].
+
+The Performance Monitoring 1.0 feature (`monitor-1.0`) is automatically enabled by MicroProfile Telemetry 2.0  to capture runtime component statistics. This statistical data is registered as metrics in the telemetry runtime and can be forwarded to any OpenTelemetry Protocol (OTLP) compatible metric consumer to meet your monitoring needs.
+
+The `server.xml` also contains the following MpTelemetry property to allow MicroProfile Telemetry to collect message logs: 
+
+[source,xml]
+----
+<mpTelemetry source="message"/>
+----
+
+For a full list of available logging event types, see the link:https://openliberty.io/docs/latest/mptel-log-events-list.html[MicroProfile Telemetry log events reference list].
+
+== Automatic instrumentation
+
+Without any code instrumentation, the following components are automatically collected and exported to the backend exporter in the `Person` service:
+
+* Runtime metrics including:
+* ThreadPool
+* Sessions
+* RequestTiming
+* ConnectionPool
+* HTTP metrics
+* Message logs
+* Requests and responses to Jakarta RESTful Web Services
+
+Start the `Person` service:
+
+[source, sh]
+----
+cd person
+mvn liberty:dev
+----
+
+To create a new person with the name Bob and age 21, navigate to:
+
+`http://localhost:9080/people/createPerson?name=bob&age=21`
+
+You will see confirmation that a person has been created with a unique id:
+
+`Person created with id 5859008369859564999`
+
+To view all the people that you have created, navigate to:
+
+`http://localhost:9080/people`
+
+You should see a result like the following, with the unique id shown previously: 
+
+`{"age":21,"id":5859008369859564999,"name":"bob"}`
+
+View the traces that were automatically created from your request in the Grafana link:http://localhost:3000/explore?schemaVersion=1&panes=%7B%22xze%22:%7B%22datasource%22:%22tempo%22,%22queries%22:%5B%7B%22refId%22:%22A%22,%22datasource%22:%7B%22type%22:%22tempo%22,%22uid%22:%22tempo%22%7D,%22queryType%22:%22traceqlSearch%22,%22limit%22:20,%22tableType%22:%22traces%22,%22filters%22:%5B%7B%22id%22:%224d7a67f7%22,%22operator%22:%22%3D%22,%22scope%22:%22span%22%7D%5D%7D%5D,%22range%22:%7B%22from%22:%22now-1h%22,%22to%22:%22now%22%7D%7D%7D&orgId=1[dashboard].
+
+image::img/blog/person-traces.png[align="center", Traces from Person service.]
+
+View the messages logs to see timestamped events from the server startup in the link:http://localhost:3000/explore?schemaVersion=1&panes=%7B%228dg%22:%7B%22datasource%22:%22loki%22,%22queries%22:%5B%7B%22refId%22:%22A%22,%22expr%22:%22%7Bservice_name%3D%5C%22person%5C%22%7D%20%7C%3D%20%60%60%22,%22queryType%22:%22range%22,%22datasource%22:%7B%22type%22:%22loki%22,%22uid%22:%22loki%22%7D,%22editorMode%22:%22builder%22%7D%5D,%22range%22:%7B%22from%22:%22now-1h%22,%22to%22:%22now%22%7D%7D%7D&orgId=1[dashboard].
+
+View an overview of the JVM metrics, including the number of classes, CPU utilization and heap memory utilization in the link:http://localhost:3000/d/b91844d7-121e-4d0a-93b8-a9c1a05703b3/jvm-overview-opentelemetry?orgId=1&from=now-15m&to=now&var-datasource=prometheus&var-job=person&var-instance=All[dashboard].
+
+image::img/blog/jvm-metrics.png[align="center", JVM metrics from Person service.]
+
+View an overview of the HTTP metrics to see graphs that show the duration of HTTP requests in the link:http://localhost:3000/d/f543a537-cb96-470d-a349-660ad1513136/red-metrics-classic-histogram?orgId=1&from=now-5m&to=now[dashboard].
+
+image::img/blog/http-metrics.png[align="center", HTTP metrics from Person service.]
+
+=== Use the OpenTelemetry API to manually create metrics
+
+In addition to the supported runtime metric components, you can also use the OpenTelemetry metrics API to define custom metrics in your application code.
+Before instrumenting your code, the following prerequisite is required:
+
+• Third-party APIs must be made visible for your application in the `server.xml`. You can see that this configuration is present link:https://github.com/yasmin-aumeeruddy/car-person-demo/blob/main/car/src/main/liberty/config/server.xml#L14[here].:
+
+[source, xml]
+----
+<webApplication location="demo-microprofile-telemetry-car.war" contextRoot="/">
+    <!-- enable visibility to third party apis -->
+    <classloader apiTypeVisibility="+third-party"/>
+</webApplication>
+----
+
+You can the use the OpenTelemetry API to create custom metrics. In link:https://github.com/yasmin-aumeeruddy/car-person-demo/blob/main/car/src/main/java/io/openliberty/demo/car/CarService.java#L80-L88[`CarService.java`], `Meter` is used to define instruments, in this case, a counter.
+
+[source,java]
+----
+@Inject
+Meter meter;
+
+LongCounter carCreatedCounter;
+
+@PostConstruct
+public void init(){
+    carCreatedCounter = meter.counterBuilder("car.created").build();
+}
+----
+
+The value of the counter is incremented in the link:https://github.com/yasmin-aumeeruddy/car-person-demo/blob/main/car/src/main/java/io/openliberty/demo/car/CarService.java#L128[`createCar` method]:
+
+[source, java]
+----
+carCreatedCounter.add(1);
+----
+
+For a full list of available metrics, see the link:https://opentelemetry.io/docs/specs/otel/metrics/api/#meter-operations#default[meter operations] in the OpenTelemetry documentation.
+
+Start the Car service in another terminal:
+
+[source, sh]
+----
+cd car
+mvn liberty:dev
+----
+
+Create a car associated with the person that you created using the `Person` service. To do this, navigate to the following endpoint replacing the `personId` with the id shown in your previous result from `http://localhost:9080/people`:
+
+`http://localhost:9081/cars/createCar?make=skoda&personId=5859008369859564999`
+
+When the car has been created, a HTTP request is sent to the `Person` service to return the details of the person with the given id. Consequently, you should see a result like the following 
+
+`Car created with id 3644955172396212837 owned by {"age":21,"id":5859008369859564999,"name":"bob"}`
+
+To view all the cars you have created, navigate to: 
+
+`http://localhost:9081/cars/`
+
+View the graph that shows the custom metric representing the number of cars created in the link:http://localhost:3000/explore/metrics/trail?metric=car_created_total&from=now-5m&to=now&var-ds=prometheus&var-filters=&refresh=&actionView=overview&layout=grid&var-groupby=$__all[dashboard].
+
+image::img/blog/manual-metrics.png[align="center", Manually created metrics from Car service.]
+
+=== Observe application logs
+
+Log messages are created in link:https://github.com/yasmin-aumeeruddy/car-person-demo/blob/main/car/src/main/java/io/openliberty/demo/client/PersonClient.java#L44[`PersonClient.java`] to show when events occur. For example, an `INFO` message is created when a new client is built:
+
+[source, java]
+----
+private static final Logger julLogger = Logger.getLogger("jul-logger");
+
+...
+
+private void initHelper(String hostname, int port, Long personId) {
+    this.url = buildUrl(PROTOCOL, hostname, port, PEOPLE + personId);
+    julLogger.log(Level.INFO, "Building client for url " + url);
+    this.clientBuilder = buildClientBuilder(this.url);
+}
+----
+
+You can see the additional custom application logs in the link:http://localhost:3000/explore?schemaVersion=1&panes=%7B%224j4%22:%7B%22datasource%22:%22loki%22,%22queries%22:%5B%7B%22refId%22:%22A%22,%22expr%22:%22%7Bservice_name%3D%5C%22car%5C%22%7D%20%7C%3D%20%60%60%22,%22queryType%22:%22range%22,%22datasource%22:%7B%22type%22:%22loki%22,%22uid%22:%22loki%22%7D,%22editorMode%22:%22builder%22%7D%5D,%22range%22:%7B%22from%22:%22now-1h%22,%22to%22:%22now%22%7D%7D%7D&orgId=1[dashboard].
+
+=== Use the OpenTelemetry API to manually create traces
+
+The `CarService.java` class injects a `Tracer` and `Span` called `carNotFoundSpan`.
+
+[source, java]
+----
+@Inject
+Tracer tracer;[source, java]
+...
+@Inject
+Span carNotFoundSpan;
+----
+
+The span is started if a car is not found with the Id that is used to query the `getCar` method:
+
+[source, java]
+----
+@GET
+@Path("/getCar/{carId}")
+public Car getCar(@PathParam("carId") @NotEmpty Long id) throws InterruptedException {
+    ...
+    if (foundCar == null){
+        carNotFoundSpan = tracer.spanBuilder("carNotFound").startSpan();
+        try(Scope subScope = carNotFoundSpan.makeCurrent()){
+            Thread.sleep(3000);
+            return "Car with id " + id + " not found.";
+        }
+        finally{
+            carNotFoundSpan.end();
+        }
+    }
+    ...
+}
+----
+
+Navigate to the following endpoint to start the aforementioned spans:
+
+`http://localhost:9081/cars/getCar/3131`
+
+You may notice significant latency. See the manually created subspan by viewing the most recent trace in the link:http://localhost:3000/explore?schemaVersion=1&panes=%7B%225md%22:%7B%22datasource%22:%22tempo%22,%22queries%22:%5B%7B%22refId%22:%22A%22,%22datasource%22:%7B%22type%22:%22tempo%22,%22uid%22:%22tempo%22%7D,%22queryType%22:%22traceqlSearch%22,%22limit%22:20,%22tableType%22:%22traces%22,%22filters%22:%5B%7B%22id%22:%22b5bda2a9%22,%22operator%22:%22%3D%22,%22scope%22:%22span%22%7D%5D%7D%5D,%22range%22:%7B%22from%22:%22now-5m%22,%22to%22:%22now%22%7D%7D%7D&orgId=1[dashboard].
+
+image::img/blog/manual-trace.png[align="center", Manually created trace from Car service.]
+
+We can see that the total time taken for the trace is over a minute. This is a significant amount of time. To investigate further, select the TraceID and open the tab labelled `Node Graph`.
+
+image::img/blog/node-graph.png[align="center", Node graph from Car service.]
+
+The graph highlights the `carNotFound` span in red, showing that it was a time consuming process in the request. When looking at the code that is executed during the span, we can see a pause in execution. This would be the cause for the latency that we experienced when interacting with the `Car` service:
+
+[source, java]
+----
+Thread.sleep(3000);
+----
+
+Removing this line of code significantly reduces the time it takes for the user to get a response. We have successfully identified an inefficiency using the backend service!
+
+== Analyzing telemetry data
+
+As previously shown, analyzing traces, metrics and logs becomes a crucial step in understanding the behavior of your distributed microservices architecture. It is important to do the following:
+
+* **Identify bottlenecks**
+
+Bottlenecks and evidence of inefficiencies can be highlighted with traces. Spans with long durations can be found by finding the longest path in a trace. Additionally, repeated spans or high failure rates indicate problematic dependencies or transient errors.
+
+* **Diagnose failures**
+
+Traces have multiple attributes that help identify failures such as error codes and exception details.
+
+* **Correlate traces with and metrics**
+
+Performance data from runtime metrics like CPU usage, memory consumption, or request rates can be correlated with traces. For example, if a span indicates high latency, you can check corresponding metrics to identify the underlying cause, such as a resource constraint.
+
+* **Understand service dependencies**
+
+Dependency graphs generated from traces can show the interactions between services. Recognising these interactons can help
+identify how services depend on each other, detect circular dependencies or show excessive coupling.
+
+== Summary and next steps
+
+With MicroProfile Telemetry 2.0, you can observe microservices to address issues and optimize performance through traces, metrics and logs.
+
+To find out more, visit the link:https://openliberty.io/docs/latest/microprofile-telemetry.html[Open Liberty documentation].
