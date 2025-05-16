@@ -1,0 +1,215 @@
+---
+layout: post
+title: "25.0.0.4におけるJava24のサポートとOpenTelemetryを使用したLiberty監査ログの収集機能"
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/navaneethsnair1
+author_github: https://github.com/navaneethsnair1
+seo-title: 25.0.0.4 における Java 24 のサポートと OpenTelemetry を使用した Liberty 監査ログの収集機能 - OpenLiberty.io
+seo-description: 25.0.0.4 リリースでは、Java 24 のサポートが追加されたほか、InstantOn の機能が拡張され、J2EEManagement、AppClientSupport、WsSecurityが追加されました。また、MicroProfile Telemetry 2.0 を使用して Liberty 監査ログをOpenTelemetry に送信することで、統合的な監視を実現できるようになりました。
+blog_description: 25.0.0.4 リリースでは、Java 24 のサポートが追加されたほか、InstantOn の機能が拡張され、J2EEManagement、AppClientSupport、WsSecurityが追加されました。また、MicroProfile Telemetry 2.0 を使用して Liberty 監査ログをOpenTelemetry に送信することで、統合的な監視を実現できるようになりました。
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+additional_authors:
+- name: 野村 拓未（翻訳）
+  github: https://github.com/nomutaku-cloud
+  image: https://avatars.githubusercontent.com/nomutaku-cloud
+blog-available-in-language:
+- lang:en
+  path: /blog/2025/02/25/25.0.0.4.html
+---
+= 25.0.0.4 における Java 24 のサポートと OpenTelemetry を使用した Liberty 監査ログの収集機能
+Navaneeth S Nair <https://github.com/navaneethsnair1>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+
+25.0.0.4 リリースでは、Java 24 のサポートが追加されたほか、InstantOn の機能が拡張され、J2EEManagement、AppClientSupport、WsSecurityが追加されました。また、MicroProfile Telemetry 2.0 を使用して Liberty 監査ログをOpenTelemetry に送信することで、統合的な監視を実現できるようになりました。
+
+In link:{url-about}[Open Liberty] 25.0.0.4 では:以下のアップデートが行われました。
+
+* <<support, InstantOn 機能サポート対象に J2EEManagement、AppClientSupport、WsSecurity が追加>>
+* <<java, Open Liberty における Java 24 のサポート>>
+* <<telemetry, MicroProfile Telemetry 2.0 を使用することで Open Liberty の監査ログを OpenTelemetry に送信>>
+* <<CVEs, セキュリティ脆弱性（CVE）の修正>>
+
+link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A25004+label%3A%22release+bug%22[25.0.0.4] で修正されたバグの一覧をご確認ください。
+
+link:{url-prefix}/blog/?search=release&search!=beta[以前のOpen Liberty GAリリースのブログ投稿]もご覧ください。
+
+[#run]
+
+== 25.0.0.4 を使用してアプリを開発および実行する
+
+link:{url-prefix}/guides/maven-intro.html[Maven]を使用している場合は、`pom.xml` ファイルに以下の内容を含めます。
+
+[source,xml]
+----
+<plugin>
+    <groupId>io.openliberty.tools</groupId>
+    <artifactId>liberty-maven-plugin</artifactId>
+    <version>3.11.3</version>
+</plugin>
+----
+
+link:{url-prefix}/guides/gradle-intro.html[Gradle]を使用している場合は、`build.gradle` ファイルに以下の内容を含めます。
+
+[source,gradle]
+----
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'io.openliberty.tools:liberty-gradle-plugin:3.9.3'
+    }
+}
+apply plugin: 'liberty'
+----
+
+
+link:{url-prefix}/docs/latest/container-images.html[コンテナ イメージ]を使用している場合。
+
+[source]
+----
+FROM icr.io/appcafe/open-liberty
+----
+
+または、link:{url-prefix}/start/[ダウンロード・ページ]をご覧ください。
+
+link:https://plugins.jetbrains.com/plugin/14856-liberty-tools[IntelliJ IDEA], link:https://marketplace.visualstudio.com/items?itemName=Open-Liberty.liberty-dev-vscode-ext[Visual Studio Code]、または link:https://marketplace.eclipse.org/content/liberty-tools[Eclipse IDE]を使用している場合は、オープンソースの link:https://openliberty.io/docs/latest/develop-liberty-tools.html[Liberty developer tools] を活用して、IDE 内から効果的な開発、テスト、デバッグ、アプリケーション管理を行うこともできます。
+
+[link=https://stackoverflow.com/tags/open-liberty]
+image::img/blog/blog_btn_stack_ja.svg[Stack Overflowで質問する, align="center"]
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/31256
+// Contact/Reviewer: SmithaSubbarao
+// // // // // // // // 
+[#support]
+== InstantOn 機能のサポート対象に J2EEManagement、AppClientSupport、WsSecurity が追加
+
+Open Liberty の link:{url-prefix}/docs/latest/instanton.html[InstantOn] は、MicroProfile や Jakarta EE アプリケーションの高速な起動を可能にします。InstantOn を使用すると、スループット、メモリ使用量、本番・開発環境の整合性、Java の言語機能を損なうことなく、アプリケーションをミリ秒単位で起動できます。InstantOn は、Linuxカーネルの link:https://criu.org/[CRIU] 機能を使用してJVMのチェックポイントを取得し、後から復元できるようにします。また、InstantOn は、 link:{url-prefix}/docs/latest/instanton.html#supported-features[Open Libertyの機能のサブセット]をサポートしています。サポート対象外の機能を有効にしている場合、チェックポイントの取得はエラーメッセージとともに失敗します。バージョン25.0.0.4 以降では、以下の機能が InstantOn をサポートするように強化されています。
+
+- link:{url-prefix}/docs/latest/reference/feature/j2eeManagement-1.1.html[J2EE Management 1.1 (j2eeManagement-1.1)]
+- link:{url-prefix}/docs/latest/reference/feature/appClientSupport-1.0.html[Application Client Support for Server 1.0 (appClientSupport-1.0)]
+- link:{url-prefix}/docs/latest/reference/feature/appClientSupport-2.0.html[Jakarta Application Client Support for Server 2.0 (appClientSupport-2.0)]
+- link:{url-prefix}/docs/latest/reference/feature/wsSecurity-1.1.html[Web Service Security 1.1 (wsSecurity-1.1)]
+   
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/31244
+// Contact/Reviewer: gjwatts
+// // // // // // // // 
+[#java]
+== InstantOn 機能サポート対象に J2EEManagement、AppClientSupport、WsSecurity が追加
+
+2025年3月18日にリリースされた Java 24 は、従来のバージョンと比較して数多くの新機能や改良が加えられています。なお、Java 24 は長期サポート（LTS）リリースではないため、次期バージョンの登場とともにサポートが終了します。
+とはいえ、Java 24 には多くの魅力的な機能があります。
+
+link:https://openjdk.org/projects/jdk/24/[Java 24のJEPはこちら]:
+
+* 404: 	link:https://openjdk.org/jeps/404[Generational Shenandoah (実験的)]
+* 450: 	link:https://openjdk.org/jeps/450[コンパクトなオブジェクトヘッダ（実験的）]
+* 472: 	link:https://openjdk.org/jeps/472[JNIの使用制限の準備]
+* 475: 	link:https://openjdk.org/jeps/475[G1ガベージコレクタにおける遅延バリア展開]
+* 478: 	link:https://openjdk.org/jeps/478[鍵導出関数API（プレビュー）]
+* 479: 	link:https://openjdk.org/jeps/479[Windows 32-bit x86 ポートの削除]
+* 483: 	link:https://openjdk.org/jeps/483[AOT（Ahead-of-Time）クラスの読み込みとリンク]
+* 484: 	link:https://openjdk.org/jeps/484[クラスファイルAPI]
+* 485: 	link:https://openjdk.org/jeps/485[Stream Gatherers]
+* 486: 	link:https://openjdk.org/jeps/486[セキュリティマネージャの恒久的な無効化]
+* 487: 	link:https://openjdk.org/jeps/487[スコープ付き値（第4プレビュー）]
+* 488: 	link:https://openjdk.org/jeps/488[パターン、instanceof、switchにおけるプリミティブ型（第2プレビュー）]
+* 489: 	link:https://openjdk.org/jeps/489[ベクトルAPI（第9インキュベーター）]
+* 490: 	link:https://openjdk.org/jeps/490[ZGC: 非世代別モードの削除]
+* 491: 	link:https://openjdk.org/jeps/491[仮想スレッドのピン留めなし同期]
+* 492: 	link:https://openjdk.org/jeps/492[柔軟なコンストラクタ本体（第3プレビュー）]
+* 493: 	link:https://openjdk.org/jeps/493[JMODなしでのランタイムイメージのリンク]
+* 494: 	link:https://openjdk.org/jeps/494[モジュールのインポート宣言（第2プレビュー）]
+* 495: 	link:https://openjdk.org/jeps/495[簡易ソースファイルとインスタンスメインメソッド（第4プレビュー）]
+* 496: 	link:https://openjdk.org/jeps/496[耐量子モジュール格子ベース鍵カプセル化機構]
+* 497: 	link:https://openjdk.org/jeps/497[耐量子モジュール格子ベース電子署名アルゴリズム]
+* 498: 	link:https://openjdk.org/jeps/498[sun.misc.Unsafeのメモリアクセスメソッド使用時の警告]
+* 499: 	link:https://openjdk.org/jeps/499[構造化並行性（第4プレビュー）]
+* 501: 	link:https://openjdk.org/jeps/501[32-bit x86 ポートの非推奨化と将来的な削除]
+
+セキュリティマネージャが無効化されたため、Java をセキュリティマネージャ付きで起動したり、実行時にセキュリティマネージャをインストールしたり、`AccessController::checkPermission`、`Policy::setPolicy`、`SecurityManager::check*`、`Subject::getSubject`を使用することができなくなりました。この大きな変更についてアプリケーションを十分にテストし、詳細についてはlink:https://openjdk.org/jeps/486#Description[JEP 486の説明セクション]を参照ください。
+
+Open LibertyでJava 24 の新機能をいち早く活用することで、アプリケーション、マイクロサービス、ランタイム環境の見直しに、より多くの時間を確保することができます。この機会に、お使いのサーバーランタイムでの準備を進めましょう！
+
+Open LibertyでJava 24を使い始めるには、link:https://adoptium.net/temurin/releases/?version=24[Java 24の最新リリースをダウンロード]し、link:https://openliberty.io/start/#runtime_releases[25.0.0.4]以降のバージョンのOpen Libertyをダウンロードしてインストールしてください。その後、Libertyサーバーのlink:https://openliberty.io/docs/latest/reference/config/server-configuration-overview.html#server-env[server.envファイル]を編集し、JAVA_HOMEをJava 24のインストールディレクトリに設定してテストを開始してください。
+
+Java 24の詳細については、Java 24のlink:https://jdk.java.net/24/release-notes[リリースノート]、link:https://docs.oracle.com/en/java/javase/24/docs/api/index.html[API Javadocページ]、またはlink:https://adoptium.net/temurin/releases/?version=24[ダウンロードページ]をご覧ください。
+
+   
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/31143
+// Contact/Reviewer: pgunapal
+// // // // // // // // 
+[#telemetry]
+== MicroProfile Telemetry 2.0 を使用することで Open Liberty の監査ログを OpenTelemetry に送信
+
+
+MicroProfile Telemetry 2.0 は最新の OpenTelemetry テクノロジーを提供し、分散トレースに加えてメトリックとログの収集およびエクスポートを可能にします。
+
+Open Liberty link:{url-prefix}/docs/latest/reference/feature/audit-2.0.html[Audit]機能は、ランタイム環境からセキュリティ関連イベントを取得し、人間が判読できる監査レコードをログファイルに出力します。バージョン25.0.0.4以降では、link:{url-prefix}/docs/latest/reference/feature/mpTelemetry-2.0.html[MicroProfile Telemetry 2.0]機能（`mpTelemetry-2.0`）とAudit機能（`audit-1.0`または`audit-2.0`）を使用することで、Liberty の監査ログを収集し、構成済みの OpenTelemetry Exporter に送信できるようになりました。このアップデートは、他の Open Libertyランタイムログソース（message logs、trace logs、ffdc）と、`java.util.logging`（JUL）コンポーネントによって生成されるアプリケーションログの仕組みを基盤としています。
+
+監査ログを収集するには、`audit-1.0` または `audit-2.0` 機能と `mpTelemetry-2.0`` 機能を `server.xml` ファイルに追加します。次の例に示すように、新しい `audit`` ログソースを`mpTelemetry`サーバー構成要素の `source` 属性に設定します。
+
+[source,xml]
+----
+<featureManager>
+   <feature>audit-2.0</feature>
+   <feature>mpTelemetry-2.0</feature>
+</featureManager>
+
+<mpTelemetry source="audit"/>
+----
+
+以下の例に示すように`auditFileHandler`要素で監査イベントとその結果を指定することで、どの監査イベントを取得して OpenTelemetry に送信するかを設定することもできます。
+
+[source,xml]
+----
+<auditFileHandler maxFiles="5" maxFileSize="20" compact="true">
+    <events name="AuditEvent_1" eventName="SECURITY_AUTHN" outcome="SUCCESS"/>
+    <events name="AuditEvent_2" eventName="SECURITY_AUTHN" outcome="REDIRECT"/>
+    <events name="AuditEvent_3" eventName="SECURITY_AUTHN" outcome="FAILURE"/>
+    <events name="AuditEvent_4" eventName="SECURITY_AUTHZ"/>
+</auditFileHandler>
+----
+
+監査機能の詳細については、link:{url-prefix}/docs/latest/reference/feature/audit-1.0.html[機能ドキュメント]をご覧ください。OpenTelemetry を包括的な監視ソリューションとして使用する方法の詳細については、link:{url-prefix}/docs/latest/microprofile-telemetry.html[OpenTelemetryによるログ、メトリクス、トレースの収集]をご覧ください。
+
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+[#CVEs]
+== セキュリティ脆弱性（CVE）の修正
+[cols="5*"]
+
+|===
+|CVE |CVSSスコア |脆弱性の内容 |影響を受けるバージョン |備考
+
+|https://www.cve.org/CVERecord?id=CVE-2025-25193[CVE-2025-25193]
+|5.5
+|Denial of service
+|21.0.0.2 ～ 25.0.0.3
+|`grpc-1.0` および `grpcClient-1.0` 機能に影響
+
+|https://www.cve.org/CVERecord?id=CVE-2025-23184[CVE-2025-23184]
+|5.9
+|Denial of service
+|17.0.0.3 ～ 25.0.0.3
+|`jaxws-2.2`、`xmlWS-3.0`、`xmlWS-4.0` 機能に影響
+|===
+
+過去のセキュリティ脆弱性の修正の一覧については、link:{url-prefix}/docs/latest/security-vulnerabilities.html[Security vulnerability (CVE) list]を参照してください。
+
+
+
+== Open Liberty 25.0.0.4を今すぐ入手
+
+<<run,Maven, Gradle, Docker, およびダウンロード可能なアーカイブ>> のリンクから入手できます。
