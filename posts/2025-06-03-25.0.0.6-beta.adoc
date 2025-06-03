@@ -18,7 +18,7 @@ Navaneeth S Nair <https://github.com/navaneethsnair1>
 :url-about: /
 //Blank line here is necessary before starting the body of the post.
 
-This beta release brings updates to backporting compatibility of mpHealth-4.0 and file-based health checks that were earlier released in 25.0.0.4-beta.
+This beta release brings updates to backporting compatibility of mpHealth-4.0 and file-based health checks that were earlier released in 25.0.0.4-beta. This feature performs health checks on applications deployed to the server, allowing automated services to check availability and responsiveness during runtime.
 
 // // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
 // Blog issue: https://github.com/OpenLiberty/open-liberty/issues/31468
@@ -28,13 +28,13 @@ This beta release brings updates to backporting compatibility of mpHealth-4.0 an
 == Backporting compatibility of mpHealth-4.0 for Java EE7 and EE8 environments and introducing file-based health checks
 
 
-In the previous link:https://blogs-draft-openlibertyio.mqj6zf7jocq.us-south.codeengine.appdomain.cloud/blog/2025/04/08/25.0.0.4-beta.html[25.0.0.4-beta] release, the Open Liberty server introduced the link:https://blogs-draft-openlibertyio.mqj6zf7jocq.us-south.codeengine.appdomain.cloud/blog/2025/04/08/25.0.0.4-beta.html#backport[file-based health check mechanism] for a MicroProfile Health 4.0 feature (`mpHealth-4.0`). In 25.0.0.4-beta, the configuration for this mechanism was introduced with the `server.xml` attribute `fileUpdateInterval` for the `<mpHealth>` element with an associated `MP_HEALTH_FILE_UPDATE_INTERVAL` environment variable. The configuration attribute has now been updated to `checkInterval` with an associated `MP_HEALTH_CHECK_INTERVAL` environment variable. Similar to before, this attribute needs to be configured to enable this alternative file-based health check mechanism. The configuration accepts a number followed by an optional `ms` or `s` to denote the time unit. If no time unit is specified, it defaults to seconds. Invalid values default the interval to 10 seconds. 
+In the previous link:https://blogs-draft-openlibertyio.mqj6zf7jocq.us-south.codeengine.appdomain.cloud/blog/2025/04/08/25.0.0.4-beta.html[25.0.0.4-beta] release, the Open Liberty server introduced the link:https://blogs-draft-openlibertyio.mqj6zf7jocq.us-south.codeengine.appdomain.cloud/blog/2025/04/08/25.0.0.4-beta.html#backport[file-based health check mechanism] for a MicroProfile Health 4.0 feature (`mpHealth-4.0`). In 25.0.0.4-beta, the configuration for this mechanism was introduced with the `server.xml` attribute `fileUpdateInterval` for the `<mpHealth>` element with an associated `MP_HEALTH_FILE_UPDATE_INTERVAL` environment variable. The configuration attribute has now been updated to `checkInterval` with an associated `MP_HEALTH_CHECK_INTERVAL` environment variable. Similar to before, this attribute needs to be configured to enable this alternative file-based health check mechanism. The configuration accepts a number followed by an optional `ms` or `s` to denote the time unit. If no time unit is specified, it defaults to seconds. Invalid values default the interval to 10 s. 
 
 This beta now introduces a new `server.xml` attribute for the `<mpHealth>` element named `startupCheckInterval` with an associated `MP_HEALTH_STARTUP_CHECK_INTERVAL` environment variable. This configuration is optional and defaults to 100 ms if the user has not configured it. The configuration accepts a number followed by an optional `ms` or `s` to denote the time unit. If no time unit is specified, it defaults to milliseconds. Invalid values default the interval to 100 ms.  
 
 The `startupCheckInterval` is used during the _startup_ phase of the file-based health check mechanism. As a refresher, the file-based health check functionality creates the `live`, `ready`, and `started` files under the `${server.output.dir}/health` directory. The `${server.output.dir}` defaults to `wlp/usr/servers/<server>`. For more information, see link:{url-prefix}/docs/latest/reference/directory-locations-properties.html[directory locations and properties]. 
 
-These files are created when their respective health checks return an `UP` status. The `startupCheckInterval` is the interval at which the runtime queries the health checks during the startup phase. When all statuses report UP then all three `started`, `ready` and `live` files are created. Next, proceed to the _update_ phase. At this point, `started` file is no longer useful. After Kubernetes has found an UP status, it proceeds to start its checks for _liveness_ and _readiness_. It's at this point when the `checkInterval` is used by the runtime to establish the interval at which the liveness and readiness health checks are queried. Similar to before, if an UP status is resolved then the respective health-check file is _updated_ (that is, the last modified time of the file is updated). A DOWN status results in the respective health-check file not being updated.
+These files are created when their respective health checks return an `UP` status. The `startupCheckInterval` is the interval at which the runtime queries the health checks during the startup phase. When all statuses report `UP` then all three `started`, `ready` and `live` files are created. Next, we proceed to the _update_ phase. At this point, the `started` file is no longer needed, as its purpose is to indicate that all application startup health checks have been completed successfully. After Kubernetes has found an `UP` status, it proceeds to start its checks for _liveness_ and _readiness_. It's at this point when the `checkInterval` is used by the runtime to establish the interval at which the liveness and readiness health checks are queried. Similar to before, if an `UP` status is resolved then the respective health-check file is _updated_ (that is, the last modified time of the file is updated). A `DOWN` status results in the respective health-check file not being updated.
 
 The following example shows the `server.xml` configuration with both configurations:
 Note that only `checkInterval` is required to enable the functionality and the `startupCheckInterval` is optional as it defaults to `100 ms`.
@@ -50,11 +50,11 @@ The `startupCheckInterval` is faster compared to the `checkInterval` to allow fo
 </server>
 ```
 
-With file-based checks, `exec` command strategy can be used instead of the `httpGet` or `gRPC` strategy when configuring the Kubernetes health check probes. In this beta, scripts are introduced in to the Open Liberty(beta) image for these file-based health checks.
+With file-based checks, the `exec` command strategy can be used instead of the `httpGet` or `gRPC` strategy when configuring the Kubernetes health check probes. In this beta, scripts are introduced into the Open Liberty image for these file-based health checks.
 
-The scripts are `startupHealthCheck.sh`, `livenessHealthCheck.sh` and `readinessHealthCheck.sh`. For the `startupHealthCheck.sh` script, it is important to pass in the option -t or --timeout-seconds with a value that matches the `timeoutSeconds` configuration of the startup probe.
+The scripts are `startupHealthCheck.sh`, `livenessHealthCheck.sh` and `readinessHealthCheck.sh`. For the `startupHealthCheck.sh` script, it is important to pass in the option `-t` or `--timeout-seconds` with a value that matches the `timeoutSeconds` configuration of the startup probe.
 
-Similarly, for the `livenessHealthCheck.sh` and `readinessHealthCheck.sh`, a -p or --period-seconds option should be passed in with the value used for the `periodSeconds` configuration of the respective liveness and readiness probe. The liveness and readiness health check scripts check that the respective `live` and `ready` files have been updated within the past _period seconds_.
+Similarly, for the `livenessHealthCheck.sh` and `readinessHealthCheck.sh`, a `-p` or `--period-seconds` option should be passed in with the value used for the `periodSeconds` configuration of the respective liveness and readiness probe. The liveness and readiness health check scripts check that the respective `live` and `ready` files have been updated within the past _period seconds_.
 
 For best results, configure the liveness and readiness probes to at least 1.5 times greater than the `checkInterval` configuration. 
 
@@ -99,13 +99,6 @@ Notice that in the liveness and readiness probes, the `periodSeconds` is set to 
        
 // DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
 
-To enable the new beta features in your app, add them to your `server.xml`:
-
-[source, xml]
-----
-
-----
-
 [#run]
 === Try it now
 
@@ -138,7 +131,7 @@ If you're using link:{url-prefix}/guides/maven-intro.html[Maven], you can instal
 </plugin>
 ----
 
-Don't forget to add dependencies to your pom.xml file for the beta version of the APIs that are associated with the beta features that wanted to be tried. For example, the following block adds dependencies for two example beta APIs:
+Don't forget to add dependencies to your `pom.xml` file for the beta version of the APIs that are associated with the beta features that wanted to be tried. For example, the following block adds dependencies for two example beta APIs:
 
 [source,xml]
 ----
