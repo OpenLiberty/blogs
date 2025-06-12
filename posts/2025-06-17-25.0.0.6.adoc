@@ -1,13 +1,13 @@
 ---
 layout: post
-title: "TITLE"
+title: "Backporting compatibility of mpHealth-4.0 for Java EE7 and EE8 environments and introducing file-based health checks in 25.0.0.6"
 # Do NOT change the categories section
 categories: blog
 author_picture: https://avatars3.githubusercontent.com/navaneethsnair1
 author_github: https://github.com/navaneethsnair1
-seo-title: TITLE - makes sure it ends with - OpenLiberty.io
-seo-description: DESCRIPTION
-blog_description: DESCRIPTION
+seo-title: Backporting compatibility of mpHealth-4.0 for Java EE7 and EE8 environments and introducing file-based health checks in 25.0.0.6- OpenLiberty.io
+seo-description: In this release, the MicroProfile Health 4.0 feature is now supported in Java EE 7 and EE 8 environments, in addition to Jakarta EE 9 or later. Furthermore, a file-based health check mechanism is introduced.
+blog_description: In this release, the MicroProfile Health 4.0 feature is now supported in Java EE 7 and EE 8 environments, in addition to Jakarta EE 9 or later. Furthermore, a file-based health check mechanism is introduced.
 open-graph-image: https://openliberty.io/img/twitter_card.jpg
 open-graph-image-alt: Open Liberty Logo
 ---
@@ -49,7 +49,7 @@ Navaneeth S Nair <https://github.com/navaneethsnair1>
 // change the "IMAGE CAPTION" to a couple words of what the image is
 // // // // // // // //
 
-RELEASE_SUMMARY
+In this release, the MicroProfile Health 4.0 feature is now supported in Java EE 7 and EE 8 environments, in addition to Jakarta EE 9 or later. Furthermore, a file-based health check mechanism is introduced. This feature performs health checks on applications deployed to the server, allowing automated services to check availability and responsiveness during runtime.
 
 // // // // // // // //
 // In the preceding section:
@@ -66,9 +66,7 @@ RELEASE_SUMMARY
 
 In link:{url-about}[Open Liberty] 25.0.0.6:
 
-* <<SUB_TAG_0, Backporting compatibility of mpHealth-4.0 for Java EE7 and EE8 environments and introducing file-based health checks>>
-* <<SUB_TAG_1, Guides updated>>
-* <<CVEs, Security Vulnerability (CVE) Fixes>>
+* <<backport, Backporting compatibility of mpHealth-4.0 for Java EE7 and EE8 environments and introducing file-based health checks>>
 * <<bugs, Notable bug fixes>>
 
 
@@ -119,7 +117,7 @@ If you're using link:{url-prefix}/guides/maven-intro.html[Maven], include the fo
 <plugin>
     <groupId>io.openliberty.tools</groupId>
     <artifactId>liberty-maven-plugin</artifactId>
-    <version>3.8.2</version>
+    <version>3.11.3</version>
 </plugin>
 ----
 
@@ -132,17 +130,12 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath 'io.openliberty.tools:liberty-gradle-plugin:3.6.2'
+        classpath 'io.openliberty.tools:liberty-gradle-plugin:3.9.3'
     }
 }
 apply plugin: 'liberty'
 ----
-// // // // // // // //
-// In the preceding section:
-// Replace the Maven `3.8.2` with the latest version of the plugin: https://search.maven.org/artifact/io.openliberty.tools/liberty-maven-plugin
-// Replace the Gradle `3.6.2` with the latest version of the plugin: https://search.maven.org/artifact/io.openliberty.tools/liberty-gradle-plugin
-// TODO: Update GHA to automatically do the above.  If the maven.org is problematic, then could fallback to using the GH Releases for the plugins
-// // // // // // // //
+
 
 Or if you're using link:{url-prefix}/docs/latest/container-images.html[container images]:
 
@@ -162,19 +155,18 @@ image::img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="cent
 // Blog issue: https://github.com/OpenLiberty/open-liberty/issues/31793
 // Contact/Reviewer: Channyboy,navaneethsnair1
 // // // // // // // // 
-[#SUB_TAG_0]
+[#backport]
 == Backporting compatibility of mpHealth-4.0 for Java EE7 and EE8 environments and introducing file-based health checks
-
 
 The MicroProfile Health 4.0 feature (`mpHealth-4.0`) enables a runtime for the Open Liberty server that previously supported only Jakarta EE 9 or later. In this release, the `mpHealth-4.0` feature is now also supported within Java EE 7 and EE 8 environments. Also, a file-based health check mechanism is introduced as an alternative to using the `/health/*` REST endpoints.
 
 The MicroProfile Health technology is most effective when the application is deployed onto a Kubernetes based environment where link:https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/['Liveness', 'Readiness' and 'Startup' Probes] can be used. In such a deployment scenario, applications that are deployed might be on different Java and Jakarta EE levels. This configuration can result in a mixture of `mpHealth-x.x` features across different servers and different Kubernetes probe configurations. The `mpHealth-4.0` feature is now compatible for use with Java EE 7 and Java EE 8 alongside its existing support for Jakarta EE 9 and Jakarta EE 10 environments. This feature hence unifies Open Liberty server configurations and Kubernetes Health Check probe configurations.
 
-In addition to the link:https://openliberty.io/docs/latest/health-check-microservices.html[existing strategy] of querying the `/health/live`, `/health/ready`, `/health/started REST` endpoints, the 25.0.0.4-beta release introduces an alternative file-based health check functionality. When this function is enabled, the live, ready, and started files are created under the `${server.output.dir}/health` directory. The `${server.output.dir}` defaults to `wlp/usr/servers/<server>`. For more information, see link:https://openliberty.io/docs/latest/reference/directory-locations-properties.html[Directory locations and properties].
+In addition to the link:https://openliberty.io/docs/latest/health-check-microservices.html[existing strategy] of querying the `/health/live`, `/health/ready`, `/health/started REST` endpoints, the 25.0.0.4-beta release introduces an alternative file-based health check functionality. When this function is enabled, the `live`, `ready`, and `started` files are created under the `${server.output.dir}/health` directory. The `${server.output.dir}` defaults to `wlp/usr/servers/<server>`. For more information, see link:{url-prefix}/docs/latest/reference/directory-locations-properties.html[Directory locations and properties].
 
-The three health check files are created when the application returns an UP statuses for all three startup, liveness and readiness checks. The Open Liberty runtime will query these health checks every 100ms unless otherwise configured. This is part of the _startup phase_. Once these file are created the runtime proceeds to the _update phase_. The runtime then continues querying the liveness and readiness health checks at a user-defined interval. If the status returns UP, the last modified time of the file is updated. If a file is not updated, then it indicates that a DOWN status was returned.
+The three health check files are created when the application returns an UP statuses for all three _startup_, _liveness_ and _readiness_ checks. The Open Liberty runtime will query these health checks every 100ms unless otherwise configured. This is part of the _startup phase_. Once these file are created the runtime proceeds to the _update phase_. The runtime then continues querying the liveness and readiness health checks at a user-defined interval. If the status returns `UP`, the last modified time of the file is updated. If a file is not updated, then it indicates that a `DOWN` status was returned.
 
-This file-based functionality is only enabled if a user configures the `checkInterval` configuration attribute for the `mpHealth` configuration element or the `MP_HEALTH_CHECK_INTERVAL` link:https://openliberty.io/docs/latest/reference/config/server-configuration-overview.html#server-env[environment variable]. The _check interval_ configuration is the value used during the _update phase). If both the environment variable and the `checkInterval` attribute are configured, the `server.xml` takes precedence at run time. The configuration accepts a number followed by an optional `ms` or `s` to denote the time unit. If no time unit is specified, it defaults to seconds. Invalid values default the interval to 10 seconds. 
+This file-based functionality is only enabled if a user configures the `checkInterval` configuration attribute for the `mpHealth` configuration element or the `MP_HEALTH_CHECK_INTERVAL` link:https://openliberty.io/docs/latest/reference/config/server-configuration-overview.html#server-env[environment variable]. The _check interval_ configuration is the value used during the _update phase_. If both the environment variable and the `checkInterval` attribute are configured, the `server.xml` takes precedence at run time. The configuration accepts a number followed by an optional `ms` or `s` to denote the time unit. If no time unit is specified, it defaults to seconds. Invalid values default the interval to 10 seconds. 
 
 The query interval used during the _startup phase_ is defined with the configuration attribute `startupCheckInterval`. There is an accompanying environment variable with `MP_HEALTH_STARTUP_CHECK_INTERVAL`. Remember that this value is optional and a default of `100ms` is used if no configuration is defined. Similarly, if both the `server.xml` and environment variable configurations are defined, the `server.xml` value will take precedence. The configuration accepts a number followed by an optional `ms` or `s` to denote the time unit. If no time unit is specified, it defaults to milliseconds. Invalid values default the interval to 100 milliseconds. 
 
@@ -190,7 +182,7 @@ The following example shows the server.xml configuration:
 </server>
 ```
 
-With file-based checks, the exec command strategy can be used instead of the `httpGet` or `gRPC` strategy when configuring the Kubernetes health check probes. In this release, scripts are introduced into the Open Liberty image for these file-based health checks.
+With file-based checks, the `exec` command strategy can be used instead of the `httpGet` or `gRPC` strategy when configuring the Kubernetes health check probes. In this release, scripts are introduced into the Open Liberty image for these file-based health checks.
 
 The scripts are `startupHealthCheck.sh`, `livenessHealthCheck.sh` and `readinessHealthCheck.sh`. For the `startupHealthCheck.sh` script, it is important to pass in the option `-t` or `--timeout-seconds` with a value that matches the `timeoutSeconds` configuration of the startup probe.
 
@@ -234,62 +226,17 @@ For example, if an Open Liberty application image is configured and deployed whe
       timeoutSeconds: 5
 ```
 Notice that in the liveness and readiness probes, the `periodSeconds` is set to 15, or 1.5x the `checkInterval`.
-
-
-   
+  
 // DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
 
 // // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
 // Blog issue: https://github.com/OpenLiberty/open-liberty/issues/31777
 // Contact/Reviewer: gkwan-ibm
 // // // // // // // // 
-[#SUB_TAG_1]
-== Guides updated
-
-- A new guide link:https://openliberty.io/guides/gradle-multimodules.html[Creating a multi-module application with Gradle] is published under the link:https://openliberty.io/guides/#build[Build] category.
-- All guides except the deprecated and the gradle guides are updated to use Maven wrapper.
-    
 
 
    
 // DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
-
-
-For more details, check the LINK[LINK_DESCRIPTION].
-
-// // // // // // // //
-// In the preceding section:
-// Replace TAG_X/SUB_TAG_X with the given tag of your secton from the contents list
-// Replace SUB_FEATURE_TITLE/FEATURE_X_TITLE with the given title from the contents list 
-// Replace FEATURE with the feature name for the server.xml file e.g. mpHealth-1.4
-// Replace LINK with the link for extra information given for the feature
-// Replace LINK_DESCRIPTION with a readable description of the information
-// // // // // // // //
-
-[#CVEs]
-== Security vulnerability (CVE) fixes in this release
-[cols="5*"]
-|===
-|CVE |CVSS Score |Vulnerability Assessment |Versions Affected |Notes
-
-|Link[CVE-XXXX-XXXXX]
-|Score
-|vulnerability
-|Affected versions
-|Affected Features and other notes
-|===
-// // // // // // // //
-// In the preceding section:
-// If there were any CVEs addressed in this release, fill out the table.  For the information, reference https://github.com/OpenLiberty/docs/blob/draft/modules/ROOT/pages/security-vulnerabilities.adoc.  If it has not been updated for this release, reach out to Kristen Clarke or Michal Broz.
-// Note: When linking to features, use the 
-// `link:{url-prefix}/docs/latest/reference/feature/someFeature-1.0.html[Some Feature 1.0]` format and 
-// NOT what security-vulnerabilities.adoc does (feature:someFeature-1.0[])
-//
-// If there are no CVEs fixed in this release, replace the table with: 
-// "There are no security vulnerability fixes in Open Liberty [25.0.0.6]."
-// // // // // // // //
-For a list of past security vulnerability fixes, reference the link:{url-prefix}/docs/latest/security-vulnerabilities.html[Security vulnerability (CVE) list].
-
 
 [#bugs]
 == Notable bugs fixed in this release
@@ -339,7 +286,7 @@ We’ve spent some time fixing bugs. The following sections describe just some o
 // // // // // // // //
 [#guides]
 == New and updated guides since the previous release
-As Open Liberty features and functionality continue to grow, we continue to add link:https://openliberty.io/guides/?search=new&key=tag[new guides to openliberty.io] on those topics to make their adoption as easy as possible.  Existing guides also receive updates to address any reported bugs/issues, keep their content current, and expand what their topic covers.
+As Open Liberty features and functionality continue to grow, we continue to add link:https://openliberty.io/guides/?search=new&key=tag[new guides to openliberty.io] on those topics to make their adoption as easy as possible. Checkout this new guide,link:https://openliberty.io/guides/gradle-multimodules.html[Creating a multi-module application with Gradle] published under the link:https://openliberty.io/guides/#build[Build] category. Also, all guides except the deprecated and the gradle guides are updated to use Maven wrapper.
 
 // // // // // // // //
 // In the following section, list any new guides, or changes/updates to existing guides.  
