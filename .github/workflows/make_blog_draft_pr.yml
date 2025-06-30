@@ -54,9 +54,9 @@ jobs:
       - name: Generate draft and staging URLs
         id: gen-url
         run: |
-          echo "::set-output name=draft-url::https://blogs-draft-openlibertyio.mqj6zf7jocq.us-south.codeengine.appdomain.cloud/blog/$(echo ${{ inputs.publish-date }} | tr - /)/${{ inputs.version }}.html"
-          echo "::set-output name=staging-url::https://blogs-staging-openlibertyio.mqj6zf7jocq.us-south.codeengine.appdomain.cloud/blog/$(echo ${{ inputs.publish-date }} | tr - /)/${{ inputs.version }}.html"
-          echo "::set-output name=pr-branch::Draft"
+          echo "draft-url=https://blogs-draft-openlibertyio.mqj6zf7jocq.us-south.codeengine.appdomain.cloud/blog/$(echo ${{ inputs.publish-date }} | tr - /)/${{ inputs.version }}.html" >> $GITHUB_OUTPUT
+          echo "staging-url=https://blogs-staging-openlibertyio.mqj6zf7jocq.us-south.codeengine.appdomain.cloud/blog/$(echo ${{ inputs.publish-date }} | tr - /)/${{ inputs.version }}.html" >> $GITHUB_OUTPUT
+          echo "pr-branch=Draft" >> $GITHUB_OUTPUT
 
       - name: Commit post and create PR to draft branch
         id: create-pr
@@ -83,6 +83,16 @@ jobs:
       - name: Update PR to draft branch
         if: false
         run: gh pr edit ${{ steps.create-pr.outputs.pull-request-number }} --base draft
+      
+      - name: Install Asciidoctor
+        run: sudo apt-get install -y asciidoctor
+
+      - name: Run Vale on AsciiDoc files
+        uses: errata-ai/vale-action@v2.1.1
+        with:
+          files: posts/${{ inputs.publish-date }}-${{ inputs.version }}.adoc 
+        env:
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}  
           
       - name: Send Slack alert
         run: |
@@ -90,20 +100,3 @@ jobs:
           ${{ inputs.version }} ${{ inputs.publish-date }} "${{ inputs.author-name }}" ${{ inputs.github-username }} "${{ inputs.slack-notification }}" \
           ${{ secrets.SLACK_HOOK }} ${{ secrets.SLACK_HOOK_TEST }} \
           ${{ steps.create-pr.outputs.pr-url }} ${{ steps.gen-url.outputs.pr-branch }} ${{ steps.gen-url.outputs.draft-url }}
-
-  analyse_blog_content:
-    name: Vale Lint Check
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Install Asciidoctor
-        run: sudo apt-get install -y asciidoctor
-
-      - name: Run Vale on AsciiDoc files
-        uses: errata-ai/vale-action@v2.1.1
-        with:
-          files: posts/${{ inputs.version }}-post.adoc 
-        env:
-          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
