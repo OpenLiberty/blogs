@@ -97,7 +97,7 @@ These steps are to be completed by the author of the blog post.
    - Link the PR to the issue.
    - In the PR, provide a link to your post on the [blogs-draft site](https://blogs-draft-openlibertyio.mqj6zf7jocq.us-south.codeengine.appdomain.cloud/blog/) or [draft site](https://draft-openlibertyio.mqj6zf7jocq.us-south.codeengine.appdomain.cloud/blog/).
    - Ideally, also paste a screenshot of the entire blog post page as this will allow reviewers to see the rendered post content even while the sites are innaccessible (e.g. redeploys). 
-   - Add @GraceJansen, as well as your technical reviewer and any other reviewers to get their final approval for both content and format.
+   - Add [@ayoho](https://github.com/ayoho), as well as your technical reviewer and any other reviewers to get their final approval for both content and format.
 8. The editors will now review and edit the post. Please respond to any questions they ask or suggestions they make. Their aim is to make the post readable and useful to its target audience.
 9. If you need to make changes based on review comments, as before: 
    - Make any changes in your feature branch
@@ -184,7 +184,7 @@ If a published post on openliberty.io/blog contains an error or needs updating i
 
    Make any changes in your branch, then push to the `draft` branch again  and verify the changes after rebuild.
 
-5. Create a PR from your branch to `staging branch` (not from `draft` branch) and add @GraceJansen as reviewer. You can create this PR at any point because any new changes you make in your branch are automatically added to the PR.
+5. Create a PR from your branch to `staging branch` (not from `draft` branch) and add [@ayoho](https://github.com/ayoho) as reviewer. You can create this PR at any point because any new changes you make in your branch are automatically added to the PR.
 
 6. When the PR is approved, the editor will merge it the `staging` branch, causing IBM Cloud to automatically kick off a build of both the [blogs-staging site](https://blogs-staging-openlibertyio.mqj6zf7jocq.us-south.codeengine.appdomain.cloud/blog/) and [staging site](https://staging-openlibertyio.mqj6zf7jocq.us-south.codeengine.appdomain.cloud/blog/), which you can use to verify the changes look correct.
 
