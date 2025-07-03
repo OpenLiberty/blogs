@@ -62,10 +62,11 @@ def main():
     #         break
 
     # print('::set-output name=publish-date::' + filename.partition('-' + version + '.adoc')[0])
-    print('::set-output name=publish-date::' + publish_date)
-    print('::set-output name=author-name::' + author)
-    print('::set-output name=github-username::' + github_username)
-    print('::set-output name=reviewers::' + ','.join(sorted(list(reviewers))))
+    with open(os.environ['GITHUB_OUTPUT'],'a') as f:  
+        f.write(f"publish-date=publish_date\n")
+        f.write(f"author-name=author\n")
+        f.write(f"github-username=github_username\n")
+        f.write(f"reviewers={','.join(sorted(list(reviewers)))}\n")
                 
 if __name__ == "__main__":
     main()
