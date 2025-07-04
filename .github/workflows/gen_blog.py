@@ -201,7 +201,8 @@ def main():
     filename = f"{publish_date}-{version}.adoc"
     with open(f"posts/{filename}", "w") as fp:
         fp.write(template)
-    print('::set-output name=reviewers::' + ','.join(sorted(list(people))))
+    with open(os.environ['GITHUB_OUTPUT'],'a') as f:  
+        f.write(f"reviewers={','.join(sorted(list(people)))}\n")
 
 if __name__ == "__main__":
     main()
