@@ -255,12 +255,220 @@ Now, examine the responses and check their relevance and accuracy against the fi
 == How does the application work?
 
 The application demonstrates how to use the LangChain4j APIs, https://openliberty.io/docs/ref/feature/#cdi-4.0.html[Jakarta Contexts and Dependency Injection], https://openliberty.io/docs/latest/reference/feature/websocket-2.1.html[Jakarta WebSocket], https://openliberty.io/docs/ref/feature/#mpConfig-3.0.html[MicroProfile Config], and https://openliberty.io/docs/latest/reference/feature/mpMetrics-5.1.html[MicroProfile Metrics] features.
+We will go through a step by step process to create a RAG application.
 
 [#create_service]
 === Creating the LangChain4j AI service
 
-The application uses the `HuggingFaceChatModel` class to provide the model for building the AI service.
+The application uses the `ModelBuilder` class to provide the model for building the AI service:
 
+Environment variables are used to set these microprofile config properties.
+----
+@Inject
+    @ConfigProperty(name = "hugging.face.api.key")
+    private String HUGGING_FACE_API_KEY;
+
+    @Inject
+    @ConfigProperty(name = "hugging.face.language.model.id")
+    private String HUGGING_FACE_LANGUAGE_MODEL_ID;
+
+    ...
+----
+
+The getChatModelForWeb function in `ModelBuilder` class sets the chatModelForWeb of type ChatModel by using a langchain4j APIs.
+In order to configure the models, the model name, the api key, temperature, maxtokens and other variables are set.
+Some of the variables such as temperature may be set differently depending on the use case.
+For example, to generate more creative responses by the AI, the temperature may be set to a higher value such as 0.8 or 1.0.
+These use cases could include: generating stories, or generating ideas. A disadvantage of this higher value may lead to the model producing 
+more hallucinations during the inference stage.
+
+The lower the temperature value, the more predictable the answers of the LLM are but there is also a potential chance of repetition of the similar answers.
+
+----
+ public ChatModel getChatModelForWeb() throws Exception {
+        if (chatModelForWeb == null) {
+            if (usingGithub()) {
+                chatModelForWeb = GitHubModelsChatModel.builder()
+                        .gitHubToken(GITHUB_API_KEY)
+                        .modelName(GITHUB_CHAT_MODEL_ID)
+                        .timeout(ofSeconds(TIMEOUT))
+                        .temperature(TEMPERATURE)
+                        .maxTokens(MAX_NEW_TOKEN)
+                        .build();
+                logger.info("using Github " + GITHUB_CHAT_MODEL_ID + " chat model for the web");
+            } else if (usingOllama()) {
+                chatModelForWeb = OllamaChatModel.builder()
+                        .baseUrl(OLLAMA_BASE_URL)
+                        .modelName(OLLAMA_CHAT_MODEL_ID)
+                        .timeout(ofSeconds(TIMEOUT))
+                        .temperature(TEMPERATURE)
+                        .build();
+                logger.info("using Ollama " + OLLAMA_CHAT_MODEL_ID + " chat model for the web");
+            } else if (usingMistralAi()) {
+                chatModelForWeb = MistralAiChatModel.builder()
+                        .apiKey(MISTRAL_AI_API_KEY)
+                        .modelName(MISTRAL_AI_MISTRAL_CHAT_MODEL_ID)
+                        .timeout(ofSeconds(TIMEOUT))
+                        .temperature(TEMPERATURE)
+                        .maxTokens(MAX_NEW_TOKEN)
+                        .build();
+                logger.info("using Mistral AI " + MISTRAL_AI_MISTRAL_CHAT_MODEL_ID + " chat model for the web");
+            } else if (usingHuggingFace()) {
+                chatModelForWeb = HuggingFaceChatModel.builder()
+                        .accessToken(HUGGING_FACE_API_KEY)
+                        .modelId(HUGGING_FACE_CHAT_MODEL_ID)
+                        .timeout(ofSeconds(TIMEOUT))
+                        .temperature(TEMPERATURE)
+                        .maxNewTokens(MAX_NEW_TOKEN)
+                        .waitForModel(true)
+                        .build();
+                logger.info("using Hugging Face " + HUGGING_FACE_CHAT_MODEL_ID + " chat model for the web");
+
+            } else {
+                throw new Exception("No available platform to access model");
+            }
+        }
+        return chatModelForWeb;
+    }
+----
+
+The getAssistant function in the `ChatAgent` class is required when calling chat. The response from the AI model
+is stored in a string and is an output of: getAssistant().chat(sessionId, message).
+
+After the zip file processing is completed inside getAssistant(), each element of fileStr contains the text found in the .txt and .pdf documents.
+The metadata of the file is also stored in a separate variable called dataStore. 
+
+----
+        public Assistant getAssistant() throws Exception {
+                if (assistant == null) {
+
+                        ChatModel model = modelBuilder.getChatModelForWeb();
+
+                       
+                        ArrayList<String> filesStr = new ArrayList<>();
+                        // an array of records stores metadata for each file
+                        ArrayList<Data> dataStore = new ArrayList<>();
+
+                        ... 
+                        
+                        //The zip file processing is explored in the following section 
+
+                        ...
+
+                        OllamaEmbeddingModel embModel = OllamaEmbeddingModel.builder()
+                                        .baseUrl("http://localhost:11434/")
+                                        .modelName("nomic-embed-text")
+                                        .build();
+
+                        if (!DatabaseReady.existing(mongodbClient, "rag_txt")) {
+                                List<Document> documentFiles = new ArrayList<>();
+
+                                for (int i = 0; i < filesStr.size(); i++) {
+                                        DateFormat df = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss");
+
+                                        Metadata fileInfoMetaData = Metadata.from(Map.of(
+                                                        "File Name", dataStore.get(i).fileName(),
+                                                        "Source", dataStore.get(i).source(),
+                                                        "Date Added", df.format(dataStore.get(i).date())));
+
+                                        String contentOfFile = filesStr.get(i);
+                                        Document doc = Document.from(contentOfFile, fileInfoMetaData);
+                                        documentFiles.add(doc);
+                                }
+
+                                DocumentSplitter noOverlapSplitter = DocumentSplitters.recursive(500, 0);
+
+                                List<TextSegment> textSeg = noOverlapSplitter.splitAll(documentFiles);
+
+                                List<Embedding> embeddings = embModel.embedAll(textSeg).content();
+                                Bson filter_none = null;
+                                Set<String> metaDataFieldsStr = new HashSet<>();
+
+                                IndexMapping mapIndex = new IndexMapping(768, metaDataFieldsStr);
+
+                                EmbeddingStore<TextSegment> embStore = new MongoDbEmbeddingStore(
+                                                mongodbClient,
+                                                "rag_txt",
+                                                "documents",
+                                                "embedding",
+                                                10L,
+                                                new CreateCollectionOptions(),
+                                                filter_none,
+                                                mapIndex,
+                                                true);
+
+                                embStore.addAll(embeddings, textSeg);
+                        }
+
+                        Bson filter_none = null;
+                        Set<String> metaDataFieldsStr = new HashSet<>();
+
+                        IndexMapping mapIndex = new IndexMapping(768, metaDataFieldsStr);
+                        EmbeddingStore<TextSegment> embStore = new MongoDbEmbeddingStore(
+                                        mongodbClient,
+                                        "rag_txt",
+                                        "documents",
+                                        "embedding",
+                                        10L,
+                                        new CreateCollectionOptions(),
+                                        filter_none,
+                                        mapIndex,
+                                        true);
+                        ContentRetriever contentRetrieverFromStore = EmbeddingStoreContentRetriever.builder()
+                                        .embeddingStore(embStore)
+                                        .embeddingModel(embModel)
+                                        .maxResults(6)
+                                        .minScore(0.6)
+                                        .build();
+
+                        WebSearchEngine tavilySearchEngine = TavilyWebSearchEngine.builder()
+                                        .apiKey(System.getenv("API_KEY_SEARCH_ENGINE"))
+                                        .build();
+                        ContentRetriever contentRetrieverFromWeb = WebSearchContentRetriever.builder()
+                                        .webSearchEngine(tavilySearchEngine)
+                                        .maxResults(5)
+                                        .build();
+                        QueryRouter queryRouterWithEmbAndWeb = new DefaultQueryRouter(contentRetrieverFromStore,
+                                        contentRetrieverFromWeb);
+
+                        ContentInjector contentInjectorToModel = DefaultContentInjector.builder()
+                                        .promptTemplate(
+                                                        PromptTemplate.from("{{userMessage}}\n" +
+                                                                        "\n" +
+                                                                        "Use relevent information from the stored documents:\n"
+                                                                        +
+                                                                        "{{contents}}. "))
+                                        .metadataKeysToInclude(List.of("file_name"))
+                                        .build();
+                        // use .contentRetriever(contentRetrieverFromStore) without queryRotuer if only
+                        // want to search internal documents and no web searches
+                        RetrievalAugmentor retrievalAugmentorToModel = DefaultRetrievalAugmentor.builder()
+                                        .queryRouter(queryRouterWithEmbAndWeb)
+                                        .contentInjector(contentInjectorToModel)
+                                        .build();
+
+                        assistant = AiServices.builder(Assistant.class)
+                                        .chatModel(model)
+                                        .chatMemoryProvider(
+                                                        sessionId -> MessageWindowChatMemory
+                                                                        .withMaxMessages(MAX_MESSAGES))
+                                        .retrievalAugmentor(retrievalAugmentorToModel)
+                                        .build();
+
+                }
+
+                return assistant;
+        }
+----
+
+
+Through the customized `Assistant` interface, the application can send messages to the LLM by its `chat()` method.
+
+----
+    interface Assistant {
+       String chat(@MemoryId String sessionId, @UserMessage String userMessage);
+    }
+----
 See the {example-location}/src/main/java/dev/langchain4j/example/chat/ChatAgent.java[src/main/java/dev/langchain4j/example/chat/ChatAgent.java] file.
 [source, java, role="no_copy"]
 ----
@@ -283,13 +491,7 @@ See the {example-location}/src/main/java/dev/langchain4j/example/chat/ChatAgent.
     }
 ----
 
-Through the customized `Assistant` interface, the application can send messages to the LLM by its `chat()` method.
 
-----
-    interface Assistant {
-       String chat(@MemoryId String sessionId, @UserMessage String userMessage);
-    }
-----
 
 [#external_config]
 === Externalizing the configuration
