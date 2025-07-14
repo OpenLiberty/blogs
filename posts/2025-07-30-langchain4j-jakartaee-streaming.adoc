@@ -54,13 +54,47 @@ Text starts here...
 * llms generate their output token by token
 * we can show the user the output as it is generated
 
-== Initialize the streaming chat model
+== Initialize the streaming chat model and AI service
 
 have some static variable somewhere ig
+
+note that we store the last 10 messages, and also extend ChatMemoryAccess for evicting unused memory
+
+[source,java]
+----
+var streamingModel = OllamaStreamingChatModel.builder()
+	.baseUrl("http://localhost:11434")
+	.modelName("llama3.2")
+	.build()
+interface StreamingAssistant extends ChatMemoryAccess {
+	TokenStream streamingChat(@MemoryId String sessionId, @UserMessage String userMessage);
+}
+var assistant = AiServices.builder(StreamingAssistant.class)
+	.streamingChatModel(streamingModel)
+	.chatMemoryProvider(sessionId -> MessageWindowChatMemory.withMaxMessages(10))
+	.build();
+----
 
 == Setting up a websocket endpoint
 
 show how to create a @ServerEndpoint thingy idk
+
+[source,java]
+----
+@ServerEndpoint
+public class StreamingChatService {
+	@OnMessage
+	public void onMessage(String message, Session session) throws IOException {
+		try {
+			session.getBasicRemote().sendText("Received message: " + message);
+		} catch (Exception e) {
+			session.getBasicRemote().sendText("My failure reason is:\n\n" + e.getMessage());
+		} finally {
+			session.getBasicRemote().sendText("");
+		}
+	}
+}
+----
 
 == Respond to websocket messages
 
@@ -69,9 +103,123 @@ use the @OnMessage thing
 * langchain4j has an api for this (TokenStream.onPartialResponse)
 * send each token through websocket to user in real time
 
+[source,java]
+----
+CompletableFuture<ChatResponse> future = new CompletableFuture<>();
+assistant.streamingChat(session.getId(), message)
+	.onPartialResponse(token -> {
+		try {
+			session.getBasicRemote().sendText(token);
+			Thread.sleep(100);
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		}
+	})
+	.onCompleteResponse(future::complete)
+	.onError(future::completeExceptionally)
+	.start();
+ChatResponse chatResponse = future.get();
+if (chatResponse.finishReason() != STOP) {
+	session.getBasicRemote().sendText(" ...");
+}
+----
+
+also need to delete the chat memory for any disconnected clients (e.g. when the user closes the tab)
+
+[source,java]
+----
+@OnClose
+public void onClose(Session session) {
+	assistant.evictChatMemory(session.getId());
+}
+----
+
 == Set up a simple frontend
 
 very simple website with just an input box and message history, which appends to the last element (cuz its streaming)
+
+[source,html]
+----
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<title>AI Chat Room</title>
+		<style>
+			body {
+				margin: 0 auto;
+				padding: 0 1rem;
+				max-width: 80ch;
+				word-break: break-word;
+			}
+			.mine {
+				max-width: 60ch;
+				margin-left: auto;
+				text-align: right;
+				&::before { content: "Me: "; }
+			}
+			.ai {
+				max-width: 60ch;
+				margin-right: auto;
+				&::before { content: "AI: "; }
+				&:empty::after { content: "thinking..."; }
+			}
+			form {
+				float: right;
+			}
+			form, input {
+				max-width: 100%;
+			}
+		</style>
+	</head>
+	<body>
+		<h1 id="appTitle">Chat Room - streaming chat example</h1>
+		<div id="messages"></div>
+		<form onsubmit="sendMessage()" action="javascript:void 0;">
+			<label for="input">My message:</label>
+			<input id="input" type="text" required></input>
+			<button id="button" type="submit">Send</button>
+		</form>
+		<script>
+			var messages = document.getElementById('messages');
+			var input = document.getElementById('input');
+			var button = document.getElementById('button');
+			function sendMessage() {
+				var text = input.value.trim();
+				var myMessage = document.createElement('p');
+				myMessage.classList.add('mine');
+				myMessage.innerText = text;
+				messages.appendChild(myMessage);
+				var aiMessage = document.createElement('p');
+				aiMessage.classList.add('ai');
+				messages.appendChild(aiMessage);
+				webSocket.send(text);
+				input.value = "";
+				button.disabled = true;
+			}
+			// Get browser URL to build websocket
+			var webSocket = new WebSocket(
+				(window.location.protocol === "https:" ? "wss:" : "ws:")
+				+ "//" + window.location.host + "/streamingchat"
+			);
+			var escapes = {
+				'<': '&lt;',
+				'&': '&amp;',
+				'\n': '<br />',
+			};
+			webSocket.onmessage = function (event) {
+				if (event.data) {
+					var safe = event.data.replace(/[<&\n]/g, char => escapes[char]);
+					messages.lastChild.innerHTML += safe;
+				} else {  // response is ended by an empty string
+					button.disabled = false;
+				}
+			};
+		</script>
+	</body>
+</html>
+----
 
 // // // // // // // //
 // LINKS
