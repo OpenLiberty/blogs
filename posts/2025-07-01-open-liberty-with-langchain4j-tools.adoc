@@ -23,7 +23,11 @@ Andrew Sasmito <https://github.com/AndrewSasmito>
 :example-location: https://github.com/OpenLiberty/sample-langchain4j/tree/main/tools
 
 
-With the recent advances in Artificial Intelligence (AI), there are several new cutting-edge features that can transform how people use large language models (LLM). One new feature is giving LLM's the ability to call tools, giving them the power to use new features to help automate or enhance their responses.
+With the recent advances in Artificial Intelligence (AI), there are several new cutting-edge features that can transform how people use large language models (LLM). In the past, AI relied on pre-trained knowledge on datasets in order to generate static responses, struggling with dynamic queries that needed live data.
+
+Thus, a new feature developers created are giving LLM's the ability to call external tools to allow them to get real-time information and execute functions to help automate or enhance their responses. This shifts AI from a passive chatbot to become more proactive helper.
+
+See the following https://www.ibm.com/think/topics/tool-calling[blog] to learn more about AI with tools.
 
 In this post, we'll explore how to give AI tools in Java applications using LangChain4j. We'll also get started using them in an example Jakarta EE/MicroProfile app.
 
@@ -35,7 +39,7 @@ In this post, we'll explore how to give AI tools in Java applications using Lang
 [#what_Are_LLMs_with_tools]
 == What are tools for LLMs?
 
-For certain LLM models, they have the capability to call tools set in their programs to improve their response or perform actions. This greatly enhances the capability of LLMs as they can start doing tasks for you automatically or use online APIs to access the web.
+For certain LLM models, they have the capability to call tools set in their programs to improve their response or perform actions. This greatly enhances the capability of LLMs as they can start doing tasks for you automatically or use online APIs and databases to access the web.
 
 Many models such as ollama, GPT-4.1, devstral support the ability to call tools. Some can be found on AI providers such as Ollama, GitHub, and MistralAI.
 
@@ -63,37 +67,6 @@ To see how you can apply LangChain4j with tools to your own Jakarta EE and Micro
 === Prerequisites
 Before you clone the application to your machine, install JDK 21, and ensure that your `JAVA_HOME` environment variable is set.  You can use the https://developer.ibm.com/languages/java/semeru-runtimes/downloads[IBM Semeru Runtime] as your chosen Java runtime. This runtime offers performance benefits from deep technology investment in projects such as Eclipse OpenJ9 and is available across a wide variety of hardware and software platforms. To find out more about IBM Semeru Runtime, see https://openliberty.io/blog/2022/08/19/open-liberty-semeru-performance.html[Open Liberty and Semeru Runtimes, cloud-native performance that matters].
 
-The application supports several providers, you may use one of the following:
-
-#### Github
----
-    - Sign up and sign in to https://github.com.
-    - Go to your https://github.com/settings/personal-access-tokens[Personal access tokens].
-    - Generate a new token
----
-
-#### Ollama
----
-    - Download and install https://ollama.com/download[Ollama]
-        * see the https://github.com/ollama/ollama/blob/main/README.md#ollama[README.md]
-    - Pull the following model
-        * `ollama pull llama3.2`
----
-
-#### Mistral AI
----
-    - Sign up and log in to https://console.mistral.ai/home.
-    - Go to https://console.mistral.ai/api-keys[Your API keys].
-    - Create a new key.
----
-
-#### Hugging Face
----
-    - Sign up and log in to https://huggingface.co.
-    - Go to https://huggingface.co/settings/tokens[Access Tokens].
-    - Create a new access token with `read` role.
----
-
 To access the repository remotely, install https://git-scm.com/book/en/v2/Getting-Started-Installing-Git[Git] if you haven't already. You can clone the `sample-langchain4j` GitHub repository to your local machine by running the following command:
 
 [source]
@@ -111,34 +84,67 @@ To run the application, navigate to the `sample-langchain4j/tools` directory:
 cd sample-langchain4j/tools
 ----
 
-Set the following environment variables:
+Set the following environment variable:
 
 [source]
 ----
 export JAVA_HOME=<your Java 21 home path>
 ----
 
-Set the appropriate key or url dependent on your provider:
+The application supports several providers, you may use one of the following.
 
-If you are using Github, set with your GitHub API token:
+[#github_setup]
+=== GitHub setup
+---
+    - Sign up and sign in to https://github.com.
+    - Go to your https://github.com/settings/personal-access-tokens[Personal access tokens].
+    - Generate a new token
+---
+
+Set the GitHub key environment variable:
 [source]
 ----
 export GITHUB_API_KEY=<your Github API token>
 ----
 
-If you are using Ollama, set the url:
+[#ollama_setup]
+=== Ollama setup
+---
+    - Download and install https://ollama.com/download[Ollama]
+        * see the https://github.com/ollama/ollama/blob/main/README.md#ollama[README.md]
+    - Pull the following model
+        * `ollama pull llama3.2`
+---
+
+Set the Ollama base url environment variable:
 [source]
 ----
 export OLLAMA_BASE_URL=http://localhost:11434
 ----
 
-If you are using Mistral, set the Mistral API key:
+[#mistral_setup]
+=== Mistral setup
+---
+    - Sign up and log in to https://console.mistral.ai/home.
+    - Go to https://console.mistral.ai/api-keys[Your API keys].
+    - Create a new key.
+---
+
+Set the Mistral API key:
 [source]
 ----
 export MISTRAL_AI_API_KEY=<your Mistral AI API key>
 ----
 
-If you are using Hugging Face, set the hugging face token with the appropriate permissions:
+[#huggingface_setup]
+=== Hugging Face setup
+---
+    - Sign up and log in to https://huggingface.co.
+    - Go to https://huggingface.co/settings/tokens[Access Tokens].
+    - Create a new access token with `read` role.
+---
+
+Set the hugging face token with the appropriate read/write permissions:
 [source]
 ----
 export HUGGING_FACE_API_KEY=<your Hugging Face read token>
@@ -210,7 +216,7 @@ The application demonstrates how to use the LangChain4j https://docs.langchain4j
 
 We first create functions that the AI is allowed to call by annotating it with `@Tool` and explaining the premise of the function. If there are any parameters, we annotate with `@P` to explain what it represents. This helps the AI distinguish when to call the tool and what to put as parameters. If the function returns, the AI will receive the output and can use it to customize its response back to the user.
 
-The tools use the https://api.stackexchange.com/[Stack Overflow] along with JakartaEE methods to call the api and return the response to the AI. We created a few methods to search for different topics on Stack Overflow and a general search method.
+The tools use the https://api.stackexchange.com/[Stack Overflow] API along with JakartaEE methods to call the api and return the response to the AI. We created a few methods to search for questions and answers to different topics on Stack Overflow and a general search method to enhance the AI's response to help the user develop programs.
 
 See the {example-location}/src/main/java/io/openliberty/sample/langchain4j/StackOverflowTools.java[src/main/java/io/openliberty/sample/langchain4j/StackOverflowTools.java] file to learn more.
 [source, java, role="no_copy"]
@@ -269,7 +275,7 @@ See the {example-location}/src/main/java/io/openliberty/sample/langchain4j/ChatA
                 .chatModel(model)
                 .tools(stackOverflowTools)
                 .hallucinatedToolNameStrategy(toolExecutionRequest -> ToolExecutionResultMessage.from(
-                    toolExecutionRequest, "Error: there is no tool with the following parameters called" + toolExecutionRequest.name()))
+                    toolExecutionRequest, "Error: there is no tool with the following parameters called " + toolExecutionRequest.name()))
                 .chatMemoryProvider(
                     sessionId -> MessageWindowChatMemory.withMaxMessages(MAX_MESSAGES))
                 .build();
@@ -350,7 +356,4 @@ Check out the link:https://openliberty.io/guides/[Open Liberty guides^] for more
 * link:https://openliberty.io/blog/2024/04/01/open-liberty-with-langchain4j-example.html[Introductory blog into AI-enabled Jakarta EE and MicroProfile applications on Open Liberty]
 * Link to the RAG and streaming chat blog
 * link:https://huggingface.co/models[Hugging Face LLMs]
-* link:https://openliberty.io/guides/jakarta-websocket.html[Bidirectional communication between services using Jakarta WebSocket^]
-* link:https://openliberty.io/guides/cdi-intro.html[Injecting dependencies into microservices^]
-* link:https://openliberty.io/guides/microprofile-config.html[Configuring microservices^]
-* link:https://openliberty.io/guides/microprofile-metrics.html[Providing metrics from a microservice^]
+* link:https://www.ibm.com/think/topics/tool-calling[Bidirectional communication between services using Jakarta WebSocket^]
