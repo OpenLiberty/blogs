@@ -332,6 +332,7 @@ The lower the temperature value, the more predictable the answers of the LLM are
     }
 ----
 
+## RAG setup: Storing the Embeddings in MonogoDB if the Database does not exist
 The getAssistant function in the `ChatAgent` class is required when calling chat. The response from the AI model
 is stored in a string and is an output of: getAssistant().chat(sessionId, message).
 
@@ -356,6 +357,24 @@ In this example, the MongoDB embedding store is used to store these embeddings.
 
 When creating the embedding store, the IndexMapping is specified. Here, the Ollama embedding model dimesions is 768.
 All these embeddings are then added to the embedding store.
+
+## Inference: Providing the RAG content to the Model
+
+The content must be first retrieved from the MongoDB embedding store using a ContentRetriver that requires the embedding store, and embedding model. It returns max number of emeddings specified after 
+using the similarity score. The min score value indicates that all scores above 0.6 are acceptable; the higher the value, the more stricter the contentRetriever is in retriving similar embeddings. 
+
+A web search engine is also used to search and query the web. In this example the TavilyWebSearchEngine is used.
+
+Similar to how a Content Retriver for the database embeddings is created for stored content, a ContentRetriever for the web using the WebSearchContentRetriever is required to get the max results from the web.
+
+Next, DefaultQueryRouter routes the query from the user to both the content retrivers: the contentRetrieverFromStore that takes similar embeddings from the emedding Store and contentRetrieverFromWeb that gets similar search results .
+
+The contentInjector that injects the content using a prompt template and it stores the file name.
+
+To construct the RetrievalAugmentor, queryRouter (for retriving the results from embeddings and web) and content injector are used.      
+
+This retrival augmentor will then augment the user query by adding the results from embedding and web to the AI model.
+At the end, the retrival augmentor is used when generating the Assistant.
 
 ----
         public Assistant getAssistant() throws Exception {
