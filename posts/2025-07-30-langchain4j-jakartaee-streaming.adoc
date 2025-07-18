@@ -73,9 +73,9 @@ var assistant = AiServices.builder(StreamingAssistant.class)
 	.build();
 ----
 
-== Setting up a websocket endpoint
+== Set up the WebSocket endpoint
 
-show how to create a @ServerEndpoint thingy idk
+Use JakartaEE's WebSocket annotations to declare a server endpoint that the front end will connect to. Because the response will be streamed, the end of the response will be signalled by sending an empty string.
 
 [source,java]
 ----
@@ -94,12 +94,9 @@ public class StreamingChatService {
 }
 ----
 
-== Respond to websocket messages
+== Respond to messages
 
-use the @OnMessage thing
-
-* langchain4j has an api for this (TokenStream.onPartialResponse)
-* send each token through websocket to user in real time
+Use the assistant created earlier to generate a response, with the callback given to `.onPartialResponse(...)` called with each token as it get generated. Each tokens gets sent through the WebSocket using `.sendText(token)`.
 
 [source,java]
 ----
@@ -122,7 +119,7 @@ if (chatResponse.finishReason() != STOP) {
 }
 ----
 
-also need to delete the chat memory for any disconnected clients (e.g. when the user closes the tab)
+Make sure to remove chat messages using `.evictChatMemory(...)` when clients disconnect, such as when the tab is closed.
 
 [source,java]
 ----
@@ -189,6 +186,8 @@ form {
 }
 ----
 
+On the frontend, create a WebSocket connection to the server endpoint.
+
 index.js
 
 [source,javascript]
@@ -205,6 +204,8 @@ var webSocket = new WebSocket(
 
 ...
 ----
+
+When the user pressed the send button, send the message to the server through the WebSocket created earlier and disable the button. Append the AI message element with each new token until an empty token is received, which re-enables the send button as it signifies the end of the response.
 
 [source,javascript]
 ----
