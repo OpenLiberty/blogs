@@ -68,15 +68,16 @@ Set the JAVA_HOME environment variable to your Java 21 or newer installation pat
 
 Start the sample application by running `./mvnw liberty:dev` if you are on MacOS or Linux, and `mvnw.cmd liberty:dev` if you are on Windows. Once the server has started, go to http://localhost:9080, send a message, and check out how the response is streamed token by token.
 
-== Initialize the streaming chat model and AI service
+== How do I set up streaming chat?
 
-To start, build a streaming chat model from a provider of your choice (e.g. Ollama, GitHub Models, or MistralAI). Declare an assistant interface with a chat method. Note that the assistant supports multiple user conversations at the same time, so we'll also need to extend ChatMemoryAccess which provides methods to delete conversation history when a user leaves. Build an AI service implementing the interface using the streaming chat model from earlier, with up to the last 10 messages of each conversation preserved.
+To start, build a streaming chat model from a provider of your choice (e.g, GitHub Models, Ollama, Mistral AI, Hugging Face) and set a 200 token limit on the response. The code below shows how to build an Ollama streaming chat model using the Llama3.2 model. Declare an assistant interface with a chat method that LangChain4j will implement. To support multiple user conversations at the same time, it should extend ChatMemoryAccess which provides a method to delete conversation history such as when a user leaves. Build an AI service implementing the interface using the streaming chat model from earlier, with the 10 most recent messages of each conversation preserved.
 
 [source,java]
 ----
 var streamingModel = OllamaStreamingChatModel.builder()
 	.baseUrl("http://localhost:11434")
 	.modelName("llama3.2")
+	.numPredict(200)
 	.build()
 interface StreamingAssistant extends ChatMemoryAccess {
 	TokenStream streamingChat(@MemoryId String sessionId, @UserMessage String userMessage);
@@ -87,7 +88,7 @@ var assistant = AiServices.builder(StreamingAssistant.class)
 	.build();
 ----
 
-== Set up the WebSocket endpoint
+=== Set up the WebSocket endpoint
 
 Use JakartaEE's WebSocket annotations to declare a server endpoint that the front end will connect to. Because the response will be streamed, the end of the response will be signalled by sending an empty string.
 
@@ -107,8 +108,6 @@ public class StreamingChatService {
 	}
 }
 ----
-
-== Respond to messages
 
 Use the assistant created earlier to generate a response, with the callback given to `.onPartialResponse(...)` called with each token as it get generated. Each tokens gets sent through the WebSocket using `.sendText(token)`. If the response was cut short because of the token limit, indicate it with an ellipsis (`...`).
 
@@ -143,7 +142,7 @@ public void onClose(Session session) {
 }
 ----
 
-== Set up a simple frontend
+=== Set up a simple frontend
 
 very simple website with just an input box and message history, which appends to the last element (cuz its streaming)
 
