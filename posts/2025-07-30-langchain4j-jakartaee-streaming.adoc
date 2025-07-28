@@ -90,7 +90,7 @@ var assistant = AiServices.builder(StreamingAssistant.class)
 
 === Set up the WebSocket endpoint
 
-Use JakartaEE's WebSocket annotations to declare a server endpoint that the front end will connect to. Because the response will be streamed, the end of the response will be signalled by sending an empty string.
+Use JakartaEE's WebSocket annotations to declare a server endpoint that the front end will connect to. For each user message, use the assistant from before to generate a response. As the model generates the response, LangChain4j will call the callback given to `.onPartialResponse(...)` with each token, which gets sent through the WebSocket using `.sendText(token)`. If the response was cut short because of the token limit, end the response with an ellipsis (`...`). The end of the response is signalled by sending an empty string.
 
 [source,java]
 ----
@@ -98,44 +98,37 @@ Use JakartaEE's WebSocket annotations to declare a server endpoint that the fron
 public class StreamingChatService {
 	@OnMessage
 	public void onMessage(String message, Session session) throws IOException {
-		try {
-			...
-		} catch (Exception e) {
-			session.getBasicRemote().sendText("My failure reason is:\n\n" + e.getMessage());
-		} finally {
-			session.getBasicRemote().sendText("");
-		}
+		var response = new CompletableFuture<ChatResponse>();
+		assistant.streamingChat(session.getId(), message)
+			.onPartialResponse(token -> {
+				try {
+					session.getBasicRemote().sendText(token);
+					Thread.sleep(100);
+				} catch (IOException e) {
+					throw new RuntimeException(e);
+				}
+			})
+			.onCompleteResponse(response::complete)
+			.onError(response::completeExceptionally)
+			.start();
+		if (response.get().finishReason() == LENGTH)
+			session.getBasicRemote().sendText(" ...");
+		session.getBasicRemote().sendText("");
 	}
+	...
 }
 ----
 
-Use the assistant created earlier to generate a response, with the callback given to `.onPartialResponse(...)` called with each token as it get generated. Each tokens gets sent through the WebSocket using `.sendText(token)`. If the response was cut short because of the token limit, indicate it with an ellipsis (`...`).
+For now, when errors occur, send the error message back to the user. Make sure to remove a user's chat history using `.evictChatMemory(...)` when they disconnect, such as after closing the tab.
 
 [source,java]
 ----
-CompletableFuture<ChatResponse> future = new CompletableFuture<>();
-assistant.streamingChat(session.getId(), message)
-	.onPartialResponse(token -> {
-		try {
-			session.getBasicRemote().sendText(token);
-			Thread.sleep(100);
-		} catch (IOException e) {
-			throw new RuntimeException(e);
-		}
-	})
-	.onCompleteResponse(future::complete)
-	.onError(future::completeExceptionally)
-	.start();
-ChatResponse chatResponse = future.get();
-if (chatResponse.finishReason() == LENGTH) {
-	session.getBasicRemote().sendText(" ...");
+@OnError
+public void onError(Session session, Throwable error) throws IOException {
+	session.getBasicRemote().sendText("My failure reason is:\n\n" + error.getMessage());
+	session.getBasicRemote().sendText("");
 }
-----
 
-Make sure to remove chat messages using `.evictChatMemory(...)` when clients disconnect, such as when the tab is closed.
-
-[source,java]
-----
 @OnClose
 public void onClose(Session session) {
 	assistant.evictChatMemory(session.getId());
