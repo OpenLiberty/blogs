@@ -90,33 +90,41 @@ StreamingAssistant assistant = AiServices.builder(StreamingAssistant.class)
 
 === Set up the WebSocket endpoint
 
-Use JakartaEE's WebSocket annotations to declare a server endpoint that the front end will connect to. For each user message, use the assistant from before to generate a response. As the model generates the response, LangChain4j will call the callback given to `.onPartialResponse(...)` with each token, which gets sent through the WebSocket using `.sendText(token)`. If the response was cut short because of the token limit, end the response with an ellipsis (`...`). The end of the response is signalled by sending an empty string.
+Use JakartaEE's WebSocket annotations to declare a server endpoint that the front end will connect to.
 
 [source,java]
 ----
 @ServerEndpoint("/streamingchat")
 public class StreamingChatService {
-	@OnMessage
-	public void onMessage(String message, Session session) throws Exception {
-		CompletableFuture<ChatResponse> response = new CompletableFuture<>();
-		assistant.streamingChat(session.getId(), message)
-			.onPartialResponse(token -> {
-				try {
-					session.getBasicRemote().sendText(token);
-					Thread.sleep(100);
-				} catch (Exception e) {
-					throw new RuntimeException(e);
-				}
-			})
-			.onCompleteResponse(response::complete)
-			.onError(response::completeExceptionally)
-			.start();
-		if (response.get().finishReason() == LENGTH)
-			session.getBasicRemote().sendText(" ...");
-		session.getBasicRemote().sendText("");
-	}
 	...
 }
+----
+
+For each user message, use the assistant from before to generate a response. As the model generates the response, LangChain4j will call the callback given to `.onPartialResponse(...)` with each token, which gets sent through the WebSocket using `.sendText(token)`. If the response was cut short because of the token limit, end the response with an ellipsis (`...`). The end of the response is signalled by sending an empty string.
+
+[source,java]
+----
+@OnMessage
+public void onMessage(Session session, String message) throws Exception {
+	CompletableFuture<ChatResponse> response = new CompletableFuture<>();
+	assistant.streamingChat(session.getId(), message)
+		.onPartialResponse(token -> {
+			try {
+				session.getBasicRemote().sendText(token);
+				Thread.sleep(100);
+			} catch (Exception error) {
+				throw new RuntimeException(error);
+			}
+		})
+		.onCompleteResponse(response::complete)
+		.onError(response::completeExceptionally)
+		.start();
+	if (response.get().finishReason() == LENGTH)
+		session.getBasicRemote().sendText(" ...");
+	session.getBasicRemote().sendText("");
+}
+
+...
 ----
 
 For now, when errors occur, send the error message back to the user. Make sure to remove a user's chat history using `.evictChatMemory(...)` when they disconnect, such as after closing the tab.
