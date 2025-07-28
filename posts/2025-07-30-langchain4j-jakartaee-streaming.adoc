@@ -74,11 +74,11 @@ To start, build a streaming chat model from a provider of your choice (e.g, GitH
 
 [source,java]
 ----
-var streamingModel = OllamaStreamingChatModel.builder()
+StreamingChatModel streamingModel = OllamaStreamingChatModel.builder()
 	.baseUrl("http://localhost:11434")
 	.modelName("llama3.2")
 	.numPredict(200)
-	.build()
+	.build();
 interface StreamingAssistant extends ChatMemoryAccess {
 	TokenStream streamingChat(@MemoryId String sessionId, @UserMessage String userMessage);
 }
@@ -97,14 +97,14 @@ Use JakartaEE's WebSocket annotations to declare a server endpoint that the fron
 @ServerEndpoint("/streamingchat")
 public class StreamingChatService {
 	@OnMessage
-	public void onMessage(String message, Session session) throws IOException {
-		var response = new CompletableFuture<ChatResponse>();
+	public void onMessage(String message, Session session) throws Exception {
+		CompletableFuture<ChatResponse> response = new CompletableFuture<>();
 		assistant.streamingChat(session.getId(), message)
 			.onPartialResponse(token -> {
 				try {
 					session.getBasicRemote().sendText(token);
 					Thread.sleep(100);
-				} catch (IOException e) {
+				} catch (Exception e) {
 					throw new RuntimeException(e);
 				}
 			})
@@ -124,7 +124,7 @@ For now, when errors occur, send the error message back to the user. Make sure t
 [source,java]
 ----
 @OnError
-public void onError(Session session, Throwable error) throws IOException {
+public void onError(Session session, Throwable error) throws Exception {
 	session.getBasicRemote().sendText("My failure reason is:\n\n" + error.getMessage());
 	session.getBasicRemote().sendText("");
 }
@@ -152,7 +152,7 @@ index.html
 	<body>
 		<h1>Chat Room - streaming chat example</h1>
 		<div id="messages"></div>
-		<form onsubmit="sendMessage()" action="javascript:void 0;">
+		<form id="form" action="javascript:void 0;">
 			<label for="input">My message:</label>
 			<input id="input" type="text" required />
 			<button id="button" type="submit">Send</button>
@@ -197,6 +197,7 @@ index.js
 [source,javascript]
 ----
 var messages = document.getElementById('messages');
+var form = document.getElementById('form');
 var input = document.getElementById('input');
 var button = document.getElementById('button');
 
@@ -213,25 +214,23 @@ When the user pressed the send button, send the message to the server through th
 
 [source,javascript]
 ----
-function sendMessage() {
-	var text = input.value.trim();
+form.addEventListener('submit', function () {
+	var text = input.value;
 
 	var myMessage = document.createElement('p');
-	myMessage.classList.add('mine');
+	myMessage.className = 'mine';
 	myMessage.textContent = text;
-	messages.appendChild(myMessage);
-
 	var aiMessage = document.createElement('p');
-	aiMessage.classList.add('ai');
-	messages.appendChild(aiMessage);
+	aiMessage.className = 'ai';
+	messages.append(myMessage, aiMessage);
 
 	webSocket.send(text);
-	input.value = '';
+	form.reset();
 	button.disabled = true;
-}
+});
 
 webSocket.addEventListener('message', function (event) {
-	if (event.data != "")
+	if (event.data != '')
 		messages.lastChild.textContent += event.data;
 	else
 		button.disabled = false;
