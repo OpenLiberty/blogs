@@ -70,7 +70,7 @@ Start the sample application by running `./mvnw liberty:dev` if you are on MacOS
 
 == How do I set up streaming chat?
 
-To start, build a streaming chat model from a provider of your choice (e.g, GitHub Models, Ollama, Mistral AI, Hugging Face) and set a 200 token limit on the response. The code below shows how to build an Ollama streaming chat model using the Llama3.2 model. Declare an assistant interface with a chat method that LangChain4j will implement. To support multiple user conversations at the same time, it should extend ChatMemoryAccess which provides a method to delete conversation history such as when a user leaves. Build an AI service implementing the interface using the streaming chat model from earlier, with the 10 most recent messages of each conversation preserved.
+To start, build a streaming chat model from a provider of your choice (e.g, GitHub Models, Ollama, Mistral AI, Hugging Face) and set a 200 token limit on the response. The code below shows how to build an Ollama streaming chat model using the Llama3.2 model.
 
 [source,java]
 ----
@@ -79,9 +79,21 @@ StreamingChatModel streamingModel = OllamaStreamingChatModel.builder()
 	.modelName("llama3.2")
 	.numPredict(200)
 	.build();
+----
+
+Declare an assistant interface with a chat method that LangChain4j will implement. To support multiple user conversations at the same time, it should extend ChatMemoryAccess which provides a method to delete conversation history such as when a user leaves.
+
+[source,java]
+----
 interface StreamingAssistant extends ChatMemoryAccess {
 	TokenStream streamingChat(@MemoryId String sessionId, @UserMessage String userMessage);
 }
+----
+
+Build an AI service implementing the interface using the streaming chat model from earlier, with the 10 most recent messages of each conversation preserved.
+
+[source,java]
+----
 StreamingAssistant assistant = AiServices.builder(StreamingAssistant.class)
 	.streamingChatModel(streamingModel)
 	.chatMemoryProvider(sessionId -> MessageWindowChatMemory.withMaxMessages(10))
@@ -123,11 +135,9 @@ public void onMessage(Session session, String message) throws Exception {
 		session.getBasicRemote().sendText(" ...");
 	session.getBasicRemote().sendText("");
 }
-
-...
 ----
 
-For now, when errors occur, send the error message back to the user. Make sure to remove a user's chat history using `.evictChatMemory(...)` when they disconnect, such as after closing the tab.
+For now, when errors occur, send the error message back to the user.
 
 [source,java]
 ----
@@ -136,7 +146,12 @@ public void onError(Session session, Throwable error) throws Exception {
 	session.getBasicRemote().sendText("My failure reason is:\n\n" + error.getMessage());
 	session.getBasicRemote().sendText("");
 }
+----
 
+Make sure to remove a user's chat history using `.evictChatMemory(...)` when they disconnect, such as after closing the tab.
+
+[source,java]
+----
 @OnClose
 public void onClose(Session session) {
 	assistant.evictChatMemory(session.getId());
@@ -214,8 +229,6 @@ var webSocket = new WebSocket(
 	(window.location.protocol == 'https:' ? 'wss:' : 'ws:')
 	+ '//' + window.location.host + '/streamingchat'
 );
-
-...
 ----
 
 When the user presses Enter, send the message to the server through the WebSocket created earlier and disable the button.
@@ -236,11 +249,9 @@ form.addEventListener('submit', function () {
 	form.reset();
 	button.disabled = true;
 });
-
-...
 ----
 
-Add each new token to the AI's last message element until an empty string is received. Re-enable the send button as the empty string ends the response. Display an error message if the WebSocket was closed for any reason.
+Add each new token to the AI's last message element until an empty string is received. Re-enable the send button as the empty string ends the response.
 
 [source,javascript]
 ----
@@ -250,7 +261,12 @@ webSocket.addEventListener('message', function (event) {
 	else
 		button.disabled = false;
 });
+----
 
+Display an error message if the WebSocket was closed for any reason.
+
+[source,javascript]
+----
 webSocket.addEventListener('close', function (event) {
 	var errorMessage = document.createElement('p');
 	errorMessage.textContent = 'Error: Connection closed unexpectedly.';
