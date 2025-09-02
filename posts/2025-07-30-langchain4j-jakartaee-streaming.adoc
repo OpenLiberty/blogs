@@ -146,58 +146,50 @@ On the frontend, create a WebSocket connection to the server endpoint.
 
 [source,javascript]
 ----
-var messages = document.getElementById('messages');
-var form = document.getElementById('form');
-var input = document.getElementById('input');
-var button = document.getElementById('button');
-
 // Connect to websocket
-var webSocket = new WebSocket(
-	(window.location.protocol == 'https:' ? 'wss:' : 'ws:')
-	+ '//' + window.location.host + '/streamingchat'
-);
+var webSocket = new WebSocket('/streamingchat');
 ----
 
 When the user presses Enter, send the message to the server through the WebSocket created earlier and disable the button.
 
 [source,javascript]
 ----
-form.addEventListener('submit', function () {
-	var myMessage = document.createElement('p');
-	myMessage.className = 'mine';
-	myMessage.textContent = input.value;
-	var aiMessage = document.createElement('p');
-	aiMessage.className = 'ai';
-	messages.append(myMessage, aiMessage);
-
-	webSocket.send(input.value);
-	form.reset();
-	button.disabled = true;
-});
+function sendMessage() {
+	var message = input.value;
+	appendMessage('my-msg', message, new Date().toLocaleTimeString());
+	appendMessage('thinking-msg', 'thinking...');
+	webSocket.send(message);
+	input.value = '';
+	sendButton.disabled = true;
+};
 ----
 
 Add each new token to the AI's last message element until an empty string is received. Re-enable the send button as the empty string ends the response.
 
 [source,javascript]
 ----
-webSocket.addEventListener('message', function (event) {
-	if (event.data != '')
-		messages.lastChild.textContent += event.data;
-	else
-		button.disabled = false;
-});
+webSocket.onmessage = function (event) {
+	if (event.data != '') {  // stream ends with empty string
+		if (messages.lastChild.querySelector('.thinking-msg')) {  // if this is the first token
+			messages.removeChild(messages.lastChild);
+			appendMessage('agent-msg', '', new Date().toLocaleTimeString());
+		}
+                messages.lastChild.querySelector('.agent-msg').textContent += event.data;
+	} else {
+		sendButton.disabled = false;
+	}
+};
 ----
 
 Display an error message if the WebSocket was closed for any reason.
 
 [source,javascript]
 ----
-webSocket.addEventListener('close', function (event) {
-	var errorMessage = document.createElement('p');
-	errorMessage.textContent = 'Error: Connection closed unexpectedly.';
-	messages.append(errorMessage);
-	button.disabled = true;
-});
+webSocket.onclose = function (event) {
+	...
+	appendMessage('agent-msg', 'Error: Connection closed unexpectedly.');
+	sendButton.disabled = true;
+};
 ----
 
 == What's next?
