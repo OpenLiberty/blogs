@@ -4,7 +4,7 @@ If you'd like to write a blog post for OpenLiberty.io, see [README](./README.md)
 
 When you contribute to the Open Liberty blog, if you are not employed by IBM, please sign off your work using the standard developer certificate. The sign-off is a line at the end of the commit message that certifies that you wrote it or otherwise have the right to pass it on as an open source patch.
 
-The rules are simple: if you can certify the following information (from link:https://developercertificate.org/[developercertificate.org]):
+The rules are simple: if you can certify the following information (from [developercertificate.org](https://developercertificate.org/)):
 
 ```
 Developer Certificate of Origin
