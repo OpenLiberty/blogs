@@ -1,0 +1,154 @@
+---
+layout: post
+title: "在 Open Liberty 25.0.0.9 中为 JWT Builder 新增 ECDH-ES 密钥管理算法的支持"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/IsmathBadsha
+author_github: https://github.com/IsmathBadsha
+seo-title: 在 Open Liberty 25.0.0.9 中为 JWT Builder 新增 ECDH-ES 密钥管理算法的支持 - OpenLiberty.io
+seo-description: '本次发布在 JWT Builder 中引入了对 ECDH-ES 密钥管理算法的支持，提供了比 RSA-OAEP 更安全的替代方案。'
+blog_description: '本次发布在 JWT Builder 中引入了对 ECDH-ES 密钥管理算法的支持，提供了比 RSA-OAEP 更安全的替代方案。'
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+additional_authors:
+- name: 張藝馨 (翻译)
+  github: https://github.com/shin19991207
+  image: https://avatars0.githubusercontent.com/shin19991207
+
+blog-available-in-languages:
+- lang: en
+  path: /blog/2025/09/09/25.0.0.9.html
+---
+= 在 Open Liberty 25.0.0.9 中为 JWT Builder 新增 ECDH-ES 密钥管理算法的支持
+Ismath Badsha <https://github.com/IsmathBadsha>
+:imagesdir: /s
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+本次发布在 JWT Builder 中引入了对 ECDH-ES 密钥管理算法的支持，提供了比 RSA-OAEP 更安全的替代方案。
+
+在 link:{url-about}[Open Liberty] 25.0.0.9 中：
+
+* <<ECDH_ES, 为 JWT Builder 新增 ECDH-ES 密钥管理算法的支持>>
+* <<CVEs, 修复安全漏洞（CVE）>>
+
+查看版本 link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A25009+label%3A%22release+bug%22[25.0.0.9] 中修复的 bug 列表。
+
+浏览link:{url-prefix}/blog/?search=release&search!=beta[之前的 Open Liberty GA 发布博客]。
+
+[#run]
+
+== 使用 25.0.0.9 开发和运行应用程序
+
+如使用 link:{url-prefix}/guides/maven-intro.html[Maven]， 请在 `pom.xml` 文件中添加以下插件配置：
+
+[source,xml]
+----
+<plugin>
+    <groupId>io.openliberty.tools</groupId>
+    <artifactId>liberty-maven-plugin</artifactId>
+    <version>3.11.5</version>
+</plugin>
+----
+
+如使用 link:{url-prefix}/guides/gradle-intro.html[Gradle]， 在您的 `build.gradle` 文件中添加：
+
+[source,gradle]
+----
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'io.openliberty.tools:liberty-gradle-plugin:3.9.5'
+    }
+}
+apply plugin: 'liberty'
+----
+
+如使用 link:{url-prefix}/docs/latest/container-images.html[容器镜像]：
+
+[source]
+----
+FROM icr.io/appcafe/open-liberty
+----
+
+或者您也可以访问我们的link:{url-prefix}/start/[下载页面]获取归档包。
+
+此外，您若使用 link:https://plugins.jetbrains.com/plugin/14856-liberty-tools[IntelliJ IDEA]、link:https://marketplace.visualstudio.com/items?itemName=Open-Liberty.liberty-dev-vscode-ext[Visual Studio Code] 或 link:https://marketplace.eclipse.org/content/liberty-tools[Eclipse IDE]，还集成使用我们的开源 link:https://openliberty.io/docs/latest/develop-liberty-tools.html[Liberty 开发工具 (Liberty developer tools)]，在 IDE 内实现应用程序的开发、测试、调试及运行管理等全流程支持。
+
+[link=https://stackoverflow.com/tags/open-liberty]
+image::img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="center"]
+
+[#ECDH_ES]
+== 为 JWT Builder 新增 ECDH-ES 密钥管理算法的支持
+
+Open Liberty 在其 JSON Web Token 1.0（`jwt-1.0`）功能中新增对 ECDH-ES（Elliptic Curve Diffie-Hellman Ephemeral Static，椭圆曲线 Diffie-Hellman 临时静态）作为密钥管理算法的支持。通过在 `jwtBuilder` 配置中启用该算法，应用开发者可利用椭圆曲线密码学（Elliptic Curve Cryptography）生成 JSON Web Encryption（JWE）令牌的内容加密密钥（CEK）。
+
+与之前支持的 RSA-OAEP 相比，ECDH-ES 提供了更现代、更安全的密钥协商机制。
+
+要启用 ECDH-ES，开发者需在 `keyManagementKeyAlias` 属性中指定一个EC（Elliptic Curve，椭圆曲线）公钥。EC 公私钥对可通过 `securityUtility` 或 `keytool` 工具生成，例如：
+
+----
+./securityUtility createSSLCertificate --sigAlg=SHA256withECDSA --keySize=256 --server=myServer --validity=3650 --password=password
+----
+
+----
+keytool -genkeypair -alias eccert -keyalg EC -groupname secp256r1 -validity 3650 -storetype pkcs12 -keystore myKeystore.p12 -storepass password
+----
+
+ECDH-ES can be configured under the `keyManagementKeyAlgorithm` attribute in a `jwtBuilder` element of JSON Web Token 1.0 (`jwt-1.0`) feature. Reference the EC public key used by the ECDH-ES key management algorithm by its alias in `keyManagementKeyAlias`, and specify the keystore using the `trustStoreRef` attribute.
+
+在 JSON Web Token 1.0（`jwt-1.0`）功能的 `jwtBuilder` 元素中，可通过 `keyManagementKeyAlgorithm` 属性配置使用 ECDH-ES 密钥管理算法。开发者需通过 `keyManagementKeyAlias` 属性引用用于 ECDH-ES 密钥管理的 EC 公钥别名，并通过 `trustStoreRef` 属性指定密钥库。
+
+在 `server.xml` 文件中配置这些特性，示例如下：
+
+[source, xml]
+----
+<jwtBuilder
+    keyManagementKeyAlgorithm="ECDH-ES"
+    keyManagementKeyAlias="myECPublicKey"
+    trustStoreRef="myTrustStore" ... />
+----
+
+For more information on configuring `jwtBuilder`, see the link:https://openliberty.io/docs/latest/reference/config/jwtBuilder.html[Open Liberty documentation].
+
+更多关于 jwtBuilder 的配置信息，请参阅 link:https://openliberty.io/docs/latest/reference/config/jwtBuilder.html[Open Liberty 官方文档]。
+
+[#CVEs]
+== 本次发布修复的安全漏洞（CVE）
+[cols="5*"]
+|===
+|CVE 编号|CVSS 分数 |漏洞类型 |受影响版本 |说明
+
+|https://www.cve.org/CVERecord?id=CVE-2025-36000[CVE-2025-36000]
+|4.4
+|存储型跨站脚本（Stored XSS）
+|17.0.0.3-25.0.0.8
+|影响 `adminCenter-1.0` 功能
+
+|https://www.cve.org/CVERecord?id=CVE-2025-36047[CVE-2025-36047]
+|5.3
+|拒绝服务（Denial of Service）
+|18.0.0.2-25.0.0.8
+|影响 `servlet-3.1`、`servlet-4.0`、`servlet-5.0` 和 `servlet-6.0` 功能
+
+|https://www.cve.org/CVERecord?id=CVE-2025-48976[CVE-2025-48976]
+|7.5
+|拒绝服务（Denial of Service）
+|17.0.0.3-25.0.0.8
+|影响 `servlet-3.1`、`servlet-4.0`、`servlet-5.0` 和 `servlet-6.0` 功能
+
+|https://www.cve.org/CVERecord?id=CVE-2025-36124[CVE-2025-36124]
+|5.9
+|Bypass security
+|17.0.0.3-25.0.0.8
+|影响 `wasJmsServer-1.0`、`wasJmsSecurity-1.0`、`wasJmsClient-2.0`、`messagingServer-3.0`、`messagingSecurity-3.0` 和 `messagingClient-3.0` 功能
+|===
+
+如需查看历史版本中已修复的安全漏洞，请参阅link:{url-prefix}/docs/latest/security-vulnerabilities.html[安全漏洞（CVE）列表]。
+
+== 立即开始使用 Open Liberty 25.0.0.9
+
+通过 <<run,Maven、Gradle、Docker或下载归档包进行获取>>.
