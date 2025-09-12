@@ -29,20 +29,16 @@ This post demonstrates how to implement tool calling in Java applications by usi
 
 == Understanding LLM tool calling
 
-Tool calling is a capability where LLMs can identify when to invoke external functions and with what parameters. When an LLM determines that a user query requires information or actions beyond its training data, it generates a structured function call with appropriate arguments rather than attempting to hallucinate an answer.
+Tool calling enables LLMs to identify when to call external functions and with what parameters. When an LLM determines that a user query requires information or actions beyond its training data, it generates a structured function call with appropriate arguments rather than attempting to hallucinate an answer.
 
-For example, when asked about current Stack Overflow issues with a specific library, instead of providing potentially outdated information from its training data, the LLM can complete the following tasks:
-
-* Recognize the need for current information.
-* Call an appropriate search function with the correct query parameters.
-* Process the returned data to formulate a response.
+For example, when asked about current Stack Overflow issues with a specific library, instead of providing potentially outdated information from its training data, the LLM can recognize the need for current information, call an appropriate search function with the correct query parameters, and process the returned data to formulate a response.
 
 Tool-enabled models like Llama 3.1, GPT-4o, Claude 3 Opus, and Mistral Large support this capability through standardized JSON function-calling interfaces. In this tutorial, we'll use models available through GitHub Copilot, Ollama, and Mistral AI platforms.
 
 [#Java_LLMs_Tools]
 == LangChain4j: A Java framework for LLM tool integration
 
-Implementing tool calling directly with LLM APIs requires handling complex JSON schemas, managing context windows, and dealing with provider-specific implementations. LangChain4j solves these challenges by providing:
+Implementing tool calling directly with LLM APIs requires handling complex JSON schemas, managing context windows, and dealing with provider-specific implementations. LangChain4j solves these challenges by providing the following capabilities:
 
 * A unified Java interface for multiple LLM providers
 * Simple annotations for converting Java methods into LLM tools
@@ -83,7 +79,7 @@ By running this example, you see:
 [#pre-reqs]
 === Prerequisites and setup
 
-To run this example, you'll need:
+To run this sample, you'll need:
 
 * **JDK 21** (e.g. https://developer.ibm.com/languages/java/semeru-runtimes/downloads[IBM Semeru Runtime])
 ** Run the following command to set the `JAVA_HOME` environment variable: `export JAVA_HOME=<your Java 21 home path>`
@@ -172,7 +168,7 @@ To ensure that the application started successfully, you can run the tests by pr
 
 When the application is running, open a browser at http://localhost:9080/toolChat.html and start experimenting with it.
 
-image::/img/blog/langchain4j-tool-example-chat-room.png[Chat Room of LangChain4j Jakarta EE and MicroProfile example,width=70%,align="center"] 
+image::/img/blog/langchain4j-tool-example-chat-room.png[Chat room of LangChain4j Jakarta EE and MicroProfile example,width=70%,align="center"] 
 
 Enter any text to chat with the AI assistant. Here are some suggested messages:
 
@@ -187,10 +183,10 @@ Expect to see logs in the dev mode console to see that a tool is being called.
 
 The application architecture consists of four main components that work together to provide an AI assistant with tool-calling capabilities:
 
-* **Tool Implementation** (`StackOverflowTools.java`) - Java methods annotated to be callable by the LLM
-* **AI Service** (`ChatAgent.java`) - Configures the LLM and exposes it through a Java interface
-* **WebSocket Endpoint** (`ChatService.java`) - Handles real-time communication with clients
-* **Frontend** (`toolChat.js` and `toolChat.html`) - Provides the user interface
+* **Tool implementation** (`StackOverflowTools.java`) - Java methods annotated to be callable by the LLM
+* **AI service** (`ChatAgent.java`) - Configures the LLM and exposes it through a Java interface
+* **WebSocket endpoint** (`ChatService.java`) - Handles real-time communication with clients
+* **Front end** (`toolChat.js` and `toolChat.html`) - Provides the user interface
 
 image::/img/blog/langchain4jDiagram.png[Architectural diagram,width=70%,height=70%,align="center"]
 
@@ -200,16 +196,16 @@ When a user sends a message through the WebSocket, the following sequence occurs
 2. The message is forwarded to the `ChatAgent`, which sends it to the configured LLM.
 3. The LLM analyzes the message and determines if it needs to call a tool.
 4. If needed, the LLM generates a tool call with appropriate parameters.
-5. LangChain4j executes the corresponding Java method with those parameters.
+5. LangChain4j runs the corresponding Java method with those parameters.
 6. The tool result is returned to the LLM, which incorporates it into its response.
 7. The final response is sent back to the client through the WebSocket.
 
-This implementation uses the https://api.stackexchange.com/[Stack Overflow API] to enhance the LLM's capabilities. When the user asks a technical question that might benefit from current Stack Overflow data, the LLM calls the appropriate search method. The search performs the following steps:
+This implementation uses the https://api.stackexchange.com/[Stack Overflow API] to enhance the LLM's capabilities. When the user asks a technical question that might benefit from current Stack Overflow data, the LLM calls the appropriate search method:
 
-1. Queries the Stack Exchange API to find relevant questions.
-2. Retrieves the top answer for each question.
-3. Returns the formatted results to the LLM.
-4. The LLM then synthesizes this information into a coherent response.
+1. The search queries the Stack Exchange API to find relevant questions.
+2. The search retrieves the top answer for each question.
+3. The search returns the formatted results to the LLM.
+4. The LLM then synthesizes the returned information into a coherent response.
 
 
 [#create_tool]
@@ -229,15 +225,8 @@ public ArrayList<String> searchStackOverflow(@P("Question you are searching") St
 
 These annotations serve critical purposes:
 
-* **`@Tool` annotation** - Provides a description that helps the LLM understand:
-** When this tool is appropriate to use
-** What functionality it provides
-** The expected output format
-
-* **`@P` annotation** - Describes each parameter so the LLM can:
-** Understand what information to provide
-** Format the parameter correctly
-** Extract relevant details from the user's query
+* `@Tool` annotation provides a description that helps the LLM understand when the tool is appropriate to use, what functionality it provides, and what the expected output format is.
+* `@P` annotation describes each parameter so the LLM can understand what information to provid, format the parameter correctly, and extract relevant details from the user's query.
 
 The implementation uses standard Jakarta EE HTTP Client APIs to interact with the Stack Exchange API:
 
@@ -258,19 +247,15 @@ private ArrayList<String> questionAndAnswer(String url) throws Exception {
 }
 ----
 
-The method returns results in a format that:
+The method returns results in a format that is easily parseable by the LLM, contains all necessary context (question, answer, and link), and maintains a consistent structure for reliable processing.
 
-* Is easily parseable by the LLM
-* Contains all necessary context (question, answer, and link)
-* Maintains a consistent structure for reliable processing
+When implementing tools, consider the following good practices:
 
-Some good practices for implementing tools include:
-
-* Keep tool methods focused on a single responsibility
-* Return structured data that's easy for the LLM to process
-* Include sufficient context in the return value
-* Use descriptive annotations that clearly explain the functions
-* Handle exceptions to prevent LLM confusion
+* Keep tool methods focused on a single responsibility.
+* Return structured data that is easy for the LLM to process.
+* Include sufficient context in the return value.
+* Use descriptive annotations that clearly explain the functions.
+* Handle exceptions to prevent LLM confusion.
 
 
 See the complete implementation in {example-location}/src/main/java/io/openliberty/sample/langchain4j/StackOverflowTools.java[StackOverflowTools.java].
@@ -278,12 +263,7 @@ See the complete implementation in {example-location}/src/main/java/io/openliber
 [#create_service]
 === AI service implementation
 
-The `ChatAgent` class serves as the bridge between your application and the LLM. It handles:
-
-* LLM provider configuration
-* Tool registration
-* Conversation memory management
-* Error handling for hallucinated tool calls
+The `ChatAgent` class serves as the bridge between your application and the LLM. It handles LLM provider configuration, tool registration, conversation memory management, and error handling for hallucinated tool calls.
 
 The core configuration is done through LangChain4j's builder pattern:
 
@@ -305,13 +285,11 @@ public Assistant getAssistant() {
 }
 ----
 
-Key configuration elements include:
+Key configuration elements include the following methods:
 
-* **Tool Registration** - The `tools()` method registers your tool classes with the LLM.
-   
-* **Hallucination Handling** - The `hallucinatedToolNameStrategy` provides graceful error handling when the LLM attempts to call a non-existent tool (a common issue with LLMs).
-   
-* **Memory Management** - The `chatMemoryProvider` configures conversation history retention, which is essential for maintaining context across multiple messages.
+* `tools()`, which registers your tool classes with the LLM.
+* `hallucinatedToolNameStrategy`, which provides graceful error handling when the LLM attempts to call a non-existent tool (a common problem with LLMs).  
+* `chatMemoryProvider`, which configures conversation history retention; this is essential for maintaining context across multiple messages.
 
 The AI service is exposed through a Java interface with LangChain4j annotations:
 
@@ -329,12 +307,7 @@ interface Assistant {
 }
 ----
 
-The `@SystemMessage` annotation provides critical instructions to the LLM about:
-
-* Its role and purpose
-* When and how to use tools
-* Constraints on its behavior
-* Error handling expectations
+The `@SystemMessage` annotation provides critical instructions to the LLM about its role and purpose, when and how to use tools, constraints on its behavior, and error handling expectations.
 
 The `@MemoryId` annotation ensures each user gets a separate conversation history, while `@UserMessage` marks the parameter that contains the user's input.
 
@@ -380,11 +353,9 @@ public class ChatService {
 
 Key implementation details:
 
-* **Session Management** - Each WebSocket connection gets a unique `sessionId` that's passed to the AI service to maintain conversation context.
-   
-* **Error Handling** - Robust error handling ensures users receive appropriate feedback even when issues occur.
-   
-* **Asynchronous Processing** - The WebSocket architecture naturally supports the potentially long processing times of LLM requests.
+* Each WebSocket connection gets a unique `sessionId` that's passed to the AI service to maintain conversation context. 
+* Robust error handling ensures users receive appropriate feedback even when issues occur.
+* The asynchronous WebSocket architecture naturally supports the potentially long processing times of LLM requests.
 
 The client-side JavaScript establishes the WebSocket connection and handles message exchange:
 
@@ -417,22 +388,22 @@ See the complete implementations in {example-location}/src/main/java/io/openlibe
 
 In this tutorial, we've explored how to implement LLM tool calling capabilities in MicroProfile and Jakarta EE applications using LangChain4j. By following the implementation patterns demonstrated here, you can extend your own applications with AI capabilities that go beyond simple text generation.
 
-Key technical concepts we've covered include:
+We've covered the following key technical concepts:
 
-* **Tool Definition** - Using `@Tool` and `@P` annotations to expose Java methods to LLMs
-* **AI Service Configuration** - Setting up LangChain4j with appropriate model settings and tool registrations
-* **Error Handling** - Implementing strategies for handling hallucinated tool calls
-* **WebSocket Integration** - Creating real-time communication channels between users and AI services
-* **Memory Management** - Maintaining conversation context across multiple interactions
+* Using `@Tool` and `@P` annotations to expose Java methods to LLMs
+* Setting up LangChain4j with appropriate model settings and tool registrations
+* Implementing strategies for handling hallucinated tool calls
+* Creating real-time communication channels between users and AI services by using WebSockets
+* Maintaining conversation context memory across multiple interactions
 
 The approach demonstrated here offers several advantages for Java developers:
 
-* **Separation of Concerns** - Your business logic remains in standard Java methods, cleanly separated from AI integration
-* **Provider Flexibility** - The same code works with multiple LLM providers (GitHub, Ollama, Mistral)
-* **Enterprise Integration** - Seamless integration with existing Jakarta EE and MicroProfile applications
-* **Extensibility** - Easy to add new tools as your application's requirements evolve
+* **Separation of Concerns** - Your business logic remains in standard Java methods, cleanly separated from AI integration.
+* **Provider Flexibility** - The same code works with multiple LLM providers (GitHub, Ollama, Mistral).
+* **Enterprise Integration** - The LLM calls can be seamlessly integrated into existing Jakarta EE and MicroProfile applications
+* **Extensibility** - It's easy to add new tools as your application's requirements evolve
 
-To extend this example for your own applications, consider:
+Ways in which you could extend this tool calling example for your own applications include:
 
 * Creating tools that interact with your application's databases.
 * Implementing tools that trigger business processes or workflows.
