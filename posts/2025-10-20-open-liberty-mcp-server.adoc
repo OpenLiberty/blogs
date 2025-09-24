@@ -1,0 +1,332 @@
+---
+layout: post
+title: "Building custom MCP Servers with Jakarta Servlet on Open Liberty"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/shin19991207
+author_github: https://github.com/shin19991207
+seo-title: Building custom MCP Servers with Jakarta Servlet on Open Liberty
+seo-description: Learn how to build a custom MCP server on Open Liberty by using Jakarta Servlet and the MCP Java SDK.
+blog_description: "Learn how to build a custom MCP server on Open Liberty by using Jakarta Servlet and the MCP Java SDK."
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+---
+= Building custom MCP Servers with Jakarta Servlet on Open Liberty
+Morgan Chang <https://github.com/shin19991207>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+// CHANGE_THIS_VALUE_LATER to https://github.com/OpenLiberty/sample-langchain4j/tree/main/mcp/server
+:example-location: https://github.com/OpenLiberty/sample-langchain4j/tree/chang-mcp/mcp/server
+:blog-building-mcp-client: CHANGE_THIS_VALUE_LATER
+
+Large Language Models (LLMs) are great at reasoning, but they don’t have access to your current or proprietary data. link:https://www.ibm.com/think/topics/model-context-protocol[Model Context Protocol (MCP)] fills that gap by standardizing how AI applications interact with server-hosted capabilities. Think of MCP as REST for AI tools—you expose capabilities via a server, and any MCP-compatible client can invoke them.
+
+MCP defines three types of capabilities:
+
+* **Tools** - Executable functions that allow models to perform actions or retrieve information
+* **Resources** - Structured data or content that provides additional context to the model during execution
+* **Prompts** - Pre-defined templates or instructions that guide how the model interacts or responds
+
+This post focuses on tools. Instead of using a pre-built link:https://github.com/modelcontextprotocol/servers[MCP server], it demonstrates how to build a custom MCP server on Open Liberty, using Jakarta Servlet and the link:https://github.com/modelcontextprotocol/java-sdk[MCP Java SDK]. If you already have a server and want to connect a Java client, check out the companion post: {blog-building-mcp-client}[Building an MCP client on Open Liberty with LangChain4j].
+
+[#tryout]
+== Try out the sample MCP server
+
+Try the sample to explore a Streamable HTTP–based MCP server on Open Liberty. It serves a single `/mcp` endpoint and exposes four Stack Overflow tools callable from any MCP client.
+
+[#pre-reqs]
+=== Prerequisites and setup
+
+To run this sample, you'll need:
+
+* **JDK 21** or later (e.g. https://developer.ibm.com/languages/java/semeru-runtimes/downloads[IBM Semeru Runtime])
+** Run the following command to set the `JAVA_HOME` environment variable: `export JAVA_HOME=<your Java 21 home path>`
+* **Git** - To clone the sample application repository.
+
+Clone the repository and navigate to the MCP server module:
+
+[source, bash]
+----
+git clone https://github.com/OpenLiberty/sample-langchain4j.git
+cd sample-langchain4j/mcp/server
+----
+
+[#start]
+=== Start the server
+
+To start the server, use the provided Maven wrapper to run Open Liberty in https://openliberty.io/docs/latest/development-mode.html[dev mode]:
+
+[source, bash]
+----
+./mvnw liberty:dev
+----
+
+After you see the following message, the application is ready:
+
+[source, bash, role="no_copy"]
+----
+************************************************************************
+*    Liberty is running in dev mode.
+*        Automatic generation of features: [ Off ]
+*        h - see the help menu for available actions, type 'h' and press Enter.
+*        q - stop the server and quit dev mode, press Ctrl-C or type 'q' and press Enter.
+*        
+*    Liberty server port information:
+*        Liberty server HTTP port: [ 9081 ]
+*        Liberty debug port: [ 7777 ]
+************************************************************************
+----
+
+When the application is ready, the server listens at http://localhost:9081/mcp.
+
+=== Test the server
+
+The integration test drives the full protocol flow using the MCP Java SDK. It opens the SSE stream, initializes the session, pings the server, lists available tools, and invokes them.
+
+[source, java, role="no_copy"]
+----
+...
+    private static final String PORT = System.getProperty("http.port", "9081");
+    private static final String BASE_URL = "http://localhost:" + PORT;
+
+    private static McpSyncClient client;
+    private static McpClientTransport transport;
+
+    @BeforeAll
+    static void startClientAndInitialize() {
+        transport = HttpClientStreamableHttpTransport
+                .builder(BASE_URL)
+                .endpoint("/mcp")
+                .build();
+
+        client = McpClient.sync(transport).build();
+
+        client.initialize();
+        client.ping();
+    }
+    // The test methods
+----
+
+See the link:{example-location}/src/test/java/it/io/openliberty/sample/server/McpServerIT.java[McpServerIT.java] file for the full test class.
+
+To verify that the server is working, you can run the tests by pressing the `enter/return` key from the command-line session. If the tests pass, you can see output similar to the following example:
+
+[source, java, role="no_copy"]
+----
+-------------------------------------------------------
+ T E S T S
+-------------------------------------------------------
+Running it.io.openliberty.sample.server.McpServerIT
+...
+Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.797 s...
+
+Results:
+
+Tests run: 3, Failures: 0, Errors: 0, Skipped: 0
+----
+
+== How does the application work?
+
+This sample demonstrates a Jakarta Servlet application that integrates the MCP Java SDK using its Streamable HTTP transport. Tool capabilities are registered during application startup, and all communication is routed through a single `/mcp` endpoint.
+
+When connected to an MCP client, the interaction pattern follows the sequence:
+
+1. The client initiates the session by sending an initialize request via POST to `/mcp`.
+2. The client issues a tool call via POST to `/mcp`.
+3. The server responds with either a single JSON reply or a streamed Server-Sent Events (SSE) response, depending on the request.
+4. To maintain an open stream for server-pushed messages, the client can issue a GET request to `/mcp`.
+
+=== Tool implementation
+
+The core functionality behind the tools is implemented in the link:{example-location}/src/main/java/io/openliberty/sample/server/StackOverflowService.java[`StackOverflowService`] class. This service uses standard Jakarta EE HTTP Client APIs to query the Stack Exchange API and format the results for LLM consumption:
+
+[source, java, role="no_copy"]
+----
+    private ArrayList<String> questionAndAnswer(String url) {
+        ArrayList<String> out = new ArrayList<>();
+        ...
+            for (Map<String, Object> data : clientSearch(url)) {
+                ...
+                    List<Map<String, Object>> answers = clientSearch(String.format(FIND_ANSWER_FMT, qId));
+                    String topAnswer = answers.isEmpty() ? "No answers." : String.valueOf(answers.get(0).get("body"));
+
+                    String line =
+                        "- [" + escapeMd(title) + "](" + qUrl + ")\n" +
+                        "  Problem: " + stripHtml(body) + "\n" +
+                        "  Top answer: " + stripHtml(topAnswer);
+
+                    out.add(line);
+                ...
+            }
+        ...
+        return out;
+    }
+----
+
+=== Registering the MCP Tools
+
+The link:{example-location}/src/main/java/io/openliberty/sample/server/StackOverflowAsyncTools.java[`StackOverflowAsyncTools`] class registers methods from the `StackOverflowService` class as MCP link:https://modelcontextprotocol.io/specification/2025-06-18/server/tools[tools].
+
+Each method is exposed as an asynchronous MCP tool using the `McpServerFeatures.AsyncToolSpecification` API. This API defines tool metadata, a `JsonSchema` input definition, and execution logic, enabling non-blocking and scalable request handling.
+
+==== Tools with parameters
+
+For tools that accept input parameters, a `JsonSchema` object defines the expected properties, including their types and whether they are required. For example, the free-text Stack Overflow free-text search tool requires a single `query` parameter of type `string`:
+
+[source, java, role="no_copy"]
+----
+    public AsyncToolSpecification search() {
+        JsonSchema inputJsonSchema =
+            new JsonSchema(
+                "object",
+                Map.of(
+                    "query", Map.of("type", "string")
+                ),
+                List.of("query"),
+                null,
+                null,
+                null
+            );
+        ...
+----
+
+The `inputJsonSchema` is passed into the tool definition via the https://modelcontextprotocol.io/specification/2025-06-18/schema#tool[`Tool`] builder. The tool is then wrapped in an `AsyncToolSpecification` with a handler that extracts the `query` parameter and passes it to the link:{example-location}/src/main/java/io/openliberty/sample/server/StackOverflowService.java#L117-L121[`StackOverflowService.searchStackOverflow()`] method:
+
+[source, java, role="no_copy"]
+----
+        ...
+        Tool tool = Tool.builder()
+            .name(...)
+            .title(...)
+            .description(...)
+            .inputSchema(inputJsonSchema)
+            .build();
+
+        return AsyncToolSpecification.builder()
+            .tool(tool)
+            .callHandler((McpAsyncServerExchange exchange, CallToolRequest request) ->
+                Mono.fromCallable(() -> {
+                    String query = (String) request.arguments().get("query");
+                    ...
+                    List<String> output = stackOverflowService.searchStackOverflow(query);
+                    ...
+                        resultBuilder.textContent(output);
+                    ...
+                    return resultBuilder.build();
+                }).onErrorResume(error ->
+                    ...
+                )
+            )
+            .build();
+    }
+----
+
+link:https://projectreactor.io[Project Reactor] provides the link:https://projectreactor.io/docs/core/release/api/reactor/core/publisher/Mono.html[`Mono`] type to represent a single asynchronous result. In MCP tool handlers, logic is wrapped using link:https://projectreactor.io/docs/core/release/api/reactor/core/publisher/Mono.html#fromCallable-java.util.concurrent.Callable-[`Mono.fromCallable()`] to execute non-blocking operations. Errors are handled with link:https://projectreactor.io/docs/core/release/api/reactor/core/publisher/Mono.html#onErrorResume-java.lang.Class-java.util.function.Function-[`Mono.onErrorResume()`], allowing graceful fallback responses.
+
+==== Tools without Parameters
+
+For tools that don’t require input, an empty input schema is used. For example, the `noArgsTool()` helper, used to retrieve top questions tagged `jakarta-ee`, `microprofile`, or `langchain4j`, constructs a `JsonSchema` object with no properties:
+
+[source, java, role="no_copy"]
+----
+    private AsyncToolSpecification noArgsTool(...) {
+        JsonSchema emptyJsonSchema = new JsonSchema(
+            "object", Collections.emptyMap(), null, null, null, null);
+        ...
+    }
+----
+
+=== Integrating the MCP Streamable HTTP transport with Jakarta Servlet
+
+To integrate MCP with Jakarta Servlet, the application registers the SDK link:https://modelcontextprotocol.io/specification/2025-06-18/basic/transports#streamable-http[Streamable HTTP transport] as a regular servlet and boots the MCP server during application startup. The transport serves link:https://www.jsonrpc.org/[JSON-RPC] on a single `/mcp` path.
+
+The link:{example-location}/src/main/java/io/openliberty/sample/server/McpServerInitializer.java[`McpServerInitializer`] class implements Jakarta Servlet link:https://jakarta.ee/specifications/platform/10/apidocs/jakarta/servlet/servletcontextlistener[`ServletContextListener`] interface to register the transport and wire the server:
+
+[source, java, role="no_copy"]
+----
+public class McpServerInitializer implements ServletContextListener {
+    ...
+}
+----
+
+At application startup, the initializer creates a `HttpServletStreamableServerTransportProvider` with the default JSON mapper and the `/mcp` endpoint. It registers this transport as the `mcp-streamable` servlet, maps it to `/mcp`, enables asynchronous I/O, and marks it to load on startup. On the same transport, it builds the async MCP server, sets server info and capabilities for tools and logging, and registers the four tools from the `StackOverflowAsyncTools` class:
+
+[source, java, role="no_copy"]
+----
+...
+    @Override
+    public void contextInitialized(ServletContextEvent sce) {
+        ServletContext ctx = sce.getServletContext();
+
+        transport = HttpServletStreamableServerTransportProvider.builder()
+            .jsonMapper(McpJsonMapper.getDefault())
+            .mcpEndpoint("/mcp")
+            .build();
+
+        Dynamic registration = ctx.addServlet("mcp-streamable", transport);
+        registration.addMapping("/mcp");
+        registration.setAsyncSupported(true);
+        registration.setLoadOnStartup(1);
+
+        server = McpServer.async(transport)
+            .serverInfo("mcp-stackoverflow-server", "1.0.0")
+            .capabilities(ServerCapabilities.builder()
+                .tools(true)
+                .logging()
+                .build())
+            .tools(
+                stackOverflowAsyncTools.jakartaEETop(),
+                stackOverflowAsyncTools.microProfileTop(),
+                stackOverflowAsyncTools.langChain4jTop(),
+                stackOverflowAsyncTools.search()
+            )
+            .build();
+    }
+...
+----
+
+Liberty scans annotations by default. Because the transport class carries the link:https://github.com/modelcontextprotocol/java-sdk/blob/main/mcp-core/src/main/java/io/modelcontextprotocol/server/transport/HttpServletStreamableServerTransportProvider.java#L60[`@WebServlet`] annotation without explicit URL patterns, it triggers an link:https://www.ibm.com/docs/en/was-liberty/core?topic=messages-srve[`SRVE9989E`] error about incomplete servlet metadata.
+
+The link:{example-location}/src/main/webapp/WEB-INF/web.xml[`web.xml`] sets the application `metadata-complete` as `true` to turn off scanning and declares only the bootstrap listener. The `/mcp` mapping remains programmatic, as shown above:
+
+[source, xml, role="no_copy"]
+----
+...
+  <listener>
+    <listener-class>io.openliberty.sample.server.McpServerInitializer</listener-class>
+  </listener>
+...
+----
+
+== Conclusion: Building MCP servers with Jakarta EE on Open Liberty
+
+In this tutorial, we've demonstrated how to implement a custom MCP server using Jakarta Servlet on Open Liberty. For simplicity, the sample application focuses on the MCP tool capability and wraps the public Stack Overflow API, allowing you to focus on protocol and server wiring.
+
+To extend this example for your own use cases, consider implementing additional MCP capabilities:
+
+* Creating tools that interact with internal APIs, databases, or business logic
+* Defining prompts that guide LLMs through complex tasks or workflows
+* Registering resources that expose internal documentation, metrics, or domain-specific knowledge
+
+By combining MCP with Jakarta EE’s enterprise-grade features, you can build scalable, intelligent systems that respond to real-time data, automate operations, and deliver meaningful insights to users.
+
+[#next]
+== Where to next?
+
+When you’re happy with the server, connect it from a Java client. See the companion post link:{blog-building-mcp-client}[Building an MCP client on Open Liberty with LangChain4j], which shows how to integrate LangChain4j to invoke MCP capabilities from enterprise-grade Java applications.
+  
+You can also check out the link:https://openliberty.io/guides[Open Liberty guides] for more information and interactive tutorials that walk you through other Jakarta EE and MicroProfile APIs with Open Liberty.
+
+[#more]
+== Find out more
+
+* link:https://modelcontextprotocol.io/specification/latest[Model Context Protocol Specification]
+
+* link:https://github.com/modelcontextprotocol/java-sdk[MCP Java SDK]
+
+* link:https://openliberty.io/docs/latest/reference/feature/servlet.html[Enabling Jakarta Servlet on Open Liberty]
+
+* link:https://projectreactor.io[Project Reactor]
+
+* link:https://openliberty.io/blog/2024/04/01/open-liberty-with-langchain4j-example.html?_gl=1*18odeci*_ga*MTM2NjY0NTQ3NS4xNzU4MjkxMDk2*_ga_FYECCCS21D*czE3NTg2NjI3MDckbzUkZzAkdDE3NTg2NjI3MzUkajMyJGwwJGgw[Run AI-enabled Jakarta EE and MicroProfile applications on Open Liberty]
