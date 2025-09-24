@@ -1,0 +1,394 @@
+---
+layout: post
+title: "在 Open Liberty 上运行支持 AI 的 Jakarta EE 和 MicroProfile 应用程序"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/gkwan-ibm
+author_github: https://github.com/gkwan-ibm
+seo-title: 在 Open Liberty 上运行支持 AI 的 Jakarta EE 和 MicroProfile 应用程序
+seo-description: 通过使用 LangChain4j API，在运行于 Open Liberty 上的 Jakarta EE 和 MicroProfile 应用程序中体验 AI 技术。
+blog_description: "通过使用 LangChain4j API，在运行于 Open Liberty 上的 Jakarta EE 和 MicroProfile 应用程序中体验 AI 技术。"
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+additional_authors:
+- name: Grace Jansen
+  github: https://github.com/GraceJansen
+  image: https://avatars0.githubusercontent.com/GraceJansen
+- name: 張藝馨 (翻译)
+  github: https://github.com/shin19991207
+  image: https://avatars0.githubusercontent.com/shin19991207
+blog-available-in-languages:
+- lang: en
+  path: /blog/2024/04/01/open-liberty-with-langchain4j-example.html
+---
+= 在 Open Liberty 上运行支持 AI 的 Jakarta EE 和 MicroProfile 应用程序
+Gilbert Kwan <https://github.com/gkwan-ibm>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+:example-location: https://github.com/langchain4j/langchain4j-examples/tree/main/jakartaee-microprofile-example
+
+
+人工智能（Artificial Intelligence，AI）是一个令人兴奋且具有颠覆性的领域，它已经通过实现自动化、改进决策制定和从数据中获取新见解来转变企业甚至整个行业。随着 ChatGPT 等大型语言模型（Large Language Model，LLM）的兴起，AI 的性能及其推动企业价值的潜力发生了重大转变。那么，这将如何影响企业的软件开发以及云原生 Java 应用程序的构建呢？
+
+在本文中，我们将探讨什么是 LLM 以及如何在 Java 应用程序中使用它们。我们也将在一个 Jakarta EE/MicroProfile 示例应用程序中入门实践。
+
+* <<what_Are_LLMs, 了解什么是大型语言模型（LLM）>>
+* <<Java_LLMs, 探索简化 LLM 使用的 Java 应用框架>>
+* <<using_Langchain4j, 学习如何在 Java 应用中使用 LangChain4j>>
+* <<tryout, 试用 jakartaee-microprofile-example 示例应用>>
+* <<how_app_work, 了解该示例应用的工作原理和架构>>
+
+[#what_Are_LLMs]
+== 什么是 LLMs？
+
+语言模型是基于概率的自然语言模型，它们能够生成一系列词语组合的概率。而https://www.ibm.com/cn-zh/think/topics/large-language-models[大型语言模型（LLM）]是指规模庞大的语言模型，通常以其参数数量巨大而被分类为“大型”。这些模型通过自监督和半监督学习技术，在海量数据上进行训练，参数量可能达到数十亿级别。训练后的模型具备生成自然语言及其他类型内容的能力，能够执行广泛的任务。
+
+你可以观看这个link:https://www.youtube.com/watch?v=5sLYAQS9sWQ[介绍视频]，了解 LLM 的基本概念、工作原理以及在商业中的应用场景。
+
+目前几乎所有主流云服务提供商都在其产品中集成了 LLM。例如，IBM 通过其 link:https://www.ibm.com/watsonx[watsonx] 服务提供模型；link:https://azure.microsoft.com/en-us/solutions/ai[Microsoft Azure] 提供如 Llama 2 和 OpenAI GPT-4 等模型；link:https://aws.amazon.com/bedrock/[Amazon Bedrock] 则聚合了来自多家 AI 公司的模型服务。
+
+
+[#Java_LLMs]
+== 我们如何在 Java 应用中充分利用 LLM？
+
+将 AI/LLM 能力集成到应用程序中可能具有一定挑战性。开源框架 LangChain 于 2022 年推出，旨在帮助简化创建生成式 AI 应用程序的开发流程。
+
+LangChain 提供了一系列工具和抽象层，用于提升模型生成内容的定制性、准确性和相关性。例如，开发者可以使用 LangChain 组件构建新的提示链（Prompt chain），或自定义已有的提示模板（Prompt template）。LangChain 还包括使 LLM 能够在不重新训练的情况下访问新数据集的组件，并能高效组织模型所需的大量数据，以便可以轻松访问和使用。
+
+虽然 LangChain 主要提供 Python 和 JavaScript/TypeScript 版本，但社区项目如 https://github.com/langchain4j/langchain4j[LangChain4j] 也提供了在 Java 应用中使用 LangChain 的选项。通过 LangChain4j API，开发者可以将 LLM 集成到 Java 应用中，并连接到不同的 AI 平台，如 OpenAI 和 Hugging Face。
+
+image::/img/blog/langchain4j.png[langchain4j GitHub README image,width=70%,align="center"]
+
+[#using_Langchain4j]
+== 如何在 Jakarta EE 和 MicroProfile 应用程序中使用 LangChain4j
+
+LangChain4j 提供了一个非常有用的开源 https://github.com/langchain4j/langchain4j-examples[langchain4j-examples] GitHub 仓库，用于存放示例应用程序。然而，我们没有找到任何展示如何在基于 Jakarta EE 或 MicroProfile 的应用程序中体验这些 AI 技术的示例。因此，我们决定自行构建一个名为 `jakartaee-microprofile-example` 的示例应用，且目前已收录在该 `jakartaee-microprofile-example`, which can now be found in this https://github.com/langchain4j/langchain4j-examples/tree/main/jakartaee-microprofile-example[langchain4j-examples] 仓库中。
+这个演示应用展示了如何在使用 Open Liberty 的 Jakarta EE 和 MicroProfile 应用程序中使用 LangChain4j API。
+
+[#tryout]
+== 试用 jakartaee-microprofile-example 示例应用
+
+要了解如何将 LangChain4j 应用于你自己的 Jakarta EE 和 MicroProfile 应用，请亲自查看这个示例项目。
+
+[#pre-reqs]
+=== 前提条件
+
+在将应用克隆到本地之前，请先安装 JDK 17，并确保已正确设置 `JAVA_HOME` 环境变量。你可以选择使用 https://developer.ibm.com/languages/java/semeru-runtimes/downloads[IBM Semeru Runtime] 作为您的 Java 运行时。该运行时基于 Eclipse OpenJ9 等项目的深度技术投入，在多种硬件和软件平台上都具备良好的性能优势。更多关于 IBM Semeru Runtime 的信息，请参阅 https://openliberty.io/blog/2022/08/19/open-liberty-semeru-performance.html[Open Liberty and Semeru Runtimes, cloud-native performance that matters]。
+
+该应用程序使用 Hugging Face。您需要获取 Hugging Face API 密钥：
+
+* 注册并登录 https://huggingface.co
+* 前往 link:https://huggingface.co/settings/tokens[访问令牌页面]
+* 创建一个具有 `read` 权限的访问令牌
+
+To access the repository remotely, install https://git-scm.com/book/en/v2/Getting-Started-Installing-Git[Git] if you haven't already. You can clone the `langchain4j-examples` GitHub repository to your local machine by running the following command:
+
+[source]
+----
+git clone https://github.com/langchain4j/langchain4j-examples.git
+----
+
+[#env_setup]
+=== Environment setup
+
+To run the application, navigate to the `jakartaee-microprofile-example` directory:
+
+[source]
+----
+cd langchain4j-examples/jakartaee-microprofile-example
+----
+
+Set the following environment variables:
+
+[source]
+----
+export JAVA_HOME=<your Java 17 home path>
+export HUGGING_FACE_API_KEY=<your Hugging Face read token>
+----
+
+[#tryout]
+== 尝试 jakartaee-microprofile-example 应用程序
+
+要了解如何将 LangChain4j 应用到您自己的 Jakarta EE 和 MicroProfile 应用程序中，请亲自查看这个示例项目。
+
+[#pre-reqs]
+=== 前提条件
+在将应用程序克隆到您的机器之前，请安装 JDK 17，并确保设置了 `JAVA_HOME` 环境变量。您可以使用 https://developer.ibm.com/languages/java/semeru-runtimes/downloads[IBM Semeru Runtime] 作为您选择的 Java 运行时。这个运行时通过在 Eclipse OpenJ9 等项目中的深度技术投资提供性能优势，并且可在各种硬件和软件平台上使用。要了解有关 IBM Semeru Runtime 的更多信息，请参阅 https://openliberty.io/blog/2022/08/19/open-liberty-semeru-performance.html[Open Liberty 和 Semeru Runtimes，重要的云原生性能]。
+
+该应用程序使用 Hugging Face。您需要获取 Hugging Face API 密钥：
+
+* 注册并登录 https://huggingface.co
+* 前往 link:https://huggingface.co/settings/tokens[访问令牌页面]
+* 创建一个具有 `read` 角色的访问令牌
+
+如果你尚未安装 Git，可以参考 https://git-scm.com/book/en/v2/Getting-Started-Installing-Git[Git 安装指南]进行安装。安装完成后，运行以下命令将 `langchain4j-examples` GitHub 仓库克隆到本地：
+
+[source]
+----
+git clone https://github.com/langchain4j/langchain4j-examples.git
+----
+
+[#env_setup]
+=== 环境配置
+
+要运行该应用，请进入 `jakartaee-microprofile-example` 目录：
+
+[source]
+----
+cd langchain4j-examples/jakartaee-microprofile-example
+----
+
+设置以下环境变量：
+
+[source]
+----
+export JAVA_HOME=<your Java 17 home path>
+export HUGGING_FACE_API_KEY=<your Hugging Face read token>
+----
+
+[#start_app]
+=== 启动应用程序
+
+要启动该应用程序，请使用项目中提供的 Maven Wrapper，在 Open Liberty https://openliberty.io/docs/latest/development-mode.html[dev mode] 下运行：
+
+[source]
+----
+./mvnw liberty:dev
+----
+
+当您看到以下消息时，说明应用程序已准备就绪：
+
+----
+************************************************************************
+*    Liberty is running in dev mode.
+*        Automatic generation of features: [ Off ]
+*        h - see the help menu for available actions, type 'h' and press Enter.
+*        q - stop the server and quit dev mode, press Ctrl-C or type 'q' and press Enter.
+*
+*    Liberty server port information:
+*        Liberty server HTTP port: [ 9080 ]
+*        Liberty server HTTPS port: [ 9443 ]
+*        Liberty debug port: [ 7777 ]
+************************************************************************
+----
+
+为确认应用是否成功启动，你可以在命令行中按下 `enter/return` 键运行测试。如果测试通过，你将看到类似如下的输出：
+
+----
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running it.dev.langchan4j.example.ChatServiceIT
+[INFO] ...
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.439 s...
+[INFO] ...
+[INFO] Running it.dev.langchan4j.example.ModelResourceIT
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.733 s...
+[INFO]
+[INFO] Results:
+[INFO]
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0
+----
+
+[#access_app]
+=== 访问应用程序
+
+应用启动后，你可以通过任意浏览器访问 http://localhost:9080/ 并开始试验。
+
+image::/img/blog/langchain4j-example-chat-room.png[Chat Room of LangChain4j Jakarta EE and MicroProfile example,width=70%,align="center"]
+
+你可以输入任意文本与 AI 代理进行对话。以下是一些推荐的消息示例：
+
+* `什么是 MicroProfile？`
+* `目前有哪些主要公司在推动 MicroProfile 项目的发展？`
+* `有任何文档吗？`
+
+[#how_app_work]
+== 应用程序的工作原理
+
+该应用展示了如何结合使用以下技术：
+
+* LangChain4j API
+* https://openliberty.io/docs/ref/feature/#cdi-4.0.html[Jakarta Contexts and Dependency Injection]
+* https://openliberty.io/docs/latest/reference/feature/websocket-2.1.html[Jakarta WebSocket]
+* https://openliberty.io/docs/ref/feature/#mpConfig-3.0.html[MicroProfile Config]
+* https://openliberty.io/docs/latest/reference/feature/mpMetrics-5.1.html[MicroProfile Metrics]
+
+[#create_service]
+=== 创建 LangChain4j AI 服务
+
+该应用使用 `HuggingFaceChatModel` 类作为构建 AI 服务的模型。
+
+请参阅文件：{example-location}/src/main/java/dev/langchain4j/example/chat/ChatAgent.java[src/main/java/dev/langchain4j/example/chat/ChatAgent.java]
+
+[source, java, role="no_copy"]
+----
+    public Assistant getAssistant() {
+        ...
+            HuggingFaceChatModel model = HuggingFaceChatModel.builder()
+                .accessToken(HUGGING_FACE_API_KEY)
+                .modelId(CHAT_MODEL_ID)
+                .timeout(ofSeconds(TIMEOUT))
+                .temperature(TEMPERATURE)
+                .maxNewTokens(MAX_NEW_TOKEN)
+                .waitForModel(true)
+                .build();
+            assistant = AiServices.builder(Assistant.class)
+                .chatLanguageModel(model)
+                .chatMemoryProvider(
+                    sessionId -> MessageWindowChatMemory.withMaxMessages(MAX_MESSAGES))
+                .build();
+       ...
+    }
+----
+
+通过自定义的 `Assistant` 接口，应用程序可以通过其 `chat()` 方法向 LLM 发送消息。
+
+----
+    interface Assistant {
+       String chat(@MemoryId String sessionId, @UserMessage String userMessage);
+    }
+----
+
+[#external_config]
+=== 外部化配置
+
+访问模型需要 API 密钥。出于安全考虑，密钥不会硬编码在代码中。应用通过 MicroProfile Config 特性将 API 密钥和 LangChain4j 模型属性外部化，从而支持在不同环境中运行而无需修改代码。详细信息请参考link:https://openliberty.io/docs/latest/external-configuration.html[微服务的外部配置]文档。
+
+请参阅文件：{example-location}/src/main/java/dev/langchain4j/example/chat/ChatAgent.java[src/main/java/dev/langchain4j/example/chat/ChatAgent.java]
+
+[source, java, role="no_copy"]
+----
+    @Inject
+    @ConfigProperty(name = "hugging.face.api.key")
+    private String HUGGING_FACE_API_KEY;
+
+    @Inject
+    @ConfigProperty(name = "chat.model.id")
+    private String CHAT_MODEL_ID;
+
+    @Inject
+    @ConfigProperty(name = "chat.model.timeout")
+    private Integer TIMEOUT;
+
+    @Inject
+    @ConfigProperty(name = "chat.model.max.token")
+    private Integer MAX_NEW_TOKEN;
+
+    @Inject
+    @ConfigProperty(name = "chat.model.temperature")
+    private Double TEMPERATURE;
+
+    @Inject
+    @ConfigProperty(name = "chat.memory.max.messages")
+    private Integer MAX_MESSAGES;
+----
+
+要微调 LangChain4j 模型或尝试其他 LLM，只需更新配置文件 {example-location}/src/main/resources/META-INF/microprofile-config.properties[langchain4j-examples/jakartaee-microprofile-example/src/main/resources/META-INF/microprofile-config.properties] 中的值或通过环境变量提供它们。
+
+----
+hugging.face.api.key=set it by env variable
+chat.model.id=NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO
+chat.model.timeout=120
+chat.model.max.token=200
+chat.model.temperature=1.0
+chat.memory.max.messages=20
+----
+
+[#communicate]
+=== 客户端与 LLM 的通信
+
+该应用提供了交互式 UI 客户端，供用户与 LLM 进行通信。Jakarta WebSocket 实现了客户端与 `ChatService` 服务之间的双向通信。每个客户端通过 HTTP 建立连接，并通过 `send()` 方法发送消息。
+
+请参阅文件：{example-location}/src/main/webapp/chatroom.js[src/main/webapp/chatroom.js] file
+
+[source, java, role="no_copy"]
+----
+    const webSocket = new WebSocket('ws://localhost:9080/chat');
+    ...
+    function sendMessage() {
+        ...
+        var myMessage = document.getElementById('myMessage').value;
+        ...
+        webSocket.send(myMessage);
+        ...
+    }
+----
+
+服务端通过 WebSocket 的 `onMessage()` 方法接收用户消息，调用 `ChatAgent.chat()` 方法将消息转发给 LLM，并通过 `sendObject()` 方法将 LLM 的回复广播回客户端会话。
+
+请参阅文件：{example-location}/src/main/java/dev/langchain4j/example/chat/ChatService.java[src/main/java/dev/langchain4j/example/chat/ChatService.java]
+
+[source, java, role="no_copy"]
+----
+    @OnMessage
+    public void onMessage(String message, Session session) {
+        ...
+        try {
+            ...
+            answer = agent.chat(sessionId, message);
+        } catch (Exception e) {
+            ...
+        }
+
+        try {
+            session.getBasicRemote().sendObject(answer);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+    }
+----
+
+[#enable_metrics]
+=== 启用指标数据
+
+为了确定应用程序的性能和健康状况，应用使用 MicroProfile Metrics 通过在 `onMessage()` 方法上添加 `@Timed` 注解来收集聊天处理时间。
+
+请参阅文件：{example-location}/src/main/java/dev/langchain4j/example/chat/ChatService.java[src/main/java/dev/langchain4j/example/chat/ChatService.java]
+
+[source, java, role="no_copy"]
+----
+    @OnMessage
+    @Timed(name = "chatProcessingTime",
+           absolute = true,
+           description = "Time needed chatting to the agent.")
+    public void onMessage(String message, Session session) {
+        ...
+----
+
+访问 http://localhost:9080/metrics?scope=application 以查看指标数据。
+
+----
+# HELP chatProcessingTime_seconds Time needed chatting to the agent.
+# TYPE chatProcessingTime_seconds summary
+chatProcessingTime_seconds{mp_scope="application",quantile="0.5",} 0.0
+chatProcessingTime_seconds{mp_scope="application",quantile="0.75",} 0.0
+chatProcessingTime_seconds{mp_scope="application",quantile="0.95",} 0.0
+chatProcessingTime_seconds{mp_scope="application",quantile="0.98",} 0.0
+chatProcessingTime_seconds{mp_scope="application",quantile="0.99",} 0.0
+chatProcessingTime_seconds{mp_scope="application",quantile="0.999",} 0.0
+chatProcessingTime_seconds_count{mp_scope="application",} 6.0
+chatProcessingTime_seconds_sum{mp_scope="application",} 31.674357666
+# HELP chatProcessingTime_seconds_max Time needed chatting to the agent.
+# TYPE chatProcessingTime_seconds_max gauge
+chatProcessingTime_seconds_max{mp_scope="application",} 13.191547042
+----
+
+如果你对 LangChain4j API 的其他使用方式感兴趣，可以参考此文件中提供的 REST API 示例：{example-location}/src/main/java/dev/langchain4j/example/rest/ModelResource.java[src/main/java/dev/langchain4j/example/rest/ModelResource.java]
+
+[#where_to_next]
+== 下一步做什么？
+
+访问 link:https://openliberty.io/guides/[Open Liberty 指南^]，学习如何在 Open Liberty 中使用更多 Jakarta EE 和 MicroProfile API。
+
+[#help_links]
+== 有用的链接
+
+* link:https://github.com/langchain4j[LangChain4j]
+* link:https://huggingface.co/models[Hugging Face LLMs]
+* link:https://openliberty.io/guides/jakarta-websocket.html[Bidirectional communication between services using Jakarta WebSocket^]
+* link:https://openliberty.io/guides/cdi-intro.html[Injecting dependencies into microservices^]
+* link:https://openliberty.io/guides/microprofile-config.html[Configuring microservices^]
+* link:https://openliberty.io/guides/microprofile-metrics.html[Providing metrics from a microservice^]
