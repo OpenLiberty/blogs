@@ -152,20 +152,20 @@ The core functionality behind the tools is implemented in the link:{example-loca
 
 [source, java, role="no_copy"]
 ----
-    private ArrayList<String> questionAndAnswer(String url) {
-        ArrayList<String> out = new ArrayList<>();
+    private List<Map<String,Object>> questionAndAnswer(String url) {
+        List<Map<String,Object>> out = new ArrayList<>();
         ...
             for (Map<String, Object> data : clientSearch(url)) {
                 ...
+                Map<String,Object> item = new LinkedHashMap<>();
+                item.put("Title", title);
+                item.put("URL", "https://stackoverflow.com/questions/" + qId);
+                item.put("Problem description", stripHtml(body));
+                ...
                     List<Map<String, Object>> answers = clientSearch(String.format(FIND_ANSWER_FMT, qId));
                     String topAnswer = answers.isEmpty() ? "No answers." : String.valueOf(answers.get(0).get("body"));
-
-                    String line =
-                        "- [" + escapeMd(title) + "](" + qUrl + ")\n" +
-                        "  Problem: " + stripHtml(body) + "\n" +
-                        "  Top answer: " + stripHtml(topAnswer);
-
-                    out.add(line);
+                    item.put("Top answer", stripHtml(topAnswer));
+                    out.add(item);
                 ...
             }
         ...
@@ -218,9 +218,9 @@ The `inputJsonSchema` is passed into the tool definition via the https://modelco
                 Mono.fromCallable(() -> {
                     String query = (String) request.arguments().get("query");
                     ...
-                    List<String> output = stackOverflowService.searchStackOverflow(query);
+                    List<Map<String,Object>> output = stackOverflowService.searchStackOverflow(query);
                     ...
-                        resultBuilder.textContent(output);
+                        resultBuilder.structuredContent(Map.of("results", output));
                     ...
                     return resultBuilder.build();
                 }).onErrorResume(error ->
