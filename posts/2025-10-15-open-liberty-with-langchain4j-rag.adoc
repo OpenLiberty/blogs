@@ -110,17 +110,11 @@ The application can use a variety of model providers.
     - Download and install [Ollama](https://ollama.com/download)
       - see the [README.md](https://github.com/ollama/ollama/blob/main/README.md#ollama)
     - Pull the following models
-      - `ollama pull llama3.2`
-      - `ollama pull all-minilm`
-      - `ollama pull tinydolphin`
+      - `ollama pull nomic-embed-text`
   - Mistral AI
     - Sign up and log in to https://console.mistral.ai/home.
     - Go to [Your API keys](https://console.mistral.ai/api-keys).
     - Create a new key.
-  - Hugging Face
-    - Sign up and log in to https://huggingface.co.
-    - Go to [Access Tokens](https://huggingface.co/settings/tokens).
-    - Create a new access token with `read` role.
 
 To access the repository remotely, install https://git-scm.com/book/en/v2/Getting-Started-Installing-Git[Git] if you haven't already. You can clone the sample-langchain4j [GitHub repository](https://github.com/OpenLiberty/sample-langchain4j) to your local machine by running the following command:
 
@@ -160,7 +154,6 @@ Set the `GITHUB_API_KEY` environment variable if using Github.
 
 [source]
 ----
-unset HUGGING_FACE_API_KEY
 unset OLLAMA_BASE_URL
 unset MISTRAL_AI_API_KEY
 export GITHUB_API_KEY=<your Github API token>
@@ -170,7 +163,6 @@ Set the `OLLAMA_BASE_URL` environment variable if using Ollama. Use your Ollama 
 
 [source]
 ----
-unset HUGGING_FACE_API_KEY
 unset GITHUB_API_KEY
 unset MISTRAL_AI_API_KEY
 export OLLAMA_BASE_URL=http://localhost:11434
@@ -180,22 +172,10 @@ Set the `MISTRAL_AI_API_KEY` environment variable if using Mistral AI.
 
 [source]
 ----
-unset HUGGING_FACE_API_KEY
 unset GITHUB_API_KEY
 unset OLLAMA_BASE_URL
 export MISTRAL_AI_API_KEY=<your Mistral AI API key>
 ----
-
-Set the `HUGGING_FACE_API_KEY` environment variable if using Hugging Face.
-
-[source]
-----
-unset GITHUB_API_KEY
-unset OLLAMA_BASE_URL
-unset MISTRAL_AI_API_KEY
-export HUGGING_FACE_API_KEY=<your Hugging Face read token>
-----
-
 
 ### Running MongoDB in a Docker container
 
@@ -245,40 +225,43 @@ To ensure that the application started successfully, you can run the tests by pr
 === Access the application
 If you are currently using one of the following model providers: GitHub, Ollama or MistralAI, you may proceed.
 
-After the application is running, you can access it through a browser of your choice at http://localhost:9081/ to start experimenting with it.
-Initially, the MongoDB Atlas Database is empty and thus, in order for the RAG to be used in conjunction with the chat application, initialize the database using 
-http://localhost:9081/openapi/ui POST request at `/api/embedding/init`.
+Visit and try out the chat application at http://localhost:9081/.
+  - At the prompt, try the following message examples:
+    - ```
+      Explain the Core Profile and Jakarta EE JSON Binding?
+      ```
+    - ```
+      What are the default ConfigSources and the values? List in the order of default precedence.
+      ```
+  - Currently, the chat application does not use the knowledge base.
 
-Navigate to http://localhost:9081/openapi/ui/ to see the OpenAPI user interface (UI) that provides API documentation and a client to test the API endpoints for mongoDB.
-  * To try a particular api, authentication is required.
-  *  The admin (read/write full access) and user (read only access) security roles are created. 
-  *  For admin access, use `bob` and his password is `bobpwd`.
-  *  For read only access, use `alice` and her password is`alicepwd`.
+Navigate to http://localhost:9081/openapi/ui/ to see the OpenAPI user interface (UI) that provides API documentation and a client to test the API endpoints for MongoDB.
+  - To try a particular api, authentication is required. The admin (read/write full access) and user (read only access) security roles are created.
+    - For admin access, use `bob` and his password is `bobpwd`.
+    - For read only access, use `alice` and her password is`alicepwd`.
+  - Information about the REST APIs: 
+    - The GET request at `/api/embedding` retrieves the content stored in the database.
+    - The POST request at `/api/embedding` adds content to the database.
+    - The POST request at `/api/embedding/init` processes and adds the knowledge base from `sample-langchain4j/rag/src/main/resources/knowledge_base`.
+    - The PUT request at `/api/embedding/{id}` updates the content and summary given the id.
+    - The DELETE request at `/api/embedding/{id}` removes the content from the database given the id.
 
-*  Try the GET request at `/api/embedding`. Initially the database is empty.
-* Try the POST request at `/api/embedding/init`. This adds the knowledge base embeddings to MongoDB.
-* Try the GET request at `/api/embedding` again. The content from the `sample-langchain4j/rag/src/main/resources/knowledge_base` should be displayed.
+Try the POST request at `/api/embedding/init` that adds the knowledge base embeddings to MongoDB.
 
-Navigate to http://localhost:9081/ to use the chat application
+Navigate to http://localhost:9081/ to try out the chat application again. Now, the application uses the knowledge base through RAG.
+  - At the prompt, try the following message examples:
+    - ```
+      Explain the Core Profile and Jakarta EE JSON Binding?
+      ```
+    - ```
+      What are the default ConfigSources and the values? List in the order of default precedence.
+      ```
 
-image::/img/blog/langchain4j-example-chat-room.png[Chat Room of LangChain4j Jakarta EE and MicroProfile example,width=70%,align="center"]
+You can compare the AI responses to the knowledge base files at the `sample-langchain4j/rag/src/main/resources/knowledge_base` directory. The response should be more specific and relevant compared to the responses before.
 
-At the prompt, try the following message examples:
+You can try out adding your own data into the database directly by using POST `/api/embedding` API and then try out messages in RAG chat application.
 
-  *  ```
-      How do I isolate applications on the same server?
-    ```
-  *  ```
-      Which OpenTelemetry property enabled by MicroProfile Telemetry do I need in order to set the exporter that is used to collect traces?
-    ```
-
-Use the `sample-langchain4j/rag/src/main/resources/knowledge_base` files to compare the AI responses to the knowledge base files.
-
-In the `rag-db` directory, restarting the program by running `./mvnw liberty:dev` again and submitting the GET request gives the embeddings that are stored in MongoDB previously. 
-Similarly, resubmitting POST request to `/api/embedding/init` indicates that the knowledge base has already been initialized. 
-
-
-Now, examine the responses and check their relevance and accuracy against the files provided to the AI in `sample-langchain4j/rag/src/main/resources/document_files/files.zip`
+Note that the embeddings and content that are stored in MongoDB previously are preserved even after restarting the application by stopping and running `./mvnw liberty:dev` again.
 
 [#how_app_work]
 == How does the application work?
@@ -286,13 +269,25 @@ Now, examine the responses and check their relevance and accuracy against the fi
 The application demonstrates how to use the LangChain4j APIs, https://openliberty.io/docs/ref/feature/#cdi-4.0.html[Jakarta Contexts and Dependency Injection], https://openliberty.io/docs/latest/reference/feature/websocket-2.1.html[Jakarta WebSocket], https://openliberty.io/docs/ref/feature/#mpConfig-3.0.html[MicroProfile Config], and https://openliberty.io/docs/latest/reference/feature/mpMetrics-5.1.html[MicroProfile Metrics] features.
 We will go through a step by step process to create a RAG application.
 
-== How RAG works in this application
+== Big Picture: How RAG works in this application
 Stage 1. Initialization Stage: process and store the content as embeddings or vectors inside the database. Each embedding(vector) corresponds to some content(text data) in this example. Sometimes the processing step involves chunking the content.
 Stage 2. Inference Stage: When the user asks a query, convert the query to an embedding/vector and then find similar embeddings/vectors. 
 The user query embedding and the database embeddings are compared; Similar vectors are obtained from vector search and their respective content is retrieved.
 The augmented message sent to AI contains the user query plus similar content/text that was retrieved.
 
 === Connecting to MongoDB Atlas
+The docker-compose file creates a MongoDB database using the mongodb/mongodb-atlas-local image.
+The root username and password are set inside the environment. 
+Furthermore, the ports are also set to connect the host port to the container MongoDB database port 27017.
+
+services:
+  mongodb:
+    image: mongodb/mongodb-atlas-local
+    environment:
+      - MONGODB_INITDB_ROOT_USERNAME=sampleUser
+      - MONGODB_INITDB_ROOT_PASSWORD=openliberty
+    ports:
+      - 27017:27017
 
 Inside the sample-langchain4j/rag-db/src/main/java/io/openliberty/sample/langchain4j/mongo directory, MongoProducer.java produces a MongoDatabase object that is used in other classes, and AtlasMongoDB.java contains methods to create search indexes, retrieve similar content, remove, update, or delete the database contents.
 
@@ -343,9 +338,56 @@ The close method closes the connection.
     }
 ----
 
-*********** AtlasMongoDB .java SECTION Code update PR in progress ********
+The role of the AtlasMongoDB.java class is to provide relevent functions for RAG such as creating indexes, or retrieving the content.
+Inside the mongo directory, the AtlasMongoDB will create a collection within the existing database injected as MongoDatabase.
+The ModelBuilder instance is required to get the corresponding embedding model.
 
-*********** AtlasMongoDB .java SECTION ************************************************************************************
+The database.getCollection method returns a MongoCollection<Document>. 
+
+Before the database is initialized in the program and for the vector search to work, createIndex() method
+creates a search index. It gets the current collection called embeddingStore and then stores the information
+such as the vector dimension obtained from  modelBuilder.getEmbeddingModel().dimension(), it will also use a cosine similarity approach when 
+creating the search indexes.
+
+The createSearchIndexes method is called to execute the request.
+Then, the search indexes are ready when queryable variable is set to true. Search indexes may take some time to become ready.
+The convertUserQueryToEmbedding function uses the LangChain4j API to embed the content.
+
+The rest of the functions such as deleteOne, replaceOne and insertOne call the respective methods on the current collection.
+
+The retrieveContent method takes in a the userQuery embedding vector, and the query text. 
+It uses the userQuery vector, the location or PATH to where the vectors are stored, selects NUM_CANDIDATES vectors in the nearby group in the latent space,
+and returns the limit of MAX_RESULTS_TO_AI, based on the SEARCH_INDEX_NAME. The aggregate returns the results for $vectorSearch command and each result is a Document.
+
+The Document contains summary, cntent, and vector sections but only the content section is required and is obtained using result.getString("Content") for each result.  
+
+=== Open API UI to initialize the MongoDB Atlas Database with embeddings
+
+An embedding application is created using the jakarta at /api. 
+The EmbeddingService implements various REST API upon request at the application path /embedding. 
+Given the summary and content text, the POST request at /api/embedding stores the summary, content, and vector together into MongoDB as a List<Float>.
+The response is created and returned. 
+The RolesAllowed defines which group is allowed to perform that request operation.
+Similarily, the annotations such as APIResponses indicate the potential response code with the descriptions.
+
+The POST request at /api/embedding/init works as follows to initialize the MongoDB database from the knowledge base.
+If the mongodb database is empty, the search index is created using the methods as described in AtlasMongoDB in order for the vector search to work.
+The code goes through the resources/knowledge_base folder using the listed MD_FILES.
+Each line of the text file is extracted where the first line is stored as the summary, and the rest as the content.
+The summary, content, and embedding vector is created and added into the same document. 
+Each document is inserted into MongoDB Atlas.
+
+The GET request at /api/embedding lists the embeddings from the database using the retrieve method.
+It uses the mongoDB.getCollection().find() that returns all the Document objects from MongoDB.
+The Json String is returned as the response. 
+
+The PUT updates the content and summary given the object id at /api/embedding/{id}. 
+A new document with summary, and content with its newly generated vector is created and replaced using replaceOne
+for the existing oid located at _id. If none of the records match, a BAD_REQUEST status code is returned.
+
+Likewise, the Delete operation at /api/embedding/{id} requires the object id to delete the particular document using the deleteOne method.
+The appropriate status code are returned. 
+
 
 [#create_service]
 === User and AI Interaction using Langchain4j AI service
@@ -359,7 +401,9 @@ The close method closes the connection.
     ChatAgent class contains functions to get the assistant and to chat using the assistant.
     Calling the chat function of a ChatAgent object will get the response message from the AI.
 
-==== Using AI models 
+==== Using AI models
+
+Model Builder uses LangChain4j to connect to the AI models. 
 The application uses the `ModelBuilder` class to provide the model for building the AI service:
 
 Environment variables are used to set these microprofile config properties.
@@ -423,11 +467,15 @@ The lower the temperature value, the more predictable the answers of the LLM are
 }
 ----
 
-******** Work in progress region for Model Builder ********* 
+The getEmbeddingModel() constructs the EmbeddingModel using respective embedding models from the provider.
+For example, if the ollama provider was being used, then nomic-embed-text would be used as the model name.
 
-******** End Work in progress region for Model Builder ********* 
+Embedding models are used to convert a section of text into a vector (embedding).
+These embedding models are of different dimensions; the best emebdding model for the use case may be found by 
+fine tuning the application and trying out new models. 
 
-==== Creating an Assistant
+
+==== Creating an Assistant in ChatAgent
 
 Through the `Assistant` interface, the application can send messages to the LLM by its `chat()` method.
 
@@ -472,6 +520,8 @@ Using the chat function as defined in the interface, the AI reply is returned.
         return reply;
     }
 ----
+
+==== Stage 2: Inference with the RAG Chat application and interaction with the front-end 
 
 === User Interaction with the RAG Chat Application frontend
 The chat service controls what happens related to the site.
@@ -548,6 +598,7 @@ chat.model.max.token=200
 chat.model.temperature=1.0
 chat.memory.max.messages=20
 ----
+
 
 
 [#where_to_next]
