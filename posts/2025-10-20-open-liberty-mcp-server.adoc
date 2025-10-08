@@ -16,8 +16,7 @@ Morgan Chang <https://github.com/shin19991207>
 :imagesdir: /
 :url-prefix:
 :url-about: /
-// CHANGE_THIS_VALUE_LATER to https://github.com/OpenLiberty/sample-langchain4j/tree/main/mcp/server
-:example-location: https://github.com/OpenLiberty/sample-langchain4j/tree/chang-mcp/mcp/server
+:example-location: https://github.com/OpenLiberty/sample-langchain4j/tree/main/mcp/server
 :blog-building-mcp-client: CHANGE_THIS_VALUE_LATER
 
 Large Language Models (LLMs) are great at reasoning, but they don’t have access to your current or proprietary data. link:https://www.ibm.com/think/topics/model-context-protocol[Model Context Protocol (MCP)] fills that gap by standardizing how AI applications interact with server-hosted capabilities. Think of MCP as REST for AI tools—you expose capabilities via a server, and any MCP-compatible client can invoke them.
@@ -137,18 +136,40 @@ Tests run: 3, Failures: 0, Errors: 0, Skipped: 0
 
 == How does the application work?
 
-This sample demonstrates a Jakarta Servlet application that integrates the MCP Java SDK using its Streamable HTTP transport. Tool capabilities are registered during application startup, and all communication is routed through a single `/mcp` endpoint.
+This sample demonstrates a Jakarta Servlet application that integrates the MCP Java SDK using its Streamable HTTP transport. It handles protocol messages over HTTP, streams results asynchronously to clients, and exposes MCP tool capabilities.
 
-When connected to an MCP client, the interaction pattern follows the sequence:
+The architecture consists of three components:
 
-1. The client initiates the session by sending an initialize request via POST to `/mcp`.
-2. The client issues a tool call via POST to `/mcp`.
-3. The server responds with either a single JSON reply or a streamed Server-Sent Events (SSE) response, depending on the request.
-4. To maintain an open stream for server-pushed messages, the client can issue a GET request to `/mcp`.
+1. **Tool implementation** (link:{example-location}/src/main/java/io/openliberty/sample/server/StackOverflowService.java[StackOverflowService.java]) – The business logic behind what your server can do.
+
+2. **Tool definition** (link:{example-location}/src/main/java/io/openliberty/sample/server/StackOverflowAsyncTools.java[StackOverflowAsyncTools.java]) – Prepares methods as MCP tools, including metadata, input schema, and execution logic.
+
+3. **Server integration** (link:{example-location}/src/main/java/io/openliberty/sample/server/McpServerInitializer.java[McpServerInitializer.java]) – Registers the tools with the server and exposes them to clients over the transport layer.
+
+When the server is running, all client communication goes through a single `/mcp` endpoint. The interaction pattern follows this flow:
+
+1. The client sends an initialize request via POST to start the session.
+2. The client calls one of the registered tools by sending another POST request.
+3. The server executes the tool and responds either with a single JSON reply or a streamed Server-Sent Events (SSE) response.
+4. To receive live updates, the client opens a GET stream to `/mcp`.
+
+The following sections explain how each part works in detail.
 
 === Tool implementation
 
-The core functionality behind the tools is implemented in the link:{example-location}/src/main/java/io/openliberty/sample/server/StackOverflowService.java[StackOverflowService] class. This service uses standard Jakarta EE HTTP Client APIs to query the Stack Exchange API and format the results for LLM consumption:
+The link:{example-location}/src/main/java/io/openliberty/sample/server/StackOverflowService.java[StackOverflowService] class defines the main logic behind the MCP tools. Its objective is to fetch relevant questions and answers from Stack Overflow and format them into structured data that the LLM can easily process.
+
+This service defines four tools, each of which queries the public link:https://api.stackexchange.com/[Stack Exchange API] for recent questions and answers:
+
+* link:{example-location}/src/main/java/io/openliberty/sample/server/StackOverflowService.java#L99-L102[searchJakartaEEQuestions()] — Finds recent questions tagged `jakarta-ee`.
+
+* link:{example-location}/src/main/java/io/openliberty/sample/server/StackOverflowService.java#L104-L107[searchMicroProfileQuestions()] — Finds recent questions tagged `microprofile`.
+
+* link:{example-location}/src/main/java/io/openliberty/sample/server/StackOverflowService.java#L109-L112[searchLangChain4jQuestions()] — Finds recent questions tagged `langchain4j`.
+
+* link:{example-location}/src/main/java/io/openliberty/sample/server/StackOverflowService.java#L114-L118[searchStackOverflow(String question)] — Performs a free-text search for any query.
+
+The implementation uses the Jakarta EE HTTP Client API to call the Stack Exchange endpoints:
 
 [source, java, role="no_copy"]
 ----
@@ -173,15 +194,21 @@ The core functionality behind the tools is implemented in the link:{example-loca
     }
 ----
 
-=== Registering the MCP Tools
+The method returns results in a structured format that is easy for the LLM to parse, contains all necessary metadata (question’s title, URL, problem description, and top answer), and maintains consistency across responses.
 
-The link:{example-location}/src/main/java/io/openliberty/sample/server/StackOverflowAsyncTools.java[StackOverflowAsyncTools] class registers methods from the `StackOverflowService` class as link:https://modelcontextprotocol.io/specification/2025-06-18/server/tools[MCP tools].
+=== Defining the MCP tools
 
-Each method is exposed as an asynchronous MCP tool using the `McpServerFeatures.AsyncToolSpecification` API. This API defines tool metadata, a `JsonSchema` input definition, and execution logic, enabling non-blocking and scalable request handling.
+The link:{example-location}/src/main/java/io/openliberty/sample/server/StackOverflowAsyncTools.java[StackOverflowAsyncTools] class defines four MCP tool specifications using the `McpServerFeatures.AsyncToolSpecification` API. These specifications follow the MCP protocol for link:https://modelcontextprotocol.io/specification/2025-06-18/server/tools[tools] and wrap business logic methods from the `StackOverflowService` class so the MCP server can expose these operations as protocol-compliant tools.
+
+Each specification includes:
+
+* **Tool metadata** – Name, title, and description.
+* **Input schema** – A `JsonSchema` object describing required parameters.
+* **Execution logic** – An asynchronous handler for non-blocking, scalable request processing.
 
 ==== Tools with parameters
 
-For tools that accept input parameters, a `JsonSchema` object defines the expected properties, including their types and whether they are required. For example, the free-text Stack Overflow free-text search tool requires a single `query` parameter of type `string`:
+Tools that accept input parameters define a `JsonSchema` object specifying property names, types, and required fields. For example, the free-text Stack Overflow `search()` tool requires a single `query` parameter of type `string`:
 
 [source, java, role="no_copy"]
 ----
@@ -233,9 +260,9 @@ The `inputJsonSchema` is passed into the tool definition via the https://modelco
 
 link:https://projectreactor.io[Project Reactor] provides the link:https://projectreactor.io/docs/core/release/api/reactor/core/publisher/Mono.html[Mono] type to represent a single asynchronous result. In MCP tool handlers, logic is wrapped using link:https://projectreactor.io/docs/core/release/api/reactor/core/publisher/Mono.html#fromCallable-java.util.concurrent.Callable-[Mono.fromCallable()] to execute non-blocking operations. Errors are handled with link:https://projectreactor.io/docs/core/release/api/reactor/core/publisher/Mono.html#onErrorResume-java.lang.Class-java.util.function.Function-[Mono.onErrorResume()], allowing graceful fallback responses.
 
-==== Tools without Parameters
+==== Tools without parameters
 
-For tools that don’t require input, an empty input schema is used. For example, the `noArgsTool()` helper, used to retrieve top questions tagged `jakarta-ee`, `microprofile`, or `langchain4j`, constructs a `JsonSchema` object with no properties:
+Tools that don’t require input use an empty input schema. The `noArgsTool()` helper, which is used by the `jakartaEETop()`, `microProfileTop()`, and `langChain4jTop()` tools to retrieve top questions, constructs a `JsonSchema` object with no properties:
 
 [source, java, role="no_copy"]
 ----
@@ -248,9 +275,9 @@ For tools that don’t require input, an empty input schema is used. For example
 
 === Integrating the MCP Streamable HTTP transport with Jakarta Servlet
 
-To integrate MCP with Jakarta Servlet, the application registers the SDK link:https://modelcontextprotocol.io/specification/2025-06-18/basic/transports#streamable-http[Streamable HTTP transport] as a regular servlet and boots the MCP server during application startup. The transport serves link:https://www.jsonrpc.org/[JSON-RPC] on a single `/mcp` path.
+To integrate MCP with Jakarta Servlet, the application registers the SDK's link:https://modelcontextprotocol.io/specification/2025-06-18/basic/transports#streamable-http[Streamable HTTP transport] as a servlet and initializes the MCP server during application startup. The transport serves link:https://www.jsonrpc.org/[JSON-RPC] on a single `/mcp` path.
 
-The link:{example-location}/src/main/java/io/openliberty/sample/server/McpServerInitializer.java[McpServerInitializer] class implements Jakarta Servlet link:https://jakarta.ee/specifications/platform/10/apidocs/jakarta/servlet/servletcontextlistener[ServletContextListener] interface to register the transport and wire the server:
+The link:{example-location}/src/main/java/io/openliberty/sample/server/McpServerInitializer.java[McpServerInitializer] class implements implements Jakarta Servlet's link:https://jakarta.ee/specifications/platform/10/apidocs/jakarta/servlet/servletcontextlistener[ServletContextListener] interface to manage the server lifecycle:
 
 [source, java, role="no_copy"]
 ----
@@ -259,8 +286,11 @@ public class McpServerInitializer implements ServletContextListener {
 }
 ----
 
-At application startup, the initializer creates a `HttpServletStreamableServerTransportProvider` with the default JSON mapper and the `/mcp` endpoint. It registers this transport as the `mcp-streamable` servlet, maps it to `/mcp`, enables asynchronous I/O, and marks it to load on startup. On the same transport, it builds the async MCP server, sets server info and capabilities for tools and logging, and registers the four tools from the `StackOverflowAsyncTools` class:
+The class overrides two methods:
 
+* `contextInitialized()` — Creates and registers the HTTP transport, builds the MCP server, and registers the defined tools:
+
++
 [source, java, role="no_copy"]
 ----
 ...
@@ -295,18 +325,29 @@ At application startup, the initializer creates a `HttpServletStreamableServerTr
 ...
 ----
 
-Liberty scans annotations by default. Because the transport class carries the link:https://github.com/modelcontextprotocol/java-sdk/blob/main/mcp-core/src/main/java/io/modelcontextprotocol/server/transport/HttpServletStreamableServerTransportProvider.java#L60[@WebServlet] annotation without explicit URL patterns, it triggers an link:https://www.ibm.com/docs/en/was-liberty/core?topic=messages-srve[SRVE9989E] error about incomplete servlet metadata.
++
+At application startup, the initializer creates an instance of `HttpServletStreamableServerTransportProvider` with the default JSON mapper and maps it to the `/mcp` endpoint. It then enables asynchronous I/O and marks the servlet to load on startup.
++
+The MCP server is built on top of the same transport by calling `McpServer.async()`. The builder configures basic information such as server name and version, enables capabilities for tools and logging, and registers the tool definitions from the `StackOverflowAsyncTools` class using the `.tools()` method.
+    
+* `contextDestroyed()` — Gracefully shuts down the server and closes the transport when the application stops.
 
-The link:{example-location}/src/main/webapp/WEB-INF/web.xml[web.xml] sets the application `metadata-complete` as `true` to turn off scanning and declares only the bootstrap listener. The `/mcp` mapping remains programmatic, as shown above:
+Because Liberty automatically scans for annotations, the SDK’s `HttpServletStreamableServerTransportProvider` class, which carries a link:https://github.com/modelcontextprotocol/java-sdk/blob/main/mcp-core/src/main/java/io/modelcontextprotocol/server/transport/HttpServletStreamableServerTransportProvider.java#L60[@WebServlet] annotation without explicit URL patterns, can trigger an link:https://www.ibm.com/docs/en/was-liberty/core?topic=messages-srve[SRVE9989E] error about incomplete servlet metadata.
+
+To prevent this, the link:{example-location}/src/main/webapp/WEB-INF/web.xml[web.xml] sets the application `metadata-complete` as `true` to turn off scanning and declares only the bootstrap listener:
 
 [source, xml, role="no_copy"]
 ----
 ...
+<web-app ...
+         metadata-complete="true">
   <listener>
     <listener-class>io.openliberty.sample.server.McpServerInitializer</listener-class>
   </listener>
-...
+</web-app>
 ----
+
+The `/mcp` mapping itself remains programmatic, as defined in the `McpServerInitializer` class.
 
 == Conclusion: Building MCP servers with Jakarta EE on Open Liberty
 
