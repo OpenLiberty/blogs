@@ -50,7 +50,7 @@ Clone the repository and navigate to the MCP server module:
 [source, bash]
 ----
 git clone https://github.com/OpenLiberty/sample-langchain4j.git
-cd sample-langchain4j/mcp/server
+cd sample-langchain4j/mcp
 ----
 
 Set the `JAVA_HOME` environment variable to point to your JDK 21 installation:
@@ -67,7 +67,7 @@ To start the server, use the provided Maven wrapper to run Open Liberty in https
 
 [source, bash]
 ----
-./mvnw liberty:dev
+./mvnw -pl server liberty:dev
 ----
 
 After you see the following message, the application is ready:
@@ -138,13 +138,13 @@ Tests run: 3, Failures: 0, Errors: 0, Skipped: 0
 
 This sample demonstrates a Jakarta Servlet application that integrates the MCP Java SDK using its Streamable HTTP transport. It handles protocol messages over HTTP, streams results asynchronously to clients, and exposes MCP tool capabilities.
 
-The architecture consists of three components:
+The application consists of three components:
 
-1. **Tool implementation** (link:{example-location}/src/main/java/io/openliberty/sample/server/StackOverflowService.java[StackOverflowService.java]) – The business logic behind what your server can do.
+* **<<tool-implementation, Tool implementation>>** (link:{example-location}/src/main/java/io/openliberty/sample/server/StackOverflowService.java[StackOverflowService.java]) – The business logic behind what your server can do.
 
-2. **Tool definition** (link:{example-location}/src/main/java/io/openliberty/sample/server/StackOverflowAsyncTools.java[StackOverflowAsyncTools.java]) – Prepares methods as MCP tools, including metadata, input schema, and execution logic.
+* **<<tool-definition, Tool definition>>** (link:{example-location}/src/main/java/io/openliberty/sample/server/StackOverflowAsyncTools.java[StackOverflowAsyncTools.java]) – Prepares methods as MCP tools, including metadata, input schema, and execution logic.
 
-3. **Server integration** (link:{example-location}/src/main/java/io/openliberty/sample/server/McpServerInitializer.java[McpServerInitializer.java]) – Registers the tools with the server and exposes them to clients over the transport layer.
+* **<<server-integration, Server integration>>** (link:{example-location}/src/main/java/io/openliberty/sample/server/McpServerInitializer.java[McpServerInitializer.java]) – Registers the tools with the server and exposes them to clients over the transport layer.
 
 When the server is running, all client communication goes through a single `/mcp` endpoint. The interaction pattern follows this flow:
 
@@ -155,6 +155,7 @@ When the server is running, all client communication goes through a single `/mcp
 
 The following sections explain how each part works in detail.
 
+[#tool-implementation]
 === Tool implementation
 
 The link:{example-location}/src/main/java/io/openliberty/sample/server/StackOverflowService.java[StackOverflowService] class defines the main logic behind the MCP tools. Its objective is to fetch relevant questions and answers from Stack Overflow and format them into structured data that the LLM can easily process.
@@ -196,6 +197,7 @@ The implementation uses the Jakarta EE HTTP Client API to call the Stack Exchang
 
 The method returns results in a structured format that is easy for the LLM to parse, contains all necessary metadata (question’s title, URL, problem description, and top answer), and maintains consistency across responses.
 
+[#tool-definition]
 === Defining the MCP tools
 
 The link:{example-location}/src/main/java/io/openliberty/sample/server/StackOverflowAsyncTools.java[StackOverflowAsyncTools] class defines four MCP tool specifications using the `McpServerFeatures.AsyncToolSpecification` API. These specifications follow the MCP protocol for link:https://modelcontextprotocol.io/specification/2025-06-18/server/tools[tools] and wrap business logic methods from the `StackOverflowService` class so the MCP server can expose these operations as protocol-compliant tools.
@@ -273,6 +275,7 @@ Tools that don’t require input use an empty input schema. The `noArgsTool()` h
     }
 ----
 
+[#server-integration]
 === Integrating the MCP Streamable HTTP transport with Jakarta Servlet
 
 To integrate MCP with Jakarta Servlet, the application registers the SDK's link:https://modelcontextprotocol.io/specification/2025-06-18/basic/transports#streamable-http[Streamable HTTP transport] as a servlet and initializes the MCP server during application startup. The transport serves link:https://www.jsonrpc.org/[JSON-RPC] on a single `/mcp` path.
