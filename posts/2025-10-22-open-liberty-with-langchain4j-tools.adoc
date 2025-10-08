@@ -1,21 +1,25 @@
 ---
 layout: post
-title: "Using Tools to perform tasks in your AI application"
+title: "Calling LLM tools in MicroProfile and Jakarta EE applications with LangChain4j"
 # Do NOT change the categories section
 categories: blog
 author_picture: https://avatars3.githubusercontent.com/AndrewSasmito
 author_github: https://github.com/AndrewSasmito
-seo-title: Using Tools to perform tasks in your AI application
-seo-description: Experience AI technology using tools in Jakarta EE and MicroProfile applications that run on Open Liberty by using LangChain4j APIs.
-blog_description: "Experience AI technology using tools in Jakarta EE and MicroProfile applications that run on Open Liberty by using LangChain4j APIs."
+seo-title: Calling LLM tools in MicroProfile and Jakarta EE applications with LangChain4j
+seo-description: Learn how to call LLM tools  in Jakarta EE and MicroProfile applications using the LangChain4j library on Open Liberty.
+blog_description: "Learn how to call LLM tools  in Jakarta EE and MicroProfile applications using the LangChain4j library on Open Liberty."
 open-graph-image: https://openliberty.io/img/twitter_card.jpg
 open-graph-image-alt: Open Liberty Logo
 additional_authors:
 - name: Gilbert Kwan
   github: https://github.com/gkwan-ibm
   image: https://avatars3.githubusercontent.com/gkwan-ibm
+
+- name: Laura Cowen 
+  github: https://github.com/lauracowen
+  image: https://avatars3.githubusercontent.com/lauracowen
 ---
-= Using Tools to perform tasks in your AI application
+= Calling LLM tools in MicroProfile and Jakarta EE applications with LangChain4j
 Andrew Sasmito <https://github.com/AndrewSasmito>
 :imagesdir: /
 :url-prefix:
@@ -23,107 +27,117 @@ Andrew Sasmito <https://github.com/AndrewSasmito>
 :example-location: https://github.com/OpenLiberty/sample-langchain4j/tree/main/tools
 
 
-With the recent advances in Artificial Intelligence (AI) come several new cutting-edge features that can transform how people use large language models (LLM). In the past, AI relied on pre-trained knowledge from datasets to generate static responses, struggling with dynamic queries that needed live data. Thus, developers started to train their LLMs so that they gain the ability to call external tools, allowing them to get real-time information and run functions to help automate tasks or enhance their responses. This shifts AI from a passive chatbot to becoming a more proactive helper, allowing the creation of agentic AIs that can perform external tasks for you and more accurate chatbots. See the https://www.ibm.com/think/topics/tool-calling[What is tool calling?] article from IBM to learn more about tool-calling AIs and how they work.
+Modern Large Language Models (LLMs) can do more than just generate text from their pre-trained knowledge--they can also execute functions through a capability called "https://www.ibm.com/think/topics/tool-calling[tool calling]." This feature allows LLMs to interact with external systems, access real-time data, and perform actions outside their training data. For Java developers working with MicroProfile and Jakarta EE, implementing this capability has become straightforward with the LangChain4j library.
 
-In this post, we explore how to give AI tools in Java applications by using LangChain4j. We also use them in an example Jakarta EE/MicroProfile application.
+This post demonstrates how to implement tool calling in Java applications by using LangChain4j, with a practical example that integrates Stack Overflow search capabilities into a MicroProfile and Jakarta EE application. You'll learn how to define tools as Java methods, connect them to LLM providers like GitHub, Ollama, or Mistral, and build a complete working application.
 
-* <<what_Are_LLMs_with_tools, Find out what tools mean in an LLM context>>
-* <<using_Langchain4j, Discover how to use tools with AI in Java applications>>
-* <<tryout, Try out the AI tools sample application>>
-* <<how_app_work, Learn how this sample application works>>
+== Understanding LLM tool calling
 
-[#what_Are_LLMs_with_tools]
-== What are tools for LLMs?
+Tool calling enables LLMs to identify when to call external functions and with what parameters. When an LLM determines that a user query requires information or actions beyond its training data, it generates a structured function call with appropriate arguments rather than attempting to hallucinate an answer.
 
-Some LLM models are able to call tools due to their training data, which improves their response and gives them the ability to perform actions. When an AI is given a prompt that it believes it cannot do, it tries to search for a tool that can best perform the task. This ability greatly enhances LLMs as they can start doing tasks for you or use online APIs and databases to access the web and better their response.
+For example, when asked about current Stack Overflow issues with a specific library, instead of providing potentially outdated information from its training data, the LLM can recognize the need for current information, call an appropriate search function with the correct query parameters, and process the returned data to formulate a response.
 
-Many models such as Llama, GPT-4.1, and Devstral support the ability to call and run tools. Some can be found on AI providers such as GitHub, Mistral AI, and Ollama.
+Tool-enabled models like Llama 3.1, GPT-4o, Claude 3 Opus, and Mistral Large support this capability through standardized JSON function-calling interfaces. In this tutorial, we'll use models available through GitHub Copilot, Ollama, and Mistral AI platforms.
 
 [#Java_LLMs_Tools]
-== How to take advantage of using AI with tools in Java applications?
+== LangChain4j: A Java framework for LLM tool integration
 
-Creating tools by hand for models can be hard. The open source project LangChain has abstractions and tools to allow for a common interface to use tools for several models.
+Implementing tool calling directly with LLM APIs requires handling complex JSON schemas, managing context windows, and dealing with provider-specific implementations. LangChain4j solves these challenges by providing the following capabilities:
 
-You can use community projects like https://github.com/langchain4j/langchain4j[LangChain4j] to help speed development with AI and tools. LangChain4j APIs can help integrate LLMs into your Java application for different AI platforms by using one interface. They allow for simple development of integrating tools with several models and providers.
+* A unified Java interface for multiple LLM providers
+* Simple annotations for converting Java methods into LLM tools
+* Automatic handling of parameter serialization and response parsing
+* Memory management for maintaining conversation context
+* Error handling for hallucinated tool calls
+
+The https://github.com/langchain4j/langchain4j[LangChain4j] library lets you focus on your business logic rather than LLM integration details. With simple annotations like `@Tool` and `@P`, you can expose any Java method to an LLM, making it particularly valuable for MicroProfile and Jakarta EE applications where you might want to integrate AI capabilities with existing enterprise services.
 
 image::/img/blog/langchain4j.png[langchain4j GitHub README image,width=70%,align="center"]
 
 [#using_Langchain4j]
-== How to use LangChain4j in a Jakarta EE and MicroProfile application
+== Integrating LangChain4j with MicroProfile and Jakarta EE
 
-Langchain4j has a useful open source https://github.com/langchain4j/langchain4j-examples[langchain4j-examples] GitHub repository where it stores example applications. Another repository that showcases the many other features of AI such as streaming chat and tools that can be found at the https://github.com/OpenLiberty/sample-langchain4j[sample-langchain4j] GitHub repository. However, this blog and the https://github.com/OpenLiberty/sample-langchain4j/tree/main/tools[sample-langchain4j/tools] has a deeper focus on tools.
+LangChain4j integrates seamlessly with MicroProfile and Jakarta EE applications through standard CDI mechanisms. The key components you implement include:
+
+* **Tool definitions** - Java methods annotated with `@Tool` that the LLM can invoke
+* **AI service interfaces** - Interfaces that define how your application communicates with the LLM
+* **Model configuration** - Setup code that connects to your chosen LLM provider
+* **Jakarta WebSocket endpoints** - For real-time communication between users and the AI
+
+The following sample application demonstrates all these components in a working Stack Overflow search assistant. The complete code is available in the https://github.com/OpenLiberty/sample-langchain4j/tree/main/tools[sample-langchain4j/tools] repository, which we'll examine in detail.
+
+For more examples beyond what is covered here, you can also explore the official https://github.com/langchain4j/langchain4j-examples[langchain4j-examples] repository.
 
 [#tryout]
 == Try out the AI tools sample application
 
-To see how you can apply LangChain4j with tools to your own Jakarta EE and MicroProfile applications, check out this example project for yourself.
+The sample application demonstrates LLM tool calling in a MicroProfile and Jakarta EE application. This sample implements a chat interface. An AI assistant can search Stack Overflow when asked technical questions, providing up-to-date answers beyond its training data.
+
+By running this example, you see:
+
+* How tool methods are defined and annotated
+* How the AI decides when to call tools
+* How WebSockets enable real-time AI communication
+* How to configure different LLM providers
 
 [#pre-reqs]
-=== Prerequisites
-Before you clone the application to your machine, install JDK 21, and ensure that your `JAVA_HOME` environment variable is set. You can use the https://developer.ibm.com/languages/java/semeru-runtimes/downloads[IBM Semeru Runtime] as your chosen Java runtime. This runtime offers performance benefits from deep technology investment in projects such as Eclipse OpenJ9 and is available across a wide variety of hardware and software platforms. To find out more about IBM Semeru Runtime, see https://openliberty.io/blog/2022/08/19/open-liberty-semeru-performance.html[Open Liberty and Semeru Runtimes, cloud-native performance that matters].
+=== Prerequisites and setup
 
-To access the repository remotely, install https://git-scm.com/book/en/v2/Getting-Started-Installing-Git[Git] if you haven't already. You can clone the `sample-langchain4j` GitHub repository to your local machine by running the following command:
+To run this sample, you'll need:
+
+* **JDK 21** (e.g. https://developer.ibm.com/languages/java/semeru-runtimes/downloads[IBM Semeru Runtime])
+** Run the following command to set the `JAVA_HOME` environment variable: `export JAVA_HOME=<your Java 21 home path>`
+* **Git** - To clone the sample application repository.
+* **Access to an LLM provider** - Choose from GitHub, Ollama, or Mistral (setup instructions provided below).
+
+To clone the repository, run the following command:
 
 [source]
 ----
 git clone https://github.com/OpenLiberty/sample-langchain4j.git
-----
-
-[#env_setup]
-=== Environment setup
-
-To run the application, navigate to the `sample-langchain4j/tools` directory:
-[source]
-----
 cd sample-langchain4j/tools
 ----
 
-Set the following environment variable:
-[source]
-----
-export JAVA_HOME=<your Java 21 home path>
-----
 === AI provider setup
-The application supports the following AI providers. You can choose either of them and follow their instructions: <<github_setup, GitHub>>, <<ollama_setup, Ollama>>, <<mistral_setup, Mistral>>
+The application supports multiple LLM providers with tool-calling capabilities. Choose one of the following options based on your preference:
 
 [#github_setup]
 ==== GitHub setup
-- Sign up and sign in to https://github.com
-- Go to your https://github.com/settings/personal-access-tokens[Personal access tokens]
-- Generate a new token with the `models` account permission
-- Set the GitHub key environment variable:
-     * `export GITHUB_API_KEY=<your GitHub API token>`
+
+. Sign up and sign in to https://github.com
+. Go to your https://github.com/settings/personal-access-tokens[Personal access tokens]
+. Generate a new token with the `models` account permission
+. Set the GitHub key environment variable: `export GITHUB_API_KEY=<your GitHub API token>` or `set GITHUB_API_KEY=<your GitHub API token>`
 
 [#ollama_setup]
 ==== Ollama setup
-- Download and install https://ollama.com/download[Ollama]
+
+. Download and install https://ollama.com/download[Ollama]
     * Follow the instructions in the https://github.com/ollama/ollama/blob/main/README.md#ollama[README]
-- Pull the following model:
-     * `ollama pull llama3.2`
-- Set the Ollama base url environment variable:
-     * `export OLLAMA_BASE_URL=http://localhost:11434`
+. Pull the following model: `ollama pull llama3.2`
+. Set the Ollama base url environment variable: `export OLLAMA_BASE_URL=http://localhost:11434` or `set OLLAMA_BASE_URL=http://localhost:11434`
+
 
 [#mistral_setup]
 ==== Mistral setup
-- Sign up and log in to https://console.mistral.ai/home
-- Go to https://console.mistral.ai/api-keys[Your API keys]
-- Create a new key
-- Set the Mistral API key environment variable:
-     * `export MISTRAL_AI_API_KEY=<your Mistral AI API key>`
+
+. Sign up and log in to https://console.mistral.ai/home
+. Go to https://console.mistral.ai/api-keys[Your API keys]
+. Create a new key
+. Set the Mistral API key environment variable: `export MISTRAL_AI_API_KEY=<your Mistral AI API key>` or `set MISTRAL_AI_API_KEY=<your Mistral AI API key>`
 
 
 [#start_app]
 === Start the application
 
-To start the application, use the provided Maven Wrapper to run Open Liberty in https://openliberty.io/docs/latest/development-mode.html[dev mode]:
-
+Start the application, in https://openliberty.io/docs/latest/development-mode.html[dev mode]:
 
 [source]
 ----
 ./mvnw liberty:dev
 ----
 
-After you see the following message, the application is ready:
+When you see the following message, the application is ready:
 
 ----
 ************************************************************************
@@ -156,134 +170,176 @@ To ensure that the application started successfully, you can run the tests by pr
 [#access_app]
 === Access the application
 
-After the application is running, you can access it through a browser of your choice at http://localhost:9080/toolChat.html and start experimenting with it.
+When the application is running, open a browser at http://localhost:9080/toolChat.html and start experimenting with it.
 
-image::/img/blog/langchain4j-tool-example-chat-room.png[Chat Room of LangChain4j Jakarta EE and MicroProfile example,width=70%,align="center"] 
+image::/img/blog/langchain4j-tool-example-chat-room.png[Chat room of LangChain4j Jakarta EE and MicroProfile example,width=70%,align="center"] 
 
-You can enter in any text to chat with the AI assistant. Here are some suggested messages:
+Enter any text to chat with the AI assistant. Here are some suggested messages:
 
 * `What are some current problems users have with LangChain4j?`
 * `What are some problems users have with Ollama?`
 
-Expect to see logs in dev mode console to see which tool is being called.
+Expect to see logs in the dev mode console to see that a tool is being called.
+
 
 [#how_app_work]
 == How does the application work?
 
-The application demonstrates how to use the https://docs.langchain4j.dev/tutorials/tools[LangChain4j Tools], https://openliberty.io/docs/ref/feature/cdi-4.0.html[Jakarta Contexts and Dependency Injection], https://openliberty.io/docs/latest/reference/feature/websocket-2.1.html[Jakarta WebSocket], and https://openliberty.io/docs/ref/feature/mpConfig-3.0.html[MicroProfile Config] features.
+The application architecture consists of four main components that work together to provide an AI assistant with tool-calling capabilities:
 
-Each AI model can only provide static data, which may be outdated based on what it was trained on. You can use the AI tools to enhance the interaction with the AI model by calling other third-party APIs, querying more data from database, or performing complex tasks.
+* **Tool implementation** (`StackOverflowTools.java`) - Java methods annotated to be callable by the LLM
+* **AI service** (`ChatAgent.java`) - Configures the LLM and exposes it through a Java interface
+* **WebSocket endpoint** (`ChatService.java`) - Handles real-time communication with clients
+* **Front end** (`toolChat.js` and `toolChat.html`) - Provides the user interface
 
-The AI model in this sample application is given tools to search from the https://stackoverflow.com[Stack Overflow website] which developers use to post their questions and answers. This allows users to efficiently search for relevant information from Stack Overflow with the help of AI without leaving the chat application. Those tools give the ability to return additional information from the Stack Overflow beyond the AI model. Thus, if the AI model is prompted with a question that it cannot solve, it uses a matched tool to search on the Stack Overflow. The tool searches questions by using the https://api.stackexchange.com/docs/excerpt-search[StackExchange excerpt-search API] that find the first question similar to what the user is asking. If the question has at least one answer, the tool calls another API to get the top answer and return the question ID, question, and top answer back to the AI model. The AI model parses the data, constructs a reply, and sends the reply to the user.
+image::/img/blog/langchain4jDiagram.png[Architectural diagram,width=70%,height=70%,align="center"]
+
+When a user sends a message through the WebSocket, the following sequence occurs:
+
+1. The message is received by the `ChatService` endpoint.
+2. The message is forwarded to the `ChatAgent`, which sends it to the configured LLM.
+3. The LLM analyzes the message and determines if it needs to call a tool.
+4. If needed, the LLM generates a tool call with appropriate parameters.
+5. LangChain4j runs the corresponding Java method with those parameters.
+6. The tool result is returned to the LLM, which incorporates it into its response.
+7. The final response is sent back to the client through the WebSocket.
+
+This implementation uses the https://api.stackexchange.com/[Stack Overflow API] to enhance the LLM's capabilities. When the user asks a technical question that might benefit from current Stack Overflow data, the LLM calls the appropriate search method:
+
+1. The search queries the Stack Exchange API to find relevant questions.
+2. The search retrieves the top answer for each question.
+3. The search returns the formatted results to the LLM.
+4. The LLM then synthesizes the returned information into a coherent response.
+
 
 [#create_tool]
-=== Creating the tools
+=== Tool implementation
 
-To create functions that the AI can call, it must be annotated with `@Tool` with an explanation so the AI model can understand the purpose of the tool. If any parameters exist, annotating with `@P` helps explain what it represents. Proper annotations help the AI distinguish when to call the tool and what to put as parameters. If the function returns, the AI receives the output and can use it to customize its response back to the user.
+The core of tool functionality is implemented through Java methods annotated with LangChain4j's `@Tool` and `@P` annotations:
 
-The searchStackOverFlow tool uses the https://api.stackexchange.com/[Stack Exchange API] along with JakartaEE methods to call the API and return the response to the AI. There are a few methods to search for questions and answers to different topics on Stack Overflow and a general search method to enhance the AI's response. Here is one of the tools shown below.
-
-See the {example-location}/src/main/java/io/openliberty/sample/langchain4j/StackOverflowTools.java[src/main/java/io/openliberty/sample/langchain4j/StackOverflowTools.java] file to learn more.
-[source, java, role="no_copy"]
+[source,java]
 ----
-public class StackOverflowTools {
-    ...
-    private ArrayList<String> questionAndAnswer(String url) throws Exception {
-        ArrayList <String> questionAnswer = new ArrayList<>();
-        for (Map<String, Object> data : clientSearch(url)) {
-            String topAnswer = clientSearch(String.format(findAnswer, data.get("question_id")))
-                                    .get(0).get("body").toString();
-            questionAnswer.add(
-                "Link: " + "https://stackoverflow.com/questions/" + data.get("question_id") + 
-                " Problem: " + data.get("body") +
-                " Answer: " + topAnswer
-            );
-        }
-        return questionAnswer;
-    }
-    ...
-    @Tool("Search for questions and answers on stackoverflow")
-    public ArrayList <String> searchStackOverflow(@P("Question you are searching") String question) throws Exception {
-        logger.info("AI called the searchStackOverflow Tool with question: " + question);
-        String targetUrl = stackOverflowMethod + "&q=" + question;
-        return questionAndAnswer(targetUrl);
-    }
+@Tool("Search for questions and answers on stackoverflow")
+public ArrayList<String> searchStackOverflow(@P("Question you are searching") String question) throws Exception {
+    logger.info("AI called the searchStackOverflow Tool with question: " + question);
+    String targetUrl = stackOverflowMethod + "&q=" + question;
+    return questionAndAnswer(targetUrl);
 }
 ----
 
+These annotations serve critical purposes:
+
+* `@Tool` annotation provides a description that helps the LLM understand when the tool is appropriate to use, what functionality it provides, and what the expected output format is.
+* `@P` annotation describes each parameter so the LLM can understand what information to provide, format the parameter correctly, and extract relevant details from the user's query.
+
+The implementation uses standard Jakarta EE HTTP Client APIs to interact with the Stack Exchange API:
+
+[source,java]
+----
+private ArrayList<String> questionAndAnswer(String url) throws Exception {
+    ArrayList<String> questionAnswer = new ArrayList<>();
+    for (Map<String, Object> data : clientSearch(url)) {
+        String topAnswer = clientSearch(String.format(findAnswer, data.get("question_id")))
+                                .get(0).get("body").toString();
+        questionAnswer.add(
+            "Link: " + "https://stackoverflow.com/questions/" + data.get("question_id") + 
+            " Problem: " + data.get("body") +
+            " Answer: " + topAnswer
+        );
+    }
+    return questionAnswer;
+}
+----
+
+The method returns results in a format that is easily parseable by the LLM, contains all necessary context (question, answer, and link), and maintains a consistent structure for reliable processing.
+
+When implementing tools, consider the following good practices:
+
+* Keep tool methods focused on a single responsibility.
+* Return structured data that is easy for the LLM to process.
+* Include sufficient context in the return value.
+* Use descriptive annotations that clearly explain the functions.
+* Handle exceptions to prevent LLM confusion.
+
+
+See the complete implementation in {example-location}/src/main/java/io/openliberty/sample/langchain4j/StackOverflowTools.java[StackOverflowTools.java].
+
 [#create_service]
-=== Creating the LangChain4j AI service
+=== AI service implementation
 
-Start off by injecting a https://github.com/OpenLiberty/sample-langchain4j/blob/3564a2f12e4caea7f2ce627d337d2647eafa5d0e/tools/src/main/java/io/openliberty/sample/langchain4j/ChatAgent.java#L33-L34[StackOverFlowTools] tool instance to the AI service. Then configure the service with the model and the tool instance by the https://github.com/OpenLiberty/sample-langchain4j/blob/3564a2f12e4caea7f2ce627d337d2647eafa5d0e/tools/src/main/java/io/openliberty/sample/langchain4j/ChatAgent.java#L58[tools] parameter so that the service can use the tools.
+The `ChatAgent` class serves as the bridge between your application and the LLM. It handles LLM provider configuration, tool registration, conversation memory management, and error handling for hallucinated tool calls.
 
-The AI service is also configured with a https://github.com/OpenLiberty/sample-langchain4j/blob/3564a2f12e4caea7f2ce627d337d2647eafa5d0e/tools/src/main/java/io/openliberty/sample/langchain4j/ChatAgent.java#L59[hallucinatedToolNameStrategy] in case that it tries to call a tool that does not exist. The hallucinatedToolNameStrategy lets the developer create a message, which indicates to the model that it used a nonexistent tool. Afterward, the AI can try to call another tool.
+The core configuration is done through LangChain4j's builder pattern:
 
-See the {example-location}/src/main/java/io/openliberty/sample/langchain4j/ChatAgent.java[src/main/java/io/openliberty/sample/langchain4j/ChatAgent.java] file.
-[source, java, role="no_copy"]
+[source,java]
 ----
-    public Assistant getAssistant() {
-        ...
-            ChatModel model = modelBuilder.getChatModel();
-            assistant = AiServices.builder(Assistant.class)
-                .chatModel(model)
-                .tools(stackOverflowTools)
-                .hallucinatedToolNameStrategy(toolExecutionRequest -> ToolExecutionResultMessage.from(
-                    toolExecutionRequest, "Error: there is no tool with the following parameters called " + toolExecutionRequest.name()))
-                .chatMemoryProvider(
-                    sessionId -> MessageWindowChatMemory.withMaxMessages(MAX_MESSAGES))
-                .build();
-       ...
-    }
+public Assistant getAssistant() {
+    ChatModel model = modelBuilder.getChatModel();
+    assistant = AiServices.builder(Assistant.class)
+        .chatModel(model)
+        .tools(stackOverflowTools)
+        .hallucinatedToolNameStrategy(toolExecutionRequest -> 
+            ToolExecutionResultMessage.from(toolExecutionRequest, 
+                "Error: there is no tool with the following parameters called " + 
+                toolExecutionRequest.name()))
+        .chatMemoryProvider(
+            sessionId -> MessageWindowChatMemory.withMaxMessages(MAX_MESSAGES))
+        .build();
+    return assistant;
+}
 ----
 
-Through the customized `Assistant` interface, the application can send messages to the LLM by the `chat()` method along with the system message that tells the AI what its role and tasks are.
+Key configuration elements include the following methods:
 
-See the {example-location}/src/main/java/io/openliberty/sample/langchain4j/ChatAgent.java[src/main/java/io/openliberty/sample/langchain4j/ChatAgent.java] file.
-[source, java, role="no_copy"]
+* `tools()`, which registers your tool classes with the LLM.
+* `hallucinatedToolNameStrategy`, which provides graceful error handling when the LLM attempts to call a non-existent tool (a common problem with LLMs).  
+* `chatMemoryProvider`, which configures conversation history retention; this is essential for maintaining context across multiple messages.
+
+The AI service is exposed through a Java interface with LangChain4j annotations:
+
+[source,java]
 ----
-    interface Assistant {
-        @SystemMessage("You are a coding helper, people will go to you for questions around coding. " +
-            "You have ONLY four tools. " +
-            "ONLY use the tools if NECESSARY. " +
-            "ALWAYS follow the tool call parameters exactly and make sure to provide ALL necessary parameters. " +
-            "Do NOT add more parameters than needed" + 
-            "NEVER give the user unnecessary information. " + 
-            "NEVER lie or make information up, if you are unsure say so.")
-        String chat(@MemoryId String sessionId, @UserMessage String userMessage);
-    }
+interface Assistant {
+    @SystemMessage("You are a coding helper, people will go to you for questions around coding. " +
+        "You have ONLY four tools. " +
+        "ONLY use the tools if NECESSARY. " +
+        "ALWAYS follow the tool call parameters exactly and make sure to provide ALL necessary parameters. " +
+        "Do NOT add more parameters than needed" + 
+        "NEVER give the user unnecessary information. " + 
+        "NEVER lie or make information up, if you are unsure say so.")
+    String chat(@MemoryId String sessionId, @UserMessage String userMessage);
+}
 ----
+
+The `@SystemMessage` annotation provides critical instructions to the LLM about its role and purpose, when and how to use tools, constraints on its behavior, and error handling expectations.
+
+The `@MemoryId` annotation ensures each user gets a separate conversation history, while `@UserMessage` marks the parameter that contains the user's input.
+
+See the complete implementation in {example-location}/src/main/java/io/openliberty/sample/langchain4j/ChatAgent.java[ChatAgent.java].
 
 [#communicate]
-=== Communicating between the client and LLM
+=== Client and LLM communication with WebSockets
 
-The application provides the interactive UI for users to communicate with the LLM. Jakarta WebSocket enables two-way communication between the client and the `ChatService` service. Each client makes an HTTP connection to the service and sends messages using the `send()` method.
+The application uses Jakarta WebSocket to provide real-time communication between the client and the AI service. This approach offers several advantages over traditional REST endpoints:
 
-See the {example-location}/src/main/webapp/toolChat.js[src/main/webapp/toolChat.js] file.
-[source, java, role="no_copy"]
+* **Real-time interaction** - Immediate responses without polling
+* **Persistent connection** - Reduced overhead for multiple messages
+* **Session management** - Easy tracking of conversation state
+
+The server-side implementation uses standard Jakarta WebSocket annotations:
+
+[source,java]
 ----
-
-    const webSocket = new WebSocket(uri);
-    ...
-    function sendMessage() {
-        ...
-        var myMessage = document.getElementById('myMessage').value;
-        ...
-        webSocket.send(myMessage);
-        ...
-    }
-----
-
-The service receives the user messages through the WebSocket `onMessage()` method, forwards them to the LLM by calling the `ChatAgent.chat()` method, and then responds with the LLM answers back to the client through the `sendObject()` method.
-
-See the {example-location}/src/main/java/io/openliberty/sample/langchain4j/ChatService.java[src/main/java/io/openliberty/sample/langchain4j/ChatService.java] file.
-[source, java, role="no_copy"]
-----
-
+@ServerEndpoint(value = "/toolchat", encoders = { ChatMessageEncoder.class })
+public class ChatService {
+    @Inject
+    ChatAgent agent = null;
+    
     @OnMessage
     public void onMessage(String message, Session session) {
         ...
+        
         try {
-            ...
             answer = agent.chat(sessionId, message);
         } catch (Exception e) {
             ...
@@ -292,11 +348,74 @@ See the {example-location}/src/main/java/io/openliberty/sample/langchain4j/ChatS
         try {
             session.getBasicRemote().sendObject(answer);
         } catch (Exception e) {
-            e.printStackTrace();
+            ...
         }
-
     }
+	// Other WebSocket lifecycle methods...   
+}
 ----
+
+Key implementation details:
+
+* Each WebSocket connection gets a unique `sessionId` that's passed to the AI service to maintain conversation context. 
+* Robust error handling ensures users receive appropriate feedback even when issues occur.
+* The asynchronous WebSocket architecture naturally supports the potentially long processing times of LLM requests.
+
+The client-side JavaScript establishes the WebSocket connection and handles message exchange:
+
+[source,javascript]
+----
+const webSocket = new WebSocket(uri);
+
+webSocket.onmessage = function(event) {
+    // Display AI response
+    displayMessage(event.data, "ai");
+};
+
+function sendMessage() {
+    var myMessageRow = document.createElement('tr');
+    var myMessage = document.getElementById('myMessage').value;
+    myMessageRow.innerHTML = '<td><p class=\"my-msg\">' + myMessage + '</p></td>' +
+                                '<td>' + getTime() + '</td>';
+    messagesTableBody.appendChild(myMessageRow);
+    messagesTableBody.appendChild(thinkingRow);
+    webSocket.send(myMessage);
+    document.getElementById('myMessage').value = "";
+}
+----
+
+This bidirectional communication channel creates a responsive chat experience while the underlying tool-calling functionality happens transparently to the user.
+
+See the complete implementations in {example-location}/src/main/java/io/openliberty/sample/langchain4j/ChatService.java[ChatService.java] and {example-location}/src/main/webapp/toolChat.js[toolChat.js].
+
+== Conclusion: Building AI-powered Java applications with tool calling
+
+In this tutorial, we've explored how to implement LLM tool calling capabilities in MicroProfile and Jakarta EE applications using LangChain4j. By following the implementation patterns demonstrated here, you can extend your own applications with AI capabilities that go beyond simple text generation.
+
+We've covered the following key technical concepts:
+
+* Using `@Tool` and `@P` annotations to expose Java methods to LLMs
+* Setting up LangChain4j with appropriate model settings and tool registrations
+* Implementing strategies for handling hallucinated tool calls
+* Creating real-time communication channels between users and AI services by using WebSockets
+* Maintaining conversation context memory across multiple interactions
+
+The approach demonstrated here offers several advantages for Java developers:
+
+* **Separation of Concerns** - Your business logic remains in standard Java methods, cleanly separated from AI integration.
+* **Provider Flexibility** - The same code works with multiple LLM providers (GitHub, Ollama, Mistral).
+* **Enterprise Integration** - The LLM calls can be seamlessly integrated into existing Jakarta EE and MicroProfile applications
+* **Extensibility** - It's easy to add new tools as your application's requirements evolve
+
+Ways in which you could extend this tool calling example for your own applications include:
+
+* Creating tools that interact with your application's databases.
+* Implementing tools that trigger business processes or workflows.
+* Adding tools that access internal knowledge bases or documentation.
+* Developing domain-specific tools for your particular industry.
+
+The combination of modern LLMs with Jakarta EE's enterprise capabilities opens up powerful new possibilities for building intelligent applications that can take actions, access real-time data, and provide more valuable responses to users.
+
 
 [#where_to_next]
 == Where to next?
@@ -304,7 +423,7 @@ See the {example-location}/src/main/java/io/openliberty/sample/langchain4j/ChatS
 Check out the link:https://openliberty.io/guides/[Open Liberty guides^] for more information and interactive tutorials that walk you through other Jakarta EE and MicroProfile APIs with Open Liberty.
 
 [#help_links]
-== Helpful links
+== Find out more
 * link:https://github.com/langchain4j[LangChain4j]
 * link:https://github.com/marketplace?type=models[GitHub], link:https://docs.mistral.ai/getting-started/models/models_overview/[Mistral], and link:https://ollama.com/search[Ollama] models
 * link:https://openliberty.io/blog/2024/04/01/open-liberty-with-langchain4j-example.html[Run AI-enabled Jakarta EE and MicroProfile applications on Open Liberty^]
