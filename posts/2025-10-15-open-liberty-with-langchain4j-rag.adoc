@@ -297,7 +297,6 @@ Note that the embeddings and content that are stored in MongoDB previously are p
 
 The application demonstrates how to use the LangChain4j APIs, https://openliberty.io/docs/ref/feature/#cdi-4.0.html[Jakarta Contexts and Dependency Injection], https://openliberty.io/docs/latest/reference/feature/websocket-2.1.html[Jakarta WebSocket], https://openliberty.io/docs/ref/feature/#mpConfig-3.0.html[MicroProfile Config], and https://openliberty.io/docs/latest/reference/feature/mpMetrics-5.1.html[MicroProfile Metrics] features.
 We will go through a step by step process to create a RAG application.
-
 === Connecting to MongoDB Atlas
 
 The docker-compose file is used to create a local containerized MongoDB Atlas database using the `mongodb/mongodb-atlas-local` image.
@@ -361,115 +360,54 @@ The close method closes the connection.
         toClose.close();
     }
 ----
+This MongoDatabase will be used by other classes.
 
-See AtlasMongoDB.java. The role of the AtlasMongoDB.java class is to provide relevant functions for RAG such as creating search indexes, or retrieving similar content.
-The MongoDatabase instance is injected. The ModelBuilder instance is required to get the corresponding embedding model; how the model builder creates the embedding model is explained in the later sections.
-Note that the embedding model method called embed is used to convert text to embedding.
+=== Building REST APIs to manage the vector database
 
-[source]
-----
-    @Inject
-    private ModelBuilder modelBuilder;
-
-    @Inject
-    MongoDatabase db;
-----
-
-The database.getCollection method returns a MongoCollection<Document> which represents a collection of BSON documents. 
-
-[source]
-----    
-  public MongoCollection<Document> getCollection() {
-        return db.getCollection(COLLECTION_NAME);
-  }
----- 
-
-Before the database is initialized in the program and for the vector search to work, createIndex() method generates a search index. 
-A new collection is created within the existing MongoDatabase called EmbeddingsStored.Then, the createSearchIndexes method uses the information
-such as the vector dimension of the embedding model, a cosine similarity approach, and the location inside the document where the vector is stored known as the path.
-
-[source]
-----    
-    public void createIndex() {
-
-        db.createCollection(COLLECTION_NAME);
-        MongoCollection<Document> embeddingStore = db.getCollection(COLLECTION_NAME);
-
-        Bson documentDefinition = new Document("fields",
-            Collections.singletonList(
-                new Document("type", "vector")
-                    .append("path", PATH)
-                    .append("numDimensions", modelBuilder.getEmbeddingModel().dimension())
-                    .append("similarity", "cosine")));
-        SearchIndexType vectorSearch = SearchIndexType.vectorSearch();
-        List<SearchIndexModel> searchIndexModels = Collections.singletonList(
-                new SearchIndexModel(SEARCH_INDEX_NAME, documentDefinition, vectorSearch));
-
-        sleep(TIMEOUT);
-		embeddingStore.createSearchIndexes(searchIndexModels);
-        boolean indexReady = false;
-        do {
-            Document index = embeddingStore.listSearchIndexes().first();
-            JSONObject json = new JSONObject(index.toJson());
-            boolean queryable = json.getBoolean("queryable");
-            if (queryable && json.getString("name").equals(SEARCH_INDEX_NAME)) {
-                indexReady = true;
-                break;
-            }
-        } while (!indexReady);
-    }
-----
-The createSearchIndexes method is called to execute the request.
-
-The search indexes are ready when queryable value is set to true and search indexes may take some time to become ready. +
-
-The convertUserQueryToEmbedding function uses the LangChain4j API to create embeddings.
-
-[source]
-----
-    public float[] convertUserQueryToEmbedding(String userQuery) {
-        return modelBuilder.getEmbeddingModel().embed(userQuery).content().vector();
-    }
-----
-
-The rest of the functions such as deleteOne, replaceOne and insertOne call the respective methods on the current collection.
-
-The retrieveContent method takes in a userQuery embedding vector, and the query text. 
-It uses the userQuery vector, the location or `PATH` to where the vectors are stored, selects `NUM_CANDIDATES` vectors in the nearby group in the latent space,
-and returns the limit of `MAX_RESULTS_TO_AI`, based on the `SEARCH_INDEX_NAME`. The aggregate returns the results for $vectorSearch command and each result is a type of Document object.
-
-[source]
-----
-    public List<String> retrieveContent(List<Float> userQuery, String query) {
-        List<String> similarContent = new ArrayList<>();
-        Document vecSearchDocument = new Document("queryVector", userQuery)
-            .append("path", PATH)
-            .append("numCandidates", NUM_CANDIDATES)
-            .append("limit", MAX_RESULTS_TO_AI)
-            .append("index", SEARCH_INDEX_NAME);
-        Bson vectorSearch = new Document("$vectorSearch", vecSearchDocument);
-        AggregateIterable<Document> results = getCollection().aggregate(Arrays.asList(vectorSearch));
-        for (Document result : results) {
-            similarContent.add(result.getString("Content"));
-        }
-        return similarContent;
-    }
-----
-
-When BSON Documents are first stored by the sample application, each BSON Document contain 3 keys: "Summary", "Content", and "Vector". 
-However, only the value of the "Content" section is required above and its value is obtained using result.getString("Content") for each result.  
-
-=== Stage 1: Open API UI to initialize the MongoDB Atlas Database with Knowledge Base
+The EmbeddingApplication.java and the EmbeddingService.java are used to build the REST APIs to manage the vector database.
 
 The embedding application is created at `/api` in EmbeddingApplication.java. + 
 
-The EmbeddingService implements various REST API upon request at the application path `/embedding`. +
+[source]
+----
+@ApplicationPath("/api")
+public class EmbeddingApplication extends Application {
+
+}
+----
+
+The EmbeddingService implements various REST API upon request at the application path `/embedding` and is application scoped. +
 
 Given the summary and content parameters, the `POST` request at `/api/embedding` stores the summary, content, and vector as a List<Float> together into MongoDB.
+
+To accomplish this a new BSON Document called newEmbedding is created with the key "Summary", and value as the summary itself. 
+Likewise, for the vector, the value is calculated using the LangChain4j APIs. The modelBuilder.getEmbeddingModel() from ModelBuilder returns the EmbeddingModel.
+The getEmbeddingModel() constructs the EmbeddingModel using respective embedding model names from the provider.
+Calling the EmbeddingModel.embed(text) returns the Response<Embedding>, to get the Embedding object form LangChain4j the content() method is called.
+The actual vector is stored as a List<Float> into MongoDB using the insertOne method.
+
+The mongoDB instance is of type AtlasMongoDB. The MongoDatabase object is injected after MongoProducer produces the MongoDatabase for the application.
+The insertOne method inserts that particular embedding for the collection.
+
+See AtlasMongoDB.java.
+[source]
+----
+    @Inject
+    MongoDatabase db;
+    ...
+    public void insertOne(Document newEmbedding) {
+        getCollection().insertOne(newEmbedding);
+    }
+    ...
+    public MongoCollection<Document> getCollection() {
+        return db.getCollection(COLLECTION_NAME);
+    }
+----
 
 The RolesAllowed defines which group is allowed to perform a particular request operation.
 Similarly, the annotations such as APIResponses indicate the response code with the descriptions.
 
+See EmbeddingService.java
 [source]
 ----
     @POST
@@ -569,7 +507,50 @@ The summary, content, and embedding vector are created and added in the same doc
     }
 ----
 
-The `GET` request at `/api/embedding` lists the embeddings from the database using the retrieve method. It uses the mongoDB.getCollection().find() that returns all the Document objects from MongoDB. The MediaType.APPLICATION_JSON is returned. 
+To understand how createIndex() method works, see the AtlasMongoDB.java.
+
+Before the database is initialized in the program and for the vector search to work, createIndex() method generates a search index. 
+A new collection is created within the existing MongoDatabase called EmbeddingsStored.Then, the createSearchIndexes method uses the information
+such as the vector dimension of the embedding model, a cosine similarity approach, and the location inside the document where the vector is stored known as the path.
+
+[source]
+----    
+    public void createIndex() {
+
+        db.createCollection(COLLECTION_NAME);
+        MongoCollection<Document> embeddingStore = db.getCollection(COLLECTION_NAME);
+
+        Bson documentDefinition = new Document("fields",
+            Collections.singletonList(
+                new Document("type", "vector")
+                    .append("path", PATH)
+                    .append("numDimensions", modelBuilder.getEmbeddingModel().dimension())
+                    .append("similarity", "cosine")));
+        SearchIndexType vectorSearch = SearchIndexType.vectorSearch();
+        List<SearchIndexModel> searchIndexModels = Collections.singletonList(
+                new SearchIndexModel(SEARCH_INDEX_NAME, documentDefinition, vectorSearch));
+
+        sleep(TIMEOUT);
+		embeddingStore.createSearchIndexes(searchIndexModels);
+        boolean indexReady = false;
+        do {
+            Document index = embeddingStore.listSearchIndexes().first();
+            JSONObject json = new JSONObject(index.toJson());
+            boolean queryable = json.getBoolean("queryable");
+            if (queryable && json.getString("name").equals(SEARCH_INDEX_NAME)) {
+                indexReady = true;
+                break;
+            }
+        } while (!indexReady);
+    }
+----
+The createSearchIndexes method is called to execute the request.
+
+The search indexes are ready when queryable value is set to true and search indexes may take some time to become ready. +
+
+
+
+In EmbeddingService.java, the `GET` request at `/api/embedding` lists the embeddings from the database using the retrieve method. It uses the mongoDB.getCollection().find() that returns all the Document objects from MongoDB. The MediaType.APPLICATION_JSON is returned. 
 
 [source]
 ----
@@ -676,215 +657,18 @@ for the existing object id (oid) located at _id. If none of the records match, a
 
 Likewise, the `Delete` request at `/api/embedding/{id}` requires the object id to delete the particular document using the deleteOne method. The appropriate status code is returned. 
 
-[source]
-----
-    @DELETE
-    @Path("/{id}")
-    @Produces(MediaType.APPLICATION_JSON)
-    @RolesAllowed({ "admin" })
-    @APIResponses({
-        @APIResponse(responseCode = "200", description = "Successfully deleted the embedding."),
-        @APIResponse(responseCode = "400", description = "Invalid object id."),
-        @APIResponse(responseCode = "404", description = "Embedding object id was not found.") })
-    @Parameter(description = "Object id of the embedding to delete.", required = true)
-    @Operation(summary = "Delete an embedding from the database.")
-    public Response remove(@PathParam("id") String id) {
-
-        ObjectId oid;
-        try {
-            oid = new ObjectId(id);
-        } catch (Exception e) {
-            return Response
-                .status(Response.Status.BAD_REQUEST)
-                .entity("[\"Invalid object id!\"]")
-                .build();
-        }
-
-        Document query = new Document("_id", oid);
-        DeleteResult deleteResult = mongoDB.deleteOne(query);
-        if (deleteResult.getDeletedCount() == 0) {
-            return Response.status(Response.Status.BAD_REQUEST)
-                           .entity("[\"_id was not found!\"]")
-                           .build();
-        }
-
-        return Response.status(Response.Status.OK)
-                       .entity(query.toJson())
-                       .build();
-    }
 ----
 
 [#create_service]
-=== Stage 2: User and AI Interaction using Langchain4j AI service
+=== Retrieving data from the vector database
 
-* ModelBuilder: +
-    ModelBuilder contains functions such as getting the chat model and the embedding model.
-    The chat model is the model type to which the response is sent to.
-    The embedding model is the model that is used to embed the text segments by converting text into vectors.
- 
-* ChatAgent: +
-    ChatAgent contains functions to get the assistant and to chat using the assistant.
-    Calling the chat function of a ChatAgent object will get the response message from the AI. 
-
-==== Using AI models from Model Builder
-
-Model Builder uses LangChain4j to connect to the AI models and to build the AI service:
-
-Environment variables are used to set these properties to connect to the AI providers.
-
-[source]
-----
-    @Inject
-    @ConfigProperty(name = "ollama.base.url")
-    private String OLLAMA_BASE_URL;
-
-    @Inject
-    @ConfigProperty(name = "ollama.chat.model.id")
-    private String OLLAMA_CHAT_MODEL_ID;
-    ...
-----
-
-The getChatModel function in ModelBuilder sets the ChatModel by using langchain4j APIs.
-In order to configure the model, the model name, the API key, temperature, max tokens and other variables are set.
-
-Some of the variables such as temperature may be set differently depending on the use case.
-For example, to generate more creative responses by the AI, the temperature may be set to a higher value.
-These use cases could include: generating stories, or generating ideas. A disadvantage of this higher value may lead to the model hallucinating more during the inference stage.
-The lower the temperature value, the more predictable the answers of the LLM are but there is also a potential chance of repetition of the similar answers.
-
-[source]
-----
- public ChatModel getChatModel() throws Exception {
-        if (chatModel == null) {
-            if (usingGithub()) {
-                chatModel = GitHubModelsChatModel.builder()
-                    .gitHubToken(GITHUB_API_KEY)
-                    .modelName(GITHUB_CHAT_MODEL_ID)
-                    .timeout(ofSeconds(TIMEOUT))
-                    .temperature(TEMPERATURE)
-                    .maxTokens(MAX_NEW_TOKEN)
-                    .build();
-                logger.info("using Github " + GITHUB_CHAT_MODEL_ID + " chat model for the web");
-            } else if (usingOllama()) {
-                chatModel = OllamaChatModel.builder()
-                    .baseUrl(OLLAMA_BASE_URL)
-                    .modelName(OLLAMA_CHAT_MODEL_ID)
-                    .timeout(ofSeconds(TIMEOUT))
-                    .temperature(TEMPERATURE)
-                    .numPredict(MAX_NEW_TOKEN)
-                    .build();
-                logger.info("using Ollama " + OLLAMA_CHAT_MODEL_ID + " chat model for the web");
-            } else if (usingMistralAi()) {
-                chatModel = MistralAiChatModel.builder()
-                    .apiKey(MISTRAL_AI_API_KEY)
-                    .modelName(MISTRAL_AI_MISTRAL_CHAT_MODEL_ID)
-                    .timeout(ofSeconds(TIMEOUT))
-                    .temperature(TEMPERATURE)
-                    .maxTokens(MAX_NEW_TOKEN)
-                    .build();
-                logger.info("using Mistral AI " + MISTRAL_AI_MISTRAL_CHAT_MODEL_ID + " chat model for the web");
-            } else {
-                throw new Exception("No available platform to access model");
-            }
-        }
-        return chatModel;
-}
-----
-
-The getEmbeddingModel() constructs the EmbeddingModel using respective embedding model names from the provider.
-For example, in this application, if Ollama was being used, then nomic-embed-text model name is chosen. 
-Other embedding model names could also have been chosen.
-Calling the EmbeddingModel.embed(text) returns the embedding which was used inside the AtlasMongoDB.
-
-[source]
-----
- public EmbeddingModel getEmbeddingModel() {
-        if (embeddingModel == null) {
-            if (usingGithub()) {
-                embeddingModel = GitHubModelsEmbeddingModel.builder()
-                    .gitHubToken(GITHUB_API_KEY)
-                    .modelName(TEXT_EMBEDDING_3_SMALL)
-                    .timeout(ofSeconds(TIMEOUT))
-                    .build();
-            } else if (usingOllama()) {
-                embeddingModel = OllamaEmbeddingModel.builder()
-                    .baseUrl(OLLAMA_BASE_URL)
-                    .modelName(OLLAMA_EMBED)
-                    .timeout(ofSeconds(TIMEOUT))
-                    .build();
-            } ...
-        }
-        return embeddingModel;
-    }
-----
-
-Embedding models are used to convert a section of text into a vector.
-These embedding models are of different dimensions; the best embedding model for the use case may be found by 
-fine tuning the application and trying out different models. 
-
-==== Creating an Assistant in ChatAgent
-
-Through the `Assistant` interface, the application can send messages to the LLM by its `chat()` method.
-
-[source]
-----
- interface Assistant extends ChatMemoryAccess {
-        @SystemMessage("You are a Java, Jakarta EE and MicroProfile coding helper, " +
-            "people will go to you for questions around coding. " +
-            "NEVER give the user unnecessary information. " + 
-            "NEVER lie or make information up, if you are unsure say so.")
-        String chat(@MemoryId String sessionId, @UserMessage String userMessage);
-    }
-----
-
-The modelBuilder instance is used to create an Assistant and the Assistant has access to max number of messages in a sessional chat history.
-
-[source]
-----
-public Assistant getAssistant() throws Exception {
-        if (assistant == null) {
-            ChatModel model = modelBuilder.getChatModel();
-            assistant = AiServices.builder(Assistant.class)
-                .chatModel(model)
-                .chatMemoryProvider(
-                    sessionId -> MessageWindowChatMemory.withMaxMessages(MAX_MESSAGES))
-                .build();
-        }
-        return assistant;
-    }
-----
-
-Using the chat function as defined in the interface, the AI reply is returned.
-
-[source]
-----
-    public String chat(String sessionId, String message) throws Exception {
-        String reply = getAssistant().chat(sessionId, message).trim();
-        return reply;
-    }
-----
-
-=== Stage 2: Inference with the RAG Chat application and interaction with the front-end 
-
-=== User Interaction with the RAG Chat Application frontend
+///Let's start with User Interaction with the RAG Chat Application frontend
 
 The chat service controls what happens upon any action on the http://localhost:9081/.
 
-When the user opens http://localhost:9081/, information about the sessionId is logged.
-
-[source]
-----  
-    @OnOpen
-    public void onOpen(Session session) {
-        ...
-        logger.info("Server connected to session: " + session.getId());
-        ...
-    }
-----
-
-When a message is sent by the user, the WebSocket `onMessage()` function is executed. 
+When a message is sent by the user, the `onMessage()` function is executed. 
 The user query is converted to an embedding vector which is a List<Float>. 
-Then the retrieveContent method of AtlasMongoDB class performs the vector search and returns 
+Then the retrieveContent, method of AtlasMongoDB, performs the vector search and returns 
 the text segments that are similar to the user query. 
 
 The message is appended with these results and sent to the AI using the agent.chat(sessionId, message);
@@ -908,16 +692,55 @@ The message is appended with these results and sent to the AI using the agent.ch
     }
 ----
 
-To fine tune the LangChain4j model or even try out another LLM, simply update the values in the https://github.com/OpenLiberty/sample-langchain4j/blob/main/rag-db/src/main/resources/META-INF/microprofile-config.properties[microprofile-config.properties] or provide them through the environment variables.
+To dive deeper into how retrieveContent works, the AtlasMongoDB.java class should be explored.
+See AtlasMongoDB.java. The role of the AtlasMongoDB.java class is to provide relevant functions for RAG such as creating search indexes, or retrieving similar content.
+The MongoDatabase instance is injected. The ModelBuilder instance is required to get the corresponding embedding model; how the model builder creates the embedding model is explained in the later sections.
+Note that the embedding model method called embed is used to convert text to embedding.
 
+[source]
 ----
-mistral.ai.chat.model.id=mistral-small-latest
+    @Inject
+    private ModelBuilder modelBuilder;
 
-chat.model.timeout=120
-chat.model.max.token=400
-chat.model.temperature=1.0
-chat.memory.max.messages=20
+    @Inject
+    MongoDatabase db;
 ----
+
+The database.getCollection method returns a MongoCollection<Document> which represents a collection of BSON documents. 
+
+[source]
+----    
+  public MongoCollection<Document> getCollection() {
+        return db.getCollection(COLLECTION_NAME);
+  }
+---- 
+
+The rest of the functions such as deleteOne, replaceOne and insertOne call the respective methods on the current collection.
+
+The retrieveContent method takes in a userQuery embedding vector, and the query text. 
+It uses the userQuery vector, the location or `PATH` to where the vectors are stored, selects `NUM_CANDIDATES` vectors in the nearby group in the latent space,
+and returns the limit of `MAX_RESULTS_TO_AI`, based on the `SEARCH_INDEX_NAME`. The aggregate returns the results for $vectorSearch command and each result is a type of Document object.
+
+[source]
+----
+    public List<String> retrieveContent(List<Float> userQuery, String query) {
+        List<String> similarContent = new ArrayList<>();
+        Document vecSearchDocument = new Document("queryVector", userQuery)
+            .append("path", PATH)
+            .append("numCandidates", NUM_CANDIDATES)
+            .append("limit", MAX_RESULTS_TO_AI)
+            .append("index", SEARCH_INDEX_NAME);
+        Bson vectorSearch = new Document("$vectorSearch", vecSearchDocument);
+        AggregateIterable<Document> results = getCollection().aggregate(Arrays.asList(vectorSearch));
+        for (Document result : results) {
+            similarContent.add(result.getString("Content"));
+        }
+        return similarContent;
+    }
+----
+
+When BSON Documents are first stored by the sample application, each BSON Document contain 3 keys: "Summary", "Content", and "Vector". 
+However, only the value of the "Content" section is required above and its value is obtained using result.getString("Content") for each result.  
 
 [#where_to_next]
 == Where to next?
@@ -925,13 +748,13 @@ chat.memory.max.messages=20
 Check out the link:https://openliberty.io/guides/[Open Liberty guides^] for more information and interactive tutorials that walk you through using more Jakarta EE and MicroProfile APIs with Open Liberty.
 
 [#help_links]
-== Helpful links
+== Find out more
 * link:https://github.com/langchain4j[LangChain4j]
 * link:https://www.mongodb.com/docs/atlas/cli/current/atlas-cli-deploy-docker/[MongoDB Atlas Docker]
+* link:https://docs.langchain4j.dev/category/tutorials[LangChain4j Tutorials]
+* link:https://blogs-draft-openlibertyio.mqj6zf7jocq.us-south.codeengine.appdomain.cloud/blog/2025/10/22/open-liberty-with-langchain4j-tools.html[Calling LLM tools in MicroProfile and Jakarta EE applications with LangChain4j]
+* link:https://openliberty.io/blog/2024/04/01/open-liberty-with-langchain4j-example.html[Run AI-enabled Jakarta EE and MicroProfile applications on Open Liberty^]
 * link:https://openliberty.io/guides/jakarta-websocket.html[Bidirectional communication between services using Jakarta WebSocket^]
-* link:https://openliberty.io/guides/cdi-intro.html[Injecting dependencies into microservices^]
-* link:https://openliberty.io/guides/microprofile-config.html[Configuring microservices^]
-* link:https://openliberty.io/guides/microprofile-metrics.html[Providing metrics from a microservice^]
 
 
 // // // // // // // //
