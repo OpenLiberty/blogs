@@ -1,0 +1,177 @@
+---
+layout: post
+title: "25.0.0.5でMicroProfile Telemetry 2.0を使用してLiberty HTTPアクセスログをOpenTelemetryに送信する"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/navaneethsnair1
+author_github: https://github.com/navaneethsnair1
+seo-title: 25.0.0.5でMicroProfile Telemetry 2.0を使用してLiberty HTTPアクセスログをOpenTelemetryに送信する - OpenLiberty.io
+seo-description: 25.0.0.5リリースでは、MicroProfile Telemetry 2.0によるLiberty HTTPアクセスログの収集がサポートされ、既存のランタイムおよびアプリケーションのログソースとともにOpenTelemetryとの統合が可能になりました。
+blog_description: 25.0.0.5リリースでは、MicroProfile Telemetry 2.0によるLiberty HTTPアクセスログの収集がサポートされ、既存のランタイムおよびアプリケーションのログソースとともにOpenTelemetryとの統合が可能になりました。
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+additional_authors:
+- name: 佐野 剛（翻訳）
+  github: https://github.com/TSA0001
+  image: https://avatars.githubusercontent.com/u/56730221
+blog-available-in-languages:
+- lang: en
+  path: /blog/2025/05/20/25.0.0.5.html
+---
+= 25.0.0.5でMicroProfile Telemetry 2.0を使用してLiberty HTTPアクセスログをOpenTelemetryに送信する
+Navaneeth S Nair <https://github.com/navaneethsnair1>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+25.0.0.5リリースでは、MicroProfile Telemetry 2.0によるLiberty HTTPアクセスログの収集がサポートされ、既存のランタイムおよびアプリケーションのログソースとともにOpenTelemetryとの統合が可能になりました。
+
+In link:{url-about}[Open Liberty] 25.0.0.5:
+
+* <<telemetry, MicroProfile Telemetry 2.0を使用してLiberty HTTPアクセスログをOpenTelemetryに送信する>>
+* <<bugs, このリリースで修正された主なバグ>>
+
+
+link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A25005+label%3A%22release+bug%22[25.0.0.5] で修正されたバグのリストを見る。
+
+過去の link:{url-prefix}/blog/?search=release&search!=beta[過去のOpen Liberty GAリリースブログ記事]をご覧ください.
+
+
+[#run]
+
+== 25.0.0.5を使用したアプリの開発と実行
+
+link:{url-prefix}/guides/maven-intro.html[Maven]を使用している場合は、`pom.xml`ファイルに以下を含めます：
+
+[source,xml]
+----
+<plugin>
+    <groupId>io.openliberty.tools</groupId>
+    <artifactId>liberty-maven-plugin</artifactId>
+    <version>3.11.3</version>
+</plugin>
+----
+
+あるいは、link:{url-prefix}/guides/gradle-intro.html[Gradle]の場合は、`build.gradle`ファイルに以下をインクルードする：
+
+[source,gradle]
+----
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'io.openliberty.tools:liberty-gradle-plugin:3.9.3'
+    }
+}
+apply plugin: 'liberty'
+----
+
+Gradleの場合は、build.gradleファイルに以下をインクルードします:
+
+[source]
+----
+FROM icr.io/appcafe/open-liberty
+----
+
+または、link:{url-prefix}/start/[ダウンロード・ページ]をご覧ください。
+
+link:https://plugins.jetbrains.com/plugin/14856-liberty-tools[IntelliJ IDEA]、link:https://marketplace.visualstudio.com/items?itemName=Open-Liberty.liberty-dev-vscode-ext[Visual Studio Code]、またはlink:https://marketplace.eclipse.org/content/liberty-tools[Eclipse IDE]を使用している場合は、オープンソースのlink:https://openliberty.io/docs/latest/develop-liberty-tools.html[Liberty開発者ツール]を利用することで、IDE内から効率的な開発、テスト、デバッグ、アプリケーション管理を行うことができます。
+
+[link=https://stackoverflow.com/tags/open-liberty]
+image::img/blog/blog_btn_stack_ja.svg[Ask a question on Stack Overflow, align="center"]
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/31481
+// Contact/Reviewer: tonyreigns
+// // // // // // // // 
+[#telemetry]
+== MicroProfile Telemetry 2.0を使用してLiberty HTTPアクセスログをOpenTelemetryに送信する
+
+link:https://openliberty.io/docs/latest/microprofile-telemetry.html[MicroProfile Telemetry 2.0] (`mpTelemetry-2.0`) は OpenTelemetry によるトレース、メトリクス、ログの収集とエクスポートを可能にします。
+
+`mpTelemetry-2.0` 機能を使って、link:https://openliberty.io/docs/latest/access-logging.html[Liberty HTTPアクセスログ]をOpenTelemetryに収集できるようになりました。この新しいログソースは、これまで利用可能だったOpen Libertyのランタイムログソース（メッセージ、トレース、ffdcs、監査）と`java.util.logging`（JUL）APIによって生成されたアプリケーションログに追加されます。
+
+MicroProfile Telemetry 2.0 機能を有効にして HTTP アクセスログを収集するには、この機能を有効にし、`httpEndpoint` 構成要素およびオプションで `httpAccessLogging` 構成要素を構成します。新しい `accessLog` 値を `mpTelemtry` 構成要素の `source` 属性に含めます。また、次の `server.xml` の例に示すように、`mpTelemetry` 構成要素の `accessLogFields` 属性を `default` または `logFormat` に設定します：
+
+[source,xml]
+----
+<featureManager>
+    <feature>mpTelemetry-2.0</feature>
+    ...
+</featureManager>
+
+<httpAccessLogging id="accessLogging" logFormat='%h %u %{t}W "%r" %s %b %D %{R}W'/>
+<httpEndpoint id="defaultHttpEndpoint" accessLoggingRef="accessLogging" httpPort="9080" httpsPort="9443"/>
+
+<mpTelemetry accessLogFields="logFormat" source="message,trace,ffdc,accessLog"/>
+----
+   
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
+
+[#bugs]
+== このリリースで修正された主なバグ
+
+
+バグの修正に時間を費やしました。以下のセクションでは、このリリースで解決された問題のほんの一部について説明します。興味のある方は、link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A25005+label%3A%22release+bug%22[25.0.0.5で修正されたバグの全リスト]をご覧ください。
+
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/31347[[PH66379\] Liberty 25.0.0.3 と Java 21 with FIPS 140-2の組み合わせで構成できない]
++
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/31247[Liberty 25.0.0.3 の起動時にAuthCacheImplからの NPEで失敗することがある]
++
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/31231[JNDI内のトランザクションのオブジェクトをリストするときの不具合]
++
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/31228[SmallRye OpenAPI をバージョン4.0.9にアップデート]
++
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/31205[Libertyのフォルダーとパスを正しく構成する方法を明確化]
++
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/31167[ejblocalのサブコンテクストのルックアップの不具合]
++
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/31057['"OTEL_SDK_DISABLED=true"が構成されていても /health と /metrics に MicroProfile Telemetry を使うと,"CWMOT5100I" が表示される']
++
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/30871[ignoreWriteAfterCommit プロパティを拡張し、tWASの動作に近いものにした]
++
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/30545[jsf-2.3 フィーチャーをMyFaces 2.3.11ベースにアップデート]
++
+
+
+// // // // // // // //
+// In the preceding section:
+// For this section ask either Michal Broz or Tom Evans or the #openliberty-release-blog channel for Notable bug fixes in this release.
+// Present them as a list in the order as provided, linking to the issue and providing a short description of the bug and the resolution.
+// If the issue on Github is missing any information, leave a comment in the issue along the lines of:
+// "@[issue_owner(s)] please update the description of this `release bug` using the [bug report template](https://github.com/OpenLiberty/open-liberty/issues/new?assignees=&labels=release+bug&template=bug_report.md&title=)" 
+// Feel free to message the owner(s) directly as well, especially if no action has been taken by them.
+// For inspiration about how to write this section look at previous blogs e.g- 20.0.0.10 or 21.0.0.12 (https://openliberty.io/blog/2021/11/26/jakarta-ee-9.1.html#bugs)
+// // // // // // // //
+
+
+// // // // // // // //
+// If there were updates to guides since last release, keep the following, otherwise remove section.
+// Check with Gilbert Kwan, otherwise Michal Broz or YK Chang
+// // // // // // // //
+[#guides]
+== 前回のリリースから新しく更新されたガイド
+Open Libertyの特徴や機能が成長し続けるにつれて、それらのトピックに関するlink:https://openliberty.io/guides/?search=new&key=tag[openliberty.ioへの新しいガイド]を追加し続け、できるだけ簡単に導入できるようにしています。 既存のガイドも、報告されたバグや問題に対処し、内容を最新に保ち、トピックの対象を拡大するために更新されます。
+
+// // // // // // // //
+// In the following section, list any new guides, or changes/updates to existing guides.  
+// The following is an example of how the list can be structured (similar to the bugs section):
+// * link:{url-prefix}/guides/[new/updated guide].html[Guide Title]
+//  ** Description of the guide or the changes made to the guide.
+// // // // // // // //
+
+
+== 今すぐOpen Liberty 25.0.0.5を入手
+
+<<run、Maven、Gradle、Docker、およびダウンロード可能なアーカイブ>>から入手できます。
