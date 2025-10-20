@@ -1,0 +1,132 @@
+---
+layout: post
+title: "Integrate Agentic AI Into Your Liberty App Using MCP Server"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/habiblawal1
+author_github: https://github.com/habiblawal1
+seo-title: Support for the Model Context Protocol within Open Liberty - OpenLiberty.io
+seo-description: Learn how to use the MCP Server feature within your Liberty application to allow your business logic to be utilized within an Agentic AI workflow.
+blog_description: Learn how to use the MCP Server feature within your Liberty application to allow your business logic to be utilized within an Agentic AI workflow.
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+---
+= Integrate Agentic AI Into Your Liberty App Using MCP Server
+Habib Lawal <https://github.com/habiblawal1>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+== What is MCP
+Model Context Protocol (MCP) is an open standard that enables AI applications to interact with and utilize external systems.
+
+The *MCP Server feature* allows developers to expose the business logic of their Liberty applications, making it discoverable, understandable, and usable by AI applications.
+
+== The Power of MCP
+Model Context Protocol (MCP) has emerged as the standard for AI applications to access real-time information from external sources. This approach delivers more accurate and timely responses to users without the constant need to retrain AI models on new information.
+
+Consider a scenario where your company provides weather forecasting services that require continuous updates from multiple data sources. It's impractical and inefficient to constantly retrain your AI model with these frequently changing weather forecasts.
+
+A more effective solution is to enable the AI to access current weather data through tools exposed by your Liberty application. This allows the AI to retrieve up-to-date forecast information whenever needed, ensuring responses are always based on the most current data available, without the need for AI model retraining.
+
+== How to use the MCP Server in Liberty
+To expose your business logic to authorized AI applications, you'll need to declare it as an https://modelcontextprotocol.io/specification/2025-06-18/server/tools[MCP tool]. In this context, a tool is simply a function or operation that the AI can invoke to perform a specific task.
+
+You can easily declare a tool with the Liberty MCP Server feature by adding the `@Tool` annotation to the desired method. This method must exist within a https://openliberty.io/guides/cdi-intro.html#managing-scopes-and-contexts[CDI managed bean] that has a scope annotation (e.g. `@ApplicationScoped` or `@RequestScoped`).
+
+Below is an example of a declared tool for retrieving weather forecasts. The tool calls an external service to get the forecast based on the location coordinates provided by the AI application:
+
+[source,java]
+----
+@ApplicationScoped
+public class WeatherTools {
+    
+    @Inject
+    private WeatherToolsClient weatherClient;
+    
+    @Tool(name = "getForecast", title = "Weather Forecast Provider", description = "Get weather forecast for a location.")
+    public String getForecast(@ToolArg(name = "latitude", description = "Latitude of the location") String latitude,
+                              @ToolArg(name = "longitude", description = "Longitude of the location") String longitude) {
+        return weatherClient.getForecast(
+                Double.parseDouble(latitude),
+                Double.parseDouble(longitude),
+                4,
+                "temperature_2m,snowfall,rain,precipitation,precipitation_probability");
+    }
+}
+----
+
+Here's a breakdown of how this weather forecast tool works:
+
+`@Tool` is the annotation that exposes your application functionality to an AI application.
+
+- **Name:** The name used to identify the tool when the AI application calls it. If this attribute is not specified, the method name is used as the tool name.
+- **Title:** An optional user-friendly title for the tool that can be displayed to the end user of the application. If not declared, then the tool name is used as default for the title.
+- **Description:** This helps the AI model understand the functionality of the tool, enabling it to determine if this is the appropriate tool to use to help perform the desired action.
+
+`@ToolArg` is the annotation to declare an argument that must be passed when calling a tool.
+
+- **Name:** The name used to identify the argument that the AI is providing a value for. Arguments are identified by name, so this attribute is required unless the class was compiled with the `-parameters` option.
+- **Description:** A description of the argument, so the AI can understand what value it should provide for the argument.
+
+We've also annotated the `WeatherTools` class with `@ApplicationScoped` to make it a CDI managed bean. This is required for the `@Tool`-annotated method to be discovered by the server.
+
+Note that the AI model will use the description to decide when to call a tool and what values to pass for the arguments. Therefore, writing clear, descriptive text that the AI can understand is crucial for effective tool utilization.
+
+
+
+== Supported MCP Functionality
+Much of the MCP specification's functionality is optional to implement, allowing for gradual adoption while maintaining compatibility. As of writing, the Liberty MCP Server feature has implemented compatibility for the tool feature of the MCP Server specification, along with the following tool related capabilities listed below.
+
+=== Tool Metadata hints (Annotations)
+You can provide hints about the scope and range of your tool to give the AI application an indication of how safe the tool is to call. For example, you can indicate whether calling your tool may modify data. Confusingly, the MCP specification refers to these hints as https://modelcontextprotocol.io/specification/2025-06-18/schema#toolannotations["Tool Annotations"], despite them being unrelated to Java annotations.
+
+You can add these hints within your `@Tool` annotation. Below is an example:
+ 
+[source,java]
+----
+@Tool(annotations = @Annotations(readOnlyHint = true, openWorldHint = false)
+----
+
+You can read more about Tool Annotations in the https://modelcontextprotocol.io/specification/2025-06-18/schema#toolannotations[MCP specification]. The hints you can currently add to your tool include:
+
+- `readOnlyHint` if true, indicates the tool will not modify any data. (Default: `false`)
+- `destructiveHint` if true, for tools which are not readOnly, indicates the tool may destroy data. (Default: `true`)
+- `idempotentHint` if true, for tools which are not readOnly, indicates calling the tool repeatedly with the same arguments will have no additional effect on data. (Default: `false`)
+- `openWorldHint` if true, indicates the tool may interact with external systems. (Default: `true`)
+
+=== Cancellation
+A tool can sometimes take a long time to run, such as when fetching data from a slow external service. In these situations, clients should have the ability to cancel their request to the running tool.
+
+The Liberty MCP Server feature supports https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/cancellation#cancellation[cancellation], allowing clients to send cancellation requests at any time during tool execution.
+
+To enable cancellation for your tool, you must accept a `Cancellation` parameter. When your tool is running, you should periodically call `Cancellation.skipProcessingIfCancelled()` which will throw an `OperationCancellationException` if the client has requested cancellation.
+
+[source,java]
+----
+@Tool
+public String bigComputationTool(Cancellation cancellation) {
+    ArrayList<Data> result = new ArrayList<>();
+    for (Data someData : getData()) {
+        cancellation.skipProcessingIfCancelled();
+        result.add(process(someData));
+    }
+    return result;
+}
+----
+
+We are actively developing support for additional MCP Server features and would greatly appreciate your feedback on which functionality would be most valuable for your use case.
+
+For more information about MCP, you can read the official MCP documentation https://modelcontextprotocol.io/specification/2025-06-18[here].
+
+// // // // // // // //
+// LINKS
+//
+// OpenLiberty.io site links:
+// link:/guides/microprofile-rest-client.html[Consuming RESTful Java microservices]
+// 
+// Off-site links:
+// link:https://openapi-generator.tech/docs/installation#jar[Download Instructions]
+//
+// // // // // // // //
