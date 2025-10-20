@@ -1,0 +1,286 @@
+---
+layout: post
+title: "Model Context Protocol Server and Netty‑based HTTP transport in 25.0.0.11-beta"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/navaneethsnair1
+author_github: https://github.com/navaneethsnair1
+seo-title: "Model Context Protocol Server and Netty‑based HTTP transport in 25.0.0.11-beta- OpenLiberty.io"
+seo-description: In this beta release, Open Liberty introduces the new Model Context Protocol (MCP) Server 1.0, which enables AI applications to seamlessly interact with business logic and access real-time data through discoverable tools. It also features a Netty-based HTTP transport as a beta preview, offering an internal performance upgrade for HTTP, WebSocket, JMS, and SIP communications with zero migration impact.
+blog_description: In this beta release, Open Liberty introduces the new **Model Context Protocol (MCP) Server 1.0**, which enables AI applications to seamlessly interact with business logic and access real-time data through discoverable tools. It also features a **Netty-based HTTP transport** as a beta preview, offering an internal performance upgrade for HTTP, WebSocket, JMS, and SIP communications with zero migration impact.
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+---
+= Model Context Protocol Server and Netty‑based HTTP transport in 25.0.0.11-beta
+Navaneeth S Nair <https://github.com/navaneethsnair1>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+In this beta release, Open Liberty introduces the new **Model Context Protocol (MCP) Server 1.0**, which enables AI applications to seamlessly interact with business logic and access real-time data through discoverable tools. It also features a **Netty-based HTTP transport** as a beta preview, offering an internal performance upgrade for HTTP, WebSocket, JMS, and SIP communications with zero migration impact.
+
+// // // // // // // //
+// Change the RELEASE_SUMMARY to an introductory paragraph. This sentence is really
+// important because it is supposed to grab the readers attention.  Make sure to keep the blank lines
+//
+// Throughout the doc, replace 25.0.0.11-beta with the version number of Open Liberty, eg: 22.0.0.2-beta
+// // // // // // // //
+
+The link:{url-about}[Open Liberty] 25.0.0.11-beta includes the following beta features (along with link:{url-prefix}/docs/latest/reference/feature/feature-overview.html[all GA features]):
+
+* <<mcp, Model Context Protocol Server>>
+* <<netty, Netty‑based HTTP transport on Open Liberty>>
+
+See also link:{url-prefix}/blog/?search=beta&key=tag[previous Open Liberty beta blog posts].
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/32991
+// Contact/Reviewer: habiblawal1,Azquelt
+// // // // // // // // 
+[#mcp]
+== Model Context Protocol Server
+
+link:https://modelcontextprotocol.io/docs/getting-started/intro[Model Context Protocol (MCP)] is an open standard to enable AI applications to interact with and utilize external systems.
+
+The new MCP Server 1.0 feature (`mcpServer-1.0`) allows developers of applications on Liberty to bridge the gap between LLMs and their business code by providing the capability to expose functionality for AI applications to discover, understand, and use.
+
+### Why use MCP Server
+
+Imagine your company provides weather forecasting services that require constant updates from multiple data sources. Since the weather forecast changes frequently, it's impossible for an LLM trained on data from last week to have much idea about the weather this week. A much better approach is to allow the LLM to access this weather data via a tool that your Liberty app exposes. The LLM can then call the tool whenever it needs forecasts and instantly have the up-to-date weather information.
+
+### How to use the MCP Server 1.0 feature
+To expose your business logic to authorized AI applications, you'll need to declare it as an MCP link:https://modelcontextprotocol.io/specification/2025-06-18/server/tools[tool]. In this context, a tool is simply a function or operation that the AI can invoke to perform a specific task.
+
+The Liberty `mcpServer-1.0` feature makes this simple by allowing you to declare a tool using the `@Tool` annotation on a method of a link:https://openliberty.io/guides/cdi-intro.html#managing-scopes-and-contexts[CDI managed bean] with a scope annotation.
+
+Here is an example of a tool for getting the weather forecast:
+```java
+@ApplicationScoped
+public class WeatherTools {
+    
+    @Inject
+    private WeatherToolsClient weatherClient;
+    
+    @Tool(name = "getForecast", title = "Weather Forecast Provider", description = "Get weather forecast for a location.")
+    public String getForecast(@ToolArg(name = "latitude", description = "Latitude of the location") String latitude,
+                              @ToolArg(name = "longitude", description = "Longitude of the location") String longitude) {
+        return weatherClient.getForecast(
+                Double.parseDouble(latitude),
+                Double.parseDouble(longitude),
+                4,
+                "temperature_2m,snowfall,rain,precipitation,precipitation_probability");
+    }
+}
+```
+
+This tool calls an external service to get the weather forecast based on location declared by the AI application. Here's a breakdown of how it works:
+
+`@Tool`: This is the annotation that exposes your app functionality to the AI application.
+- **Name:** The name, used to identify the tool when the LLM wants to call it. If this attribute is not present, the name of the method is used as the tool name.
+- **Title:** An optional user-friendly title for the tool that can be displayed to the end user of the application. If this is not declared, then the name is used as the title.
+- **Description:** This helps the LLM understand the functionality of the tool so it can decide if this is the right tool to use to get the data needed to perform the LLM's desired action.
+
+`@ToolArg`: This annotation declares an argument that must be passed when calling a tool.
+- **Name:** The argument name, used to identify the argument when the LLM calls it. Arguments are identified by name so this attribute is required unless the class was compiled with the `-parameters` option.
+- **Description:** A description of the argument so the LLM can understand what value it is expected to give for the argument.
+
+We've also annotated the `WeatherTools` class with `@ApplicationScoped` to make it a CDI managed bean. This is required for the `@Tool`-annotated method to be discovered by the server.
+
+Note that the LLM will use the description to decide when to call a tool and what values to pass for the arguments, so writing good descriptions that the LLM can understand is really important.
+
+### Supported Tool Features
+
+The MCP specification has much of its functionality as optional to implement, allowing for a more gradual adoption whilst maintaining compatibility. In our current beta, we've implemented compatibility for the tool feature of the MCP Server specification, along with the following tool related capabilities:
+
+#### Tool Metadata hints (Annotations)
+
+You can provide some hints about the scope and range of your tool, to give the AI application an indication of how safe it might be to call. For example, you can indicate whether or not calling your tool may modify data. Confusingly, the MCP specification calls these "[Tool Annotations][tool-annotations]", though they're nothing to do with Java annotations.
+
+You can provide these hints within your `@Tool` annotation like this:
+
+```java
+@Tool(annotations = @Annotations(readOnlyHint = true, openWorldHint = false)
+```
+
+You can read more about Tool Annotations [in the specification][tool-annotations]. The hints that you can currently add to your tool are: 
+- `readOnlyHint`: indicates that the tool does not modify any data
+- `destructiveHint`: for tools which are not readOnly, indicates whether the tool may destroy any data
+- `idempotentHint`: for tools which are not readOnly, indicates whether calling the tool twice with the same arguments will have any additional affects on its environment
+- `openWorldHint`: indicates whether the tool may make requests to external systems
+
+[tool-annotations]: https://modelcontextprotocol.io/specification/2025-06-18/schema#toolannotations
+
+#### Cancellation
+A tool can sometimes take a long time to run, such as when fetching data from a slow external service. In this case, the client should have the right to change their mind and cancel their request to the running tool.
+
+The Liberty `mcpServer-1.0` feature supports link:https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/cancellation#cancellation[cancellation]. It allows clients to send cancellation requests at any time during the execution of a tool.
+
+To allow your tool to be cancelled, you must accept a `Cancellation` parameter. If the client requests for cancellation while running your tool, `Cancellation.skipProcessingIfCancelled()` is called which throws an `OperationCancellationException`.
+
+```java
+@Tool
+public String bigComputationTool(Cancellation cancellation) {
+    ArrayList<Data> result = new ArrayList<>();
+    for (Data someData : getData()) {
+        cancellation.skipProcessingIfCancelled();
+        result.add(process(someData));
+    }
+    return result;
+}
+```
+
+### How to Setup a MCP Server Project
+Here are the simple steps to follow to try out the new MCP Server 1.0 feature for yourself:
+
+1. Download the Open Liberty link:https://openliberty.io/start/#runtime_betas[All Beta Features package]
+2. Unzip the archive. You should have a `wlp` folder
+3. Inside your `pom.xml` file, add the path to your `wlp` folder as a variable named `<wlp-dir-path>` within the `<properties>` block:
+[source,xml]
+----
+    <wlp-dir-path>replace-with-path-to-wlp-dir</wlp-dir-path>
+----
+4. Inside your `pom.xml` file, to add the MCP jar as dependency, add the following dependency within the `<dependencies>` block:
+[source,xml]
+----
+<!-- Liberty MCP API -->
+<dependency>
+    <groupId>io.openliberty.mcp</groupId>
+    <artifactId>mcp-core</artifactId>
+    <version>1.0.106</version>
+    <scope>system</scope>
+    <systemPath>${wlp-dir-path}/lib/io.openliberty.mcp_1.0.106.jar}</systemPath>
+</dependency>
+----
+
+5. Inside your `pom.xml` file, add the following plugin within the `plugins` block.
+[source,xml]
+----
+<plugin>
+    <groupId>io.openliberty.tools</groupId>
+    <artifactId>liberty-maven-plugin</artifactId>
+    <configuration>
+        <installDirectory>${wlp-dir-path}</installDirectory>
+    </configuration>
+</plugin>
+----
+
+We are actively developing support for more MCP server features and would greatly appreciate your feedback on which functionality would be most valuable for your use case.
+ 
+        
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/32614
+// Contact/Reviewer: isaacrivriv,mrsaldana
+// // // // // // // // 
+[#netty]
+== Netty‑based HTTP transport on Open Liberty
+
+Open Liberty now provides a **Netty‑based HTTP transport** as a beta preview. This is an internal implementation swap for the underlying transport used for HTTP/1.1, HTTP/2, WebSocket, JMS and SIP communications. It is designed for **zero migration**: your applications and `server.xml` should continue to behave the same. We are looking forward and counting on your feedback before GA release!
+
+Netty’s event‑driven I/O gives us a modern foundation for long‑term scalability, easier maintenance, and future performance work. In order to help us validate parity and performance for your real-world scenarios, here are a few things you could try:
+
+- HTTP/1.1 and HTTP/2: large uploads/downloads, chunked transfers, compression-enabled content, keep-alive behavior.
+- WebSocket: long-lived communications, backpressure scenarios
+- Timeouts: read/write/keep-alive timeouts under load
+- Access logging: verify formatting and log results compared to previous builds
+- JMS communications: message send/receive throughput, durable subscriptions
+
+=== Limitations of the Beta release:
+
+* HTTP
+    ** HTTP requests with content length greater than the maximum integer value will fail due to internal limitations on request size with Netty.
+    ** If the http option `maxKeepAliveRequests` has no limits, there is a maximum limit of 50 pipelined requests on HTTP 1.1.
+    ** Http option `resetFramesWindow` is reduced from millisecond to second precision due to limitations in the Netty library.
+    ** Due to internal limitations of the Netty library, the http option `MessageSizeLimit` is now adjusted to be capped at the maximum integer value for HTTP/2.0 connections.
+    ** Due to internal differences with Netty, the http option `ThrowIOEForInboundConnections` could behave differently from the Channel Framework implementation.
+    ** Due to internal limitations of Netty, `acceptThread` and `waitToAccept` TCP options are currently not implemented and are ignored for the current Beta if set.
+    ** As of the moment, clear text upgrade requests for HTTP 2.0 with request data will be rejected with a 'Request Entity Too Large status' code. A fix is in progress.
+* WebSocket
+    ** Websocket inbound requests can generate FFDC RuntimeExceptions on connection clean up when a connection is closed from the client side.
+* SIP
+    ** SIP Resolver transport does not use a Netty transport implementation at the moment.
+* ALPN
+    ** Currently, our Netty implementation only supports the native JDK ALPN implementation. Additional information for the ALPN implementations currently supported by the Channel Framework but not our Netty beta can be found in the link:https://www.ibm.com/docs/en/was-liberty/base?topic=40-alpn-support[documentation]
+    
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
+
+[#run]
+=== Try it now
+
+To try out these features, update your build tools to pull the Open Liberty All Beta Features package instead of the main release. The beta works with Java SE 25, Java SE 21, Java SE 17, Java SE 11, and Java SE 8.
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], you can install the All Beta Features package using:
+
+[source,xml]
+----
+<plugin>
+    <groupId>io.openliberty.tools</groupId>
+    <artifactId>liberty-maven-plugin</artifactId>
+    <version>3.11.5</version>
+    <configuration>
+        <runtimeArtifact>
+          <groupId>io.openliberty.beta</groupId>
+          <artifactId>openliberty-runtime</artifactId>
+          <version>25.0.0.11-beta</version>
+          <type>zip</type>
+        </runtimeArtifact>
+    </configuration>
+</plugin>
+----
+
+You must also add dependencies to your `pom.xml` file for the beta version of the APIs that are associated with the beta features that you want to try. For example, the following block adds dependencies for two example beta APIs:
+
+[source,xml]
+----
+<dependency>
+    <groupId>org.example.spec</groupId>
+    <artifactId>exampleApi</artifactId>
+    <version>7.0</version>
+    <type>pom</type>
+    <scope>provided</scope>
+</dependency>
+<dependency>
+    <groupId>example.platform</groupId>
+    <artifactId>example.example-api</artifactId>
+    <version>11.0.0</version>
+    <scope>provided</scope>
+</dependency>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'io.openliberty.tools:liberty-gradle-plugin:3.9.5'
+    }
+}
+apply plugin: 'liberty'
+dependencies {
+    libertyRuntime group: 'io.openliberty.beta', name: 'openliberty-runtime', version: '[25.0.0.11-beta,)'
+}
+----
+
+Or if you're using link:{url-prefix}/docs/latest/container-images.html[container images]:
+
+[source]
+----
+FROM icr.io/appcafe/open-liberty:beta
+----
+
+Or take a look at our link:{url-prefix}/downloads/#runtime_betas[Downloads page].
+
+If you're using link:https://plugins.jetbrains.com/plugin/14856-liberty-tools[IntelliJ IDEA], link:https://marketplace.visualstudio.com/items?itemName=Open-Liberty.liberty-dev-vscode-ext[Visual Studio Code] or link:https://marketplace.eclipse.org/content/liberty-tools[Eclipse IDE], you can also take advantage of our open source link:https://openliberty.io/docs/latest/develop-liberty-tools.html[Liberty developer tools] to enable effective development, testing, debugging and application management all from within your IDE.
+
+For more information on using a beta release, refer to the link:{url-prefix}docs/latest/installing-open-liberty-betas.html[Installing Open Liberty beta releases] documentation.
+
+[#feedback]
+== We welcome your feedback
+
+Let us know what you think on link:https://groups.io/g/openliberty[our mailing list]. If you hit a problem, link:https://stackoverflow.com/questions/tagged/open-liberty[post a question on StackOverflow]. If you hit a bug, link:https://github.com/OpenLiberty/open-liberty/issues[please raise an issue].
