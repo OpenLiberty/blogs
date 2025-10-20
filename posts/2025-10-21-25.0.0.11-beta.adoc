@@ -7,7 +7,7 @@ author_picture: https://avatars3.githubusercontent.com/navaneethsnair1
 author_github: https://github.com/navaneethsnair1
 seo-title: "Model Context Protocol Server and Netty‑based HTTP transport in 25.0.0.11-beta- OpenLiberty.io"
 seo-description: In this beta release, Open Liberty introduces the new Model Context Protocol (MCP) Server 1.0, which enables AI applications to seamlessly interact with business logic and access real-time data through discoverable tools. It also features a Netty-based HTTP transport as a beta preview, offering an internal performance upgrade for HTTP, WebSocket, JMS, and SIP communications with zero migration impact.
-blog_description: In this beta release, Open Liberty introduces the new **Model Context Protocol (MCP) Server 1.0**, which enables AI applications to seamlessly interact with business logic and access real-time data through discoverable tools. It also features a **Netty-based HTTP transport** as a beta preview, offering an internal performance upgrade for HTTP, WebSocket, JMS, and SIP communications with zero migration impact.
+blog_description: In this beta release, Open Liberty introduces the new Model Context Protocol (MCP) Server 1.0, which enables AI applications to seamlessly interact with business logic and access real-time data through discoverable tools. It also features a Netty-based HTTP transport as a beta preview, offering an internal performance upgrade for HTTP, WebSocket, JMS, and SIP communications with zero migration impact.
 open-graph-image: https://openliberty.io/img/twitter_card.jpg
 open-graph-image-alt: Open Liberty Logo
 ---
@@ -18,14 +18,7 @@ Navaneeth S Nair <https://github.com/navaneethsnair1>
 :url-about: /
 //Blank line here is necessary before starting the body of the post.
 
-In this beta release, Open Liberty introduces the new **Model Context Protocol (MCP) Server 1.0**, which enables AI applications to seamlessly interact with business logic and access real-time data through discoverable tools. It also features a **Netty-based HTTP transport** as a beta preview, offering an internal performance upgrade for HTTP, WebSocket, JMS, and SIP communications with zero migration impact.
-
-// // // // // // // //
-// Change the RELEASE_SUMMARY to an introductory paragraph. This sentence is really
-// important because it is supposed to grab the readers attention.  Make sure to keep the blank lines
-//
-// Throughout the doc, replace 25.0.0.11-beta with the version number of Open Liberty, eg: 22.0.0.2-beta
-// // // // // // // //
+In this beta release, Open Liberty introduces the new Model Context Protocol (MCP) Server 1.0, which enables AI applications to seamlessly interact with business logic and access real-time data through discoverable tools. It also features a Netty-based HTTP transport as a beta preview, offering an internal performance upgrade for HTTP, WebSocket, JMS, and SIP communications with zero migration impact.
 
 The link:{url-about}[Open Liberty] 25.0.0.11-beta includes the following beta features (along with link:{url-prefix}/docs/latest/reference/feature/feature-overview.html[all GA features]):
 
@@ -45,16 +38,18 @@ link:https://modelcontextprotocol.io/docs/getting-started/intro[Model Context Pr
 
 The new MCP Server 1.0 feature (`mcpServer-1.0`) allows developers of applications on Liberty to bridge the gap between LLMs and their business code by providing the capability to expose functionality for AI applications to discover, understand, and use.
 
-### Why use MCP Server
+=== Why use MCP Server
 
-Imagine your company provides weather forecasting services that require constant updates from multiple data sources. Since the weather forecast changes frequently, it's impossible for an LLM trained on data from last week to have much idea about the weather this week. A much better approach is to allow the LLM to access this weather data via a tool that your Liberty app exposes. The LLM can then call the tool whenever it needs forecasts and instantly have the up-to-date weather information.
+Imagine your company provides weather forecasting services that require constant updates from multiple data sources. Since the weather forecast changes frequently, it's impossible for an LLM trained on data from last week to have an idea about the weather this week. 
 
-### How to use the MCP Server 1.0 feature
-To expose your business logic to authorized AI applications, you'll need to declare it as an MCP link:https://modelcontextprotocol.io/specification/2025-06-18/server/tools[tool]. In this context, a tool is simply a function or operation that the AI can invoke to perform a specific task.
+A better approach is to allow the LLM to access this weather data via a tool that your Liberty app exposes. The LLM can then call the tool whenever it needs forecasts and instantly have the up-to-date weather information.
 
-The Liberty `mcpServer-1.0` feature makes this simple by allowing you to declare a tool using the `@Tool` annotation on a method of a link:https://openliberty.io/guides/cdi-intro.html#managing-scopes-and-contexts[CDI managed bean] with a scope annotation.
+=== Example usage of the MCP Server 1.0 feature
+To expose your business logic to authorized AI applications, you'll need to declare it as an MCP link:https://modelcontextprotocol.io/specification/2025-06-18/server/tools[tool]. In this context, a tool is a function or operation that the AI can invoke to perform a specific task.
 
-Here is an example of a tool for getting the weather forecast:
+The Liberty `mcpServer-1.0` feature makes this process simple by allowing you to declare a tool by using the `@Tool` annotation on a method of a link:https://openliberty.io/docs/latest/cdi-beans.html[CDI managed bean] with a scope annotation. To inform the AI application of the arguments needed to be passed when calling the tool, you can use the `@ToolArg` annotation on the desired arguments in your method.
+
+The following is an example of a tool for getting the weather forecast based on the location supplied as an argument by an AI application:
 ```java
 @ApplicationScoped
 public class WeatherTools {
@@ -74,73 +69,23 @@ public class WeatherTools {
 }
 ```
 
-This tool calls an external service to get the weather forecast based on location declared by the AI application. Here's a breakdown of how it works:
+=== Supported Tool Features
 
-`@Tool`: This is the annotation that exposes your app functionality to the AI application.
-- **Name:** The name, used to identify the tool when the LLM wants to call it. If this attribute is not present, the name of the method is used as the tool name.
-- **Title:** An optional user-friendly title for the tool that can be displayed to the end user of the application. If this is not declared, then the name is used as the title.
-- **Description:** This helps the LLM understand the functionality of the tool so it can decide if this is the right tool to use to get the data needed to perform the LLM's desired action.
+The MCP specification has much of its functionality as optional to implement. In our current beta, we've implemented compatibility for the tool feature of the MCP Server specification, along with support for link:https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/cancellation#cancellation[cancellation] and link:https://modelcontextprotocol.io/specification/2025-06-18/schema#toolannotations[tool metadata hints (annotations)]
 
-`@ToolArg`: This annotation declares an argument that must be passed when calling a tool.
-- **Name:** The argument name, used to identify the argument when the LLM calls it. Arguments are identified by name so this attribute is required unless the class was compiled with the `-parameters` option.
-- **Description:** A description of the argument so the LLM can understand what value it is expected to give for the argument.
-
-We've also annotated the `WeatherTools` class with `@ApplicationScoped` to make it a CDI managed bean. This is required for the `@Tool`-annotated method to be discovered by the server.
-
-Note that the LLM will use the description to decide when to call a tool and what values to pass for the arguments, so writing good descriptions that the LLM can understand is really important.
-
-### Supported Tool Features
-
-The MCP specification has much of its functionality as optional to implement, allowing for a more gradual adoption whilst maintaining compatibility. In our current beta, we've implemented compatibility for the tool feature of the MCP Server specification, along with the following tool related capabilities:
-
-#### Tool Metadata hints (Annotations)
-
-You can provide some hints about the scope and range of your tool, to give the AI application an indication of how safe it might be to call. For example, you can indicate whether or not calling your tool may modify data. Confusingly, the MCP specification calls these "[Tool Annotations][tool-annotations]", though they're nothing to do with Java annotations.
-
-You can provide these hints within your `@Tool` annotation like this:
-
-```java
-@Tool(annotations = @Annotations(readOnlyHint = true, openWorldHint = false)
-```
-
-You can read more about Tool Annotations [in the specification][tool-annotations]. The hints that you can currently add to your tool are: 
-- `readOnlyHint`: indicates that the tool does not modify any data
-- `destructiveHint`: for tools which are not readOnly, indicates whether the tool may destroy any data
-- `idempotentHint`: for tools which are not readOnly, indicates whether calling the tool twice with the same arguments will have any additional affects on its environment
-- `openWorldHint`: indicates whether the tool may make requests to external systems
-
-[tool-annotations]: https://modelcontextprotocol.io/specification/2025-06-18/schema#toolannotations
-
-#### Cancellation
-A tool can sometimes take a long time to run, such as when fetching data from a slow external service. In this case, the client should have the right to change their mind and cancel their request to the running tool.
-
-The Liberty `mcpServer-1.0` feature supports link:https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/cancellation#cancellation[cancellation]. It allows clients to send cancellation requests at any time during the execution of a tool.
-
-To allow your tool to be cancelled, you must accept a `Cancellation` parameter. If the client requests for cancellation while running your tool, `Cancellation.skipProcessingIfCancelled()` is called which throws an `OperationCancellationException`.
-
-```java
-@Tool
-public String bigComputationTool(Cancellation cancellation) {
-    ArrayList<Data> result = new ArrayList<>();
-    for (Data someData : getData()) {
-        cancellation.skipProcessingIfCancelled();
-        result.add(process(someData));
-    }
-    return result;
-}
-```
-
-### How to Setup a MCP Server Project
+=== How to Setup a MCP Server Project
 Here are the simple steps to follow to try out the new MCP Server 1.0 feature for yourself:
 
 1. Download the Open Liberty link:https://openliberty.io/start/#runtime_betas[All Beta Features package]
 2. Unzip the archive. You should have a `wlp` folder
 3. Inside your `pom.xml` file, add the path to your `wlp` folder as a variable named `<wlp-dir-path>` within the `<properties>` block:
++
 [source,xml]
 ----
     <wlp-dir-path>replace-with-path-to-wlp-dir</wlp-dir-path>
 ----
 4. Inside your `pom.xml` file, to add the MCP jar as dependency, add the following dependency within the `<dependencies>` block:
++
 [source,xml]
 ----
 <!-- Liberty MCP API -->
@@ -152,8 +97,8 @@ Here are the simple steps to follow to try out the new MCP Server 1.0 feature fo
     <systemPath>${wlp-dir-path}/lib/io.openliberty.mcp_1.0.106.jar}</systemPath>
 </dependency>
 ----
-
 5. Inside your `pom.xml` file, add the following plugin within the `plugins` block.
++
 [source,xml]
 ----
 <plugin>
@@ -165,7 +110,7 @@ Here are the simple steps to follow to try out the new MCP Server 1.0 feature fo
 </plugin>
 ----
 
-We are actively developing support for more MCP server features and would greatly appreciate your feedback on which functionality would be most valuable for your use case.
+We are actively developing support for more MCP server features and would greatly appreciate your feedback on which functionality would be most valuable for your use case. To learn more about the current supported tool features and how to use them, stay tuned for an upcoming blog post that will go into further detail about how to make the most of the MCP Server feature in Liberty.
  
         
 // DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
