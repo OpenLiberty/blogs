@@ -356,7 +356,7 @@ Moreover, this post further elucidates how the PUT and the DELETE request are im
 
 The `EmbeddingService` class implements various REST API upon request at the application path /embedding.
 
-Given the summary and content parameters, the `POST` request at `/api/embedding` stores the summary, content, and vector together into one BSON `Document` object in MongoDB.
+Given the summary and content parameters, the `POST` request at /api/embedding stores the summary, content, and vector together into one BSON `Document` object in MongoDB.
 
 In this sample application, the vector that is stored is of type List<Float> and LangChain4j APIs convert the text to the vector.
 
@@ -381,23 +381,19 @@ Calling the `EmbeddingModel.embed(text)` returns the `Response<Embedding>` objec
     }
 ----
 
-To explore how `insertOne` works, visit https://github.com/OpenLiberty/sample-langchain4j/blob/main/rag-db/src/main/java/io/openliberty/sample/langchain4j/mongo/AtlasMongoDB.java[AtlasMongoDB.java]. The `mongoDB` instance is of type `AtlasMongoDB`. The `MongoDatabase` object is injected after `MongoProducer` class produces the `MongoDatabase` object for the application.
-The `insertOne` method inserts that particular embedding for the existing collection.
+To explore how `insertOne` works, visit https://github.com/OpenLiberty/sample-langchain4j/blob/main/rag-db/src/main/java/io/openliberty/sample/langchain4j/mongo/AtlasMongoDB.java[AtlasMongoDB.java]. The `insertOne` method inserts the BSON `Document` for the existing collection.
 
-==== POST request at `/api/embedding/init`
+==== POST request at /api/embedding/init
 
-The `POST` request at `/api/embedding/init` works as follows to initialize the MongoDB database from the knowledge base. + 
+The POST request at /api/embedding/init initializes the MongoDB database from the knowledge_base folder inside resources. + 
 
-If the database is empty, the search index is created using the methods as described in https://github.com/OpenLiberty/sample-langchain4j/blob/main/rag-db/src/main/java/io/openliberty/sample/langchain4j/mongo/AtlasMongoDB.java[AtlasMongoDB.java]. The code goes through the `resources/knowledge_base` files using the provided `MD_FILES`. Each line of the text file is extracted where the first line is stored as the summary, and the rest as the content. 
-The summary, content, and embedding vector are created and added in the same document. Each document is inserted into MongoDB Atlas database.
+If the database is empty, the search index is created using the methods as described in https://github.com/OpenLiberty/sample-langchain4j/blob/main/rag-db/src/main/java/io/openliberty/sample/langchain4j/mongo/AtlasMongoDB.java[AtlasMongoDB.java]. 
+For each file in MD_FILES of the knowledge base, its text is extracted. The summary is the first line in the file and the content is the rest of the file. Each `Document` object contains a summary, content, and embedding vector of the summary. Each document is inserted into MongoDB Atlas database.
 
 [source]
 ----
     @POST
     @Path("/init")
-    @Consumes(MediaType.APPLICATION_JSON)
-    @Produces(MediaType.TEXT_PLAIN)
-    @RolesAllowed({ "admin" })
     ...
     public Response initializeDatabase() {
         if (mongoDB.isEmpty()) {
@@ -445,9 +441,9 @@ The summary, content, and embedding vector are created and added in the same doc
     }
 ----
 
-Let's understand how `createIndex()` method works.
+Before the application executes a vector search (during inference), a search index must be created.
 
-Before the database is initialized in the program and for the vector search to work, `createIndex()` method generates a search index. 
+The `createIndex()` method generates a search index for the database. 
 A new collection is created within the existing `MongoDatabase` object called `EmbeddingsStored`. Then, the `createSearchIndexes` method uses the information
 such as the vector dimension of the embedding model, a cosine similarity approach, and the location inside the document where the vector is stored known as the path.
 
@@ -487,114 +483,24 @@ The `createSearchIndexes` method is called to execute the request.
 
 The search indexes may take some time to become ready; consequently, a loop is used to verify that search indexes are ready when queryable value gets set to true  +
 
-In https://github.com/OpenLiberty/sample-langchain4j/blob/main/rag-db/src/main/java/io/openliberty/sample/langchain4j/EmbeddingService.java[EmbeddingService.java], the `GET` request at `/api/embedding` lists the embeddings from the database using the `retrieve` method. It uses the `mongoDB.getCollection().find()` that returns all the `Document` objects from MongoDB. The `MediaType.APPLICATION_JSON` is returned. 
+==== PUT request at /api/embedding/{id}
 
-[source]
-----
-    @GET
-    @Path("/")
-    @Produces(MediaType.APPLICATION_JSON)
-    @RolesAllowed({ "admin", "user" })
-    @APIResponses({
-        @APIResponse(responseCode = "200", description = "Successfully listed the embeddings."),
-        @APIResponse(responseCode = "500", description = "Failed to list the embeddings.") })
-    @Operation(summary = "List the embeddings from the database.")
-    public Response retrieve() {
-        
-        StringWriter sb = new StringWriter();
-        try {
-            sb.append("[");
-            boolean first = true;
-            FindIterable<Document> docs = mongoDB.getCollection().find();
-            for (Document d : docs) {
-                if (!first) {
-                    sb.append(",");
-                } else {
-                    first = false;
-                }
-                sb.append(d.toJson());
-            }
-            sb.append("]");
-        } catch (Exception e) {
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                           .entity("[\"Unable to list embeddings: " + e.getMessage() + "\"]")
-                           .build();
-        }
-        return Response.status(Response.Status.OK)
-                       .entity(sb.toString())
-                       .build();
-    }
-----
-
-==== PUT request at `/api/embedding/{id}`
-
-The `PUT` request below updates the existing content and summary given the object id at `/api/embedding/{id}`. 
+The PUT request below updates the existing content and summary given the object id at `/api/embedding/{id}`. 
 A new document with summary, and content with its newly generated vector is created and replaced using `replaceOne`
 for the existing object id (`oid`) located at `_id`. If none of the records match, a `BAD_REQUEST` status code is returned.
 
-[source]
-----
-    @PUT
-    @Path("/{id}")
-    @Consumes(MediaType.APPLICATION_JSON)
-    @Produces(MediaType.APPLICATION_JSON)
-    @RolesAllowed({ "admin" })
-    @APIResponses({
-        @APIResponse(responseCode = "200", description = "Successfully updated embeddings."),
-        @APIResponse(responseCode = "400", description = "Invalid object id or embeddings configuration."),
-        @APIResponse(responseCode = "404", description = "Embeddings object id was not found.") })
-    @Parameters(value = {
-        @Parameter(
-            name = "id", in = ParameterIn.PATH,
-            description = "The object id of the embedding",
-            required = true, example = "6880f9eef887c128f1ed0bf1",
-            schema = @Schema(type = SchemaType.STRING)),
-        @Parameter(
-            name = "summary", in = ParameterIn.QUERY,
-            description = "The summary of the embedding",
-            required = true,
-            schema = @Schema(type = SchemaType.STRING)),
-        @Parameter(
-            name = "content", in = ParameterIn.QUERY,
-            description = "The content of the embedding",
-            required = true,
-            schema = @Schema(type = SchemaType.STRING))})
-    @Operation(summary = "Update an embedding in the database.")
-    public Response update(
-        @PathParam("id") String id,
-        @QueryParam("summary") String summary,
-        @QueryParam("content") String content) {
+//add a link
 
-        ObjectId oid;
-        try {
-            oid = new ObjectId(id);
-        } catch (Exception e) {
-            return Response.status(Response.Status.BAD_REQUEST)
-                           .entity("[\"Invalid object id!\"]")
-                           .build();
-        }
+==== DELETE request at /api/embedding/{id}
 
-        Document query = new Document("_id", oid);
-        Document newEmbedding = new Document();
-        newEmbedding.put("Summary", summary);
-        newEmbedding.put("Content", content);
-        newEmbedding.put("Vector", toFloat(
-            modelBuilder.getEmbeddingModel().embed(summary).content().vector()));
-        UpdateResult updateResult = mongoDB.replaceOne(query, newEmbedding);
-        if (updateResult.getMatchedCount() == 0) {
-            return Response.status(Response.Status.BAD_REQUEST)
-                           .entity("[\"_id was not found!\"]")
-                           .build();
-        }
+Likewise, the delete request at `/api/embedding/{id}` requires the object id to delete the particular document using the `deleteOne` method. The appropriate status code is returned. 
+//add a link
+ 
+==== GET request at /api/embedding
 
-        newEmbedding.put("_id", oid);
-        return Response.status(Response.Status.OK)
-                       .entity(newEmbedding.toJson())
-                       .build();
-    }
-----
+In https://github.com/OpenLiberty/sample-langchain4j/blob/main/rag-db/src/main/java/io/openliberty/sample/langchain4j/EmbeddingService.java[EmbeddingService.java], the GET request at `/api/embedding` lists the embeddings from the database using the `retrieve` method. It uses the `mongoDB.getCollection().find()` that returns all the `Document` objects from MongoDB. The `MediaType.APPLICATION_JSON` is returned. 
 
-Likewise, the `Delete` request at `/api/embedding/{id}` requires the object id to delete the particular document using the `deleteOne` method. The appropriate status code is returned. 
+//add a link
 
 [#create_service]
 === Retrieving data from the vector database
