@@ -48,10 +48,10 @@ The application builds a streaming chat model from a provider of your choice and
 [source,java]
 ----
 StreamingChatModel streamingModel = OllamaStreamingChatModel.builder()
-	.baseUrl("http://localhost:11434")
-	.modelName("llama3.2")
-	.numPredict(200)
-	.build();
+    .baseUrl("http://localhost:11434")
+    .modelName("llama3.2")
+    .numPredict(200)
+    .build();
 ----
 
 See the https://github.com/OpenLiberty/sample-langchain4j/blob/7112a4f14bc7b63bd97f8f123f6ba3c16fdebba9/streaming-chat/src/main/java/io/openliberty/sample/langchain4j/util/ModelBuilder.java#L93-L99[ModelBuilder.java file] to learn more.
@@ -61,8 +61,8 @@ An assistant interface with a chat method is declared for LangChain4j to impleme
 [source,java]
 ----
 interface StreamingAssistant extends ChatMemoryAccess {
-	@SystemMessage("You are a helpful chat bot knowledgeable about the Open Liberty application server runtime.")
-	TokenStream streamingChat(@MemoryId String sessionId, @UserMessage String userMessage);
+    @SystemMessage("You are a helpful chat bot knowledgeable about the Open Liberty application server runtime.")
+    TokenStream streamingChat(@MemoryId String sessionId, @UserMessage String userMessage);
 }
 ----
 
@@ -72,9 +72,9 @@ LangChain4j builds an AI service that implements the interface and uses the stre
 [source,java]
 ----
 StreamingAssistant assistant = AiServices.builder(StreamingAssistant.class)
-	.streamingChatModel(streamingModel)
-	.chatMemoryProvider(sessionId -> MessageWindowChatMemory.withMaxMessages(10))
-	.build();
+    .streamingChatModel(streamingModel)
+    .chatMemoryProvider(sessionId -> MessageWindowChatMemory.withMaxMessages(10))
+    .build();
 ----
 
 See the https://github.com/OpenLiberty/sample-langchain4j/blob/7112a4f14bc7b63bd97f8f123f6ba3c16fdebba9/streaming-chat/src/main/java/io/openliberty/sample/langchain4j/StreamingChatAgent.java[StreamingChatAgent.java file] to learn more.
@@ -87,7 +87,7 @@ A JakartaEE WebSocket annotation declares a server endpoint that the front end c
 ----
 @ServerEndpoint("/streamingchat")
 public class StreamingChatService {
-	...
+    ...
 }
 ----
 
@@ -97,22 +97,22 @@ For each user message, the assistant generates a response. As the model generate
 ----
 @OnMessage
 public void onMessage(Session session, String message) throws Exception {
-	CompletableFuture<ChatResponse> response = new CompletableFuture<>();
-	assistant.streamingChat(session.getId(), message)
-		.onPartialResponse(token -> {
-			try {
-				session.getBasicRemote().sendText(token);
-				Thread.sleep(100);
-			} catch (Exception error) {
-				throw new RuntimeException(error);
-			}
-		})
-		.onCompleteResponse(response::complete)
-		.onError(response::completeExceptionally)
-		.start();
-	if (response.get().finishReason() == LENGTH)
-		session.getBasicRemote().sendText(" ...");
-	session.getBasicRemote().sendText("");
+    CompletableFuture<ChatResponse> response = new CompletableFuture<>();
+    assistant.streamingChat(session.getId(), message)
+        .onPartialResponse(token -> {
+            try {
+                session.getBasicRemote().sendText(token);
+                Thread.sleep(100);
+            } catch (Exception error) {
+                throw new RuntimeException(error);
+            }
+        })
+        .onCompleteResponse(response::complete)
+        .onError(response::completeExceptionally)
+        .start();
+    if (response.get().finishReason() == LENGTH)
+        session.getBasicRemote().sendText(" ...");
+    session.getBasicRemote().sendText("");
 }
 ----
 
@@ -122,8 +122,8 @@ The error message is sent back to the user when errors occur.
 ----
 @OnError
 public void onError(Session session, Throwable error) throws Exception {
-	session.getBasicRemote().sendText("My failure reason is:\n\n" + error.getMessage());
-	session.getBasicRemote().sendText("");
+    session.getBasicRemote().sendText("My failure reason is:\n\n" + error.getMessage());
+    session.getBasicRemote().sendText("");
 }
 ----
 
@@ -133,7 +133,7 @@ The chat history of the user is removed by calling `.evictChatMemory(...)` upon 
 ----
 @OnClose
 public void onClose(Session session) {
-	assistant.evictChatMemory(session.getId());
+    assistant.evictChatMemory(session.getId());
 }
 ----
 
@@ -154,12 +154,12 @@ When the user presses the enter key, the message is sent to the server through t
 [source,javascript]
 ----
 function sendMessage() {
-	var message = input.value;
-	appendMessage('my-msg', message, new Date().toLocaleTimeString());
-	appendMessage('thinking-msg', 'thinking...');
-	webSocket.send(message);
-	input.value = '';
-	sendButton.disabled = true;
+    var message = input.value;
+    appendMessage('my-msg', message, new Date().toLocaleTimeString());
+    appendMessage('thinking-msg', 'thinking...');
+    webSocket.send(message);
+    input.value = '';
+    sendButton.disabled = true;
 };
 ----
 
@@ -168,15 +168,15 @@ The following code adds each received token to the AI's last message element. If
 [source,javascript]
 ----
 webSocket.onmessage = function (event) {
-	if (event.data != '') {  // stream ends with empty string
-		if (messages.lastChild.querySelector('.thinking-msg')) {  // if this is the first token
-			messages.removeChild(messages.lastChild);
-			appendMessage('agent-msg', '', new Date().toLocaleTimeString());
-		}
+    if (event.data != '') {  // stream ends with empty string
+        if (messages.lastChild.querySelector('.thinking-msg')) {  // if this is the first token
+            messages.removeChild(messages.lastChild);
+            appendMessage('agent-msg', '', new Date().toLocaleTimeString());
+        }
                 messages.lastChild.querySelector('.agent-msg').textContent += event.data;
-	} else {
-		sendButton.disabled = false;
-	}
+    } else {
+        sendButton.disabled = false;
+    }
 };
 ----
 
@@ -185,9 +185,9 @@ An error message is displayed if the WebSocket was closed for any reason.
 [source,javascript]
 ----
 webSocket.onclose = function (event) {
-	...
-	appendMessage('agent-msg', 'The connection to the streaming chat service was closed.');
-	sendButton.disabled = true;
+    ...
+    appendMessage('agent-msg', 'The connection to the streaming chat service was closed.');
+    sendButton.disabled = true;
 };
 ----
 
