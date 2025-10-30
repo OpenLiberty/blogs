@@ -354,36 +354,19 @@ This tutorial explores the two different POST requests: one request adds a docum
 Moreover, this post further elucidates how the PUT and the DELETE request are implemented. 
 ==== POST request at /api/embedding
 
-The `EmbeddingService` class implements various REST API upon request at the application path `/embedding`.
-The `RolesAllowed` annotation defines which group is allowed to perform a particular request operation.
-Similarly, the annotations such as `APIResponses` indicate the response code with the descriptions. +
+The `EmbeddingService` class implements various REST API upon request at the application path /embedding.
 
-Given the summary and content parameters, the `POST` request at `/api/embedding` stores the summary, content, and vector as a `List<Float>` together into MongoDB.
+Given the summary and content parameters, the `POST` request at `/api/embedding` stores the summary, content, and vector together into one BSON `Document` object in MongoDB.
 
-To accomplish this, a new BSON Document called `newEmbedding` is created with the key "Summary", and value as the summary itself. Likewise, for the key "Vector", the value is calculated using the LangChain4j APIs. Calling the `EmbeddingModel.embed(text)` returns the `Response<Embedding>` object; to get the `Embedding` object from LangChain4j, the `content()` method is called. The actual vector is converted and stored as a `List<Float>` into MongoDB using the `insertOne` method.
+In this sample application, the vector that is stored is of type List<Float> and LangChain4j APIs convert the text to the vector.
+
+Calling the `EmbeddingModel.embed(text)` returns the `Response<Embedding>` object; to get the `Embedding` object from LangChain4j, the `content()` method is called. The actual vector is converted and stored as a List<Float> into MongoDB using the `insertOne` method.
 
 [source]
 ----
     @POST
     @Path("/")
-    @Consumes(MediaType.APPLICATION_JSON)
-    @Produces(MediaType.APPLICATION_JSON)
-    @RolesAllowed({ "admin" })
-    @APIResponses({
-        @APIResponse(responseCode = "200", description = "Successfully added embedding."),
-        @APIResponse(responseCode = "400", description = "Invalid embedding configuration.")})
-    @Parameters(value = {
-        @Parameter(
-            name = "summary", in = ParameterIn.QUERY,
-            description = "The summary of the embedding",
-            required = true,
-            schema = @Schema(type = SchemaType.STRING)),
-        @Parameter(
-            name = "content", in = ParameterIn.QUERY,
-            description = "The content of the embedding",
-            required = true,
-            schema = @Schema(type = SchemaType.STRING))})
-    @Operation(summary = "Add a new embedding to the database.")
+    ...
     public Response add(
         @QueryParam("summary") String summary,
         @QueryParam("content") String content) {
@@ -394,11 +377,7 @@ To accomplish this, a new BSON Document called `newEmbedding` is created with th
         newEmbedding.put("Vector",
             toFloat(modelBuilder.getEmbeddingModel().embed(content).content().vector()));
         mongoDB.insertOne(newEmbedding);
-
-        return Response
-            .status(Response.Status.OK)
-            .entity(newEmbedding.toJson())
-            .build();
+        ...
     }
 ----
 
