@@ -356,7 +356,7 @@ Moreover, this post further elucidates how the PUT and the DELETE request are im
 
 The `EmbeddingService` class implements various REST API upon request at the application path /embedding.
 
-Given the summary and content parameters, the `POST` request at /api/embedding stores the summary, content, and vector together into one BSON `Document` object in MongoDB.
+Given the summary and content as parameters, the `POST` request at /api/embedding stores the summary, content, and vector together into one BSON `Document` object in MongoDB.
 
 In this sample application, the vector that is stored is of type List<Float> and LangChain4j APIs convert the text to the vector.
 
@@ -364,21 +364,12 @@ Calling the `EmbeddingModel.embed(text)` returns the `Response<Embedding>` objec
 
 [source]
 ----
-    @POST
-    @Path("/")
-    ...
-    public Response add(
-        @QueryParam("summary") String summary,
-        @QueryParam("content") String content) {
-
-        Document newEmbedding = new Document();
-        newEmbedding.put("Summary", summary);
-        newEmbedding.put("Content", content);
-        newEmbedding.put("Vector",
+    Document newEmbedding = new Document();
+    newEmbedding.put("Summary", summary);
+    newEmbedding.put("Content", content);
+    newEmbedding.put("Vector",
             toFloat(modelBuilder.getEmbeddingModel().embed(content).content().vector()));
-        mongoDB.insertOne(newEmbedding);
-        ...
-    }
+    mongoDB.insertOne(newEmbedding);
 ----
 
 To explore how `insertOne` works, visit https://github.com/OpenLiberty/sample-langchain4j/blob/main/rag-db/src/main/java/io/openliberty/sample/langchain4j/mongo/AtlasMongoDB.java[AtlasMongoDB.java]. The `insertOne` method inserts the BSON `Document` for the existing collection.
@@ -387,7 +378,7 @@ To explore how `insertOne` works, visit https://github.com/OpenLiberty/sample-la
 
 The POST request at /api/embedding/init initializes the MongoDB database from the knowledge_base folder inside resources. + 
 
-If the database is empty, the search index is created using the methods as described in https://github.com/OpenLiberty/sample-langchain4j/blob/main/rag-db/src/main/java/io/openliberty/sample/langchain4j/mongo/AtlasMongoDB.java[AtlasMongoDB.java]. 
+Before the application executes a vector search (during inference), a search index must be created.
 For each file in MD_FILES of the knowledge base, its text is extracted. The summary is the first line in the file and the content is the rest of the file. Each `Document` object contains a summary, content, and embedding vector of the summary. Each document is inserted into MongoDB Atlas database.
 
 [source]
@@ -422,28 +413,21 @@ For each file in MD_FILES of the knowledge base, its text is extracted. The summ
                         mongoDB.insertOne(newEmbedding);
                     }
                 }
-                return Response.status(Status.OK)
-                               .entity("Successfully loaded knowledge base into MongoDB.")
-                               .build();
+                //Return Response with Status.OK: Successfully loaded knowledge base into MongoDB.
+                ...
             } catch (Exception exception) {
-                return Response.status(Status.INTERNAL_SERVER_ERROR)
-                               .entity("Could not load knowledge base into MongoDB.")
-                               .build();
+                ...
+                //Return Response with internal server error
             }
 
         }
 
-        return Response
-            .status(Response.Status.OK)
-            .entity("Knowledge base already initialized.")
-            .build();
-
+        //Return Response with Status.OK since knowledge base is already initialized.
     }
 ----
 
-Before the application executes a vector search (during inference), a search index must be created.
 
-The `createIndex()` method generates a search index for the database. 
+The `createIndex()` method in https://github.com/OpenLiberty/sample-langchain4j/blob/main/rag-db/src/main/java/io/openliberty/sample/langchain4j/mongo/AtlasMongoDB.java[AtlasMongoDB.java] generates a search index for the database. 
 A new collection is created within the existing `MongoDatabase` object called `EmbeddingsStored`. Then, the `createSearchIndexes` method uses the information
 such as the vector dimension of the embedding model, a cosine similarity approach, and the location inside the document where the vector is stored known as the path.
 
@@ -466,6 +450,16 @@ such as the vector dimension of the embedding model, a cosine similarity approac
 
         sleep(TIMEOUT);
 		embeddingStore.createSearchIndexes(searchIndexModels);
+        ...
+    }
+----
+
+The `createSearchIndexes` method executes the request. The loop verifies that search indexes are ready when the queryable value becomes true.
+
+[source]
+----    
+    public void createIndex() {
+        ...
         boolean indexReady = false;
         do {
             Document index = embeddingStore.listSearchIndexes().first();
@@ -478,27 +472,22 @@ such as the vector dimension of the embedding model, a cosine similarity approac
         } while (!indexReady);
     }
 ----
-
-The `createSearchIndexes` method is called to execute the request.
-
-The search indexes may take some time to become ready; consequently, a loop is used to verify that search indexes are ready when queryable value gets set to true  +
-
 ==== PUT request at /api/embedding/{id}
 
-The PUT request below updates the existing content and summary given the object id at `/api/embedding/{id}`. 
-A new document with summary, and content with its newly generated vector is created and replaced using `replaceOne`
-for the existing object id (`oid`) located at `_id`. If none of the records match, a `BAD_REQUEST` status code is returned.
+For the object id, the put request updates its existing content and summary. 
+
+A new `Document` object with summary, content and updated vector replaces the existing object by using the `replaceOne` method.
 
 //add a link
 
 ==== DELETE request at /api/embedding/{id}
 
-Likewise, the delete request at `/api/embedding/{id}` requires the object id to delete the particular document using the `deleteOne` method. The appropriate status code is returned. 
+Likewise, the delete request at `/api/embedding/{id}` requires the object id to delete the particular document using the `deleteOne` method and returns the appropriate status code. 
 //add a link
- 
+
 ==== GET request at /api/embedding
 
-In https://github.com/OpenLiberty/sample-langchain4j/blob/main/rag-db/src/main/java/io/openliberty/sample/langchain4j/EmbeddingService.java[EmbeddingService.java], the GET request at `/api/embedding` lists the embeddings from the database using the `retrieve` method. It uses the `mongoDB.getCollection().find()` that returns all the `Document` objects from MongoDB. The `MediaType.APPLICATION_JSON` is returned. 
+In https://github.com/OpenLiberty/sample-langchain4j/blob/main/rag-db/src/main/java/io/openliberty/sample/langchain4j/EmbeddingService.java[EmbeddingService.java], the GET request at `/api/embedding` lists the embeddings from the database using the `retrieve` method. It uses the `mongoDB.getCollection().find()` that returns all the `Document` objects from MongoDB.
 
 //add a link
 
