@@ -352,6 +352,8 @@ public class EmbeddingApplication extends Application {
 You can explore the REST APIs that are available on http://localhost:9081/openapi/ui/.
 This tutorial explores the two different POST requests: one request adds a document with summary and content while the other initializes the database with the knowledge base.
 Moreover, this post further elucidates how the PUT and the DELETE request are implemented. 
+Additionally, the `AtlasMongoDB` class provides relevant functions such as creating search indexes, or retrieving similar content and is used in the `EmbeddingService` class.
+
 ==== POST request at /api/embedding
 
 The https://github.com/OpenLiberty/sample-langchain4j/blob/main/rag-db/src/main/java/io/openliberty/sample/langchain4j/EmbeddingService.java#L75-L110[EmbeddingService.java] implements various REST API upon request at the application path /embedding.
@@ -371,6 +373,8 @@ Calling the `EmbeddingModel.embed(text)` returns the `Response<Embedding>` objec
             toFloat(modelBuilder.getEmbeddingModel().embed(content).content().vector()));
     mongoDB.insertOne(newEmbedding);
 ----
+
+Each BSON `Document` contain 3 keys: "Summary", "Content", and "Vector" with their respective values. + 
 
 To explore how the `insertOne` method works, visit https://github.com/OpenLiberty/sample-langchain4j/blob/main/rag-db/src/main/java/io/openliberty/sample/langchain4j/mongo/AtlasMongoDB.java#L101-L103[AtlasMongoDB.java]. The `insertOne` method inserts the BSON `Document` for the existing collection.
 
@@ -514,34 +518,9 @@ The message is appended with these results and sent to the AI using the `agent.c
     }
 ----
 
-To dive deeper into how `retrieveContent` works, the https://github.com/OpenLiberty/sample-langchain4j/blob/main/rag-db/src/main/java/io/openliberty/sample/langchain4j/mongo/AtlasMongoDB.java[AtlasMongoDB.java] class should be explored.
-The role of the `AtlasMongoDB` class is to provide relevant functions for RAG such as creating search indexes, or retrieving similar content.
-The `MongoDatabase` instance is injected. The `ModelBuilder` instance is required to get the corresponding embedding model.
-Note that the embedding model method called `embed` is used to convert text to embedding.
+The https://github.com/OpenLiberty/sample-langchain4j/blob/main/rag-db/src/main/java/io/openliberty/sample/langchain4j/mongo/AtlasMongoDB.java#L109-L122[`retrieveContent` method] takes in an embedding vector of type List<Float>, and the actual query text. Note that the user message embedding is converted to a `List<Float>` because the vectors stored in the database are also of type `List<Float>`. + 
 
-[source]
-----
-    @Inject
-    private ModelBuilder modelBuilder;
-
-    @Inject
-    MongoDatabase db;
-----
-
-The `database.getCollection` method returns a `MongoCollection<Document>` object which represents a collection of BSON documents. 
-
-[source]
-----    
-  public MongoCollection<Document> getCollection() {
-        return db.getCollection(COLLECTION_NAME);
-  }
----- 
-
-The rest of the functions such as `deleteOne`, `replaceOne` and `insertOne` call the respective methods on the current collection.
-
-The `retrieveContent` method takes in a `userQuery` embedding vector, and the `query` text. 
-It uses the `userQuery` vector, the location or `PATH` to where the vectors are stored, selects `NUM_CANDIDATES` vectors in the nearby group in the latent space,
-and returns the limit of `MAX_RESULTS_TO_AI`, based on the `SEARCH_INDEX_NAME`. The aggregate returns the results for `$vectorSearch` command and each result is a type of `Document` object.
+The `userQuery` vector, the location or `PATH` to where the vectors are stored in the database and other values are required to perform the vector search. Vector search selects `NUM_CANDIDATES` vectors in the nearby group in the latent space, and returns the limit of `MAX_RESULTS_TO_AI`, based on the `SEARCH_INDEX_NAME`. The aggregate returns the results for `$vectorSearch` command and each result is a type of `Document` object.
 
 [source]
 ----
@@ -560,10 +539,7 @@ and returns the limit of `MAX_RESULTS_TO_AI`, based on the `SEARCH_INDEX_NAME`. 
         return similarContent;
     }
 ----
-
-When BSON `Documents` are first stored by the sample application, each BSON `Document` contain 3 keys: "Summary", "Content", and "Vector". 
-However, only the value of the "Content" section is required above and its value is obtained using `result.getString("Content")` for each result.  
-It is important to note that the user message embedding is converted to a `List<Float>` because the vectors stored are also of type `List<Float>`.
+The method `result.getString("Content")` obtains the value of the "Content" section inside the Document object for each of the results.
 
 [#summary]
 == Conclusion: Building AI Applications powered by RAG and Open Liberty
