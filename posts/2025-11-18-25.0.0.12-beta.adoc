@@ -1,0 +1,467 @@
+---
+layout: post
+title: "SpringBoot 4.0, preview of Jakarta Data 1.1 and more in 25.0.0.12-beta"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/navaneethsnair1
+author_github: https://github.com/navaneethsnair1
+seo-title: "SpringBoot 4.0, preview of Jakarta Data 1.1 and more in 25.0.0.12-beta- OpenLiberty.io"
+seo-description: This beta release adds Spring Boot 4.x support, previews Jakarta Data 1.1 capabilities, and enhances the Netty-based HTTP transport. It also updates Model Context Protocol Server 1.0 and introduces the option to use your own AES-256 key for Liberty password encryption.
+blog_description: This beta release adds Spring Boot 4.x support, previews Jakarta Data 1.1 capabilities, and enhances the Netty-based HTTP transport. It also updates Model Context Protocol Server 1.0 and introduces the option to use your own AES-256 key for Liberty password encryption.
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+---
+= SpringBoot 4.0, preview of Jakarta Data 1.1 and more in 25.0.0.12-beta
+Navaneeth S Nair <https://github.com/navaneethsnair1>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+This beta release adds Spring Boot 4.x support, previews Jakarta Data 1.1 capabilities, and enhances the Netty-based HTTP transport. It also updates Model Context Protocol Server 1.0 and introduces the option to use your own AES-256 key for Liberty password encryption.
+
+The link:{url-about}[Open Liberty] 25.0.0.12-beta includes the following beta features (along with link:{url-prefix}/docs/latest/reference/feature/feature-overview.html[all GA features]):
+
+
+* <<springboot, SpringBoot 4.0>>
+* <<jakarta, Early preview of Jakarta Data 1.1>>
+* <<mcp, Model Context Protocol Server 1.0 updates>>
+* <<netty, Updates to Netty‑based HTTP transport on Open Liberty>>
+* <<aes256, Bring your own AES-256 Key>>
+
+
+See also link:{url-prefix}/blog/?search=beta&key=tag[previous Open Liberty beta blog posts].
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/33154
+// Contact/Reviewer: anjumfatima90
+// // // // // // // // 
+[#springboot]
+== SpringBoot 4.0
+Open Liberty currently supports running Spring Boot 1.5, 2.x, and 3.x applications. With the introduction of the new `springBoot-4.0` feature, users can now deploy Spring Boot 4.x applications by enabling this feature. While Liberty consistently supports Spring Boot applications packaged as `WAR` files, this enhancement extends support to both `JAR` and `WAR` formats for Spring Boot 4.x applications.
+
+The springBoot-4.0 feature provides complete support for running a Sprint Boot 4.x application on Open Liberty as well as having the capability to thin the application when creating applications in containers.
+
+To use this feature, the user must be running `Java 17` or later with EE11 features enabled. If the application uses servlets, it must be configured to use `Servlet 6.1`. Include the following features in your `server.xml` file to define the settings.
+
+[source, xml]
+----
+<features>
+   <feature>springboot-4.0</feature>
+   <feature>servlet-6.1</feature>
+</features>
+----
+
+The `server.xml` configuration for deploying a Spring Boot application follows the same approach as in earlier Liberty Spring Boot versions.
+
+[source, xml]
+---- 
+<springBootApplication id="spring-boot-app" location="spring-boot-app-0.1.0.jar" name="spring-boot-app" />
+----
+
+As in earlier versions, the Spring Boot application JAR can be deployed by placing it in the `/dropins/spring` folder. The `springBootApplication` configuration in the `server.xml` file can be omitted when using this deployment method.
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/33132
+// Contact/Reviewer: njr-11
+// // // // // // // // 
+[#jakarta]
+== Early preview of Jakarta Data 1.1
+This release previews three new features of Jakarta Data 1.1: retrieving a subset or projection of entity attributes, the `@Is` annotation, and `Constraint` subtype parameters for repository methods that apply basic constraints to repository `@Find` and `@Delete` operations.
+
+Previously, repository methods couldn't limit retrieval of results to subsets of entity attributes (commonly referred to as projections). Now, repository methods can return Java records that represent a subset of an entity. In addition, parameter-based `@Find` and `@Delete` methods earlier were not able to filter on conditions other than equality. Now, more advanced filtering can be done in two different ways: typing the repository method parameter with a `Constraint` subtype or indicating the `Constraint` subtype by using the `@Is` annotation.
+
+In Jakarta Data, you write simple Java objects called *Entities* to represent data, and you write interfaces called *Repositories* to define operations on data. You inject a Repository into your application and use it. The implementation of the *Repository* is automatically provided for you!
+
+Start by defining an entity class that corresponds to your data. With relational databases, the entity class corresponds to a database table and the entity properties (public methods and fields of the entity class) generally correspond to the columns of the table. An entity class can be:
+
+- annotated with `jakarta.persistence.Entity` and related annotations from Jakarta Persistence
+- a Java class without entity annotations, in which case the primary key is inferred from an entity property named `id` or ending with `Id` and an entity property named `version` designates an automatically incremented version column.
+
+Here's a simple entity,
+
+```java
+@Entity
+public class Product {
+    @Id
+    public long id;
+    public String name;
+    public float price;
+    public float weight;
+}
+```
+
+After you define the entity to represent the data, it is usually helpful to have your IDE generate a static metamodel class for it. By convention, static metamodel classes begin with the underscore character, followed by the entity name. Because this beta is being made available well before the release of Jakarta Data 1.1, we cannot expect IDEs to generate for us yet. However, we can provide the static metamodel class that an IDE would be expected to generate for the `Product` entity:
+
+```java
+@StaticMetamodel(Product.class)
+public interface _Product {
+    String ID = "id";
+    String NAME = "name";
+    String PRICE = "price";
+    String WEIGHT = "weight";
+
+    NumericAttribute<Product, Long> id = NumericAttribute.of(
+            Product.class, ID, long.class);
+    TextAttribute<Product> name = TextAttribute.of(
+            Product.class, NAME);
+    NumericAttribute<Product, Float> price = NumericAttribute.of(
+            Product.class, PRICE, float.class);
+    NumericAttribute<Product, Float> weight = NumericAttribute.of(
+            Product.class, WEIGHT, float.class);
+}
+```
+
+The first half of the static metamodel class includes constants for each of the entity attribute names so that you don't need to otherwise hardcode string values into your application. The second half of the static metamodel class provides a special instance for each entity attribute, from which you can build restrictions and sorting to apply to queries at run time. 
+
+The following example is a repository that defines operations that are related to the `Product` entity. Your repository interface can inherit from built-in interfaces such as `BasicRepository` and `CrudRepository`. These interfaces contain various general-purpose repository methods for inserting, updating, deleting, and querying for entities. In addition, you can compose your own operations using the static metamodel and annotations such as `@Find` or `@Delete`.
+
+```java
+@Repository(dataStore = "java:app/jdbc/my-example-data")
+public interface Products extends CrudRepository<Product, Long> {
+
+    // Retrieving the whole entity,
+    @Find
+    Optional<Product> find(@By(_Product.ID) long productNum);
+
+    // The Select annotation can identify a single entity attribute to retrieve,
+    @Find
+    @Select(_Product.PRICE)
+    Optional<Float> getPrice(@By(_Product.ID) long productNum);
+
+    // You can return multiple entity attributes as a Java record,
+    @Find
+    @Select(_Product.WEIGHT)
+    @Select(_Product.NAME)
+    Optional<WeightInfo> getWeightAndName(@By(_Product.ID) long productNum);
+
+    static record WeightInfo(float itemWeight, String itemName) {}
+
+    // The Select annotation can be omitted if the record component names match the entity attribute names,
+    @Find
+    List<WeightPriceInfo> getWeightAndPrice(@By(_Product.Name) String name);
+
+    static record WeightPriceInfo(float weight, float price) {}
+
+    // Constraint subtypes (such as Like) for method parameters offer different types of filtering,
+    @Find
+    Page<Product> named(@By(_Product.Name) Like namePattern,
+                        Order<Product> sorting,
+                        PageRequest pageRequest);
+
+    // The @Is annotation also allows you to specify Constraint subtypes,
+    @Find
+    @OrderBy(_Product.PRICE)
+    @OrderBy(_Product.NAME)
+    List<Product> pricedBelow(@By(_Product.PRICE) @Is(LessThan.class) float maxPrice,
+                              @By(_Product.Name) @Is(Like.class) String namePattern);
+
+    @Delete
+    long removeHeaviest(@By(_Product.WEIGHT) @Is(GreaterThan.class) float maxWeightAllowed);
+}
+```
+
+See the following example of the application that uses the repository and static metamodel.
+
+```java
+@DataSourceDefinition(name = "java:app/jdbc/my-example-data",
+                      className = "org.postgresql.xa.PGXADataSource",
+                      databaseName = "ExampleDB",
+                      serverName = "localhost",
+                      portNumber = 5432,
+                      user = "${example.database.user}",
+                      password = "${example.database.password}")
+public class MyServlet extends HttpServlet {
+    @Inject
+    Products products;
+
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp)
+            throws ServletException, IOException {
+        // Insert:
+        Product prod = ...
+        prod = products.insert(prod);
+
+        // Find one entity attribute:
+        price = products.getPrice(prod.id).orElseThrow();
+
+        // Find multiple entity attributes as a Java record:
+        WeightInfo info = products.getWeightAndName(prod.id);
+        System.out.println(info.itemName() + " weighs " + info.itemWeight() + " kg.");
+
+        // Filter by supplying a Like constraint, returning only the first 10 results:
+        Page<Product> page1 = products.named(
+                        Like.pattern("%computer%"),
+                        Order.by(_Product.price.desc(),
+                                 _Product.name.asc(),
+                                 _Product.id.asc()),
+                        PageRequest.ofSize(10));
+
+        // Filter by supplying values only:
+        List<Product> found = pricedBelow(50.0f, "%keyboard%");
+
+        ...
+    }
+}
+```
+For more information about Jakarta Data 1.1, see the following resources:
+
+* link:https://jakarta.ee/specifications/data/1.1/apidocs[Jakarta Data 1.1 API Javadoc]
+* link:https://jakarta.ee/specifications/data/1.1/jakarta-data-1.1.0-m1[Jakarta Data 1.1 specification] 
+* link:https://jakarta.ee/specifications/data/1.1/[Jakarta Data 1.1 overview page]
+
+*Note* 
+This beta includes only the Data 1.1 features for entity subsets or projections, the `@Is` annotation, and `Constraint` subtypes as repository method parameters that accept basic constraint values. Other new Data 1.1 features are not included in this beta.
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/33198
+// Contact/Reviewer: habiblawal1
+// // // // // // // // 
+[#mcp]
+== Model Context Protocol Server 1.0 updates
+
+The link:https://modelcontextprotocol.io/docs/getting-started/intro[Model Context Protocol (MCP)] is an open standard for AI applications to access real-time information from external sources. The Liberty MCP Server feature `mcpServer-1.0` allows developers to expose the business logic of their applications, allowing it to be integrated into agentic AI workflows.
+
+This beta release of Liberty includes important updates to the `mcpServer-1.0` feature, including session management and easier discovery of the MCP endpoint.
+
+=== Prerequisites
+To use the `mcpServer-1.0` feature, it is required to have `Java 17` installed on your system.
+
+=== MCP Session Management
+This beta version includes support for the link:https://modelcontextprotocol.io/specification/2025-06-18/basic/transports#session-management[session management] function of the MCP specification. This feature enables stateful sessions between client and server, allowing the server to securely correlate multiple requests in the same session for features like tool call cancellation.
+
+When a client connects to the MCP server, a unique session ID is assigned to the client during the link:https://modelcontextprotocol.io/specification/2025-06-18/basic/lifecycle#initialization[initialization phase] and returned in the `Mcp-Session-Id` HTTP response header. For subsequent requests, the client must include the session ID in the `Mcp-Session-Id` request header.
+
+=== MCP Endpoint Discoverability
+The MCP endpoint is made available at `/mcp` under the context root of your application, e.g., `http://localhost:9080/myMcpApp/mcp`. For ease of discovery, the URL of the MCP endpoint for your Liberty hosted application is now output to the server logs on application startup. 
+
+The following example shows what you would see in your logs if you have an application called `myMcpApp`:
+
+```
+I MCP server endpoint: http://localhost:9080/myMcpApp/mcp
+```
+
+In this beta version, the MCP server endpoint is also accessible with a trailing slash(`/`) at the end, for example, `http://localhost:9080/myMcpApp/mcp/`.
+
+=== Liberty MCP Server API Documentation
+You can now find API documentation for the Liberty MCP Server feature. The javadoc is located in the `io.openliberty.mcp_1.0-javadoc.zip` file within your `wlp/dev/api/ibm/javadoc` directory.
+
+Attach the Liberty MCP Server feature’s Javadoc to your IDE to view descriptions of the API's methods and class details.
+
+*Note*: The following packages and interfaces that are documented in the Javadoc are not yet implemented:
+
+* `io.openliberty.mcp.encoders`
+* `io.openliberty.mcp.annotations.OutputSchemaGenerator`
+* `io.openliberty.mcp.annotations.Tool.OutputSchema`
+
+For more information about Liberty MCP Server feature `mcpServer-1.0`, including how to get started with it, see the link:https://openliberty.io/blog/2025/10/23/mcp-standalone-blog.html[blog post].
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
+
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/33186
+// Contact/Reviewer: isaacrivriv,mrsaldana,pnicolucci,volosied
+// // // // // // // // 
+[#netty]
+== Updates to Netty‑based HTTP transport on Open Liberty
+
+Open Liberty intoduced Netty-based HTTP transport for 25.0.0.11-beta preview. This change replaced the underlying transport implementation for HTTP/1.1, HTTP/2, WebSocket, JMS, and SIP communications. In this beta release, there are some updates added to this feature. It is designed for zero migration impact—your applications and the `server.xml` file continue to behave as before. We are looking forward and counting on your feedback before GA!
+
+Netty’s event‑driven I/O gives us a modern foundation for long‑term scalability, easier maintenance, and future performance work, all without changing APIs or configuration!
+
+No changes are required to effectively use the current 'All Beta Features' runtime for this release.
+To help us evaluate parity and performance with real-world scenarios, you can try the following things:
+
+* HTTP/1.1 and HTTP/2: large uploads or downloads, chunked transfers, compression-enabled content, keep-alive behavior.
+* WebSocket: long-lived communications, backpressure scenarios
+* Timeouts: read/write/keep-alive timeouts under load
+* Access logging: verify formatting and log results compared to previous builds
+* JMS communications: message send/receive throughput, durable subscriptions
+
+=== Limitations of the Beta release:
+==== HTTP
+* HTTP requests with content length greater than the maximum integer value fails due to internal limitations on request size with Netty.
+* When the HTTP option `maxKeepAliveRequests` has no limit, HTTP 1.1 limits pipelined requests to 50.
+* HTTP option `resetFramesWindow` is reduced from millisecond to second precision due to limitations in the Netty library.
+* Due to internal limitations of the Netty library, the HTTP option `MessageSizeLimit` is now adjusted to be capped at the maximum integer value for HTTP/2.0 connections.
+* Due to internal differences with Netty, the HTTP option `ThrowIOEForInboundConnections` could behave differently from the Channel Framework implementation.
+* Due to internal limitations of Netty, `acceptThread` and `waitToAccept` TCP options are currently not implemented and are ignored for the current Beta if set.
+* Cleartext upgrade requests for HTTP 2.0 with request data are rejected with a 'Request Entity Too Large' status code. A fix is in progress.
+
+==== WebSocket
+Websocket inbound requests can generate FFDC `RuntimeExceptions` on connection cleanup when a connection is closed from the client side.
+
+==== SIP
+SIP Resolver transport does not use a Netty transport implementation until this release. This issue is resolved in the current beta!
+
+==== ALPN
+Currently, our Netty implementation supports only the native JDK ALPN implementation. Additional information for the ALPN implementations that are currently supported by the Channel Framework but not our Netty beta can be found link:https://www.ibm.com/docs/en/was-liberty/base?topic=40-alpn-support[here]
+    
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
+
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/33031
+// Contact/Reviewer: arkarkala
+// // // // // // // // 
+[#aes256]
+== Bring Your Own AES-256 Key
+
+Liberty now allows you to provide a Base64-encoded 256-bit AES key for password encryption.
+
+=== What’s New?
+Previously, Liberty supported the `wlp.password.encryption.key` property, which accepted a password and derived an AES key through a computationally intensive process. This derivation involved repeated hashing with a salt over many iterations, which added overhead during server startup.
+
+Now you can now supply a pre-generated AES key directly. This eliminates the derivation step, resulting in faster startup times and improved runtime performance when encrypting and decrypting passwords.
+
+=== Why It Matters
+This feature not only improves performance but also prepares for migration from traditional WebSphere. The encoded password format remains the same, and future migration tools will allow you to export keys from traditional WebSphere for use in Liberty.
+
+---
+
+=== How to Enable It
+
+. *Obtain a 256-bit AES key* - Generate a 256-bit AES key using your own infrastructure and encode it in Base64, or by using securityUtility.
++
+To generate a 256-bit AES key using securityUtility, run the new securityUtility generateAESKey task to:
+
+* Generate a random AES key: 
++
+```bash
+./securityUtility generateAESKey
+```
+* Derive a key from a passphrase: 
++ 
+```bash
+./securityUtility generateAESKey --key=<password>
+```
+
+. *Configure the key in Liberty* 
++
+Add the following variable in `server.xml` or an included file: 
++ 
+[source, xml]
+----
+<variable name="wlp.aes.encryption.key" value="<your_aes_key>" />
+----
+
+. *Encode your passwords*  
++
+Use `securityUtility encode` with one of these options:
+
+* Provide the key directly:
++
+```bash
+./securityUtility encode --encoding=aes --base64Key=<your_base64_key> <password>
+```
+* Specify an XML or properties file containing `wlp.aes.encryption.key` or `wlp.password.encryption.key`. *Note:* The aesConfigFile parameter now allows users to encode with either of the aes properties:
++
+```bash
+./securityUtility encode --encoding=aes --aesConfigFile=<xml_or_properties_file_path> <password>
+```
+
+. *Update configuration*
++
+Copy the new encoded values into your server configuration.
+
+
+*Performance Tip:* For best results, re-encode all passwords using the new key. Mixed usage of old and new formats is supported for backward compatibility, but full migration ensures optimal performance.
+
+Other command line tasks have been updated to accept Base64 keys and AES configuration files in a similar fashion:
+
+. securityUtility
+  * createSSLCertificate
+  * createLTPAKeys
+  * encode
+. configUtility
+  * install
+. collective
+  * create
+  * join
+  * replicate
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
+
+
+[#run]
+=== Try it now
+
+To try out these features, update your build tools to pull the Open Liberty All Beta Features package instead of the main release. The beta works with Java SE 25, Java SE 21, Java SE 17, Java SE 11, and Java SE 8.
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], you can install the All Beta Features package using:
+
+[source,xml]
+----
+<plugin>
+    <groupId>io.openliberty.tools</groupId>
+    <artifactId>liberty-maven-plugin</artifactId>
+    <version>3.11.5</version>
+    <configuration>
+        <runtimeArtifact>
+          <groupId>io.openliberty.beta</groupId>
+          <artifactId>openliberty-runtime</artifactId>
+          <version>25.0.0.12-beta</version>
+          <type>zip</type>
+        </runtimeArtifact>
+    </configuration>
+</plugin>
+----
+
+You must also add dependencies to your `pom.xml` file for the beta version of the APIs that are associated with the beta features that you want to try. For example, the following block adds dependencies for two example beta APIs:
+
+[source,xml]
+----
+<dependency>
+    <groupId>org.example.spec</groupId>
+    <artifactId>exampleApi</artifactId>
+    <version>7.0</version>
+    <type>pom</type>
+    <scope>provided</scope>
+</dependency>
+<dependency>
+    <groupId>example.platform</groupId>
+    <artifactId>example.example-api</artifactId>
+    <version>11.0.0</version>
+    <scope>provided</scope>
+</dependency>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'io.openliberty.tools:liberty-gradle-plugin:3.9.5'
+    }
+}
+apply plugin: 'liberty'
+dependencies {
+    libertyRuntime group: 'io.openliberty.beta', name: 'openliberty-runtime', version: '[25.0.0.12-beta,)'
+}
+----
+
+Or if you're using link:{url-prefix}/docs/latest/container-images.html[container images]:
+
+[source]
+----
+FROM icr.io/appcafe/open-liberty:beta
+----
+
+Or take a look at our link:{url-prefix}/downloads/#runtime_betas[Downloads page].
+
+If you're using link:https://plugins.jetbrains.com/plugin/14856-liberty-tools[IntelliJ IDEA], link:https://marketplace.visualstudio.com/items?itemName=Open-Liberty.liberty-dev-vscode-ext[Visual Studio Code] or link:https://marketplace.eclipse.org/content/liberty-tools[Eclipse IDE], you can also take advantage of our open source link:https://openliberty.io/docs/latest/develop-liberty-tools.html[Liberty developer tools] to enable effective development, testing, debugging and application management all from within your IDE.
+
+For more information on using a beta release, refer to the link:{url-prefix}docs/latest/installing-open-liberty-betas.html[Installing Open Liberty beta releases] documentation.
+
+[#feedback]
+== We welcome your feedback
+
+Let us know what you think on link:https://groups.io/g/openliberty[our mailing list]. If you hit a problem, link:https://stackoverflow.com/questions/tagged/open-liberty[post a question on StackOverflow]. If you hit a bug, link:https://github.com/OpenLiberty/open-liberty/issues[please raise an issue].
