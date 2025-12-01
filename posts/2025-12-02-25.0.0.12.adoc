@@ -1,0 +1,344 @@
+---
+layout: post
+title: "AES-256 Key and support for FIPS 140-3 with IBM Semeru Runtimes in 25.0.0.12"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/navaneethsnair1
+author_github: https://github.com/navaneethsnair1
+seo-title: AES-256 Key and support for FIPS 140-3 with IBM Semeru Runtimes in 25.0.0.12 - OpenLiberty.io
+seo-description: This release introduces support for supplying your own Base64-encoded AES-256 key, removing the need for Liberty to derive a key during startup and resulting in faster and more efficient password encryption. It also adds FIPS 140-3 compliance when Liberty running with appropriate IBM Semeru Runtime versions.
+blog_description: This release introduces support for supplying your own Base64-encoded AES-256 key, removing the need for Liberty to derive a key during startup and resulting in faster and more efficient password encryption. It also adds FIPS 140-3 compliance when Liberty running with appropriate IBM Semeru Runtime versions.
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+---
+= AES-256 Key and support for FIPS 140-3 with IBM Semeru Runtimes in 25.0.0.12
+Navaneeth S Nair <https://github.com/navaneethsnair1>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+ 
+This release introduces support for supplying your own Base64-encoded AES-256 key, removing the need for Liberty to derive a key during startup and resulting in faster and more efficient password encryption. It also adds FIPS 140-3 compliance when Liberty running with supported IBM Semeru Runtime versions (11.0.29, 17.0.17, 21.0.9, 25.0.1 or later).
+
+// // // // // // // //
+// In the preceding section:
+// Leave any instances of `tag::xxxx[]` or `end:xxxx[]` as they are.
+//
+// Replace RELEASE_SUMMARY with a short paragraph that summarises the release. Start with the lead feature but also summarise what else is new in the release. You will agree which will be the lead feature with the reviewers so you can just leave a placeholder here until after the initial review.
+// // // // // // // //
+
+// // // // // // // //
+// Replace the following throughout the document:
+//   Replace 25.0.0.12 with the version number of Open Liberty, eg: 22.0.0.2
+//   Replace 250010 with the version number of Open Liberty wihtout the periods, eg: 22002
+// // // // // // // //
+
+In link:{url-about}[Open Liberty] 25.0.0.12:
+
+* <<aes256, Bring Your Own AES-256 Key>>
+* <<fips, Support for FIPS 140-3 with IBM Semeru Runtimes>>
+* <<CVEs, Security Vulnerability (CVE) Fixes>>
+
+View the list of fixed bugs in link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A250010+label%3A%22release+bug%22[25.0.0.12].
+
+Check out link:{url-prefix}/blog/?search=release&search!=beta[previous Open Liberty GA release blog posts].
+
+[#run]
+== Develop and run your apps using 25.0.0.12
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], include the following in your `pom.xml` file:
+
+[source,xml]
+----
+<plugin>
+    <groupId>io.openliberty.tools</groupId>
+    <artifactId>liberty-maven-plugin</artifactId>
+    <version>3.11.5</version>
+</plugin>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle], include the following in your `build.gradle` file:
+
+[source,gradle]
+----
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'io.openliberty.tools:liberty-gradle-plugin:3.9.6'
+    }
+}
+apply plugin: 'liberty'
+----
+
+Or if you're using link:{url-prefix}/docs/latest/container-images.html[container images]:
+
+[source]
+----
+FROM icr.io/appcafe/open-liberty
+----
+
+Or take a look at our link:{url-prefix}/start/[Downloads page].
+
+If you're using link:https://plugins.jetbrains.com/plugin/14856-liberty-tools[IntelliJ IDEA], link:https://marketplace.visualstudio.com/items?itemName=Open-Liberty.liberty-dev-vscode-ext[Visual Studio Code] or link:https://marketplace.eclipse.org/content/liberty-tools[Eclipse IDE], you can also take advantage of our open source link:https://openliberty.io/docs/latest/develop-liberty-tools.html[Liberty developer tools] to enable effective development, testing, debugging and application management all from within your IDE. 
+
+[link=https://stackoverflow.com/tags/open-liberty]
+image::img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="center"]
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/33391
+// Contact/Reviewer: jacobwdv
+// // // // // // // // 
+[#aes256]
+== Bring Your Own AES-256 Key
+
+Liberty now allows you to provide a Base64-encoded 256-bit AES key for password encryption.
+
+=== What’s New?
+Previously, Liberty supported the `wlp.password.encryption.key` property, which accepted a password and derived an AES key through a computationally intensive process. This derivation involved repeated hashing with a salt over many iterations, which added overhead during server startup.
+
+Now you can now supply a pre-generated AES key directly. This eliminates the derivation step, resulting in faster startup times and improved runtime performance when encrypting and decrypting passwords.
+
+=== How to Enable It
+
+. **Obtain a 256-bit AES key**   - You can obtain a 256-bit AES key from your security infrastructure or generate one by using the securityUtility generateAESKey command.
++
+To generate a 256-bit AES key using securityUtility, run the new securityUtility generateAESKey task to:
+
+* Generate a random AES key: 
++
+```bash
+./securityUtility generateAESKey
+```
+* Optionally, save a random AES key to an XML file:
+```bash
+  securityUtility generateAESKey --createConfigFile=myAesConfig.xml
+```
+* Or, generate a non-random AES key from a passphrase: 
++ 
+```bash
+./securityUtility generateAESKey --key=<password>
+```
+* Optionally, generate a non-random AES key from a passphrase and save it into an XML file:
+```bash
+  securityUtility generateAESKey --key=<password> --createConfigFile=myAesConfig.xml
+```
+
+. *Configure the key in Liberty* 
++
+To configure the AES key directly in your server.xml file, add the following variable definition:
++ 
+[source, xml]
+----
+   <variable name="wlp.aes.encryption.key" value="<your_aes_key>" />
+----
++
+Or to load the AES key from an external configuration file (such as the one generated by `generateAESKey --createConfigFile`), include the file by using the following configuration. Note: the included file must contain the variable definition for `wlp.aes.encryption.key` as shown above:
++
+[source, xml]
+----
+    <include location="/path/to/myAesConfig.xml" />
+----
+
+. *Encrypt your passwords*
+You can encrypt passwords that use the AES-256 key by running the `securityUtility encode` command:
+- Provide the key directly:
+```bash
+securityUtility encode --encoding=aes --base64Key=<your_base64_key> <password>
+```
+- To use an XML or Java properties file that contains the AES key variable, specify the --aesConfigFile option:
+```bash
+securityUtility encode --encoding=aes --aesConfigFile=<xml_or_properties_file_path> <password>
+```
+. *Update configuration*
+Copy the resulting encrypted value into your Liberty configuration.
+---
+
+*Performance Tip:* For best performance, re-encrypt all passwords by using the new AES-256 key. Open Liberty supports older password formats, but full migration provides consistent startup performance.
+
+Liberty commands that support AES encryption accept the following options:
+
+* `--base64Key` or `--passwordBase64Key`: Provide the Base64-encoded AES-256 key directly.
+* `--aesConfigFile`: Provide a configuration file that defines either wlp.aes.encryption.key or wlp.password.encryption.key.
+
+Other command line tasks have been updated to accept Base64 keys and AES configuration files in a similar fashion:
+
+. securityUtility
+  * createSSLCertificate
+  * createLTPAKeys
+  * encode
+. configUtility
+  * install
+. collective
+  * create
+  * join
+  * replicate
+   
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/33359
+// Contact/Reviewer: abutch3r
+// // // // // // // // 
+[#fips]
+== Support for FIPS 140-3 with IBM Semeru Runtimes
+
+FIPS 140-3 is the latest version of the FIPS 140 standard, which provides a set of guidelines for cryptographic modules to ensure their security and integrity. Support for FIPS 140-3 was first introduced in Liberty with IBM JDK 8 in version link:https://openliberty.io/blog/2025/03/25/25.0.0.3.html[25.0.0.3]. In this release, Open Liberty supports the FIPS 140-3 standard when using link:https://developer.ibm.com/languages/semeru-runtimes[IBM Semeru Runtimes] versions 11.0.29, 17.0.17, 21.0.9, 25.0.1 or higher.
+
+=== Enabling FIPS 140-3
+
+The `securityUtility` has a new task for enabling FIPS 140-3. The task is called `configureFIPS`.
+This new task is applicable for both IBM Semeru Runtimes and IBM SDK 8.
+
+The `configureFIPS` task operates at 3 levels:
+
+1. Install
+2. Server
+3. Client
+
+To enable across all servers, clients and tools, you can enable FIPS 140-3 at the Install level by running:
+```
+securityUtility configureFIPS
+```
+
+To enable or configure a particular server, run:
+```
+securityUtility configureFIPS --server=<server name>
+```
+
+To enable or configure a particular client, run:
+```
+securityUtility configureFIPS --client=<client name>
+```
+
+For IBM Semeru Runtimes, these commands configure the FIPS enablement requirements and create a Java security properties file that can be edited to set the required constraints of the application.
+For more information about setting the constraints, see the documentation on link:https://www.ibm.com/support/pages/node/7113528#creatingextensionsofprofiles[creating extensions of profiles].
+
+To create a profile in a particular location or with a particular name `--customProfileFile=<file path/s separated by the OS-specific path separator>` can be specified and file/s are created that can be edited. The name of the file is used as the name of the profile. The configuration is set to point at the supplied files.
+Multiple files can be specified in the property. All the files are created and extend the one before itself, the final file that is specified being the last in the chain.
+
+If you do not specify the `--customProfileFile` as part of the `securityUtility configureFIPS` command, the file is created in the following locations. The location depends on whether you specified a server or a client.
+
+- if neither server or client is specified `<Liberty install location>/wlp/etc/FIPS140-3-Liberty-Application.properties`
+- if server is specified `<server root>/resources/security/FIPS140-3-Liberty-Application.properties`
+- if client is specified `<client root>/resources/security/FIPS140-3-Liberty-Application.properties`
+
+To disable FIPS 140-3 at the required level it is enabled at, add the following option to the command.
+```
+--disable 
+```
+
+Updating the application security file.
+
+=== LTPA
+
+With FIPS 140-3 enabled, the server can only load LTPA keys generated using FIPS 140-3–approved cryptographic algorithms. For LTPA Single Sign On (SSO) to work, users must configure all servers to use FIPS 140-3. For more information on configuration, see link:https://www.ibm.com/docs/en/was-liberty/base?topic=liberty-configuring-ltpa-in[documentation].
+
+When the server is restarted after FIPS 140-3 is enabled, a new `ltpa.keys` file generated with FIPS-approved algorithms is created automatically. Any existing `ltpa.keys` files created before FIPS 140-3 was enabled are backed up.
+
+==== Creating a new FIPS approved LTPA keys using securityUtility: 
+
+One can also create the LTPA keys by using the securityUtility command's `createLTPAKeys` option. To generate the LTPA keys with FIPS 140-3 approved algorithms, configure FIPS 140-3 at the installation level.
+```
+securityUtility createLTPAKeys --password=mypassword --passwordEncoding=aes
+```
+
+=== SAML
+
+Liberty SAML Web Browser SSO encryption now supports ECDH-ES key exchange which is IBM Semeru FIPS 140-3 certified. However, if your SAML provider does not support ECDH-ES and uses RSA-OAEP key agreement instead, see the section titled `SAML using RSA-OAEP example` under link:https://www.ibm.com/docs/en/was-liberty/base?topic=liberty-configuring-saml-web-browser-sso-in-liberty-when-fips-140-3-is-enabled#saml-using-rsa-oaep-example[Configuring SAML Web Browser SSO in Liberty when FIPS 140-3 is Enabled].
+
+For full details on enabling SAML assertion encryption when FIPS 140-3 is enabled, see the section titled `Enabling SAML assertion encryption when FIPS 140-3 is enabled` under link:https://www.ibm.com/docs/en/was-liberty/base?topic=liberty-configuring-saml-web-browser-sso-in-liberty-when-fips-140-3-is-enabled#enabling-saml-assertion-encryption-when-fips-140-3-is-enabled[Configuring SAML Web Browser SSO in Liberty when FIPS 140-3 is Enabled].
+
+Liberty also now supports stronger signature algorithms with FIPS enabled, including SHA256, SHA384, SHA512, and ECDSAwithSHA256/384/512.
+
+=== Supported Signature Method algorithm options When FIPS 140-3 Mode Is Enabled
+*Supported:*
+
+- SHA256
+- 25.0.0.12+ SHA384
+- 25.0.0.12+ SHA512
+- 25.0.0.12+ ECDSAwithSHA256
+- 25.0.0.12+ ECDSAwithSHA384
+- 25.0.0.12+ ECDSAwithSHA512
+
+*Not Supported:*
+
+- SHA1
+
+*Example Usage*
+```
+<samlWebSso20 id="defaultSP" signatureMethodAlgorithm="SHA256" />
+```
+
+=== Supported Encryption algorithms When FIPS 140-3 Mode Is Enabled
+*Supported:*
+
+- ECDH-ES
+
+*Not Supported:*
+
+- RSA-OAEP encryption key transport when SAML encryption is enabled.
+
+Note: The FIPS module in use by the IBM Semeru runtime is planning to certify RSA-OAEP operations in a future release. 
+
+=== wsSecurity-1.1
+
+The `wsSecurity-1.1` feature now supports the use of the Elliptic Curve keys for signing and encryption by leveraging the ECDH-ES algorithm. For more information, see link:https://www.ibm.com/docs/en/was-liberty/nd?topic=wssml-securing-web-service-by-using-ws-security-policy[securing a web service by using a WS-Security policy].
+
+Example of WS-SecurityPolicy configuration can be found in link:https://www.ibm.com/docs/en/was-liberty/nd?topic=level-ws-securitypolicy-templates[Scenario 12 of the WS-SecurityPolicy Templates].
+
+=== Defining Constraints for applications
+
+When FIPS 140-3 is configured, the Semeru runtime enforces the use of FIPS 140-3–approved algorithms across the server when the link:https://www.ibm.com/support/pages/node/7113528#restrictedsecuritymode[FIPS140-3-Strongly-Enforced restricted security mode profile] is enabled. The Semeru FIPS 140-3 enforcement of cryptographic algorithms does not distinguish the usage of the algorithms. For example, usage of SHA1 for a message digest hash (usually used to compare two values) is permitted by the FIPS 140-3 specification but Semeru FIPS 140-3 will still throw an exception as there is no distinction made on the usage of SHA1. Whenever an exception occurs, investigate the cause and update the algorithm if needed (for example, to SHA-256 or SHA-512 in this case). If the issue is not cryptography-related and its usage is permitted by the FIPS 140-3 specification, add it to the exception list in the custom profile as an allowed constraint.
+
+IBM Semeru applies constraints by using its profiles to grant access to Java security providers and algorithms to help ensure FIPS 140-3 compliance. When Strongly-enforced or Strict profiles are used as the base, algorithms like SHA-1 are not available to any application classes until a constraint is added to allow it.
+
+If using a non-FIPS 140-3 Message Digest like SHA-1, you might see an exception like this:
+```
+java.security.NoSuchAlgorithmException: SHA1 MessageDigest not available
+	at java.base/sun.security.jca.GetInstance.getInstance(GetInstance.java:159)
+	at java.base/java.security.MessageDigest.getInstance(MessageDigest.java:185)
+  at io.openliberty.fips.test.application.ObjectComparator.compareObjects(ObjectComparator.java:463)
+```
+As the application is comparing objects, SHA-1 can be used.
+
+In the properties file that was created as part of enabling FIPS you can add the constraint under the provider that supplies the algorithm.
+```
+RestrictedSecurity.OpenJCEPlusFIPS.FIPS140-3-Liberty-Application.jce.provider.1 = com.ibm.crypto.plus.provider.OpenJCEPlusFIPS [+ \
+    {MessageDigest, SHA-1, *, FullClassName:io.openliberty.fips.test.application.ObjectComparator}]
+```
+Note: While the exception stated SHA1 was missing, the name of the algorithm is `SHA-1` with `SHA1` being an alias for it.
+
+If your application includes a Java security provider, or if you need to add a new provider that is not already registered in the `FIPS140-3-Liberty` or `FIPS140-3-Strongly-Enforced` profiles, you must also include it in the FIPS security properties file.
+
+You can add your provider like this:
+```
+RestrictedSecurity.OpenJCEPlusFIPS.FIPS140-3-Liberty-Application.jce.provider.51 = io.openliberty.fips.test.custom.SecurityProvider
+```
+If you do not specify any constraints within a provider’s definition, all algorithms offered by that provider become available to all classes in the runtime. Additionally, any new providers that you add must be placed starting at provider position 51.
+
+See the documentation for more information about link:https://www.ibm.com/support/pages/fips-140-3-cryptography-ibm-semeru-runtimes[FIPS 140-3 support] and link:https://openliberty.io/docs/latest/reference/config/samlWebSso20.html[SAML Web Browser SSO].
+
+Also see the link:https://ibmdocs-test.dcs.ibm.com/docs/en/SSAW57_liberty_test?topic=liberty-troubleshooting-fips-140-3[troubleshooting] section for some examples of constraints that might need to be added for a few different scenarios.
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
+
+[#CVEs]
+== Security vulnerability (CVE) fixes in this release
+[cols="5*"]
+|===
+|CVE |CVSS Score |Vulnerability Assessment |Versions Affected |Notes
+
+|https://www.cve.org/CVERecord?id=CVE-2025-7962[CVE-2025-7962]
+|7.5
+|SMTP injection
+|17.0.0.3-25.0.0.11
+|Affects the `javaMail-1.5`, `javaMail-1.6`, `mail-2.0` and `mail-2.1` features
+|===
+
+For a list of past security vulnerability fixes, reference the link:{url-prefix}/docs/latest/security-vulnerabilities.html[Security vulnerability (CVE) list].
+
+== Get Open Liberty 25.0.0.12 now
+
+Available through <<run,Maven, Gradle, Docker, and as a downloadable archive>>.
