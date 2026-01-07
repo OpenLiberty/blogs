@@ -6,8 +6,8 @@ categories: blog
 author_picture: https://avatars3.githubusercontent.com/venmanyarun
 author_github: https://github.com/venmanyarun
 seo-title: Honoring JDK Toolchains with the Liberty Maven Plugin
-seo-description: Learn how to use Maven Toolchains with the Liberty Maven Plugin (v3.12+) to decouple your build environment from your runtime. Discover how to configure toolchains.xml, ensure JDK consistency in Dev Mode, and manage precedence for Surefire and Failsafe plugins for seamless Open Liberty development.
-blog_description: "Learn how to use Maven Toolchains with the Liberty Maven Plugin (v3.12+) to decouple your build environment from your runtime. Discover how to configure toolchains.xml, ensure JDK consistency in Dev Mode, and manage precedence for Surefire and Failsafe plugins for seamless Open Liberty development."
+seo-description: Learn how to use Maven Toolchains with the Liberty Maven Plugin (v3.12.0+) to decouple your build environment from your runtime. Discover how to configure toolchains.xml, ensure JDK consistency in Dev Mode, and manage precedence for Surefire and Failsafe plugins for seamless Open Liberty development.
+blog_description: "Learn how to use Maven Toolchains with the Liberty Maven Plugin (v3.12.0+) to decouple your build environment from your runtime. Discover how to configure toolchains.xml, ensure JDK consistency in Dev Mode, and manage precedence for Surefire and Failsafe plugins for seamless Open Liberty development."
 open-graph-image: https://openliberty.io/img/twitter_card.jpg
 open-graph-image-alt: Open Liberty Logo
 ---
@@ -49,34 +49,43 @@ AUTHOR_NAME <https://github.com/venmanyarun>
 // change the "IMAGE CAPTION" to a couple words of what the image is
 // // // // // // // //
 
-When developing modern Java applications, the environment you use to run your build (Maven) isn't always the environment you want for your running server. Perhaps your CI/CD pipeline is locked to Java 11, but your application targets Java 21 features. Or maybe you manage multiple projects, each requiring a different JDK vendor or version.
+As the Java ecosystem evolves, developers frequently face "version mismatch" challenges. Modern development often requires balancing the requirements of your build tool, your application source code, and your target runtime environment.
 
-Managing these differences by constantly swapping `JAVA_HOME` is error-prone. Starting with **liberty-maven-plugin version 3.12**, we officially support **Maven Toolchains**. This integration allows you to decouple the JDK used to run Maven from the JDK used to run your Open Liberty server, ensuring a consistent and automated development experience.
+Starting with **liberty-maven-plugin version 3.12.0**, we officially support **Maven Toolchains**. This integration allows you to decouple the JDK used to run Maven from the JDK used to run your Open Liberty server, ensuring a consistent and automated development experience.
 
----
+'''
 
 == Why Use Maven Toolchains?
 
-Maven Toolchains provide a standardized way for plugins to share information about installed JDKs. By using toolchains with Open Liberty, you gain several advantages:
+The need for toolchains has moved from a "nice-to-have" to a necessity for many modern workflows:
 
-* **Consistency:** Ensure every developer uses the exact same JDK vendor and version for the runtime, regardless of their local `JAVA_HOME`.
-* **Decoupling:** Run Maven with a stable, older JDK while your Liberty server runs on the latest Java release.
-* **Automation:** Once configured, the Liberty Maven Plugin automatically selects the correct Java executable for goals like `liberty:run` and `liberty:dev`.
+* **Build Tool Requirements (Maven 4):** The upcoming Maven 4 requires Java 17 or higher to run. If you want to leverage the latest Maven features but your application is targeted for an older JDK (like Java 8 or 11), toolchains allow you to run Maven on Java 17 while the Liberty plugin executes your server and tests on the required target JDK.
+* **Environment Consistency:** It eliminates the "works on my machine" syndrome. By defining the JDK in the project configuration rather than relying on a local `JAVA_HOME` environment variable, every developer and CI/CD agent uses the exact same environment.
+* **Vendor Flexibility:** If your production environment uses a specific distribution (like IBM Semeru or Eclipse Temurin), toolchains ensure you develop and test against that specific vendor’s JVM without affecting your global system settings.
 
----
+'''
+
+== Internal Mechanics: How Liberty Honors Toolchains
+
+When you configure a toolchain, the `liberty-maven-plugin` doesn't just pass a flag to Maven; it internally reconfigures how it interacts with the Open Liberty runtime across **all** plugin goals.
+
+
+
+By detecting the toolchain JDK, the plugin directs the following core operations to use the toolchain’s Java executable instead of the system default:
+
+* **Server Lifecycle Goals:** Goals such as `liberty:start`, `liberty:run`, and `liberty:stop` invoke the server processes using the toolchain JVM.
+* **Development Goals:** The `liberty:dev` goal uses the toolchain to monitor, recompile, and refresh the application in real-time.
+* **Packaging and Assembly:** Goals like `liberty:package`, `liberty:create`, and `liberty:install-feature` use the toolchain to ensure any internal JVM-based logic (like feature resolution) is consistent with your target runtime.
+* **Testing and Verification:** Goals such as `liberty:test-start` and `liberty:test-stop` ensure the testing environment matches the server environment.
+
+'''
 
 == Supporting Maven Toolchains in Liberty
 
-=== Step 1: Create a Global toolchains.xml
-Maven toolchains are managed globally. You must define where your JDKs are located on your local machine so Maven can find them.
+=== Step 1: Create a Global `toolchains.xml`
+Maven toolchains are managed globally. Create a `toolchains.xml` file in your `~/.m2/` directory. For a deep dive into the schema, see the link:https://maven.apache.org/guides/mini/guide-using-toolchains.html[Official Maven Toolchains Guide].
 
-1. Navigate to your Maven configuration directory (usually `~/.m2/` or `%USERPROFILE%\.m2\`).
-2. Create a file named `toolchains.xml` if it does not already exist.
-3. Add your JDK paths as shown in the example below.
-
-For more details on this configuration, see the link:https://maven.apache.org/guides/mini/guide-using-toolchains.html[Official Maven Toolchains Documentation].
-
-**Example `toolchains.xml`:**
+**Example: Multiple JDK Vendors**
 [source,xml]
 ----
 <?xml version="1.0" encoding="UTF-8"?>
@@ -88,22 +97,21 @@ For more details on this configuration, see the link:https://maven.apache.org/gu
       <vendor>temurin</vendor>
     </provides>
     <configuration>
-      <jdkHome>/path/to/your/jdk-17</jdkHome>
+      <jdkHome>/opt/java/temurin-17</jdkHome>
     </configuration>
   </toolchain>
 </toolchains>
 ----
 
 === Step 2: Set the `jdkToolchain` in Liberty Maven Plugin
-To ensure the Liberty server specifically honors these settings during goals like `liberty:run` or `liberty:dev`, add the `jdkToolchain` parameter to your `liberty-maven-plugin` configuration.
+Add the `jdkToolchain` parameter to your `liberty-maven-plugin` configuration in the `pom.xml`.
 
-**Example `pom.xml` snippet:**
 [source,xml]
 ----
 <plugin>
     <groupId>io.openliberty.tools</groupId>
     <artifactId>liberty-maven-plugin</artifactId>
-    <version>3.12</version>
+    <version>3.12.0</version>
     <configuration>
         <jdkToolchain>
             <version>17</version>
@@ -113,56 +121,14 @@ To ensure the Liberty server specifically honors these settings during goals lik
 </plugin>
 ----
 
----
+'''
 
 == Deep Dive: Toolchains in Dev Mode
 
-A major benefit of this update is how it streamlines **Dev Mode** (`mvn liberty:dev`). When a toolchain is configured, the `liberty-maven-plugin` uses that specific JDK for the entire "inner loop" of development.
-
-
-
-=== Full Lifecycle Consistency
-The plugin honors the `jdkToolchain` for:
-
-* **Recompiling** source and test classes automatically on file changes.
-* **Running Unit Tests** via the `maven-surefire-plugin`.
-* **Running Integration Tests** via the `maven-failsafe-plugin`.
+In **Dev Mode** (`mvn liberty:dev`), the plugin ensures that the specified JDK is used for the entire "inner loop" of development. Internally, the plugin's `DevMojo` identifies the toolchain and ensures it is used for both the server runtime and the compilation of source and test classes.
 
 === Precedence and Testing Integration
-The `liberty-maven-plugin` also supports environments where `jdkToolchain` is defined for the `maven-surefire-plugin` or `maven-failsafe-plugin`. To ensure your tests run on the same JVM as your server, the following logic applies:
-
-* **Precedence:** If a `jdkToolchain` is defined in both the Liberty plugin and the Surefire/Failsafe plugins, the **Liberty Maven Plugin configuration takes higher precedence**.
-* **Warning Messages:** When a conflict occurs, the Liberty plugin will log a warning to the console, notifying you that the Liberty toolchain is overriding the test plugin settings to maintain environmental parity.
-
----
-
-== Verify the Configuration
-
-Even if your `JAVA_HOME` points to a different Java version, Liberty will now honor the toolchain. Run your project using the following command:
-
-[source,bash]
-----
-mvn liberty:run
-----
-
-To confirm that the correct Java version is being used, check the `messages.log` file located in the `target/liberty/wlp/usr/servers/defaultServer/logs/` directory. The header of the log file will indicate the `java.home` and `java.version` provided by the toolchain:
-
-**Sample `messages.log` output:**
-[source,text]
-----
-********************************************************************************
-product = Open Liberty 25.0.0.12
-wlp.install.dir = /.../target/liberty/wlp/
-java.home = /path/to/jdk/temurin-17.0.17/Contents/Home
-java.version = 17.0.17
-java.runtime = OpenJDK Runtime Environment (17.0.17+10)
-********************************************************************************
-----
-
-== Conclusion
-
-By honoring JDK toolchains, the Liberty Maven Plugin ensures that your build, runtime, and test environments are perfectly aligned. This reduces "works on my machine" issues and allows you to adopt new Java versions with confidence.
-
+If your project also defines toolchains for the `maven-surefire-plugin` or `maven-failsafe-plugin`, the Liberty plugin will handle conflicts to ensure your tests don't run on a
 // // // // // // // //
 // LINKS
 //
