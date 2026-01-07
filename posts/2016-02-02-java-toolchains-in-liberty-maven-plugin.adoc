@@ -1,0 +1,175 @@
+---
+layout: post
+title: "Honoring JDK Toolchains with the Liberty Maven Plugin"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/venmanyarun
+author_github: https://github.com/venmanyarun
+seo-title: Honoring JDK Toolchains with the Liberty Maven Plugin
+seo-description: Learn how to use Maven Toolchains with the Liberty Maven Plugin (v3.12+) to decouple your build environment from your runtime. Discover how to configure toolchains.xml, ensure JDK consistency in Dev Mode, and manage precedence for Surefire and Failsafe plugins for seamless Open Liberty development.
+blog_description: "Learn how to use Maven Toolchains with the Liberty Maven Plugin (v3.12+) to decouple your build environment from your runtime. Discover how to configure toolchains.xml, ensure JDK consistency in Dev Mode, and manage precedence for Surefire and Failsafe plugins for seamless Open Liberty development."
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+---
+= Honoring JDK Toolchains with the Liberty Maven Plugin
+AUTHOR_NAME <https://github.com/venmanyarun>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+// // // // // // // //
+// In the preceding section:
+// Do not insert any blank lines between any of the lines.
+//
+// "open-graph-image" is set to OL logo. Whenever possible update this to a more appropriate/specific image (For example if present a image that is being used in the post). However, it
+// can be left empty which will set it to the default
+//
+// "open-graph-image-alt" is a description of what is in the image (not a caption). When changing "open-graph-image" to
+// a custom picture, you must provide a custom string for "open-graph-image-alt".
+//
+// Replace TITLE with the blog post title.
+// Replace AUTHOR_NAME with your name as first author.
+// Replace GITHUB_USERNAME with your GitHub username eg: lauracowen
+// Replace DESCRIPTION with a short summary (~60 words) of the release (a more succinct version of the first paragraph of the post).
+//
+// Replace AUTHOR_NAME with your name as you'd like it to be displayed, eg: Laura Cowen
+//
+// Example post: 2020-04-02-generate-microprofile-rest-client-code.adoc
+//
+// If adding image into the post add :
+// -------------------------
+// [.img_border_light]
+// image::img/blog/FILE_NAME[IMAGE CAPTION ,width=70%,align="center"]
+// -------------------------
+// "[.img_border_light]" = This adds a faint grey border around the image to make its edges sharper. Use it around screenshots but not           
+// around diagrams. Then double check how it looks.
+// There is also a "[.img_border_dark]" class which tends to work best with screenshots that are taken on dark backgrounds.
+// Change "FILE_NAME" to the name of the image file. Also make sure to put the image into the right folder which is: img/blog
+// change the "IMAGE CAPTION" to a couple words of what the image is
+// // // // // // // //
+
+When developing modern Java applications, the environment you use to run your build (Maven) isn't always the environment you want for your running server. Perhaps your CI/CD pipeline is locked to Java 11, but your application targets Java 21 features. Or maybe you manage multiple projects, each requiring a different JDK vendor or version.
+
+Managing these differences by constantly swapping `JAVA_HOME` is error-prone. Starting with **liberty-maven-plugin version 3.12**, we officially support **Maven Toolchains**. This integration allows you to decouple the JDK used to run Maven from the JDK used to run your Open Liberty server, ensuring a consistent and automated development experience.
+
+---
+
+== Why Use Maven Toolchains?
+
+Maven Toolchains provide a standardized way for plugins to share information about installed JDKs. By using toolchains with Open Liberty, you gain several advantages:
+
+* **Consistency:** Ensure every developer uses the exact same JDK vendor and version for the runtime, regardless of their local `JAVA_HOME`.
+* **Decoupling:** Run Maven with a stable, older JDK while your Liberty server runs on the latest Java release.
+* **Automation:** Once configured, the Liberty Maven Plugin automatically selects the correct Java executable for goals like `liberty:run` and `liberty:dev`.
+
+---
+
+== Supporting Maven Toolchains in Liberty
+
+=== Step 1: Create a Global toolchains.xml
+Maven toolchains are managed globally. You must define where your JDKs are located on your local machine so Maven can find them.
+
+1. Navigate to your Maven configuration directory (usually `~/.m2/` or `%USERPROFILE%\.m2\`).
+2. Create a file named `toolchains.xml` if it does not already exist.
+3. Add your JDK paths as shown in the example below.
+
+For more details on this configuration, see the link:https://maven.apache.org/guides/mini/guide-using-toolchains.html[Official Maven Toolchains Documentation].
+
+**Example `toolchains.xml`:**
+[source,xml]
+----
+<?xml version="1.0" encoding="UTF-8"?>
+<toolchains>
+  <toolchain>
+    <type>jdk</type>
+    <provides>
+      <version>17</version>
+      <vendor>temurin</vendor>
+    </provides>
+    <configuration>
+      <jdkHome>/path/to/your/jdk-17</jdkHome>
+    </configuration>
+  </toolchain>
+</toolchains>
+----
+
+=== Step 2: Set the `jdkToolchain` in Liberty Maven Plugin
+To ensure the Liberty server specifically honors these settings during goals like `liberty:run` or `liberty:dev`, add the `jdkToolchain` parameter to your `liberty-maven-plugin` configuration.
+
+**Example `pom.xml` snippet:**
+[source,xml]
+----
+<plugin>
+    <groupId>io.openliberty.tools</groupId>
+    <artifactId>liberty-maven-plugin</artifactId>
+    <version>3.12</version>
+    <configuration>
+        <jdkToolchain>
+            <version>17</version>
+            <vendor>temurin</vendor>
+        </jdkToolchain>
+    </configuration>
+</plugin>
+----
+
+---
+
+== Deep Dive: Toolchains in Dev Mode
+
+A major benefit of this update is how it streamlines **Dev Mode** (`mvn liberty:dev`). When a toolchain is configured, the `liberty-maven-plugin` uses that specific JDK for the entire "inner loop" of development.
+
+
+
+=== Full Lifecycle Consistency
+The plugin honors the `jdkToolchain` for:
+
+* **Recompiling** source and test classes automatically on file changes.
+* **Running Unit Tests** via the `maven-surefire-plugin`.
+* **Running Integration Tests** via the `maven-failsafe-plugin`.
+
+=== Precedence and Testing Integration
+The `liberty-maven-plugin` also supports environments where `jdkToolchain` is defined for the `maven-surefire-plugin` or `maven-failsafe-plugin`. To ensure your tests run on the same JVM as your server, the following logic applies:
+
+* **Precedence:** If a `jdkToolchain` is defined in both the Liberty plugin and the Surefire/Failsafe plugins, the **Liberty Maven Plugin configuration takes higher precedence**.
+* **Warning Messages:** When a conflict occurs, the Liberty plugin will log a warning to the console, notifying you that the Liberty toolchain is overriding the test plugin settings to maintain environmental parity.
+
+---
+
+== Verify the Configuration
+
+Even if your `JAVA_HOME` points to a different Java version, Liberty will now honor the toolchain. Run your project using the following command:
+
+[source,bash]
+----
+mvn liberty:run
+----
+
+To confirm that the correct Java version is being used, check the `messages.log` file located in the `target/liberty/wlp/usr/servers/defaultServer/logs/` directory. The header of the log file will indicate the `java.home` and `java.version` provided by the toolchain:
+
+**Sample `messages.log` output:**
+[source,text]
+----
+********************************************************************************
+product = Open Liberty 25.0.0.12
+wlp.install.dir = /.../target/liberty/wlp/
+java.home = /path/to/jdk/temurin-17.0.17/Contents/Home
+java.version = 17.0.17
+java.runtime = OpenJDK Runtime Environment (17.0.17+10)
+********************************************************************************
+----
+
+== Conclusion
+
+By honoring JDK toolchains, the Liberty Maven Plugin ensures that your build, runtime, and test environments are perfectly aligned. This reduces "works on my machine" issues and allows you to adopt new Java versions with confidence.
+
+// // // // // // // //
+// LINKS
+//
+// OpenLiberty.io site links:
+// link:/guides/microprofile-rest-client.html[Consuming RESTful Java microservices]
+// 
+// Off-site links:
+// link:https://openapi-generator.tech/docs/installation#jar[Download Instructions]
+//
+// // // // // // // //
