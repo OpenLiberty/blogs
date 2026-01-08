@@ -128,7 +128,58 @@ Add the `jdkToolchain` parameter to your `liberty-maven-plugin` configuration in
 In **Dev Mode** (`mvn liberty:dev`), the plugin ensures that the specified JDK is used for the entire "inner loop" of development. Internally, the plugin's `DevMojo` identifies the toolchain and ensures it is used for both the server runtime and the compilation of source and test classes.
 
 === Precedence and Testing Integration
-If your project also defines toolchains for the `maven-surefire-plugin` or `maven-failsafe-plugin`, the Liberty plugin will handle conflicts to ensure your tests don't run on a
+If your project also defines toolchains for the `maven-surefire-plugin` or `maven-failsafe-plugin`, the Liberty plugin will handle conflicts to ensure your tests don't run on a different JVM than your server.
+
+[IMPORTANT]
+====
+If a `jdkToolchain` is defined in both the Liberty plugin and the Surefire/Failsafe plugins, the **Liberty Maven Plugin configuration takes higher precedence**.
+====
+
+**Console Output Examples:**
+If the Liberty plugin overrides a toolchain configured in another plugin, it will log a warning:
+
+`[WARNING] The jdkToolchain configuration in liberty-maven-plugin overrides the jdkToolchain configuration in maven-surefire-plugin.`
+
+When starting Dev Mode, the plugin confirms the toolchain being used:
+
+`[INFO] Using jdkToolchain: JDK[/opt/java/temurin-17]`
+
+'''
+
+== Troubleshooting Toolchain Issues
+
+If the Liberty plugin cannot find a matching toolchain based on your `pom.xml` configuration, it will default to the system's `JAVA_HOME`. Here is how to diagnose issues:
+
+1. **Verify the Match:** Ensure the `<provides>` block in your `toolchains.xml` exactly matches the `<jdkToolchain>` block in your `pom.xml`. These are simple string matches.
+2. **Check File Location:** Ensure `toolchains.xml` is in the correct directory (`~/.m2/toolchains.xml`).
+3. **Check Plugin Logs:** If the plugin cannot find the requested toolchain, it will log an info message:
++
+[source,text]
+----
+[INFO] The jdkToolchain configuration will be ignored because the specified toolchain could not be found.
+----
+4. **Use Maven Debug Mode:** Run your command with `-X` (e.g., `mvn liberty:dev -X`) to see exactly how Maven is searching for and matching toolchains.
+
+'''
+
+== Verify the Configuration
+
+Check the `messages.log` file in `target/liberty/wlp/usr/servers/defaultServer/logs/`. The header will indicate the toolchain's Java version:
+
+**Sample `messages.log` output:**
+[source,text]
+----
+********************************************************************************
+product = Open Liberty 25.0.0.12
+java.home = /opt/java/temurin-17/Contents/Home
+java.version = 17.0.12
+********************************************************************************
+----
+
+== Conclusion
+
+By honoring JDK toolchains across all goals—from `liberty:create` to `liberty:dev`—the Liberty Maven Plugin ensures that your build, runtime, and test environments are perfectly aligned. Whether you are moving to Maven 4 or managing complex legacy requirements, toolchains provide the flexibility and stability needed for modern Cloud Native development.
+
 // // // // // // // //
 // LINKS
 //
