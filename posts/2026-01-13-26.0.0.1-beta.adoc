@@ -1,0 +1,358 @@
+---
+layout: post
+title: "Log Throttling and Model Context Protocol Server 1.0 updates in 26.0.0.1-beta"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/navaneethsnair1
+author_github: https://github.com/navaneethsnair1
+seo-title: "Log Throttling and Model Context Protocol Server 1.0 updates in 26.0.0.1-beta- OpenLiberty.io"
+seo-description: In this beta release, Open Liberty introduces log throttling to prevent excessive log output by limiting repeated high-volume messages within a short time span. It also includes updates to the `mcpServer-1.0` feature.
+blog_description: In this beta release, Open Liberty introduces log throttling to prevent excessive log output by limiting repeated high-volume messages within a short time span. It also includes updates to the `mcpServer-1.0` feature.
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+---
+= Log Throttling and Model Context Protocol Server 1.0 updates in 26.0.0.1-beta
+Navaneeth S Nair <https://github.com/navaneethsnair1>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+In this beta release, Open Liberty introduces log throttling to prevent excessive log output by limiting repeated high-volume messages within a short time span. It also includes updates to the `mcpServer-1.0` feature.
+
+The link:{url-about}[Open Liberty] 26.0.0.1-beta includes the following beta features (along with link:{url-prefix}/docs/latest/reference/feature/feature-overview.html[all GA features]):
+
+* <<logging, Log Throttling>>
+* <<mcp, Model Context Protocol Server 1.0 updates>>
+
+See also link:{url-prefix}/blog/?search=beta&key=tag[previous Open Liberty beta blog posts].
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/33154
+// Contact/Reviewer: anjumfatima90
+// // // // // // // // 
+[#logging]
+== Log Throttling 
+OpenLiberty Logging is introducing log throttling. Developers previously had no way to throttle or suppress high-volume messages. This new feature helps to prevent excessive log output when the same log events occur repeatedly within a short span of time.
+
+Throttling is enabled by default, and while it is enabled, Liberty tracks each messageID using a sliding window. By default, any messageID that is repeated more than 1000 times in the span of 5 minutes is suppressed. A throttle warning is logged as soon as throttling begins.
+
+Log throttling can be configured to throttle messages based on message or messageID by using the `throttleType` logging attribute. The number of messages before throttling can be configured by using `throttleMaxMessagesPerWindow` attribute.
+
+Log Throttling is disabled by setting `throttleMaxMessagesPerWindow` to 0.
+
+Currently, these attributes can be configured as follows:
+In `server.xml`:
+`<logging throttleMaxMessagesPerWindow="5000" throttleType="message" />`
+
+In `bootstrap.properties`:
+[source,properties]
+----
+com.ibm.ws.logging.throttle.max.messages.per.window=5000
+com.ibm.ws.logging.throttle.type=messageID
+----
+
+=== Difference between message and messageID:
+
+See the following example of a log event, `TEST0111I: Hello World!`.
+
+ThrottleType being set to `messageID` exclusively throttles based on the number of occurrences of the messageID. In this example, `TEST0111I` is used for throttling.
+
+ThrottleType being set to `message` looks at the entire message, so any variation in the message content is tracked separately. In this example, `TEST0111I: Hello World!` is used for throttling.
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/33132
+// Contact/Reviewer: njr-11
+// // // // // // // // 
+[#mcp]
+== Model Context Protocol Server 1.0 updates
+The link:https://modelcontextprotocol.io/docs/getting-started/intro[Model Context Protocol (MCP)] is an open standard for AI applications to access real-time information from external sources. The Liberty MCP Server feature `mcpServer-1.0` allows developers to expose the business logic of their applications, allowing it to be integrated into agentic AI workflows.
+
+This beta release of Liberty includes important updates to the `mcpServer-1.0` feature, including asynchronous tool support, stateless mode support, and a few bug fixes.
+
+=== Prerequisites
+To use the `mcpServer-1.0` feature, it is required to have `Java 17` installed on your system.
+
+=== Update on the MCP JAR location
+
+The MCP server JAR is located in a new directory, `/dev/ibm/api`, replacing the location used during the initial beta. You can view the link:https://openliberty.io/blog/2025/10/23/mcp-standalone-blog.html[set up guide] for complete instructions on how to build an MCP server in Liberty.
+
+=== Asynchronous Tool Execution Support
+
+MCP tools can now run asynchronously by returning a link:https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/CompletionStage.html[CompletionStage]. If a tool needs to wait for something, such as for data to be returned from a remote system, running asynchronously allows it to wait without occupying a thread.
+
+The tool method can return a `CompletionStage` quickly, but the response is not returned to the client until the `CompletionStage` completes and provides the response data.
+
+The following example illustrates how this approach would look for a tool that calls an asynchronous Jakarta REST client:
+[source,java]
+----
+private Client client = ClientBuilder.newClient();
+
+@Tool
+public CompletionStage<String> toolName(@ToolArg(name = "value") int value) {
+    return client.target("https://example.com/api")
+            .queryParam("value", value)
+            .request()
+            .rx()
+            .get(String.class);
+}
+----
+    
+=== Stateless Mode 
+
+Parts of the Model Context Protocol require the server to store client information and reuse it for subsequent requests from the same client. This stateful behavior creates challenges for clustering MCP servers. When requests from the same client are handled by different servers, the stored information must be shared across all servers.
+
+One way to solve this problem is called session affinity. The ingress or load balancer in front of the MCP servers helps ensure that all requests from a single session are served by the same server. However, this approach requires special support for how MCP identifies sessions, and such support for MCP session affinity is not widely available yet.
+
+This beta introduces another option that is called "stateless mode". This option disables the features of MCP, which require storing state so that MCP servers can be clustered easily, without any special logic for session affinity.
+
+At the moment enabling stateless mode disables the ability for a client to cancel tool calls. As we add new features, we document which features are disabled or have limitations in stateless mode.
+
+To enable stateless mode in your application, you need to add the following configuration in your `server.xml` file:
+[source,xml]
+----
+<mcpServer stateless="true"/>
+----
+
+One of the main differences in stateless mode is that the server does not assign a session ID to clients. As a result, subsequent client requests do not include the `Mcp-Session-Id` header.
+
+
+=== Working with structured content in MCP Tools
+
+The link:https://modelcontextprotocol.io/specification/2025-06-18/server/tools#structured-content[MCP specification] supports returning structured content from tools.
+
+==== Returning structured content
+
+It's now possible to return structured JSON from a tool method. To enable this capability, set `structuredContent = true` on the `@Tool` annotation and return a POJO from your tool method:
+
+[source,java]
+----
+public record Street(String streetName, String roadType) {}
+
+@Tool(name = "getStreet",
+      description = "Look up a street by name"
+      structuredContent = true)
+public Street getStreet(@ToolArg(name = "street", description = "the street name") String streetName){
+    //Get street information
+    return new Street(streetName, "One way Street");
+}
+----
+
+Open Liberty uses link:https://jakarta.ee/specifications/jsonb/[Jarkata JSON Binding (JSON-B)] to encode the returned `Street` object into JSON and this is returned to the MCP client in the `structuredContent` field of the response. For compatibility with earlier versions and older clients that do not support `structuredContent`, the encoded JSON is also returned as `TextContent`.
+In addition, Open Liberty generates a schema for the method's return type to indicate the expected data structure to the MCP client.
+
+==== Customizing Serialization
+Since Open Liberty uses JSON-B to encode the returned object, you can use the standard JSON-B annotations to customize how your objects are serialized.
+
+=== Customizing Schemas with `@Schema`
+MCP protocol requires tools to declare schemas for their inputs and outputs. These schemas help clients to understand what to send and what to expect back. Open Liberty generates these schemas automatically by inspecting your Java types - although you can customize them by using the `@Schema` annotation. 
+The simplest use of `@Schema` is adding descriptions to your types. These descriptions help clients to understand the purpose of each type or field.
+
+[source,java]
+----
+@Schema(description = "Represents Street information")
+public record Street(
+    @Schema(description = "Name of the street")
+    String streetName,
+
+    @Schema(description = "type of the road and its rules") 
+    String roadType
+) {}
+
+@Tool(name = "getStreet",
+      description = "Look up a street by name"
+      structuredContent = true)
+public Street getStreet(@ToolArg(name = "street", description = "the street name") String streetName) {
+    // Get street information
+    return new Street(streetName, "One way Street");
+}
+----
+
+If the default schemas do not meet your needs, you can provide a complete schema override. You might need to do an override if you use JSON-B annotation to customize the serialization of the object and the generated schema no longer matches. Schema override is done by providing a value to the `@Schema` annotation.
+
+[source,java]
+----
+@Schema("""
+{
+    "type": "object",
+    "required": ["streetName"],
+    "properties": {
+        "streetName": {
+            "type": "string"
+        },
+        "roadType": {
+            "type": "string",
+            "enum": [
+                "One Way Street",
+                "Dual Carriageway",
+                "Motorway"
+            ]
+        }
+    }
+}
+""")
+public record Street(String streetName, String roadType) {}
+----
+
+You also usually need to provide an output schema for a tool method that returns a `ToolResponse`. In this case, Open Liberty doesn't know what type your tool is going to return so it can't generate a detailed schema for it.
+
+[source,java]
+----
+@Schema("""
+{
+    "type": "object",
+    "required": ["streetName"],
+    "properties": {
+        "streetName": {
+            "type": "string"
+        },
+        "roadType": {
+            "type": "string",
+            "enum": [
+                "One Way Street",
+                "Dual Carriageway",
+                "Motorway"
+            ]
+        }
+    }
+}
+""")
+@Tool(structuredContent = true)
+public ToolResponse toolName() {
+    Street street = yourService.getStreetInfo();
+    return ToolResponse.structuredSuccess(street)
+}
+----
+
+Use `@Schema(description = "...")` when you want to add helpful context for clients, and `@Schema(value = "{...}")` when you have more complex types and the auto-generated schema does not reflect your actual JSON output.
+
+
+=== Allowing annotations in MCP Content objects
+
+As specified in the link:https://modelcontextprotocol.io/specification/2025-06-18/server/resources#annotations[MCP specification], MCP annotations can be added to Content objects returned from tool methods. These annotations are not Java annotations; instead, they are additional fields that provide hints to clients about how to use and display the content. 
+
+The annotation includes the following fields:
+
+* `audience` field - an enum of type `Role` that indicates the intended audience for the content.
+* `lastModified` field - a string value containing an ISO 8601-formatted timestamp that indicates when the content object was last modified.
+* `priority` field - a double value between `0.0` to `1.0` that indicates the importance of the content object.
+
+The following example shows how annotation fields can be added to tools.
+
+[source,java]
+----
+@Tool
+public TextContent toolName(@ToolArg(name = "input") String input) {
+    Content.Annotations annotations = new Content.Annotations(Role.USER,
+                                                              Instant.now().toString(),
+                                                              1.0);
+    return new TextContent("My Generated Text", null, annotations);
+}
+----
+
+Result:
+
+[source,json]
+----
+{
+    "id": 1,
+    "jsonrpc": "2.0",
+    "result": {
+        "content": [
+            {
+                "annotations": {
+                    "audience": "user",
+                    "lastModified": "2025-12-11T12:31:04",
+                    "priority": 1.0
+                },
+                "text": "My Generated Text",
+                "type": "text"
+            }
+        ],
+        "isError": false
+    }
+}
+----
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
+
+[#run]
+=== Try it now
+
+To try out these features, update your build tools to pull the Open Liberty All Beta Features package instead of the main release. The beta works with Java SE 25, Java SE 21, Java SE 17, Java SE 11, and Java SE 8.
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], you can install the All Beta Features package using:
+
+[source,xml]
+----
+<plugin>
+    <groupId>io.openliberty.tools</groupId>
+    <artifactId>liberty-maven-plugin</artifactId>
+    <version>3.11.5</version>
+    <configuration>
+        <runtimeArtifact>
+          <groupId>io.openliberty.beta</groupId>
+          <artifactId>openliberty-runtime</artifactId>
+          <version>26.0.0.1-beta</version>
+          <type>zip</type>
+        </runtimeArtifact>
+    </configuration>
+</plugin>
+----
+
+You must also add dependencies to your `pom.xml` file for the beta version of the APIs that are associated with the beta features that you want to try. For example, the following block adds dependencies for two example beta APIs:
+
+[source,xml]
+----
+<dependency>
+    <groupId>org.example.spec</groupId>
+    <artifactId>exampleApi</artifactId>
+    <version>7.0</version>
+    <type>pom</type>
+    <scope>provided</scope>
+</dependency>
+<dependency>
+    <groupId>example.platform</groupId>
+    <artifactId>example.example-api</artifactId>
+    <version>11.0.0</version>
+    <scope>provided</scope>
+</dependency>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'io.openliberty.tools:liberty-gradle-plugin:3.9.6'
+    }
+}
+apply plugin: 'liberty'
+dependencies {
+    libertyRuntime group: 'io.openliberty.beta', name: 'openliberty-runtime', version: '[26.0.0.1-beta,)'
+}
+----
+
+Or if you're using link:{url-prefix}/docs/latest/container-images.html[container images]:
+
+[source]
+----
+FROM icr.io/appcafe/open-liberty:beta
+----
+
+Or take a look at our link:{url-prefix}/downloads/#runtime_betas[Downloads page].
+
+If you're using link:https://plugins.jetbrains.com/plugin/14856-liberty-tools[IntelliJ IDEA], link:https://marketplace.visualstudio.com/items?itemName=Open-Liberty.liberty-dev-vscode-ext[Visual Studio Code] or link:https://marketplace.eclipse.org/content/liberty-tools[Eclipse IDE], you can also take advantage of our open source link:https://openliberty.io/docs/latest/develop-liberty-tools.html[Liberty developer tools] to enable effective development, testing, debugging and application management all from within your IDE.
+
+For more information on using a beta release, refer to the link:{url-prefix}docs/latest/installing-open-liberty-betas.html[Installing Open Liberty beta releases] documentation.
+
+[#feedback]
+== We welcome your feedback
+
+Let us know what you think on link:https://groups.io/g/openliberty[our mailing list]. If you hit a problem, link:https://stackoverflow.com/questions/tagged/open-liberty[post a question on StackOverflow]. If you hit a bug, link:https://github.com/OpenLiberty/open-liberty/issues[please raise an issue].
