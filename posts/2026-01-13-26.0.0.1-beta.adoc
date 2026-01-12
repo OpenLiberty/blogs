@@ -33,19 +33,25 @@ See also link:{url-prefix}/blog/?search=beta&key=tag[previous Open Liberty beta 
 // // // // // // // // 
 [#logging]
 == Log Throttling 
-OpenLiberty Logging is introducing log throttling. Developers previously had no way to throttle or suppress high-volume messages. This new feature helps to prevent excessive log output when the same log events occur repeatedly within a short span of time.
+Open Liberty Logging is introducing log throttling. Developers previously had no way to throttle or suppress high-volume messages. This new feature helps to prevent excessive log output when the same log events occur repeatedly within a short span of time.
 
-Throttling is enabled by default, and while it is enabled, Liberty tracks each messageID using a sliding window. By default, any messageID that is repeated more than 1000 times in the span of 5 minutes is suppressed. A throttle warning is logged as soon as throttling begins.
+Throttling is enabled by default. While enabled, Liberty tracks each messageID using a sliding window. By default, any messageID that is repeated more than 1,000 times within a five-minute interval is suppressed. A throttle warning is logged when throttling begins.
 
-Log throttling can be configured to throttle messages based on message or messageID by using the `throttleType` logging attribute. The number of messages before throttling can be configured by using `throttleMaxMessagesPerWindow` attribute.
+Log throttling can be configured to throttle messages based on the message or messageID by using the `throttleType` logging attribute. The number of messages allowed before throttling can be configured by using the `throttleMaxMessagesPerWindow` attribute.
 
-Log Throttling is disabled by setting `throttleMaxMessagesPerWindow` to 0.
+Log Throttling is disabled by setting `throttleMaxMessagesPerWindow` to `0`.
 
 Currently, these attributes can be configured as follows:
-In `server.xml`:
-`<logging throttleMaxMessagesPerWindow="5000" throttleType="message" />`
 
-In `bootstrap.properties`:
+* In `server.xml`:
++
+[source,xml]
+----
+<logging throttleMaxMessagesPerWindow="5000" throttleType="message" />
+----
+
+* In `bootstrap.properties`:
++
 [source,properties]
 ----
 com.ibm.ws.logging.throttle.max.messages.per.window=5000
@@ -54,11 +60,11 @@ com.ibm.ws.logging.throttle.type=messageID
 
 === Difference between message and messageID:
 
-See the following example of a log event, `TEST0111I: Hello World!`.
+Consider the following example of a log event: `TEST0111I: Hello World!`.
 
-ThrottleType being set to `messageID` exclusively throttles based on the number of occurrences of the messageID. In this example, `TEST0111I` is used for throttling.
+When `throttleType` is set to `messageID`, throttling is exclusively applied based on the number of occurrences of the messageID. In this example, `TEST0111I` is used for throttling.
 
-ThrottleType being set to `message` looks at the entire message, so any variation in the message content is tracked separately. In this example, `TEST0111I: Hello World!` is used for throttling.
+When `throttleType` is set to `message`, throttling is applied to the entire message. Any variation in the message content is tracked separately. In this example, `TEST0111I: Hello World!` is used for throttling.
 
 // DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
 
@@ -68,16 +74,16 @@ ThrottleType being set to `message` looks at the entire message, so any variatio
 // // // // // // // // 
 [#mcp]
 == Model Context Protocol Server 1.0 updates
-The link:https://modelcontextprotocol.io/docs/getting-started/intro[Model Context Protocol (MCP)] is an open standard for AI applications to access real-time information from external sources. The Liberty MCP Server feature `mcpServer-1.0` allows developers to expose the business logic of their applications, allowing it to be integrated into agentic AI workflows.
+The link:https://modelcontextprotocol.io/docs/getting-started/intro[Model Context Protocol (MCP)] is an open standard that enables AI applications to access real-time information from external sources. The Liberty MCP Server feature `mcpServer-1.0` allows developers to expose the business logic of their applications, allowing it to be integrated into agentic AI workflows.
 
-This beta release of Liberty includes important updates to the `mcpServer-1.0` feature, including asynchronous tool support, stateless mode support, and a few bug fixes.
+This beta release of Open Liberty includes important updates to the `mcpServer-1.0` feature, including asynchronous tool support, support for stateless mode, and a few bug fixes.
 
 === Prerequisites
-To use the `mcpServer-1.0` feature, it is required to have `Java 17` installed on your system.
+To use the `mcpServer-1.0` feature, `Java 17` must be installed on the system.
 
 === Update on the MCP JAR location
 
-The MCP server JAR is located in a new directory, `/dev/ibm/api`, replacing the location used during the initial beta. You can view the link:https://openliberty.io/blog/2025/10/23/mcp-standalone-blog.html[set up guide] for complete instructions on how to build an MCP server in Liberty.
+The MCP server JAR is located in a new directory, `/dev/ibm/api`, replacing the location used in the initial beta. For complete instructions on building an MCP server in Liberty, see the link:https://openliberty.io/blog/2025/10/23/mcp-standalone-blog.html[set up guide]. 
 
 === Asynchronous Tool Execution Support
 
@@ -102,13 +108,13 @@ public CompletionStage<String> toolName(@ToolArg(name = "value") int value) {
     
 === Stateless Mode 
 
-Parts of the Model Context Protocol require the server to store client information and reuse it for subsequent requests from the same client. This stateful behavior creates challenges for clustering MCP servers. When requests from the same client are handled by different servers, the stored information must be shared across all servers.
+Parts of the Model Context Protocol require the server to store client information and reuse it for subsequent requests from the same client. This stateful behavior creates challenges when clustering MCP servers. When requests from the same client are handled by different servers, the stored information must be shared across all servers.
 
-One way to solve this problem is called session affinity. The ingress or load balancer in front of the MCP servers helps ensure that all requests from a single session are served by the same server. However, this approach requires special support for how MCP identifies sessions, and such support for MCP session affinity is not widely available yet.
+One way to address this problem is through session affinity. The ingress or load balancer in front of the MCP servers helps ensure that all requests from a single session are served by the same server. However, this approach requires special support for how MCP identifies sessions, and such support for MCP session affinity is not widely available yet.
 
-This beta introduces another option that is called "stateless mode". This option disables the features of MCP, which require storing state so that MCP servers can be clustered easily, without any special logic for session affinity.
+This beta introduces another option, called _stateless mode_. This option disables MCP features that require state to be stored, allowing MCP servers to be clustered easily without any special logic for session affinity.
 
-At the moment enabling stateless mode disables the ability for a client to cancel tool calls. As we add new features, we document which features are disabled or have limitations in stateless mode.
+Currently, enabling stateless mode disables the client’s ability to cancel tool calls. As we add new features, we document which features are disabled or have limitations in stateless mode.
 
 To enable stateless mode in your application, you need to add the following configuration in your `server.xml` file:
 [source,xml]
@@ -125,7 +131,7 @@ The link:https://modelcontextprotocol.io/specification/2025-06-18/server/tools#s
 
 ==== Returning structured content
 
-It's now possible to return structured JSON from a tool method. To enable this capability, set `structuredContent = true` on the `@Tool` annotation and return a POJO from your tool method:
+It is now possible to return structured JSON from a tool method. To enable this capability, set `structuredContent = true` on the `@Tool` annotation and return a POJO from your tool method:
 
 [source,java]
 ----
@@ -140,15 +146,15 @@ public Street getStreet(@ToolArg(name = "street", description = "the street name
 }
 ----
 
-Open Liberty uses link:https://jakarta.ee/specifications/jsonb/[Jarkata JSON Binding (JSON-B)] to encode the returned `Street` object into JSON and this is returned to the MCP client in the `structuredContent` field of the response. For compatibility with earlier versions and older clients that do not support `structuredContent`, the encoded JSON is also returned as `TextContent`.
+Open Liberty uses link:https://jakarta.ee/specifications/jsonb/[Jakarta JSON Binding (JSON-B)] to encode the returned `Street` object into JSON and this is returned to the MCP client in the `structuredContent` field of the response. For compatibility with earlier versions and older clients that do not support `structuredContent`, the encoded JSON is also returned as `TextContent`.
 In addition, Open Liberty generates a schema for the method's return type to indicate the expected data structure to the MCP client.
 
 ==== Customizing Serialization
 Since Open Liberty uses JSON-B to encode the returned object, you can use the standard JSON-B annotations to customize how your objects are serialized.
 
-=== Customizing Schemas with `@Schema`
-MCP protocol requires tools to declare schemas for their inputs and outputs. These schemas help clients to understand what to send and what to expect back. Open Liberty generates these schemas automatically by inspecting your Java types - although you can customize them by using the `@Schema` annotation. 
-The simplest use of `@Schema` is adding descriptions to your types. These descriptions help clients to understand the purpose of each type or field.
+=== Customizing schemas with `@Schema`
+MCP protocol requires tools to declare schemas for their inputs and outputs. These schemas help clients to understand what to send and what to expect in return. Open Liberty generates these schemas automatically by inspecting your Java types - although you can customize them by using the `@Schema` annotation. 
+The simplest use of `@Schema` is to add descriptions to your types. These descriptions help clients understand the purpose of each type or field.
 
 [source,java]
 ----
@@ -170,7 +176,7 @@ public Street getStreet(@ToolArg(name = "street", description = "the street name
 }
 ----
 
-If the default schemas do not meet your needs, you can provide a complete schema override. You might need to do an override if you use JSON-B annotation to customize the serialization of the object and the generated schema no longer matches. Schema override is done by providing a value to the `@Schema` annotation.
+If the default schemas do not meet your needs, you can provide a complete schema override. You might need to do an override if you use JSON-B annotations to customize the serialization of the object causing the generated schema to no longer match. A schema override is performed by providing a value to the `@Schema` annotation.
 
 [source,java]
 ----
@@ -196,7 +202,7 @@ If the default schemas do not meet your needs, you can provide a complete schema
 public record Street(String streetName, String roadType) {}
 ----
 
-You also usually need to provide an output schema for a tool method that returns a `ToolResponse`. In this case, Open Liberty doesn't know what type your tool is going to return so it can't generate a detailed schema for it.
+You usually also need to provide an output schema for a tool method that returns a `ToolResponse`. In this case, Open Liberty does not know what type your tool is going to return, so it cannot generate a detailed schema for it.
 
 [source,java]
 ----
@@ -235,9 +241,9 @@ As specified in the link:https://modelcontextprotocol.io/specification/2025-06-1
 
 The annotation includes the following fields:
 
-* `audience` field - an enum of type `Role` that indicates the intended audience for the content.
-* `lastModified` field - a string value containing an ISO 8601-formatted timestamp that indicates when the content object was last modified.
-* `priority` field - a double value between `0.0` to `1.0` that indicates the importance of the content object.
+* **`audience` field** - an enum of type `Role` that indicates the intended audience for the content.
+* **`lastModified` field** - a string containing an ISO 8601-formatted timestamp that indicates when the content object was last modified.
+* **`priority` field** - a double value between 0.0 to 1.0 that indicates the importance of the content object.
 
 The following example shows how annotation fields can be added to tools.
 
