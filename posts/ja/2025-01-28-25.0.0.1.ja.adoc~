@@ -1,0 +1,120 @@
+---
+layout: post
+title: "25.0.0.1 で簡単になった Web モジュールの移行と、新しく InstantOn による高速起動に対応したフィーチャー"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/dmuelle
+author_github: https://github.com/dmuelle
+seo-title: 25.0.0.1 で簡単になった Web モジュールのマイグレーションと、新しく InstantOn による高速起動に対応したフィーチャー - OpenLiberty.io
+seo-description: 25.0.0.1 リリースでは InstantOn 高速起動で利用できるフィーチャーと、他の Java ランタイムから Liberty への Web モジュールの移行に関する構成オプションが追加されました。
+blog_description: 25.0.0.1 リリースでは InstantOn 高速起動で利用できるフィーチャーと、他の Java ランタイムから Liberty への Web モジュールの移行に関する構成オプションが追加されました。
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+blog-available-in-languages:
+- lang: en
+  path: /blog/2025/01/28/2025-01-28-25.0.0.1.html
+additional_authors:
+- name: (翻訳) 馬場 剛
+  github: https://github.com/babatch
+  image: https://avatars.githubusercontent.com/u/29302643
+---
+= 25.0.0.1 で簡単になった Web モジュールの移行と、新しく InstantOn による高速起動に対応したフィーチャー
+David Mueller <https://github.com/dmuelle>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+
+25.0.0.1 リリースでは InstantOn 高速起動で利用できるフィーチャーと、他の Java ランタイムから Liberty への Web モジュールの移行に関する構成オプションが追加されました。
+
+
+In link:{url-about}[Open Liberty] 25.0.0.1:
+
+
+* <<instant, Jakarta Batch と Jakarta Connectors Inbound Security features の InstantOn サポート>>
+* <<class, エンタープライズ・アプリケーションにおける Web モジュール・クラスローダーの設定>>
+
+
+25.0.0.1 で修正されたバグのリストは link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A25001+label%3A%22release+bug%22[こちら] です.
+
+link:{url-prefix}/blog/?search=release&search!=beta[以前の Open Liberty GA リリースのブログ投稿] もチェックして下さい。
+
+[#instant]
+== InstantOn の Jakarta Batch と Jakarta Connectors インバウンド・セキュリティー機能のサポート
+
+Open Liberty の InstantOn は MicroProfile と Jakarta EE アプリケーションの高速起動を提供します。InstantOn は link:{url-prefix}/docs/latest/instanton.html#supported-features[一部の Open Liberty フィーチャー] をサポートします。
+
+- link:{url-prefix}/docs/latest/reference/feature/batch-1.0.html[Batch API] (`batch-1.0`)
+- link:{url-prefix}/docs/latest/reference/feature/batch-2.0.html[Jakarta Batch 2.0] (`batch-2.0`)
+- link:{url-prefix}/docs/latest/reference/feature/batch-2.1.html[Jakarta Batch 2.1]  (`batch-2.1`)
+- link:{url-prefix}/docs/latest/reference/feature/jcaInboundSecurity-1.0.html[Java Connector Architecture Security Inflow 1.0]  (`jcaInboundSecurity-1.0`)
+- link:{url-prefix}/docs/latest/reference/feature/connectorsInboundSecurity-2.0.html[Jakarta Connectors Inbound Security 2.0] (`connectorsInboundSecurity-2.0`)
+
+今回の拡張は Open Liberty InstantOn を利用したアプリケーションの高速デプロイを可能にします。さらに詳しくは link:{url-prefix}/docs/latest/instanton.html[Open Liberty によるコンテナ化されたアプリケーションの高速起動] をご覧下さい。
+
+[#class]
+== エンタープライズ・アプリケーションにおける Web モジュール・クラスローダーの設定
+
+Web モジュール (WAR) は独自に link:https://docs.oracle.com/javase/8/docs/technotes/guides/jar/jar.html#classpath[クラスパス] を指定することが可能な、エンタープライズ・アプリケーションの構成要素です。Liberty はデフォルトでは、Web モジュールの `Class-Path` 属性から参照される JAR を、Web モジュール・クラスローダーに追加します。しかし、いくつかの Java EE や Jakarta EE のランタイム実装は、これらの JAR でエンタープライズ・アプリケーション・クラスローダーを使用します。
+典型的には、エンタープライズ・アプリケーション・クラスローダーは Web モジュール・クラスローダーの親クラス・ローダーです。
+
+このようなランタイムから Liberty へのスムーズな移行を可能にするために、25.0.0.1 リリースでは `enterpriseApplication` 要素に、Web モジュールの `Class-path` 属性から参照される JAR がどのクラス・ローダーを使用するかを制御することができる `webModuleClassPathLoader` 構成属性を導入しました。
+`webModuleClassPathLoader` 属性のデフォルト値は `war` です。値 `war` は Web モジュールの `Class-Path` が Web モジュール・クラスローダーでロードされるように構成します。`webModuleClassPathLoader` を `ear` に設定すれば、Web モジュールの `Class-Path` がエンタープライズ・アプリケーション・クラスローダーでロードされるように構成することができます。
+
+例えば、`myApp.ear` という名前の EAR ファイルが `ear` クラス・ローダーを用いるように構成するには、server.xml ファイル内で Liberty 構成を以下のようにします。
+
+[source,xml]
+----
+<enterpriseApplication location="myApp.ear" webModuleClassPathLoader="ear"/>
+----
+
+[#run]
+
+== 25.0.0.1 でアプリを開発して実行する
+
+もし link:{url-prefix}/guides/maven-intro.html[Maven] を使用しているなら、`pom.xml` に以下を含めます。
+
+[source,xml]
+----
+<plugin>
+    <groupId>io.openliberty.tools</groupId>
+    <artifactId>liberty-maven-plugin</artifactId>
+    <version>3.11.2</version>
+</plugin>
+----
+
+link:{url-prefix}/guides/gradle-intro.html[Gradle] を使用している場合は、`build.gradle` ファイルに以下を含めます。
+
+[source,gradle]
+----
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'io.openliberty.tools:liberty-gradle-plugin:3.9.2'
+    }
+}
+apply plugin: 'liberty'
+----
+
+link:{url-prefix}/docs/latest/container-images.html[コンテナ・イメージ] を使用する場合は以下です。
+
+[source]
+----
+FROM icr.io/appcafe/open-liberty
+----
+
+もしくは link:{url-prefix}/start/[ダウンロード・ページ] をご覧下さい。
+
+link:https://plugins.jetbrains.com/plugin/14856-liberty-tools[IntelliJ IDEA]、link:https://marketplace.visualstudio.com/items?itemName=Open-Liberty.liberty-dev-vscode-ext[Visual Studio Code] または link:https://marketplace.eclipse.org/content/liberty-tools[Eclipse IDE] を使用している場合、これらの IDE で効率的な開発・テスト・デバッグとアプリケーション管理のすべてを実行するために、オープンソースの link:https://openliberty.io/docs/latest/develop-liberty-tools.html[Liberty Tools] を利用することができます。
+
+[link=https://stackoverflow.com/tags/open-liberty]
+image::img/blog/blog_btn_stack_ja.svg[Stack Overflow で質問する, align="center"]
+
+
+
+== 今すぐ Open Liberty 25.0.0.1 を入手する
+
+<<run,Maven, Gradle, Docker, そしてダウンロード可能なアーカイブ>> から可能です。
