@@ -54,6 +54,13 @@ The following is an example of a tool for getting the weather forecast. The tool
 
 [source,java]
 ----
+package com.example.mcp;
+
+import io.openliberty.mcp.annotations.Tool;
+import io.openliberty.mcp.annotations.ToolArg;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+
 @ApplicationScoped
 public class WeatherTools {
     
@@ -105,7 +112,26 @@ You can add these hints within your `@Tool` annotation. Below is an example:
  
 [source,java]
 ----
-@Tool(annotations = @Annotations(readOnlyHint = true, openWorldHint = false)
+package com.example.mcp;
+
+import io.openliberty.mcp.annotations.Tool;
+import io.openliberty.mcp.annotations.Tool.Annotations;
+import jakarta.enterprise.context.ApplicationScoped;
+
+@ApplicationScoped
+public class BasicTools {
+
+	@Tool(name = "toolWithAnnotation", title = "Tool with Annotation", description = "A tool that has annotations",
+			annotations = @Annotations(
+                readOnlyHint = true, 
+                destructiveHint = true, 
+                idempotentHint = true, 
+                openWorldHint = false))
+	public String toolWithAnnotation() {
+		return "This tool has some annotations";
+	}
+
+}
 ----
 
 The hints you can currently add to your tool include:
@@ -126,14 +152,26 @@ To enable cancellation for your tool, you must accept a `Cancellation` parameter
 
 [source,java]
 ----
-@Tool
-public String bigComputationTool(Cancellation cancellation) {
-    ArrayList<Data> result = new ArrayList<>();
-    for (Data someData : getData()) {
-        cancellation.skipProcessingIfCancelled();
-        result.add(process(someData));
-    }
-    return result;
+package com.example.mcp;
+
+import java.util.Arrays;
+
+import io.openliberty.mcp.annotations.Tool;
+import io.openliberty.mcp.messaging.Cancellation;
+import jakarta.enterprise.context.ApplicationScoped;
+
+@ApplicationScoped
+public class BasicTools {
+	@Tool(name = "cancellationTool", title = "Cancellable tool", description = "A tool that waits to be cancelled")
+	public String bigComputationTool(Cancellation cancellation) throws InterruptedException {
+		String[] citiesArray = { "London", "Japan", "New York" };
+		for (String city : citiesArray) {
+			cancellation.skipProcessingIfCancelled();
+			System.out.println(city);
+		}
+		return Arrays.toString(citiesArray);
+	}
+
 }
 ----
 
