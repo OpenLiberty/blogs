@@ -43,14 +43,14 @@ jobs:
         with:
           ref: prod
 
-      - name: Write SSH signing private key to runner
-        env:
-          SSH_SIGNING_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+      - name: Configure SSH commit signing
         run: |
           mkdir -p ~/.ssh
-          printf "%s\n" "$SSH_SIGNING_KEY" > ~/.ssh/id_ed25519_sign
-          chmod 600 ~/.ssh/id_ed25519_sign    
-          ssh-keygen -y -f ~/.ssh/id_ed25519_sign > ~/.ssh/id_ed25519_sign.pub
+          echo "${{ secrets.SSH_SIGNING_KEY }}" > ~/.ssh/signing_key
+          chmod 600 ~/.ssh/signing_key
+          git config --global gpg.format ssh
+          git config --global user.signingkey ~/.ssh/signing_key
+          git config --global commit.gpgsign true
         
       - name: Create new branch ${{ inputs.version }}-post
         if: false
@@ -76,7 +76,7 @@ jobs:
           git config --global user.signingkey ~/.ssh/id_ed25519_sign.pub
           git config --global commit.gpgSign true
           git add -A
-          git commit -m ${{ inputs.version }} --author "${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>"
+          git commit -S -m ${{ inputs.version }} --author "${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>"
           git push origin prod:${{ inputs.version }}-post
           echo "pr-url=$(gh pr create --base draft --head ${{ inputs.version }}-post --title "${{ inputs.version }} draft" --assignee ${{ github.actor }} --body "After this PR is merged, preview at draft site:&nbsp;${{ steps.gen-url.outputs.draft-url }}")" >> $GITHUB_OUTPUT
           
