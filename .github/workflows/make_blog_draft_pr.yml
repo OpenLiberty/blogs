@@ -42,7 +42,13 @@ jobs:
         uses: actions/checkout@v3
         with:
           ref: prod
-        
+
+      - name: Import GPG key
+        run: |
+         echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --import --batch
+         git config --global user.signingkey ${{ secrets.GPG_KEY_ID }}
+         git config --global commit.gpgsign true
+
       - name: Create new branch ${{ inputs.version }}-post
         if: false
         run: git checkout -b ${{ inputs.version }}-post
@@ -63,11 +69,12 @@ jobs:
         run: |
           git config user.name github-actions
           git config user.email github-actions@github.com
+          git config commit.gpgsign true
           git add -A
-          git commit -m ${{ inputs.version }} --author "${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>"
+          git commit -S -m ${{ inputs.version }} --author "${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>"
           git push origin prod:${{ inputs.version }}-post
           echo "pr-url=$(gh pr create --base draft --head ${{ inputs.version }}-post --title "${{ inputs.version }} draft" --assignee ${{ github.actor }} --body "After this PR is merged, preview at draft site:&nbsp;${{ steps.gen-url.outputs.draft-url }}")" >> $GITHUB_OUTPUT
-          
+                
       - name: Create PR using action from marketplace
         if: false
         id: create-pr-old
