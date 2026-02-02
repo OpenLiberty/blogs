@@ -11,6 +11,7 @@ on:
 
 env:
   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  BOBSHELL_API_KEY: ${{ secrets.BOBSHELL_API_KEY }}
 
 jobs:
   create_translation_branch:
@@ -58,4 +59,35 @@ jobs:
           echo "⚠️ Branch blog_translation_automation already exists. Use 'force-recreate' option to recreate it."
           exit 1
 
-# Made with Bob
+      - name: Setup Node.js
+        if: steps.check-branch.outputs.exists == 'false' || inputs.force-recreate == true
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Roo-Cline CLI
+        if: steps.check-branch.outputs.exists == 'false' || inputs.force-recreate == true
+        run: |
+          npm install -g roo-cline
+
+      - name: Run IBM BOB in non-interactive mode
+        if: steps.check-branch.outputs.exists == 'false' || inputs.force-recreate == true
+        env:
+          BOBSHELL_API_KEY: ${{ secrets.BOBSHELL_API_KEY }}
+        run: |
+          roo-cline --non-interactive \
+            --message "Translate all blog posts in the posts/ directory to multiple languages" \
+            --auto-approve
+        continue-on-error: true
+
+      - name: Commit translation changes
+        if: steps.check-branch.outputs.exists == 'false' || inputs.force-recreate == true
+        run: |
+          git add -A
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Add automated blog translations" --author "github-actions <github-actions@github.com>"
+            git push origin blog_translation_automation
+            echo "✅ Translation changes committed and pushed"
+          fi
