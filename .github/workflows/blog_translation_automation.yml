@@ -1,0 +1,62 @@
+name: Create blog_translation_automation branch from draft
+
+on:
+  workflow_dispatch:
+    inputs:
+    push:
+      force-recreate:
+        description: 'Force recreate branch if it already exists'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  create_translation_branch:
+    name: Create blog_translation_automation branch from draft
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout draft branch
+        uses: actions/checkout@v3
+        with:
+          ref: draft
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+
+      - name: Check if blog_translation_automation branch exists
+        id: check-branch
+        run: |
+          if git ls-remote --heads origin blog_translation_automation | grep blog_translation_automation; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Branch blog_translation_automation already exists"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "Branch blog_translation_automation does not exist"
+          fi
+
+      - name: Delete existing branch if force recreate is enabled
+        if: steps.check-branch.outputs.exists == 'true' && inputs.force-recreate == true
+        run: |
+          echo "Force recreate enabled - deleting existing blog_translation_automation branch"
+          git push origin --delete blog_translation_automation
+
+      - name: Create and push blog_translation_automation branch
+        if: steps.check-branch.outputs.exists == 'false' || inputs.force-recreate == true
+        run: |
+          git checkout -b blog_translation_automation
+          git push origin blog_translation_automation
+          echo "✅ Successfully created blog_translation_automation branch from draft"
+
+      - name: Branch already exists
+        if: steps.check-branch.outputs.exists == 'true' && inputs.force-recreate == false
+        run: |
+          echo "⚠️ Branch blog_translation_automation already exists. Use 'force-recreate' option to recreate it."
+          exit 1
+
+# Made with Bob
