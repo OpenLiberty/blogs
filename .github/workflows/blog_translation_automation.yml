@@ -1,0 +1,148 @@
+name: Create Blog Translation Automation
+
+on:
+  workflow_dispatch:
+    inputs:
+      filename:
+        description: 'Blog filename to translate (e.g., 2024-12-03-24.0.0.12.adoc or 2024-12-03-24.0.0.12)'
+        required: true
+        type: string
+
+env:
+  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  BOBSHELL_API_KEY: ${{ secrets.BOBSHELL_API_KEY }}
+  TRANSLATOR_NAME: ${{ github.actor }}
+  TRANSLATOR_GITHUB: https://github.com/${{ github.actor }}
+
+jobs:
+  create_translation_branch:
+    name: Create blog_translation_automation branch from prod
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout prod branch
+        uses: actions/checkout@v3
+        with:
+          ref: prod
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "${{ github.actor }}"
+          git config user.email "${{ github.actor }}@users.noreply.github.com"
+      - name: Prepare translation branch
+        run: |
+          if git ls-remote --heads origin blog_translation_automation | grep blog_translation_automation; then
+            echo "Preparing new translation branch..."
+            git push origin --delete blog_translation_automation
+          fi
+          git checkout -b blog_translation_automation
+          git push origin blog_translation_automation
+          echo "✅ Translation branch ready"
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install IBM BOB
+        timeout-minutes: 10
+        run: |
+          echo "Installing IBM BOB..."
+          curl -s https://s3.us-south.cloud-object-storage.appdomain.cloud/bobshell/install-bobshell.sh | bash -s -- --pm npm
+          
+          # Configure environment
+          if [ -f ~/.bashrc ]; then source ~/.bashrc; fi
+          if [ -f ~/.bash_profile ]; then source ~/.bash_profile; fi
+          if [ -f ~/.profile ]; then source ~/.profile; fi
+          
+          echo "✅ IBM BOB installed successfully"
+      - name: Generate translation
+        env:
+          BOBSHELL_API_KEY: ${{ secrets.BOBSHELL_API_KEY }}
+          BLOG_FILENAME: ${{ inputs.filename }}
+          TRANSLATOR_NAME: ${{ github.actor }}
+          TRANSLATOR_GITHUB: https://github.com/${{ github.actor }}
+        run: |
+          export PATH="$HOME/.local/bin:$HOME/.npm-global/bin:$PATH"
+          
+          echo "Starting translation process..."
+          echo "Blog: $BLOG_FILENAME"
+          echo "Translator: $TRANSLATOR_NAME"
+          
+          BASE_FILENAME="${BLOG_FILENAME%.adoc}"
+          
+          if ! which bob > /dev/null 2>&1; then
+            echo "ERROR: IBM BOB not available"
+            exit 1
+          fi
+          
+          # Execute translation (suppress verbose output)
+          echo "Processing translation..."
+          bob -p "IMPORTANT: First read @blog_translation_automation/BOB_START_HERE.md completely, then follow the instructions to read all documentation files in the specified order (@blog_translation_automation/TRANSLATION_RULES.md, @blog_translation_automation/TRANSLATION_PATTERNS.md). After understanding the translation patterns, translate the blog post with filename '$BASE_FILENAME.adoc'. Find this exact file in the posts/ directory. Translate this file to Japanese and save it in posts/ja/ directory with the SAME filename. Follow the translation style, tone, and formatting patterns documented in blog_translation_automation/ folder. IMPORTANT: For the translator credit in the front matter, use this information: Translator Name: '$TRANSLATOR_NAME', Translator GitHub Profile: '$TRANSLATOR_GITHUB'. Do NOT use 'IBM BOB' as the translator." --yolo > /tmp/translation.log 2>&1
+          
+          TRANSLATION_EXIT_CODE=$?
+          if [ $TRANSLATION_EXIT_CODE -ne 0 ]; then
+            echo "❌ Translation process encountered an error"
+            echo "Last 20 lines of output:"
+            tail -20 /tmp/translation.log
+            exit 1
+          fi
+          
+          # Verify translation output
+          TRANSLATED_FILE="posts/ja/${BASE_FILENAME}.adoc"
+          if [ -f "$TRANSLATED_FILE" ]; then
+            echo "✅ Translation completed successfully"
+            echo "Output: $TRANSLATED_FILE ($(stat -f%z "$TRANSLATED_FILE" 2>/dev/null || stat -c%s "$TRANSLATED_FILE") bytes)"
+          else
+            echo "❌ Translation failed: Output file not found"
+            exit 1
+          fi
+      - name: Commit and push translation
+        id: commit-changes
+        run: |
+          git checkout blog_translation_automation
+          git add posts/ja/*.adoc
+          
+          if git diff --staged --quiet; then
+            echo "No changes detected"
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          else
+            git commit -m "Add Japanese translation for blog ${{ inputs.filename }}" --author "${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>"
+            git push origin blog_translation_automation
+            echo "✅ Translation committed successfully"
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          fi
+      - name: Create pull request
+        if: always() && steps.commit-changes.outputs.has_changes == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Creating pull request..."
+          gh pr create \
+            --base prod \
+            --head blog_translation_automation \
+            --draft \
+            --title "Add Japanese translation for blog ${{ inputs.filename }}" \
+            --body "## Automated Blog Translation
+          
+          This PR contains the Japanese translation for blog **${{ inputs.filename }}**.
+          
+          ### Translation Details
+          - **Filename**: ${{ inputs.filename }}
+          - **Translator**: [${{ github.actor }}](https://github.com/${{ github.actor }})
+          - **Source**: English blog in \`posts/\` directory
+          - **Target**: Japanese blog in \`posts/ja/\` directory
+          
+          ### Review Checklist
+          - [ ] Translation uses formal Japanese (です・ます体)
+          - [ ] All code blocks preserved exactly
+          - [ ] Front matter correctly updated
+          - [ ] Language links swapped (ja ↔ en)
+          - [ ] Translator credit added
+          - [ ] Image references updated (_ja.svg)
+          - [ ] Technical terms handled correctly
+          
+          ---
+          *Automated translation workflow triggered by @${{ github.actor }}*"
+          echo "✅ Pull request created successfully"
+
+# Made with Bob
