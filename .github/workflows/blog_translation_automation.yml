@@ -25,10 +25,98 @@ jobs:
           ref: prod
           fetch-depth: 0
 
+      - name: Setup SSH signing key
+        run: |
+          echo "🔍 Setting up SSH signing key..."
+          
+          # Create SSH directory
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          
+          # Use SSH signing key from secrets
+          if [ -n "${{ secrets.SSH_KEY }}" ]; then
+            echo "✅ SSH_KEY secret found"
+            
+            # Write the private key to file
+            echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_ed25519
+            chmod 600 ~/.ssh/id_ed25519
+            
+            # Verify key file was created
+            if [ -f ~/.ssh/id_ed25519 ]; then
+              KEY_SIZE=$(wc -c < ~/.ssh/id_ed25519)
+              echo "✅ Private key file created (${KEY_SIZE} bytes)"
+              
+              # Check if key starts with correct header
+              FIRST_LINE=$(head -n 1 ~/.ssh/id_ed25519)
+              if [[ "$FIRST_LINE" == *"BEGIN"* ]]; then
+                echo "✅ Key format looks correct"
+              else
+                echo "⚠️  Warning: Key might not have correct format"
+                echo "   First line: ${FIRST_LINE}"
+              fi
+            else
+              echo "❌ ERROR: Failed to create private key file"
+              exit 1
+            fi
+            
+            # Extract public key from private key
+            echo "🔍 Extracting public key..."
+            if ssh-keygen -y -f ~/.ssh/id_ed25519 > ~/.ssh/id_ed25519.pub 2>&1; then
+              chmod 644 ~/.ssh/id_ed25519.pub
+              echo "✅ Public key extracted successfully"
+            else
+              echo "❌ ERROR: Failed to extract public key"
+              echo "   This means the private key format is invalid"
+              exit 1
+            fi
+          else
+            echo "❌ ERROR: SSH_KEY secret not found"
+            echo ""
+            echo "Please add your SSH signing key as a repository secret:"
+            echo "  Secret name: SSH_KEY"
+            echo "  Secret value: Your SSH private key (from ~/.ssh/id_ed25519)"
+            echo ""
+            echo "Steps:"
+            echo "  1. Get your private key: cat ~/.ssh/id_ed25519"
+            echo "  2. Go to: Repository Settings → Secrets and variables → Actions"
+            echo "  3. Click: New repository secret"
+            echo "  4. Name: SSH_KEY"
+            echo "  5. Value: Paste your entire private key (including BEGIN/END lines)"
+            echo "  6. Click: Add secret"
+            exit 1
+          fi
+          
+          echo "✅ SSH signing key configured for ${{ github.actor }}"
+      
       - name: Configure Git
         run: |
+          echo "🔍 Configuring Git for signed commits..."
+          
           git config user.name "${{ github.actor }}"
           git config user.email "${{ github.actor }}@users.noreply.github.com"
+          
+          # Configure commit signing
+          git config commit.gpgsign true
+          git config gpg.format ssh
+          git config user.signingkey ~/.ssh/id_ed25519.pub
+          
+          # Verify Git configuration
+          echo "📋 Git Configuration:"
+          echo "   User: $(git config user.name)"
+          echo "   Email: $(git config user.email)"
+          echo "   Signing: $(git config commit.gpgsign)"
+          echo "   GPG Format: $(git config gpg.format)"
+          echo "   Signing Key: $(git config user.signingkey)"
+          
+          # Verify signing key file exists
+          if [ -f ~/.ssh/id_ed25519.pub ]; then
+            echo "✅ Signing key file exists"
+          else
+            echo "❌ ERROR: Signing key file not found!"
+            exit 1
+          fi
+          
+          echo "✅ Git configured for signed commits by ${{ github.actor }}"
       - name: Prepare translation branch
         run: |
           if git ls-remote --heads origin blog_translation_automation | grep blog_translation_automation; then
@@ -81,34 +169,98 @@ jobs:
           
           TRANSLATION_EXIT_CODE=$?
           if [ $TRANSLATION_EXIT_CODE -ne 0 ]; then
-            echo "❌ Translation process encountered an error"
-            echo "Last 20 lines of output:"
+            echo "❌ Translation process failed"
+            echo ""
+            echo "📋 Error Details:"
             tail -20 /tmp/translation.log
+            echo ""
+            echo "⚠️  Possible causes:"
+            echo "   • Insufficient Bob API credits/quota"
+            echo "   • Network connectivity issues"
+            echo "   • Invalid API key"
+            echo "   • File not found or inaccessible"
+            echo ""
+            echo "💡 Next steps:"
+            echo "   1. Check your Bob API credit balance"
+            echo "   2. Verify BOBSHELL_API_KEY secret is valid"
+            echo "   3. Review the error details above"
+            echo "   4. Check if the blog file exists in posts/ directory"
+            echo ""
             exit 1
           fi
           
           # Verify translation output
           TRANSLATED_FILE="posts/ja/${BASE_FILENAME}.adoc"
+          echo "🔍 Verifying translation output..."
+          echo "   Expected file: $TRANSLATED_FILE"
+          
           if [ -f "$TRANSLATED_FILE" ]; then
+            FILE_SIZE=$(stat -f%z "$TRANSLATED_FILE" 2>/dev/null || stat -c%s "$TRANSLATED_FILE")
             echo "✅ Translation completed successfully"
-            echo "Output: $TRANSLATED_FILE ($(stat -f%z "$TRANSLATED_FILE" 2>/dev/null || stat -c%s "$TRANSLATED_FILE") bytes)"
+            echo "   Output: $TRANSLATED_FILE"
+            echo "   Size: ${FILE_SIZE} bytes"
+            
+            # Show first few lines of translated file
+            echo ""
+            echo "📄 First 5 lines of translated file:"
+            head -5 "$TRANSLATED_FILE"
           else
             echo "❌ Translation failed: Output file not found"
+            echo ""
+            echo "🔍 Checking posts/ja/ directory:"
+            ls -la posts/ja/ || echo "   Directory doesn't exist or is empty"
+            echo ""
+            echo "📋 Full translation log:"
+            cat /tmp/translation.log
             exit 1
           fi
       - name: Commit and push translation
         id: commit-changes
         run: |
+          echo "🔍 Committing and pushing translation..."
+          
           git checkout blog_translation_automation
           git add posts/ja/*.adoc
           
           if git diff --staged --quiet; then
-            echo "No changes detected"
+            echo "⚠️  No changes detected"
             echo "has_changes=false" >> $GITHUB_OUTPUT
           else
+            echo "📝 Creating signed commit..."
+            
+            # Show what will be committed
+            echo "Files to commit:"
+            git diff --staged --name-only
+            
+            # Create the commit
             git commit -m "Add Japanese translation for blog ${{ inputs.filename }}" --author "${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>"
+            
+            # Verify commit was signed
+            COMMIT_HASH=$(git rev-parse HEAD)
+            echo ""
+            echo "📋 Commit Details:"
+            echo "   Hash: ${COMMIT_HASH}"
+            echo "   Author: $(git log -1 --format='%an <%ae>')"
+            echo "   Message: $(git log -1 --format='%s')"
+            
+            # Check if commit is signed
+            if git log -1 --format='%G?' | grep -q 'G\|U'; then
+              echo "✅ Commit is signed"
+            else
+              echo "⚠️  WARNING: Commit is NOT signed!"
+              echo "   Signature status: $(git log -1 --format='%G?')"
+              echo ""
+              echo "🔍 Debugging info:"
+              echo "   Git signing config: $(git config commit.gpgsign)"
+              echo "   GPG format: $(git config gpg.format)"
+              echo "   Signing key: $(git config user.signingkey)"
+              echo "   Key file exists: $([ -f ~/.ssh/id_ed25519.pub ] && echo 'Yes' || echo 'No')"
+            fi
+            
+            echo ""
+            echo "📤 Pushing to remote..."
             git push origin blog_translation_automation
-            echo "✅ Translation committed successfully"
+            echo "✅ Translation committed and pushed successfully"
             echo "has_changes=true" >> $GITHUB_OUTPUT
           fi
       - name: Create pull request
