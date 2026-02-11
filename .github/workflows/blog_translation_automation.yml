@@ -44,15 +44,37 @@ jobs:
             # Verify key file was created
             if [ -f ~/.ssh/id_ed25519 ]; then
               KEY_SIZE=$(wc -c < ~/.ssh/id_ed25519)
-              echo "✅ Private key file created (${KEY_SIZE} bytes)"
+              LINE_COUNT=$(wc -l < ~/.ssh/id_ed25519)
+              echo "✅ Private key file created"
+              echo "   File size: ${KEY_SIZE} bytes"
+              echo "   Line count: ${LINE_COUNT} lines"
               
               # Check if key starts with correct header
               FIRST_LINE=$(head -n 1 ~/.ssh/id_ed25519)
+              LAST_LINE=$(tail -n 1 ~/.ssh/id_ed25519)
+              
+              echo "   First line: ${FIRST_LINE}"
+              echo "   Last line: ${LAST_LINE}"
+              
               if [[ "$FIRST_LINE" == *"BEGIN"* ]]; then
-                echo "✅ Key format looks correct"
+                echo "✅ Key has correct BEGIN header"
               else
-                echo "⚠️  Warning: Key might not have correct format"
-                echo "   First line: ${FIRST_LINE}"
+                echo "❌ ERROR: Key does NOT start with BEGIN header"
+                echo ""
+                echo "🔍 Key file content (first 3 lines):"
+                head -n 3 ~/.ssh/id_ed25519
+                echo ""
+                echo "Expected format:"
+                echo "-----BEGIN OPENSSH PRIVATE KEY-----"
+                echo "b3BlbnNzaC1rZXktdjEAAAAA..."
+                echo "-----END OPENSSH PRIVATE KEY-----"
+                exit 1
+              fi
+              
+              if [[ "$LAST_LINE" == *"END"* ]]; then
+                echo "✅ Key has correct END footer"
+              else
+                echo "⚠️  WARNING: Key might not have correct END footer"
               fi
             else
               echo "❌ ERROR: Failed to create private key file"
@@ -60,13 +82,42 @@ jobs:
             fi
             
             # Extract public key from private key
-            echo "🔍 Extracting public key..."
-            if ssh-keygen -y -f ~/.ssh/id_ed25519 > ~/.ssh/id_ed25519.pub 2>&1; then
+            echo ""
+            echo "🔍 Extracting public key from private key..."
+            
+            # Capture both stdout and stderr
+            PUB_KEY_OUTPUT=$(ssh-keygen -y -f ~/.ssh/id_ed25519 2>&1)
+            PUB_KEY_EXIT_CODE=$?
+            
+            if [ $PUB_KEY_EXIT_CODE -eq 0 ]; then
+              echo "$PUB_KEY_OUTPUT" > ~/.ssh/id_ed25519.pub
               chmod 644 ~/.ssh/id_ed25519.pub
               echo "✅ Public key extracted successfully"
+              echo "   Public key type: $(echo "$PUB_KEY_OUTPUT" | cut -d' ' -f1)"
             else
               echo "❌ ERROR: Failed to extract public key"
-              echo "   This means the private key format is invalid"
+              echo ""
+              echo "🔍 Detailed error from ssh-keygen:"
+              echo "$PUB_KEY_OUTPUT"
+              echo ""
+              echo "🔍 Checking key file integrity:"
+              echo "   File exists: $([ -f ~/.ssh/id_ed25519 ] && echo 'Yes' || echo 'No')"
+              echo "   File size: $(wc -c < ~/.ssh/id_ed25519) bytes"
+              echo "   File permissions: $(ls -l ~/.ssh/id_ed25519 | awk '{print $1}')"
+              echo "   First 50 chars: $(head -c 50 ~/.ssh/id_ed25519)"
+              echo ""
+              echo "💡 Common issues:"
+              echo "   1. Key is encrypted with a passphrase (GitHub Actions can't use those)"
+              echo "   2. Key format is corrupted during copy/paste"
+              echo "   3. Wrong key type (must be ed25519 or rsa)"
+              echo "   4. Key file has Windows line endings (CRLF instead of LF)"
+              echo ""
+              echo "🔧 How to fix:"
+              echo "   1. Check if your key has a passphrase: ssh-keygen -y -f ~/.ssh/id_ed25519"
+              echo "   2. If it asks for passphrase, create a new key WITHOUT passphrase:"
+              echo "      ssh-keygen -t ed25519 -C 'your_email@example.com' -N '' -f ~/.ssh/id_ed25519_nopass"
+              echo "   3. Add the NEW key's public key to your GitHub account"
+              echo "   4. Update SSH_KEY secret with the NEW private key"
               exit 1
             fi
           else
