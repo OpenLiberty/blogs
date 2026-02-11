@@ -55,13 +55,19 @@ These security annotations are declared on two levels:
 
 For complete reference documentation, see the link:https://jakarta.ee/specifications/security/[Jakarta Security Annotations specification].
 
-==== Basic Authorization policy
+The `mcpServer-1.0` feature does not currently implement all of the MCP specification's authorization requirements, particularly the use of protected resource metadata to automatically discover an authorization server. However, you can use any of Liberty's link:https://openliberty.io/docs/latest/authentication.html[authentication and authorization mechanisms] to authenticate users and assign roles. The `mcpServer-1.0` feature will then ensure that users can access only the tools permitted for their assigned roles.
+
+==== Basic Authorization Example
+
+This example shows how to set up MCP tools to require authentication and that the user has specific roles to access tools. Users authenticate using Basic Authentication and the list of users and their roles are configured in a basicRegistry in the server.xml.
 
 Consider an online bookshop that has different users each with different authorization levels:
 
-* Users - Minimum Security clearance required
-* Moderators - Medium Security clearance required
-* Admins - High Security clearance required
+* Users - can buy books and track prices
+* Moderators - can manage the books available
+* Admins - can manually ban users
+
+Clients who connect without authenticating can only display the available books or register as a new user.
 
 [source,java]
 ----
@@ -74,7 +80,7 @@ import jakarta.annotation.security.RolesAllowed;
 import jakarta.enterprise.context.ApplicationScoped;
 ----
 
-=== Security Annotation Demo Classes
+=== Security Annotation Example Classes
 
 [source,java]
 ----
@@ -123,20 +129,18 @@ public class PublicTools {
 
 ==== Steps required
 
-* Create an application with `@ApplicationScoped` and expose the tool with the required annotations.
+* Create an application with `@ApplicationScoped` and expose the tools with the required annotations.
 * Create a `server.xml` file with the users.
 * Ensure that the groups map to the roles created in the tool.
 * Add users to the groups in the `server.xml` file.
-* Create tests that validate the expected functionality of the tools.
-
 
 The following additional configuration is required in the `server.xml` (also see comments in the xml below):
 
-* additional: `appSecurity` feature
-* additional: `transportSecurity` feature
-* additional: define a user registry
-* additional: enable TLS (Transport Layer Security) for security
-* additional: require TLS (Transport Layer Security) to ensure credentials aren't sent in cleartext
+* `appSecurity` feature
+* `transportSecurity` feature
+* define a user registry
+* enable TLS (Transport Layer Security) for security
+* require TLS (Transport Layer Security) to ensure credentials aren't sent in cleartext
 
 [source,xml]
 ----
@@ -156,11 +160,11 @@ The following additional configuration is required in the `server.xml` (also see
   <!-- Required for passwords to be encrypted using HTTPS -->
   <keyStore id="defaultKeyStore" password="Liberty" />
     
- <!-- Required to define https port for TLS (Transport Layer Security) -->
-    <httpEndpoint id="defaultHttpEndpoint"
-                  httpPort="-1"
-                  httpsPort="9443">
-    </httpEndpoint>
+  <!-- Required to define https port for TLS (Transport Layer Security) -->
+  <httpEndpoint id="defaultHttpEndpoint"
+                httpPort="-1"
+                httpsPort="9443">
+  </httpEndpoint>
 
   <basicRegistry id="basic" realm="BasicRealm">
   
@@ -204,15 +208,11 @@ The following additional configuration is required in the `server.xml` (also see
 </server>
 ----
 
-If a new role like `RoleDoesNotExistInServerConfig` were added to the code, any user (e.g., Sally) attempting to authenticate with a resource annotated with `@RolesAllowed("RoleDoesNotExistInServerConfig")` would be denied access to the resource. Access would only be granted after creating a corresponding group for that role in the server.xml file and mapping the user to that group.
+If a role is listed in a `@RolesAllowed` annotation but not in the server.xml, then no user will have that role and so no-one will be granted access based on that role.
 
-In other situations we could also add multiple roles to tools: `@RolesAllowed("Admins, Moderators")`. This approach might make sense if the roles had no overlapping users.
+It's also possible to add multiple roles to tools: `@RolesAllowed("Admins, Moderators")`. Doing so grants access to users who have either role.
 
-**Authorization Configuration**
-
-The `mcpServer-1.0` feature does not currently implement the MCP specification's authorization-server-metadata-discovery requirements. However, you can use any of Liberty's link:https://openliberty.io/docs/latest/authentication.html[standard authorization methods], including custom implementations.
-
-    
+   
 === MCP: Tools can now access the ID of the request that is sent by the client
 
 Your tool can now have a new argument of type `io.openliberty.mcp.request.RequestID`.
@@ -247,7 +247,7 @@ The whole `_meta` key is seen as "example.com/myKey"
 
 ==== Adding a Tool Meta parameter
 
-The following code shows an example metaKey used to retrieve the value of the metadata. In the example, the metakey is "api.ibmtest.org/location"
+The following code shows an example metaKey used to retrieve the value of the metadata. In the example, the metakey is "example.org/location"
 
 [source,java]
 ----
@@ -257,7 +257,7 @@ The following code shows an example metaKey used to retrieve the value of the me
           structuredContent = false)
     public String noArgsRequest(Meta meta) {
         Jsonb jsonb = JsonbBuilder.create();
-        String location = (String) meta.getValue(MetaKey.from("api.ibmtest.org/location"));
+        String location = (String) meta.getValue(MetaKey.from("example.org/location"));
         BigDecimal timestamp = (BigDecimal) meta.getValue(MetaKey.from("timestamp"));
         String result = "You have called this tool from " + location + " at timestamp " + timestamp.toString();
         return result;
@@ -282,20 +282,20 @@ A method can return any metadata via the `ToolResponse` Object:
         Jsonb jsonb = JsonbBuilder.create();
         Map<MetaKey, Object> _meta = new HashMap<>();
         _meta.put(MetaKey.from("timestamp"), 1762860699);
-        _meta.put(MetaKey.from("api.ibmtest.org/location"), "Hursley");
-        _meta.put(MetaKey.from("api.libertytest.org/person"), personInstance);
+        _meta.put(MetaKey.from("example.org/location"), "Hursley");
+        _meta.put(MetaKey.from("example.org/person"), personInstance);
         return new ToolResponse(false, List.of(new TextContent(jsonb.toJson(employeeList))), employeeList, _meta);
     }
 ----
 
-The `_meta` field enables protocol extensions without breaking compatibility. Here are practical examples:
+The `_meta` field enables protocol extensions without breaking compatibility. Here are some practical examples:
 
 ==== 1) Cost Tracking Extension
 Track API costs for expensive operations.
 
 *How it works:*
 
-* Server adds costs to tool metadata.
+* Server reports the cost of executing a tool in the result metadata.
 * Client tracks total spending across operations.
 
 ==== 2) Rate Limiting Extension
@@ -311,7 +311,7 @@ Optimize performance through intelligent caching.
 
 *How it works:*
 
-* Server implements caching strategy
+* Server includes caching information in the tool call result
 * Client can implement client-side caching
 
 ==== 4) Bringing it all together
@@ -344,13 +344,12 @@ All three of the preceding extensions might be built into your MCP server as ext
 
 ==== 1) MCP Server feature used ISO-8859-1 and did not handle non-Latin characters
 
-* Non-ASCII characters are now encoded correctly using UTF-8.
-* When an asynchronous tool failed with a business exception, it was incorrectly treated as a non-business exception and the client might receive an "Internal server error" response. Now, the business exception message is correctly returned to the user in the same way that it is for synchronous tools.
+* MCP requests and responses are now encoded correctly using UTF-8.
 
 ==== 2) Fix asynchronous MCP Tool error handling
 
-* Previously, when an asynchronous tool returned a failed completion stage, the system did not verify if the exception was a business or technical error. This oversight resulted in all failures being reported as internal errors.
-* The system now differentiates between exception types. This categorization ensures that business errors are returned to the client, while technical errors are directed to the technical team for resolution.
+* Previously, when an asynchronous tool returned a failed completion stage, the system did not verify if the exception was a business or technical error. This resulted in all failures being reported as internal errors.
+* The system now differentiates between exception types. This categorization ensures that business errors are returned to the client, while technical errors are reported in the Liberty server log.
 
 // DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
 
