@@ -1,0 +1,458 @@
+---
+layout: post
+title: "Model Context Protocol Server 1.0 updates and more in 26.0.0.2-beta"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/navaneethsnair1
+author_github: https://github.com/navaneethsnair1
+seo-title: "Model Context Protocol Server 1.0 updates and more in 26.0.0.2-beta- OpenLiberty.io"
+seo-description: This beta release enhances the `mcpServer-1.0` feature with role-based authorization, request IDs, the new `_meta` field, and key bug fixes. It also adds documentation and tests for `displayCustomizedExceptionText`, allowing users to replace default Liberty error messages with clearer, custom text.
+blog_description: This beta release enhances the `mcpServer-1.0` feature with role-based authorization, request IDs, the new `_meta` field, and key bug fixes. It also adds documentation and tests for `displayCustomizedExceptionText`, allowing users to replace default Liberty error messages with clearer, custom text.
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+---
+= Model Context Protocol Server 1.0 updates and more in 26.0.0.2-beta
+Navaneeth S Nair <https://github.com/navaneethsnair1>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+This beta release enhances the `mcpServer-1.0` feature with role-based authorization, request IDs, the new `_meta` field, and key bug fixes. It also adds documentation and tests for `displayCustomizedExceptionText`, allowing users to replace default Liberty error messages with clearer, custom text.
+
+The link:{url-about}[Open Liberty] 26.0.0.2-beta includes the following beta features (along with link:{url-prefix}/docs/latest/reference/feature/feature-overview.html[all GA features]):
+
+* <<mcp, Model Context Protocol Server 1.0 updates>>
+* <<displayCustomizedExceptionText, displayCustomizedExceptionText property>>
+
+See also link:{url-prefix}/blog/?search=beta&key=tag[previous Open Liberty beta blog posts].
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/33838
+// Contact/Reviewer: martindrozdz
+// // // // // // // // 
+[#mcp]
+== Model Context Protocol Server 1.0 updates
+The link:https://modelcontextprotocol.io/docs/getting-started/intro[Model Context Protocol (MCP)] is an open standard that enables AI applications to access real-time information from external sources. The Liberty MCP Server feature `mcpServer-1.0` allows developers to expose the business logic of their applications, allowing it to be integrated into agentic AI workflows.
+
+This beta release of Open Liberty includes important updates to the `mcpServer-1.0` feature including role-based authorization, request IDs, the `_meta` field, and a few bug fixes.
+
+=== Prerequisites
+To use the `mcpServer-1.0` feature, Java 17 or later must be installed on the system.
+
+=== Implement role-based authorization for MCP tools via annotations
+
+The following new annotations allow you to restrict tool usage through authorization policies:
+
+. `@DenyAll` - Resource is denied. This annotation is the strictest policy.
+. `@RolesAllowed` - Resource is allowed for pre-authorised users in a role (the same as a group in Liberty).
+. `@PermitAll` - Resource is allowed for anyone (even unauthenticated users).
+
+These security annotations are declared on two levels:
+
+. Class level - Every method in the class inherits this class level annotation.
+. Method level - Overrides any class level annotations.
+
+For complete reference documentation, see the link:https://jakarta.ee/specifications/security/[Jakarta Security Annotations specification].
+
+==== Basic Authorization policy
+
+Consider an online bookshop that has different users each with different authorization levels:
+
+* Users - Minimum Security clearance required
+* Moderators - Medium Security clearance required
+* Admins - High Security clearance required
+
+[source,java]
+----
+// common imports for all classes below
+
+import io.openliberty.mcp.annotations.Tool;
+import io.openliberty.mcp.annotations.ToolArg;
+import jakarta.annotation.security.PermitAll;
+import jakarta.annotation.security.RolesAllowed;
+import jakarta.enterprise.context.ApplicationScoped;
+----
+
+=== Security Annotation Demo Classes
+
+[source,java]
+----
+@ApplicationScoped
+public class BookShopTools {
+
+    // Admin Tool
+    @RolesAllowed("Admins")
+    @Tool(name = "banUser")
+    public String banUser(@ToolArg(name = "userName", description = "Name of user to be banned") String userName)  {...}
+
+    // Moderator Tools
+    @RolesAllowed("Moderators")
+    @Tool(name = "addBook")
+    public String addBook(@ToolArg(name = "bookCode", description = "Code to uniquely identify the book") String bookCode)  {...}
+
+    @RolesAllowed("Moderators")
+    @Tool(name = "deleteBook")
+    public String deleteBook(@ToolArg(name = "bookCode", description = "Code to uniquely identify the book") String bookCode)  {...}
+
+    // User Tools
+    @RolesAllowed("Users")
+    @Tool(name = "buyBook")
+    public String buyBook(@ToolArg(name = "bookCode", description = "Code to uniquely identify the book") String bookCode) {...}
+
+    @RolesAllowed("Users")
+    @Tool(name = "trackBookPrice")
+    public String trackBookPrice(@ToolArg(name = "bookCode", description = "Code to uniquely identify the book") String bookCode)  {...}
+}
+----
+
+[source,java]
+----
+@ApplicationScoped
+@PermitAll // PermitAll Class level Annotation applies to all class tools, unless overwritten on method level
+public class PublicTools {
+
+    @Tool(name = "displayBooks")
+    public String displayBooks(@ToolArg(name = "bookCode", description = "Code to uniquely identify the book") String book)  {...}
+
+    @Tool(name = "registerNewUser")
+    public String registerNewUser(@ToolArg(name = "userName", description = "The name for the user to be registered") String input,
+                                  @ToolArg(name = "password", description = "The password for the user to be registered") String input)  {...}
+}
+----
+
+==== Steps required
+
+* Create an application with `@ApplicationScoped` and expose the tool with the required annotations.
+* Create a `server.xml` file with the users.
+* Ensure that the groups map to the roles created in the tool.
+* Add users to the groups in the `server.xml` file.
+* Create tests that validate the expected functionality of the tools.
+
+
+The following additional configuration is required in the `server.xml` (also see comments in the xml below):
+
+* additional: `appSecurity` feature
+* additional: `transportSecurity` feature
+* additional: define a user registry
+* additional: enable TLS (Transport Layer Security) for security
+* additional: require TLS (Transport Layer Security) to ensure credentials aren't sent in cleartext
+
+[source,xml]
+----
+<server description="Liberty server config for Security Annotations">
+
+  <featureManager>
+    <feature>servlet-6.0</feature>
+    <feature>cdi-4.0</feature>
+    <feature>mcpServer-1.0</feature>
+    <!-- The following two features are required for application security to work -->
+    <feature>appSecurity-5.0</feature>
+    <feature>transportSecurity-1.0</feature>
+  </featureManager>
+
+  <include location="../fatTestPorts.xml" />
+        
+  <!-- Required for passwords to be encrypted using HTTPS -->
+  <keyStore id="defaultKeyStore" password="Liberty" />
+    
+ <!-- Required to define https port for TLS (Transport Layer Security) -->
+    <httpEndpoint id="defaultHttpEndpoint"
+                  httpPort="-1"
+                  httpsPort="9443">
+    </httpEndpoint>
+
+  <basicRegistry id="basic" realm="BasicRealm">
+  
+       <!-- Basic user authentication setup -->
+
+       <!-- Users -->
+       <user name="Sam"   password="{xor}KzosKy8+LDwoMC07aw=="/>
+       <user name="Nile"  password="{xor}KzosKy8+LRwoMC07aw=="/>
+       <user name="Cloe"  password="{xor}KzosKy8+LEwoMC07aw=="/>
+       <user name="Vick"  password="{xor}KzosKy8+LFwoMC07aw=="/>
+
+       <!-- Moderators -->
+       <user name="Sally" password="{xor}KzosKy8+LCwoMC07bQ=="/>
+       <user name="Harry" password="{xor}KzosKy8+LCwoMC07bQ=="/>
+
+       <!-- Admins -->
+       <user name="Bob"   password="{xor}KzosKy8+LCwoMC07bA=="/>
+       <user name="Noah"  password="{xor}KzosKy8+LCwoMC07aw=="/>
+       
+
+       <!-- Mapping users to groups for the RolesAllowed annotation (a group is equivalent to a role) -->
+
+       <group name="Users">
+           <member name="Nile"/>
+           <member name="Sam"/>
+           <member name="Cloe"/>
+           <member name="Vick"/>
+       </group>
+       
+       <group name="Moderators">
+           <member name="Sally"/>
+           <member name="Harry"/>
+       </group>
+
+       <group name="Admins">
+           <member name="Bob"/>
+           <member name="Noah"/>
+       </group>
+      
+  </basicRegistry>
+</server>
+----
+
+If a new role like `RoleDoesNotExistInServerConfig` were added to the code, any user (e.g., Sally) attempting to authenticate with a resource annotated with `@RolesAllowed("RoleDoesNotExistInServerConfig")` would be denied access to the resource. Access would only be granted after creating a corresponding group for that role in the server.xml file and mapping the user to that group.
+
+In other situations we could also add multiple roles to tools: `@RolesAllowed("Admins, Moderators")`. This approach might make sense if the roles had no overlapping users.
+
+**Authorization Configuration**
+
+The `mcpServer-1.0` feature does not currently implement the MCP specification's authorization-server-metadata-discovery requirements. However, you can use any of Liberty's link:https://openliberty.io/docs/latest/authentication.html[standard authorization methods], including custom implementations.
+
+    
+=== MCP: Tools can now access the ID of the request that is sent by the client
+
+Your tool can now have a new argument of type `io.openliberty.mcp.request.RequestID`.
+
+As an example the requestID can be used for logging or audit purposes:
+
+[source,java]
+----
+public class RequestIDLoggingExample {
+
+    private static final Logger logger = Logger.getLogger(McpToolExample.class.getName());
+
+    @Tool(name = "exampleTool")
+    public String exampleTool(RequestId requestId) {
+        // Log with request ID using asString() method
+        logger.info("Processing request [" + requestId.asString() + "] with input: ");
+        ...
+    }
+}
+----
+
+=== MCP: Tools can access metadata that is sent by the client in the `_meta` field
+
+The link:https://modelcontextprotocol.io/specification/2025-06-18/basic/index#meta[MCP specification] specifies that the `_meta` property/parameter is reserved by MCP to allow clients and servers to attach additional metadata to their interactions.
+
+Key name format: valid `_meta` key names have two segments:
+
+* an optional prefix (e.g. "example.com/") and
+* a name ("myKey")
+
+The whole `_meta` key is seen as "example.com/myKey"
+
+==== Adding a Tool Meta parameter
+
+The following code shows an example metaKey used to retrieve the value of the metadata. In the example, the metakey is "api.ibmtest.org/location"
+
+[source,java]
+----
+    @Tool(name = "noArgsRequest",
+          title = "call tool without providing arguments in params",
+          description = "return string made from args and metadata",
+          structuredContent = false)
+    public String noArgsRequest(Meta meta) {
+        Jsonb jsonb = JsonbBuilder.create();
+        String location = (String) meta.getValue(MetaKey.from("api.ibmtest.org/location"));
+        BigDecimal timestamp = (BigDecimal) meta.getValue(MetaKey.from("timestamp"));
+        String result = "You have called this tool from " + location + " at timestamp " + timestamp.toString();
+        return result;
+    }
+----
+
+==== Returning metadata via a Tool Response
+
+A method can return any metadata via the `ToolResponse` Object:
+
+[source,java]
+----
+   @Tool(name = "addPersonToListToolResponse",
+         title = "adds person to people list",
+         description = "adds person to people list",
+         structuredContent = true)
+    public @Schema(value = "{ ... }",description = "Returns list of person object")
+    ToolResponse addPersonToListToolResponse(@ToolArg(name = "employeeList", description = "List of people") List<Person> employeeList,
+                                             @ToolArg(name = "person", description = "Person object") Optional<Person> person) {
+        Person personInstance = person.get();
+        employeeList.add(personInstance);
+        Jsonb jsonb = JsonbBuilder.create();
+        Map<MetaKey, Object> _meta = new HashMap<>();
+        _meta.put(MetaKey.from("timestamp"), 1762860699);
+        _meta.put(MetaKey.from("api.ibmtest.org/location"), "Hursley");
+        _meta.put(MetaKey.from("api.libertytest.org/person"), personInstance);
+        return new ToolResponse(false, List.of(new TextContent(jsonb.toJson(employeeList))), employeeList, _meta);
+    }
+----
+
+The `_meta` field enables protocol extensions without breaking compatibility. Here are practical examples:
+
+==== 1) Cost Tracking Extension
+Track API costs for expensive operations.
+
+*How it works:*
+
+* Server adds costs to tool metadata.
+* Client tracks total spending across operations.
+
+==== 2) Rate Limiting Extension
+Prevent resource exhaustion and ensure fair access.
+
+*How it works:*
+
+* Metadata shows the remaining quota before each call for time window
+* If limit is exceeded, error includes retry time in `_meta`
+
+==== 3) Caching Hints Extension
+Optimize performance through intelligent caching.
+
+*How it works:*
+
+* Server implements caching strategy
+* Client can implement client-side caching
+
+==== 4) Bringing it all together
+
+All three of the preceding extensions might be built into your MCP server as extensions:
+
+[source,json]
+----
+{
+  "name": "ToolForMetaDataExample",
+  "description": "ToolDescription",
+  "inputSchema": { ... },
+  "_meta": {
+    // Rate Limiting Extension - com.example.rateLimit namespace
+    "com.example.rateLimit/requests": 100,
+    "com.example.rateLimit/period": "hour",
+    "com.example.rateLimit/remaining": 47,
+    // Cost Tracking Extension - com.example.cost namespace
+    "com.example.cost/estimatedCost": 0.02,
+    "com.example.cost/currency": "USD",
+    // Caching Hints Extension - com.example.cache namespace
+    "com.example.cache/cacheable": true,
+    "com.example.cache/cacheKey": "LondonWeather",
+    "com.example.cache/ttl": 300
+  }
+}
+----
+
+=== Notable bug fixes in MCP 1.0
+
+==== 1) MCP Server feature used ISO-8859-1 and did not handle non-Latin characters
+
+* Non-ASCII characters are now encoded correctly using UTF-8.
+* When an asynchronous tool failed with a business exception, it was incorrectly treated as a non-business exception and the client might receive an "Internal server error" response. Now, the business exception message is correctly returned to the user in the same way that it is for synchronous tools.
+
+==== 2) Fix asynchronous MCP Tool error handling
+
+* Previously, when an asynchronous tool returned a failed completion stage, the system did not verify if the exception was a business or technical error. This oversight resulted in all failures being reported as internal errors.
+* The system now differentiates between exception types. This categorization ensures that business errors are returned to the client, while technical errors are directed to the technical team for resolution.
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/33622
+// Contact/Reviewer: ncpibm
+// // // // // // // // 
+[#displayCustomizedExceptionText]
+== displayCustomizedExceptionText property 
+This beta release adds documentation and tests for the `displayCustomizedExceptionText` configuration, which allows users to override Liberty’s default error messages (such as SRVE0218E: Forbidden and SRVE0232E: An exception occurred) with clearer, user-defined messages. 
+The feature is enabled through simple `server.xml` configuration, where custom messages can be mapped to specific HTTP status codes (403 and 500). 
+Testing ensures that these custom messages correctly replace Liberty’s defaults across all supported platforms, confirming that the configured text is returned consistently in all scenarios.
+
+[source,xml]
+----
+<webContainer displaycustomizedexceptiontext="Custom error message"/>
+----
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
+
+[#run]
+=== Try it now
+
+To try out these features, update your build tools to pull the Open Liberty All Beta Features package instead of the main release. To enable the MCP server feature, follow the instructions from link:https://openliberty.io/blog/2025/10/23/mcp-standalone-blog.html[MCP standalone blog]. The beta works with Java SE 25, Java SE 21, Java SE 17, Java SE 11, and Java SE 8.
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], you can install the All Beta Features package using:
+
+[source,xml]
+----
+<plugin>
+    <groupId>io.openliberty.tools</groupId>
+    <artifactId>liberty-maven-plugin</artifactId>
+    <version>3.12.0</version>
+    <configuration>
+        <runtimeArtifact>
+          <groupId>io.openliberty.beta</groupId>
+          <artifactId>openliberty-runtime</artifactId>
+          <version>26.0.0.2-beta</version>
+          <type>zip</type>
+        </runtimeArtifact>
+    </configuration>
+</plugin>
+----
+
+You must also add dependencies to your `pom.xml` file for the beta version of the APIs that are associated with the beta features that you want to try. For example, the following block adds dependencies for two example beta APIs:
+
+[source,xml]
+----
+<dependency>
+    <groupId>org.example.spec</groupId>
+    <artifactId>exampleApi</artifactId>
+    <version>7.0</version>
+    <type>pom</type>
+    <scope>provided</scope>
+</dependency>
+<dependency>
+    <groupId>example.platform</groupId>
+    <artifactId>example.example-api</artifactId>
+    <version>11.0.0</version>
+    <scope>provided</scope>
+</dependency>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'io.openliberty.tools:liberty-gradle-plugin:3.10.0'
+    }
+}
+apply plugin: 'liberty'
+dependencies {
+    libertyRuntime group: 'io.openliberty.beta', name: 'openliberty-runtime', version: '[26.0.0.2-beta,)'
+}
+----
+
+// // // // // // // //
+// In the preceding section:
+// Replace the Maven `3.11.5` with the latest version of the plugin: https://search.maven.org/artifact/io.openliberty.tools/liberty-maven-plugin
+// Replace the Gradle `3.9.5` with the latest version of the plugin: https://search.maven.org/artifact/io.openliberty.tools/liberty-gradle-plugin
+// TODO: Update GHA to automatically do the above.  If the maven.org is problematic, then could fallback to using the GH Releases for the plugins
+// // // // // // // //
+
+Or if you're using link:{url-prefix}/docs/latest/container-images.html[container images]:
+
+[source]
+----
+FROM icr.io/appcafe/open-liberty:beta
+----
+
+Or take a look at our link:{url-prefix}/downloads/#runtime_betas[Downloads page].
+
+If you're using link:https://plugins.jetbrains.com/plugin/14856-liberty-tools[IntelliJ IDEA], link:https://marketplace.visualstudio.com/items?itemName=Open-Liberty.liberty-dev-vscode-ext[Visual Studio Code] or link:https://marketplace.eclipse.org/content/liberty-tools[Eclipse IDE], you can also take advantage of our open source link:https://openliberty.io/docs/latest/develop-liberty-tools.html[Liberty developer tools] to enable effective development, testing, debugging and application management all from within your IDE.
+
+For more information on using a beta release, refer to the link:{url-prefix}docs/latest/installing-open-liberty-betas.html[Installing Open Liberty beta releases] documentation.
+
+[#feedback]
+== We welcome your feedback
+
+Let us know what you think on link:https://groups.io/g/openliberty[our mailing list]. If you hit a problem, link:https://stackoverflow.com/questions/tagged/open-liberty[post a question on StackOverflow]. If you hit a bug, link:https://github.com/OpenLiberty/open-liberty/issues[please raise an issue].
