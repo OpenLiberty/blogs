@@ -6,8 +6,8 @@ categories: blog
 author_picture: https://avatars3.githubusercontent.com/navaneethsnair1
 author_github: https://github.com/navaneethsnair1
 seo-title: "Model Context Protocol Server 1.0 updates and more in 26.0.0.2-beta- OpenLiberty.io"
-seo-description: This beta release enhances the `mcpServer-1.0` feature with role-based authorization, request IDs, the new `_meta` field, and key bug fixes. It also adds documentation and tests for `displayCustomizedExceptionText`, allowing users to replace default Liberty error messages with clearer, custom text.
-blog_description: This beta release enhances the `mcpServer-1.0` feature with role-based authorization, request IDs, the new `_meta` field, and key bug fixes. It also adds documentation and tests for `displayCustomizedExceptionText`, allowing users to replace default Liberty error messages with clearer, custom text.
+seo-description: This beta release enhances the `mcpServer-1.0` feature with role-based authorization, the new `_meta` field, and key bug fixes. It also adds documentation and tests for `displayCustomizedExceptionText`, allowing users to replace default Liberty error messages with clearer, custom text.
+blog_description: This beta release enhances the `mcpServer-1.0` feature with role-based authorization, the new `_meta` field, and key bug fixes. It also adds documentation and tests for `displayCustomizedExceptionText`, allowing users to replace default Liberty error messages with clearer, custom text.
 open-graph-image: https://openliberty.io/img/twitter_card.jpg
 open-graph-image-alt: Open Liberty Logo
 ---
@@ -18,7 +18,7 @@ Navaneeth S Nair <https://github.com/navaneethsnair1>
 :url-about: /
 //Blank line here is necessary before starting the body of the post.
 
-This beta release enhances the `mcpServer-1.0` feature with role-based authorization, request IDs, the new `_meta` field, and key bug fixes. It also adds documentation and tests for `displayCustomizedExceptionText`, allowing users to replace default Liberty error messages with clearer, custom text.
+This beta release enhances the `mcpServer-1.0` feature with role-based authorization, the new `_meta` field, and key bug fixes. It also adds documentation and tests for `displayCustomizedExceptionText`, allowing users to replace default Liberty error messages with clearer, custom text.
 
 The link:{url-about}[Open Liberty] 26.0.0.2-beta includes the following beta features (along with link:{url-prefix}/docs/latest/reference/feature/feature-overview.html[all GA features]):
 
@@ -33,9 +33,9 @@ See also link:{url-prefix}/blog/?search=beta&key=tag[previous Open Liberty beta 
 // // // // // // // // 
 [#mcp]
 == Model Context Protocol Server 1.0 updates
-The link:https://modelcontextprotocol.io/docs/getting-started/intro[Model Context Protocol (MCP)] is an open standard that enables AI applications to access real-time information from external sources. The Liberty MCP Server feature `mcpServer-1.0` allows developers to expose the business logic of their applications, allowing it to be integrated into agentic AI workflows.
+The link:https://modelcontextprotocol.io/docs/getting-started/intro[Model Context Protocol (MCP)] is an open standard that enables AI applications to access real-time information from external sources. The Liberty MCP Server feature (`mcpServer-1.0`) allows developers to expose the business logic of their applications, allowing it to be integrated into agentic AI workflows.
 
-This beta release of Open Liberty includes important updates to the `mcpServer-1.0` feature including role-based authorization, request IDs, the `_meta` field, and a few bug fixes.
+This beta release of Open Liberty includes important updates to the `mcpServer-1.0` feature including role-based authorization, the `_meta` field, and a few bug fixes.
 
 === Prerequisites
 To use the `mcpServer-1.0` feature, Java 17 or later must be installed on the system.
@@ -55,13 +55,19 @@ These security annotations are declared on two levels:
 
 For complete reference documentation, see the link:https://jakarta.ee/specifications/security/[Jakarta Security Annotations specification].
 
-==== Basic Authorization policy
+The `mcpServer-1.0` feature does not currently implement all of the link:https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization#authorization-server-metadata-discovery[authorization-server-metadata-discovery requirements] specified in the MCP specification. However, you can use any of Liberty's link:https://openliberty.io/docs/latest/authentication.html[authentication and authorization mechanisms] to authenticate users and assign roles. The `mcpServer-1.0` feature can then ensure that users can access only the tools that are permitted for their assigned roles.
+
+==== Basic authorization example
+
+The following example shows how to configure MCP tools to require authentication and to ensure that users have the appropriate roles to access specific tools. Users authenticate using Basic Authentication, and the list of users and their roles are configured in a basicRegistry in the `server.xml` file.
 
 Consider an online bookshop that has different users each with different authorization levels:
 
-* Users - Minimum Security clearance required
-* Moderators - Medium Security clearance required
-* Admins - High Security clearance required
+* Users - can buy books and track prices
+* Moderators - can manage the books available
+* Admins - can manually ban users
+
+Clients who connect without authenticating can only display the available books or register as a new user.
 
 [source,java]
 ----
@@ -74,7 +80,7 @@ import jakarta.annotation.security.RolesAllowed;
 import jakarta.enterprise.context.ApplicationScoped;
 ----
 
-=== Security Annotation Demo Classes
+==== Security Annotation example classes
 
 [source,java]
 ----
@@ -123,20 +129,18 @@ public class PublicTools {
 
 ==== Steps required
 
-* Create an application with `@ApplicationScoped` and expose the tool with the required annotations.
+* Create an application with `@ApplicationScoped` and expose the tools with the required annotations.
 * Create a `server.xml` file with the users.
 * Ensure that the groups map to the roles created in the tool.
 * Add users to the groups in the `server.xml` file.
-* Create tests that validate the expected functionality of the tools.
 
+The following additional configuration is required in the `server.xml` (See the comments in the XML example for details.):
 
-The following additional configuration is required in the `server.xml` (also see comments in the xml below):
-
-* additional: `appSecurity` feature
-* additional: `transportSecurity` feature
-* additional: define a user registry
-* additional: enable TLS (Transport Layer Security) for security
-* additional: require TLS (Transport Layer Security) to ensure credentials aren't sent in cleartext
+* The `appSecurity` feature
+* The `transportSecurity` feature
+* Define a user registry
+* Enable TLS (Transport Layer Security) for security
+* Require TLS (Transport Layer Security) to ensure that credentials aren't sent in cleartext
 
 [source,xml]
 ----
@@ -156,11 +160,11 @@ The following additional configuration is required in the `server.xml` (also see
   <!-- Required for passwords to be encrypted using HTTPS -->
   <keyStore id="defaultKeyStore" password="Liberty" />
     
- <!-- Required to define https port for TLS (Transport Layer Security) -->
-    <httpEndpoint id="defaultHttpEndpoint"
-                  httpPort="-1"
-                  httpsPort="9443">
-    </httpEndpoint>
+  <!-- Required to define https port for TLS (Transport Layer Security) -->
+  <httpEndpoint id="defaultHttpEndpoint"
+                httpPort="-1"
+                httpsPort="9443">
+  </httpEndpoint>
 
   <basicRegistry id="basic" realm="BasicRealm">
   
@@ -204,50 +208,22 @@ The following additional configuration is required in the `server.xml` (also see
 </server>
 ----
 
-If a new role like `RoleDoesNotExistInServerConfig` were added to the code, any user (e.g., Sally) attempting to authenticate with a resource annotated with `@RolesAllowed("RoleDoesNotExistInServerConfig")` would be denied access to the resource. Access would only be granted after creating a corresponding group for that role in the server.xml file and mapping the user to that group.
+It is also possible to add multiple roles to tools: `@RolesAllowed("Admins, Moderators")`. Doing so grants access to users who have either role.
 
-In other situations we could also add multiple roles to tools: `@RolesAllowed("Admins, Moderators")`. This approach might make sense if the roles had no overlapping users.
+If a role that is used in `@RolesAllowed` annotation is not mentioned in the `server.xml` file, that just means that no user has that role. If it is the only role that is allowed to call the tool, then no users can call the tool.
 
-**Authorization Configuration**
-
-The `mcpServer-1.0` feature does not currently implement the MCP specification's authorization-server-metadata-discovery requirements. However, you can use any of Liberty's link:https://openliberty.io/docs/latest/authentication.html[standard authorization methods], including custom implementations.
-
-    
-=== MCP: Tools can now access the ID of the request that is sent by the client
-
-Your tool can now have a new argument of type `io.openliberty.mcp.request.RequestID`.
-
-As an example the requestID can be used for logging or audit purposes:
-
-[source,java]
-----
-public class RequestIDLoggingExample {
-
-    private static final Logger logger = Logger.getLogger(McpToolExample.class.getName());
-
-    @Tool(name = "exampleTool")
-    public String exampleTool(RequestId requestId) {
-        // Log with request ID using asString() method
-        logger.info("Processing request [" + requestId.asString() + "] with input: ");
-        ...
-    }
-}
-----
-
-=== MCP: Tools can access metadata that is sent by the client in the `_meta` field
-
-The link:https://modelcontextprotocol.io/specification/2025-06-18/basic/index#meta[MCP specification] specifies that the `_meta` property/parameter is reserved by MCP to allow clients and servers to attach additional metadata to their interactions.
-
+=== MCP: Tools can access metadata that the client sends in the _meta field.
+The link:https://modelcontextprotocol.io/specification/2025-06-18/basic/index#meta[MCP specification] reserves the `_meta` property or parameter so clients and servers can attach additional metadata to their interactions.
 Key name format: valid `_meta` key names have two segments:
 
-* an optional prefix (e.g. "example.com/") and
-* a name ("myKey")
+* An optional prefix (e.g. "example.com/") and
+* A name ("myKey")
 
 The whole `_meta` key is seen as "example.com/myKey"
 
 ==== Adding a Tool Meta parameter
 
-The following code shows an example metaKey used to retrieve the value of the metadata. In the example, the metakey is "api.ibmtest.org/location"
+The following code shows an example metaKey used to retrieve the value of the metadata. In the example, the metakey is "example.org/location"
 
 [source,java]
 ----
@@ -257,16 +233,16 @@ The following code shows an example metaKey used to retrieve the value of the me
           structuredContent = false)
     public String noArgsRequest(Meta meta) {
         Jsonb jsonb = JsonbBuilder.create();
-        String location = (String) meta.getValue(MetaKey.from("api.ibmtest.org/location"));
+        String location = (String) meta.getValue(MetaKey.from("example.org/location"));
         BigDecimal timestamp = (BigDecimal) meta.getValue(MetaKey.from("timestamp"));
         String result = "You have called this tool from " + location + " at timestamp " + timestamp.toString();
         return result;
     }
 ----
 
-==== Returning metadata via a Tool Response
+==== Returning metadata in a tool response
 
-A method can return any metadata via the `ToolResponse` Object:
+A method can return any metadata by using the `ToolResponse` object:
 
 [source,java]
 ----
@@ -282,20 +258,20 @@ A method can return any metadata via the `ToolResponse` Object:
         Jsonb jsonb = JsonbBuilder.create();
         Map<MetaKey, Object> _meta = new HashMap<>();
         _meta.put(MetaKey.from("timestamp"), 1762860699);
-        _meta.put(MetaKey.from("api.ibmtest.org/location"), "Hursley");
-        _meta.put(MetaKey.from("api.libertytest.org/person"), personInstance);
+        _meta.put(MetaKey.from("example.org/location"), "Hursley");
+        _meta.put(MetaKey.from("example.org/person"), personInstance);
         return new ToolResponse(false, List.of(new TextContent(jsonb.toJson(employeeList))), employeeList, _meta);
     }
 ----
 
-The `_meta` field enables protocol extensions without breaking compatibility. Here are practical examples:
+The `_meta` field enables protocol extensions without breaking compatibility. The following examples illustrate common use cases:
 
 ==== 1) Cost Tracking Extension
 Track API costs for expensive operations.
 
 *How it works:*
 
-* Server adds costs to tool metadata.
+* Server reports the cost of executing a tool in the result metadata.
 * Client tracks total spending across operations.
 
 ==== 2) Rate Limiting Extension
@@ -304,14 +280,14 @@ Prevent resource exhaustion and ensure fair access.
 *How it works:*
 
 * Metadata shows the remaining quota before each call for time window
-* If limit is exceeded, error includes retry time in `_meta`
+* If limit is exceeded, the error includes retry time in `_meta`
 
 ==== 3) Caching Hints Extension
 Optimize performance through intelligent caching.
 
 *How it works:*
 
-* Server implements caching strategy
+* Server includes caching information in the tool call result
 * Client can implement client-side caching
 
 ==== 4) Bringing it all together
@@ -344,13 +320,12 @@ All three of the preceding extensions might be built into your MCP server as ext
 
 ==== 1) MCP Server feature used ISO-8859-1 and did not handle non-Latin characters
 
-* Non-ASCII characters are now encoded correctly using UTF-8.
-* When an asynchronous tool failed with a business exception, it was incorrectly treated as a non-business exception and the client might receive an "Internal server error" response. Now, the business exception message is correctly returned to the user in the same way that it is for synchronous tools.
+* MCP requests and responses are now encoded correctly using UTF-8.
 
 ==== 2) Fix asynchronous MCP Tool error handling
 
-* Previously, when an asynchronous tool returned a failed completion stage, the system did not verify if the exception was a business or technical error. This oversight resulted in all failures being reported as internal errors.
-* The system now differentiates between exception types. This categorization ensures that business errors are returned to the client, while technical errors are directed to the technical team for resolution.
+* Previously, when an asynchronous tool returned a failed completion stage, the system did not verify whether the exception was a business or technical error. This resulted in all failures being reported as internal errors.
+* The system now differentiates between exception types. This categorization ensures that business errors are returned to the client, while technical errors are reported in the Liberty server log.
 
 // DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
 
@@ -361,7 +336,9 @@ All three of the preceding extensions might be built into your MCP server as ext
 [#displayCustomizedExceptionText]
 == displayCustomizedExceptionText property 
 This beta release adds documentation and tests for the `displayCustomizedExceptionText` configuration, which allows users to override Liberty’s default error messages (such as SRVE0218E: Forbidden and SRVE0232E: An exception occurred) with clearer, user-defined messages. 
-The feature is enabled through simple `server.xml` configuration, where custom messages can be mapped to specific HTTP status codes (403 and 500). 
+
+The feature is enabled through simple `server.xml` file configuration, where custom messages can be mapped to specific HTTP status codes (403 and 500). 
+
 Testing ensures that these custom messages correctly replace Liberty’s defaults across all supported platforms, confirming that the configured text is returned consistently in all scenarios.
 
 [source,xml]
