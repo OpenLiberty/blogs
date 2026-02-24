@@ -1,17 +1,17 @@
 ---
 layout: post
-title: "Liberty Build Plugins Toolchain Support"
+title: "Support for Java Toolchains in Liberty Build Plugins"
 # Do NOT change the categories section
 categories: blog
 author_picture: https://avatars3.githubusercontent.com/venmanyarun
 author_github: https://github.com/venmanyarun
-seo-title: Liberty Build Plugins Toolchain Support
-seo-description: Learn how to use JDK Toolchains with the Liberty Maven Plugin (v3.12.0+) and Liberty Gradle Plugin (v3.10.0+) to decouple your build environment from your runtime. Discover how to configure toolchains, ensure JDK consistency in Dev Mode, and manage precedence for Surefire and Failsafe plugins for seamless Open Liberty development.
-blog_description: "Learn how to use JDK Toolchains with the Liberty Maven Plugin (v3.12.0+) and Liberty Gradle Plugin (v3.10.0+) to decouple your build environment from your runtime. Discover how to configure toolchains, ensure JDK consistency in Dev Mode, and manage precedence for Surefire and Failsafe plugins for seamless Open Liberty development."
+seo-title: Liberty Build Plugins Java Toolchain Support
+seo-description: Learn how to use Java Toolchains with the Liberty Maven Plugin (v3.12.0+) and Liberty Gradle Plugin (v3.10.0+) to decouple your build environment from your runtime. Discover how to configure toolchains, ensure JDK consistency in Dev Mode, and manage precedence for Surefire and Failsafe plugins for seamless Liberty development.
+blog_description: "Learn how to use Java Toolchains with the Liberty Maven Plugin (v3.12.0+) and Liberty Gradle Plugin (v3.10.0+) to decouple your build environment from your runtime. Discover how to configure toolchains, ensure JDK consistency in Dev Mode, and manage precedence for Surefire and Failsafe plugins for seamless Liberty development."
 open-graph-image: https://openliberty.io/img/twitter_card.jpg
 open-graph-image-alt: Open Liberty Logo
 ---
-= Liberty Build Plugins Toolchain Support
+= Support for Java Toolchains in Liberty Build Plugins
 Arun Venmany <https://github.com/venmanyarun>
 :imagesdir: /
 :url-prefix:
@@ -49,13 +49,13 @@ Arun Venmany <https://github.com/venmanyarun>
 // change the "IMAGE CAPTION" to a couple words of what the image is
 // // // // // // // //
 
-Liberty Gradle and Maven plugins now support **Java Toolchains**. This feature allows you to decouple the JDK used to run your build tool (Gradle or Maven) from the JDK used to compile your code and run your Liberty server.
+Liberty Gradle and Maven plugins now support **Java Toolchains**. This feature allows you to decouple the JDK used to run your build tool (Gradle or Maven) from the JDK used to compile your code and run your Liberty server and applications.
 
-When a toolchain is configured, the Liberty plugins automatically detect the specified JDK and use it to start the Liberty server (by setting `JAVA_HOME`), ensuring environment consistency across your development team.
+When a toolchain is configured, the Liberty build plugins automatically detect the specified JDK and use it to start the Liberty server, ensuring environment consistency across your development team.
 
 == Why use Java Toolchains?
 
-Using toolchains provides several advantages for enterprise development and CI/CD pipelines:
+Using Java toolchains provides several advantages for enterprise development and CI/CD pipelines:
 
 * **Environment Consistency**: Ensure every developer and build server uses the exact same JDK version for the runtime, regardless of what is installed as the system default.
 * **Decoupling**: You can run your build tool (e.g., Maven or Gradle) on a newer, high-performance JVM while targeting an older JDK (like Java 8 or 11) for the actual Liberty server.
@@ -87,17 +87,12 @@ java {
     toolchain {
         // Required Java version for your project
         languageVersion = JavaLanguageVersion.of(17)
+        // Optional: include vendor if you need to distinguish between toolchains
+        // vendor.set(JvmVendorSpec.ADOPTIUM)
     }
 }
 ----
 
-=== Dev mode (libertyDev) behavior
-When you run `gradle libertyDev`, the plugin:
-
-* **Server JVM**: Sets the Liberty server process's `JAVA_HOME` to the toolchain JDK.
-* **Recompilation**: Uses the toolchain JDK for `compileJava` and `compileTestJava` tasks.
-* **Logs**: Look for confirmation in the terminal:
-** `CWWKM4101I: The :libertyDev task is using the configured toolchain JDK located at /path/to/jdk-17`
 
 == Liberty Maven Plugin Support
 
@@ -116,16 +111,29 @@ By leveraging Maven Toolchains, the Liberty Maven plugin can decouple the JDK us
     <configuration>
         <jdkToolchain>
             <version>11</version>
+             <!-- Optional: include vendor if you need to distinguish between toolchains -->
+             <!-- <vendor>ibm</vendor> -->
         </jdkToolchain>
     </configuration>
 </plugin>
 ----
 
+== Dev mode behavior
+When you run `gradle libertyDev` or `mvn liberty:dev`, the plugin ensures environment consistency by applying the following logic:
+
+* *Server JVM*: Sets the Liberty server process's `JAVA_HOME` to the configured toolchain JDK.
+* *Recompilation*: Automatically uses the toolchain JDK for compilation (e.g., `compileJava` and `compileTestJava` tasks in Gradle, or `compiler:compile` and `compiler:testCompile` goals in Maven).
+* *Logs*: Look for confirmation in the terminal output to verify the toolchain is active:
+
+[horizontal]
+Gradle:: `CWWKM4101I: The :libertyDev task is using the configured toolchain JDK located at /path/to/jdk-17`
+Maven:: `CWWKM4101I: The liberty:dev goal is using the configured toolchain JDK located at /path/to/jdk-17`
+
 == Rules and precedence
 
 Both plugins follow a specific order of operations:
 
-1. **Manual Overrides**: If `JAVA_HOME` is set in `server.env` or `jvm.options`, *that value takes precedence* over the toolchain.
+1. **Manual Overrides**: If `JAVA_HOME` is set in `server.env` or `jvm.options`, *that value takes precedence* over the Java toolchain.
 2. **Toolchain Resolution**: If no manual override exists, the plugin uses the resolved toolchain JDK.
 3. **Fallback**: If no toolchain is found, the plugin falls back to the JVM currently running the build.
 
@@ -150,7 +158,7 @@ Java Library path = /path/to/java/semeru-11.0.28/Contents/Home/lib/default:/path
 
 == Conclusion
 
-With toolchain support in the Liberty Gradle and Maven plugins, managing your development environment becomes significantly more robust. By defining your Java version at the project level, you eliminate the "it works on my machine" class of bugs related to mismatched JDKs. Whether you are using Gradle's automatic provisioning or Maven's toolchain manager, your Liberty server will now stay in perfect sync with your source code's requirements.
+With Java toolchain support in the Liberty Gradle and Maven plugins, managing your development environment becomes significantly more robust. By defining your Java version at the project level, you eliminate the "it works on my machine" class of bugs related to mismatched JDKs. Whether you are using Gradle's automatic provisioning or Maven's toolchain manager, your Liberty server will now stay in perfect sync with your source code's requirements.
 
 == Further Documentation
 
@@ -158,6 +166,12 @@ For detailed technical specifications, refer to the `toolchains.md` documentatio
 
 * Liberty Gradle Plugin: link:https://github.com/OpenLiberty/ci.gradle/blob/main/docs/toolchain.md[toolchain.md]
 * Liberty Maven Plugin: link:https://github.com/OpenLiberty/ci.maven/blob/main/docs/toolchain.md[toolchain.md]
+
+== Reporting Issues
+We welcome feedback and contributions! If you encounter any bugs or have feature requests, please report them in our open-source repositories:
+
+* For Maven issues, visit the link:https://github.com/OpenLiberty/ci.maven/issues[Liberty Maven Plugin GitHub Issues].
+* For Gradle issues, visit the link:https://github.com/OpenLiberty/ci.gradle/issues[Liberty Gradle Plugin GitHub Issues].
 // // // // // // // //
 // LINKS
 //
