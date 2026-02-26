@@ -1,0 +1,184 @@
+---
+layout: post
+title: "Support for Java Toolchains in Liberty Build Plugins"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/venmanyarun
+author_github: https://github.com/venmanyarun
+seo-title: Liberty Build Plugins Java Toolchain Support
+seo-description: Learn how to use Java Toolchains with the Liberty Maven Plugin (v3.12.0+) and Liberty Gradle Plugin (v3.10.0+) to decouple your build environment from your runtime. Discover how to configure toolchains, ensure JDK consistency in Dev Mode, and manage precedence for Surefire and Failsafe plugins for seamless Liberty development.
+blog_description: "Learn how to use Java Toolchains with the Liberty Maven Plugin (v3.12.0+) and Liberty Gradle Plugin (v3.10.0+) to decouple your build environment from your runtime. Discover how to configure toolchains, ensure JDK consistency in Dev Mode, and manage precedence for Surefire and Failsafe plugins for seamless Liberty development."
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+---
+= Support for Java Toolchains in Liberty Build Plugins
+Arun Venmany <https://github.com/venmanyarun>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+// // // // // // // //
+// In the preceding section:
+// Do not insert any blank lines between any of the lines.
+//
+// "open-graph-image" is set to OL logo. Whenever possible update this to a more appropriate/specific image (For example if present a image that is being used in the post). However, it
+// can be left empty which will set it to the default
+//
+// "open-graph-image-alt" is a description of what is in the image (not a caption). When changing "open-graph-image" to
+// a custom picture, you must provide a custom string for "open-graph-image-alt".
+//
+// Replace TITLE with the blog post title.
+// Replace AUTHOR_NAME with your name as first author.
+// Replace GITHUB_USERNAME with your GitHub username eg: lauracowen
+// Replace DESCRIPTION with a short summary (~60 words) of the release (a more succinct version of the first paragraph of the post).
+//
+// Replace AUTHOR_NAME with your name as you'd like it to be displayed, eg: Laura Cowen
+//
+// Example post: 2020-04-02-generate-microprofile-rest-client-code.adoc
+//
+// If adding image into the post add :
+// -------------------------
+// [.img_border_light]
+// image::img/blog/FILE_NAME[IMAGE CAPTION ,width=70%,align="center"]
+// -------------------------
+// "[.img_border_light]" = This adds a faint grey border around the image to make its edges sharper. Use it around screenshots but not           
+// around diagrams. Then double check how it looks.
+// There is also a "[.img_border_dark]" class which tends to work best with screenshots that are taken on dark backgrounds.
+// Change "FILE_NAME" to the name of the image file. Also make sure to put the image into the right folder which is: img/blog
+// change the "IMAGE CAPTION" to a couple words of what the image is
+// // // // // // // //
+
+Liberty Gradle and Maven plugins now support **Java Toolchains**. This feature allows you to decouple the JDK used to run your build tool (Gradle or Maven) from the JDK used to compile your code and run your Liberty server and applications.
+
+When a toolchain is configured, the Liberty build plugins automatically detect the specified JDK and use it to start the Liberty server, ensuring environment consistency across your development team.
+
+== Why use Java Toolchains?
+
+Using Java toolchains provides several advantages for enterprise development and CI/CD pipelines:
+
+* **Environment Consistency**: Ensure every developer and build server uses the exact same JDK version for the runtime, regardless of what is installed as the system default.
+* **Decoupling**: You can run your build tool (e.g., Maven or Gradle) on a newer, high-performance JVM while targeting an older JDK (like Java 8 or 11) for the actual Liberty server.
+* **Simplified Configuration**: Avoid manually setting and maintaining `JAVA_HOME` environment variables across different machines. The build tool handles the discovery and provisioning of the required JDK.
+* **Early Detection**: If a developer tries to build a project but lacks the required JDK version, the build tool will provide a clear error or automatically download the correct version (depending on your configuration).
+
+== Minimum Version Requirements
+
+To use toolchain support, ensure you are using the following plugin versions or newer:
+
+* **Liberty Maven Plugin**: link:https://central.sonatype.com/artifact/io.openliberty.tools/liberty-maven-plugin/3.12.0[3.12.0]
+* **Liberty Gradle Plugin**: link:https://central.sonatype.com/artifact/io.openliberty.tools/liberty-gradle-plugin/3.10.0[3.10.0]
+
+== Liberty Gradle Plugin Support
+
+The Liberty Gradle plugin integrates with the standard link:https://docs.gradle.org/current/userguide/toolchains.html[Gradle Java Toolchain] feature. It does not require a Liberty-specific configuration block; it automatically honors the project's `java { toolchain { ... } }` settings.
+
+=== How to use
+Apply the `java` plugin and define the desired Java version in your `build.gradle` file:
+
+[source,gradle]
+----
+plugins {
+    id 'java'
+    id 'io.openliberty.tools.gradle.Liberty' version '3.10.0'
+}
+
+java {
+    toolchain {
+        // Required Java version for your project
+        languageVersion = JavaLanguageVersion.of(17)
+        // Optional: include vendor if you need to distinguish between toolchains
+        // vendor.set(JvmVendorSpec.ADOPTIUM)
+    }
+}
+----
+
+
+== Liberty Maven Plugin Support
+
+By leveraging Maven Toolchains, the Liberty Maven plugin can decouple the JDK used to run the plugin from the JDK used to run your Liberty server. It retrieves these definitions from your local `toolchains.xml`.
+
+=== How to use
+1. **Configure toolchains.xml**: Ensure your `~/.m2/toolchains.xml` defines the JDKs available on your system.
+2. **Update pom.xml**: Configure the plugin versions in your `liberty-maven-plugin` configurations and add a `<jdkToolchain>` configuration.
+
+[source,xml]
+----
+<plugin>
+    <groupId>io.openliberty.tools</groupId>
+    <artifactId>liberty-maven-plugin</artifactId>
+    <version>3.12.0</version>
+    <configuration>
+        <jdkToolchain>
+            <version>11</version>
+             <!-- Optional: include vendor if you need to distinguish between toolchains -->
+             <!-- <vendor>ibm</vendor> -->
+        </jdkToolchain>
+    </configuration>
+</plugin>
+----
+
+== Dev mode behavior
+When you run `gradle libertyDev` or `mvn liberty:dev`, the plugin ensures environment consistency by applying the following logic:
+
+* *Server JVM*: Sets the Liberty server process's `JAVA_HOME` to the configured toolchain JDK.
+* *Recompilation*: Automatically uses the toolchain JDK for compilation (e.g., `compileJava` and `compileTestJava` tasks in Gradle, or `compiler:compile` and `compiler:testCompile` goals in Maven).
+* *Logs*: Look for confirmation in the terminal output to verify the toolchain is active:
+
+[horizontal]
+Gradle:: `CWWKM4101I: The :libertyDev task is using the configured toolchain JDK located at /path/to/jdk-17`
+Maven:: `CWWKM4101I: The liberty:dev goal is using the configured toolchain JDK located at /path/to/jdk-17`
+
+== Rules and precedence
+
+Both plugins follow a specific order of operations:
+
+1. **Manual Overrides**: If `JAVA_HOME` is set in `server.env` or `jvm.options`, *that value takes precedence* over the Java toolchain.
+2. **Toolchain Resolution**: If no manual override exists, the plugin uses the resolved toolchain JDK.
+3. **Fallback**: If no toolchain is found, the plugin falls back to the JVM currently running the build.
+
+== Verification
+
+To confirm which JDK the Liberty server started with, check the `messages.log` file (located in `${server.output.dir}/logs/`). You should see entries similar to the following:
+
+[source,text]
+----
+********************************************************************************
+product = Open Liberty 25.0.0.12 (wlp-1.0.108.cl251220251117-0302)
+wlp.install.dir = /path/to/project/build/wlp/
+java.home = /path/to/java/semeru-11.0.28/Contents/Home
+java.version = 11.0.28
+java.runtime = IBM Semeru Runtime Open Edition (11.0.28+6)
+os = Mac OS X (26.1; aarch64) (en_IN)
+process = 62955@Device-Name.local
+Classpath = /path/to/project/build/wlp/bin/tools/ws-server.jar
+Java Library path = /path/to/java/semeru-11.0.28/Contents/Home/lib/default:/path/to/java/semeru-11.0.28/Contents/Home/lib:/usr/lib
+********************************************************************************
+----
+
+== Conclusion
+
+With Java toolchain support in the Liberty Gradle and Maven plugins, managing your development environment becomes significantly more robust. By defining your Java version at the project level, you eliminate the "it works on my machine" class of bugs related to mismatched JDKs. Whether you are using Gradle's automatic provisioning or Maven's toolchain manager, your Liberty server will now stay in perfect sync with your source code's requirements.
+
+== Further Documentation
+
+For detailed technical specifications, refer to the `toolchains.md` documentation in the plugin repositories:
+
+* Liberty Gradle Plugin: link:https://github.com/OpenLiberty/ci.gradle/blob/main/docs/toolchain.md[toolchain.md]
+* Liberty Maven Plugin: link:https://github.com/OpenLiberty/ci.maven/blob/main/docs/toolchain.md[toolchain.md]
+
+== Reporting Issues
+We welcome feedback and contributions! If you encounter any bugs or have feature requests, please report them in our open-source repositories:
+
+* For Maven issues, visit the link:https://github.com/OpenLiberty/ci.maven/issues[Liberty Maven Plugin GitHub Issues].
+* For Gradle issues, visit the link:https://github.com/OpenLiberty/ci.gradle/issues[Liberty Gradle Plugin GitHub Issues].
+// // // // // // // //
+// LINKS
+//
+// OpenLiberty.io site links:
+// link:/guides/microprofile-rest-client.html[Consuming RESTful Java microservices]
+// 
+// Off-site links:
+// link:https://openapi-generator.tech/docs/installation#jar[Download Instructions]
+//
+// // // // // // // //
