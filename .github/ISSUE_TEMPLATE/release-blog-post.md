@@ -27,11 +27,11 @@ Follow the instructions in the README and the template file to complete the foll
 - [ ] Create a draft blog post using the [GA release blog post template](https://github.com/OpenLiberty/blogs/blob/prod/templates/ga-release-post.adoc) or the [beta release blog post template](https://github.com/OpenLiberty/blogs/blob/prod/templates/beta-release-post.adoc). Build the draft blog post on the draft website according to the [blog post instructions](https://github.com/OpenLiberty/blogs/blob/prod/README.md).
 - [ ] When you've compiled the whole blog and checked that it makes sense to the best of your knowledge, create a PR from your feature branch to the `staging` branch (as described in the [blog post instructions](https://github.com/OpenLiberty/blogs/blob/prod/README.md)).
 - [ ] Get the draft post reviewed by all the people who contributed the content to the blog post.
-- [ ] Then, when they're all happy, ask the [Release Architect](https://github.com/orgs/OpenLiberty/teams/release-architect) to review it.
-- [ ] Agree with the [Release Architect](https://github.com/orgs/OpenLiberty/teams/release-architect) which feature will lead this blog post, then write a title, slug, summary first paragraph, and SEO front matter appropriately.
+- [ ] Then, when they're all happy, ask @mbroz2 to review it.
+- [ ] Agree with @mbroz2 which feature will lead this blog post, then write a title, slug, summary first paragraph, and SEO front matter appropriately.
 - [ ] Add relevant tags to the post in the `staging` branch (see [the blog post instructions](https://github.com/OpenLiberty/blogs#editors-editing-and-publishing-a-post)).
-- [ ] Get the post approved by the [Release Architect](https://github.com/orgs/OpenLiberty/teams/release-architect).
-- [ ] On release day (usually Tuesday for the GA release post and Thursday for the beta release post), the [Release Architect](https://github.com/orgs/OpenLiberty/teams/release-architect) will publish the post.
+- [ ] Get the post approved by @mbroz2.
+- [ ] On release day (usually Tuesday for the GA release post and Thursday for the beta release post), @mbroz2 will publish the post.
 
 ## All done?
 
