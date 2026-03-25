@@ -1,0 +1,325 @@
+---
+layout: post
+title: "26.0.0.3 における UserRegistry 属性リーダーの機能強化と Jandex インデックス形式サポートの更新"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/navaneethsnair1
+author_github: https://github.com/navaneethsnair1
+seo-title: 26.0.0.3 における UserRegistry 属性リーダーの機能強化と Jandex インデックス形式サポートの更新 - OpenLiberty.io
+seo-description: このリリースでは、LDAP およびカスタム・レジストリからユーザー属性を取得するための UserRegistry 属性リーダー API が導入され、Jandex インデックス形式 11-13 のサポートが追加されてアプリケーションの起動パフォーマンスが向上しました。
+blog_description: このリリースでは、LDAP およびカスタム・レジストリからユーザー属性を取得するための UserRegistry 属性リーダー API が導入され、Jandex インデックス形式 11-13 のサポートが追加されてアプリケーションの起動パフォーマンスが向上しました。
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+blog-available-in-languages:
+- lang: en
+  path: /blog/2026/03/24/26.0.0.3.html
+additional_authors:
+- name: Mona the Octocat (校正)
+  github: https://github.com/Octocat
+  image: https://avatars.githubusercontent.com/u/583231?v=4
+---
+= 26.0.0.3 における UserRegistry 属性リーダーの機能強化と Jandex インデックス形式サポートの更新
+Navaneeth S Nair <https://github.com/navaneethsnair1>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+// // // // // // // //
+// In the preceding section:
+// Do not insert any blank lines between any of the lines.
+// Do not remove or edit the variables on the lines beneath the author name.
+//
+// "open-graph-image" is set to OL logo. Whenever possible update this to a more appropriate/specific image (For example if present a image that is being used in the post). However, it
+// can be left empty which will set it to the default
+//
+// "open-graph-image-alt" is a description of what is in the image (not a caption). When changing "open-graph-image" to
+// a custom picture, you must provide a custom string for "open-graph-image-alt".
+//
+// Replace TITLE with the blog post title eg: MicroProfile 3.3 is now available on Open Liberty 20.0.0.4
+// Replace navaneethsnair1 with your GitHub username eg: lauracowen
+// Replace DESCRIPTION with a short summary (~60 words) of the release (a more succinct version of the first paragraph of the post).
+// Replace Navaneeth S Nair with your name as you'd like it to be displayed, eg: Laura Cowen
+//
+// Example post: 2020-04-09-microprofile-3-3-open-liberty-20004.adoc
+//
+// If adding image into the post add :
+// -------------------------
+// [.img_border_light]
+// image::img/blog/FILE_NAME[IMAGE CAPTION ,width=70%,align="center"]
+// -------------------------
+// "[.img_border_light]" = This adds a faint grey border around the image to make its edges sharper. Use it around screenshots but not           
+// around diagrams. Then double check how it looks.
+// There is also a "[.img_border_dark]" class which tends to work best with screenshots that are taken on dark
+// backgrounds.
+// Change "FILE_NAME" to the name of the image file. Also make sure to put the image into the right folder which is: img/blog
+// change the "IMAGE CAPTION" to a couple words of what the image is
+// // // // // // // //
+
+このリリースでは、LDAP およびカスタム・レジストリからユーザー属性を取得するための UserRegistry 属性リーダー API が導入され、Jandex インデックス形式 11-13 のサポートが追加されてアプリケーションの起動パフォーマンスが向上しました。
+
+// // // // // // // //
+// In the preceding section:
+// Leave any instances of `tag::xxxx[]` or `end:xxxx[]` as they are.
+//
+// Replace RELEASE_SUMMARY with a short paragraph that summarises the release. Start with the lead feature but also summarise what else is new in the release. You will agree which will be the lead feature with the reviewers so you can just leave a placeholder here until after the initial review.
+// // // // // // // //
+
+// // // // // // // //
+// Replace the following throughout the document:
+//   Replace 26.0.0.3 with the version number of Open Liberty, eg: 22.0.0.2
+//   Replace 26001 with the version number of Open Liberty wihtout the periods, eg: 22002
+// // // // // // // //
+
+link:{url-about}[Open Liberty] 26.0.0.3 では:
+
+* <<userregistry, UserRegistry 属性リーダーの機能強化>>
+* <<jandex, Jandex インデックス形式サポートの更新>>
+* <<bugs, 注目すべきバグ修正>>
+
+link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A26003+label%3A%22release+bug%22[26.0.0.3] で修正されたバグのリストをご覧ください。
+
+link:{url-prefix}/blog/?search=release&search!=beta[以前の Open Liberty GA リリースのブログ投稿] もチェックしてください。
+
+
+[#run]
+
+// // // // // // // //
+// LINKS
+//
+// OpenLiberty.io site links:
+// link:{url-prefix}/guides/maven-intro.html[Maven]
+// 
+// Off-site links:
+//link:https://openapi-generator.tech/docs/installation#jar[Download Instructions]
+//
+// IMAGES
+//
+// Place images in ./img/blog/
+// Use the syntax:
+// image::/img/blog/log4j-rhocp-diagrams/current-problem.png[Logging problem diagram,width=70%,align="center"]
+// // // // // // // //
+
+== 26.0.0.3 を使用してアプリを開発および実行する
+
+link:{url-prefix}/guides/maven-intro.html[Maven] を使用している場合は、`pom.xml` ファイルに以下を含めます:
+
+[source,xml]
+----
+<plugin>
+    <groupId>io.openliberty.tools</groupId>
+    <artifactId>liberty-maven-plugin</artifactId>
+    <version>3.12.0</version>
+</plugin>
+----
+
+link:{url-prefix}/guides/gradle-intro.html[Gradle] の場合は、`build.gradle` ファイルに以下を含めます:
+
+[source,gradle]
+----
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'io.openliberty.tools:liberty-gradle-plugin:4.0.0'
+    }
+}
+apply plugin: 'liberty'
+----
+// // // // // // // //
+// In the preceding section:
+// Replace the Maven `3.11.5` with the latest version of the plugin: https://search.maven.org/artifact/io.openliberty.tools/liberty-maven-plugin
+// Replace the Gradle `3.9.5` with the latest version of the plugin: https://search.maven.org/artifact/io.openliberty.tools/liberty-gradle-plugin
+// TODO: Update GHA to automatically do the above.  If the maven.org is problematic, then could fallback to using the GH Releases for the plugins
+// // // // // // // //
+
+link:{url-prefix}/docs/latest/container-images.html[コンテナ・イメージ] を使用している場合は:
+
+[source]
+----
+FROM icr.io/appcafe/open-liberty
+----
+
+または、link:{url-prefix}/start/[ダウンロード・ページ] をご覧ください。
+
+link:https://plugins.jetbrains.com/plugin/14856-liberty-tools[IntelliJ IDEA]、link:https://marketplace.visualstudio.com/items?itemName=Open-Liberty.liberty-dev-vscode-ext[Visual Studio Code]、または link:https://marketplace.eclipse.org/content/liberty-tools[Eclipse IDE] を使用している場合は、オープンソースの link:https://openliberty.io/docs/latest/develop-liberty-tools.html[Liberty 開発者ツール] を活用して、IDE 内から効果的な開発、テスト、デバッグ、およびアプリケーション管理を行うこともできます。
+
+[link=https://stackoverflow.com/tags/open-liberty]
+image::img/blog/blog_btn_stack_ja.svg[Stack Overflow で質問する, align="center"]
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/34074
+// Contact/Reviewer: karel-harjono
+// // // // // // // // 
+[#userregistry]
+== UserRegistry 属性リーダーの機能強化
+
+UserRegistry API は、LDAP およびカスタム・ユーザー・レジストリから直接、特定のユーザー属性を取得し、属性値に基づいてユーザーを検索する機能をアプリケーションに提供します。
+
+=== 新機能
+
+以前は、UserRegistry API は `userSecurityName` による検索やワイルドカード・パターン・マッチングを使用した基本的なユーザー検索のみをサポートしていました。しかし、特定のユーザー属性を取得したり、属性値に基づいてユーザーを検索したりすることはできませんでした。これらの機能は、VMM API を通じて従来の WebSphere で利用可能でした。これら 2 つの新しい API の導入により、アプリケーションは LDAP およびカスタム・ユーザー・レジストリからユーザーを検索し、属性を取得できるようになりました。
+
+この機能強化により、`getAttributesForUser()` メソッドを使用してユーザーの特定の属性を取得できるようになりました。このメソッドは、email や phoneNumber などの個別の属性の取得、または "*" を使用してユーザーの利用可能なすべての属性の取得をサポートします。
+
+また、`getUsersByAttribute()` メソッドを使用して属性値に基づいてユーザーを検索することもでき、アプリケーションは特定の属性条件に一致するユーザーを見つけることができます。これらのメソッドは LDAP ユーザー・レジストリでサポートされています。カスタム・ユーザー・レジストリの実装でも、これらのメソッドを実装してサポートすることができます。
+
+=== 使用方法
+
+`UserRegistry.java` に追加された新しい API メソッド:
+
+. `default Map<String, Object> getAttributesForUser(String userSecurityName, Set<String> attributeNames)`
++
+*説明:* LDAP ユーザー・レジストリで構成されている、指定された `userSecurityName` の `attributesNames` とそれに対応する値を含む Map<String, Object> を返します。
++
+[source,java]
+----
+UserRegistry ur = RegistryHelper.getUserRegistry("realmName");
+
+// 有効な ldap 属性名
+Set<String> attributeNames = Set.of("telephoneNumber", "uid", "mail");  // またはすべての属性を取得するには "*"
+Map<String, Object> result = ur.getAttributesForUser("testuser", attributeNames);
+
+// trace.log の出力
+> getAttributesForUser Entry
+  testuser
+  [telephoneNumber, uid, mail]
+
+< getAttributesForUser Exit
+  {uid=testuser, mail=testuser@example.com, telephoneNumber=<telephone-number>}
+----
+
+. `default SearchResult getUsersByAttribute(String attributeName, String value, int limit)`
++
+*説明:* LDAP ユーザー・レジストリで構成されている、指定された `value` を持つ `attributeName` に一致するユーザーのリストを含む `SearchResult` オブジェクトを返します。
++
+[source,java]
+----
+UserRegistry ur = RegistryHelper.getUserRegistry("realmName");
+
+SearchResult searchResult = ur.getUsersByAttribute("email", "testuser@example.com", 1);
+
+// trace.log の出力
+> getUsersByAttribute Entry
+  email
+  testuser@example.com
+  1
+
+< getUsersByAttribute Exit
+  SearchResult hasMore=false [testuser]
+----
+
+ユーザー・レジストリの詳細については、以下のリソースを参照してください:
+
+* link:https://www.ibm.com/docs/en/was-liberty/base?topic=infrastructure-customizing-user-registries-repositories-liberty[Open Liberty カスタム・ユーザー・レジストリのドキュメント]
+* link:https://openliberty.io/docs/modules/reference/24.0.0.3/com.ibm.websphere.appserver.api.securityClient_1.1-javadoc/com/ibm/websphere/security/UserRegistry.html[UserRegistry API Javadoc]
+* link:https://openliberty.io/docs/latest/user-registries-application-security.html#_federated_user_registries[フェデレーテッド・ユーザー・レジストリの構成]
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/34231
+// Contact/Reviewer: benjamin-confino, tbitonti
+// // // // // // // // 
+[#jandex]
+== Jandex インデックス形式サポートの更新
+
+Open Liberty は最新の Jandex インデックス形式をサポートするようになり、Jandex バージョン 3.1.0 以降で作成された Jandex インデックスを使用できるようになりました。Jandex は、スペース効率の高い Java アノテーション・インデクサーおよびオフライン・リフレクション・ライブラリで、クラス・メタデータを事前にインデックス化することでアプリケーションの起動パフォーマンスを向上させます。
+
+この機能は、Jakarta EE および MicroProfile アプリケーションを扱うアプリケーション開発者および DevOps エンジニアを対象としています。アプリケーションの起動時間を最適化し、ランタイム・コストを削減するように設計されています。
+
+=== 新機能
+
+この更新により、Open Liberty は Jandex インデックス形式 *11、12、および 13* をサポートします。Jandex バージョン 3.1.0 から現在の最新バージョン 3.5.3 までは、これらの形式を使用するインデックスを生成します。
+
+以前は、Open Liberty は Jandex インデックス形式バージョン 10 までしかサポートしていませんでした。このインデックス形式の制限により、Jandex インデックスでパッケージ化されたアプリケーションは、期待されるパフォーマンス向上を維持しながらバージョン 10 を超えるインデックス形式を使用することができませんでした。これらのパフォーマンス上の利点を維持するために、ビルド・ツールは 3.1.0 より前の Jandex バージョンを使用し続けるか、バージョン 10 までのインデックス形式を使用するインデックスを生成するように Jandex インデックス生成を明示的に構成する必要がありました。
+
+=== メリット
+
+Jandex インデックス形式のサポート追加には、いくつかのメリットがあります:
+
+* *互換性の向上:* 新しい Jandex バージョンを使用する最新のビルド・ツールおよびフレームワークとシームレスに連携
+* *起動時間の短縮:* バージョンの制約なしに Jandex の効率的なアノテーション・インデックス化の恩恵を受け続けることができる
+* *メンテナンスの削減:* 複数の Jandex バージョンを維持したり、互換性のためにインデックスを再生成したりする必要がない
+* *将来性:* Jandex エコシステムの進化に合わせて最新の状態を維持
+
+=== 制限事項
+
+*Jandex インデックスを使用する場合は、インデックス・ファイルがアプリケーション・クラスと最新の状態に保たれていることを確認してください。* Jandex インデックスがアプリケーション・クラスと同期していない場合、不正なアノテーション・データが含まれる可能性があり、アプリケーションが正しく機能しなくなる可能性があります。古い Jandex インデックスを確実に検出することはできません。
+
+Open Liberty は、インデックス形式 13 より高いインデックス形式を読み取りません。新しいバージョンの Jandex がより高いインデックス形式バージョンを追加した場合、Open Liberty はより高いインデックス形式バージョンを使用する Jandex インデックスを読み取る前に更新が必要です。
+
+外部ソースから取得される Open Liberty フィーチャー `mpGraphQL` は、インデックス形式 10 以下の Jandex インデックス形式の読み取りに制限されています。フィーチャー `mpGraphQL` を使用する場合、Jandex インデックスはインデックス形式 10 を使用して生成する必要があります。この制限は、現在の最高バージョン `mpGraphQL-2.0` を含む、`mpGraphQL` のすべての現在のバージョンに適用されます。
+
+=== 制限の解除
+
+以前は、Jandex の使用が有効になっており、アプリケーションに形式 11 から 13 を使用する Jandex インデックスが含まれている場合、Open Liberty はエラー・メッセージを表示し、それらのインデックスを無視していました。このような場合、アノテーション・スキャンは Liberty の内部アノテーション・スキャン・メカニズムを使用して実行されていました。
+
+Jandex インデックス形式 11 から 13 のサポートが追加されたことで、Open Liberty はこれらの形式で生成されたインデックスを使用するようになりました。これらのインデックスは、アプリケーション・クラスと最新の状態に保つ必要があります。アプリケーションでパッケージ化された Jandex インデックスが現在のアプリケーション・クラスを正確に反映していることを確認してください。
+
+=== 使用方法
+
+新しい Jandex インデックス形式のサポートを有効にするために、`server.xml` ファイルで構成を変更する必要はありません。Open Liberty は Jandex インデックス形式を自動的に検出し、その形式に適したインデックス・リーダーを選択します。形式 11、12、および 13 を使用するインデックスを読み取り、バージョン 10 までの形式を使用するインデックスも引き続きサポートします。
+
+デフォルトでは、Jandex の使用は無効になっています。Jandex を有効にするには、`application` 要素または `applicationManager` 要素のいずれかで `useJandex` プロパティを `true` に設定します。
+
+ビルド・プロセスの一部として Jandex インデックスを生成している場合、最新の Jandex Maven プラグインまたは Gradle プラグインのバージョンを使用できるようになりました:
+
+*Maven の例:*
+
+[source,xml]
+----
+<plugin>
+    <groupId>io.smallrye</groupId>
+    <artifactId>jandex-maven-plugin</artifactId>
+    <version>3.5.3</version>
+    <executions>
+        <execution>
+            <id>make-index</id>
+            <goals>
+                <goal>jandex</goal>
+            </goals>
+        </execution>
+    </executions>
+</plugin>
+----
+
+*Gradle の例:*
+
+[source,gradle]
+----
+plugins {
+    id 'org.kordamp.gradle.jandex' version '2.3.0'
+}
+----
+
+Open Liberty は、サポートされているインデックス形式バージョンに対して、生成された `META-INF/jandex.idx` ファイルを自動的に検出して認識します。
+
+詳細については、link:https://smallrye.io/jandex/jandex/3.5.3/index.html[Jandex ドキュメント] を参照してください。
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
+
+[#bugs]
+== このリリースで修正された注目すべきバグ
+
+
+バグ修正に時間を費やしました。以下のセクションでは、このリリースで解決された問題のいくつかについて説明します。興味がある場合は、link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A26003+label%3A%22release+bug%22[26.0.0.3 で修正されたバグの完全なリスト] をご覧ください。
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/34017[JMX REST クライアントでエラー・メッセージが欠落]
+* link:https://github.com/OpenLiberty/open-liberty/issues/34052[EclipseLink 2.7.16 修正の削除により Open Liberty で NullPointerException が再発]
+* link:https://github.com/OpenLiberty/open-liberty/issues/34171[IBM WebSphere Application Server Liberty が jose4j によるサービス拒否の影響を受ける (CVE-2024-29371 CVSS 7.5)]
+
+// // // // // // // //
+// In the preceding section:
+// For this section ask either Michal Broz or Tom Evans or the #openliberty-release-blog channel for Notable bug fixes in this release.
+// Present them as a list in the order as provided, linking to the issue and providing a short description of the bug and the resolution.
+// If the issue on Github is missing any information, leave a comment in the issue along the lines of:
+// "@[issue_owner(s)] please update the description of this `release bug` using the [bug report template](https://github.com/OpenLiberty/open-liberty/issues/new?assignees=&labels=release+bug&template=bug_report.md&title=)" 
+// Feel free to message the owner(s) directly as well, especially if no action has been taken by them.
+// For inspiration about how to write this section look at previous blogs e.g- 20.0.0.10 or 21.0.0.12 (https://openliberty.io/blog/2021/11/26/jakarta-ee-9.1.html#bugs)
+// // // // // // // //
+
+== Open Liberty 26.0.0.3 を今すぐ入手
+
+<<run,Maven、Gradle、Docker、およびダウンロード可能なアーカイブ>> から入手できます。
