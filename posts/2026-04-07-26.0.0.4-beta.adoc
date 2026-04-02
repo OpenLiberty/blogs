@@ -1,0 +1,923 @@
+---
+layout: post
+title: "Jakarta EE 11, Jakarta Security 4.0, Java 26, and more in 26.0.0.4-beta"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/navaneethsnair1
+author_github: https://github.com/navaneethsnair1
+seo-title: "Jakarta EE 11, Jakarta Security 4.0, Java 26, and more in 26.0.0.4-beta- OpenLiberty.io"
+seo-description: This beta introduces Jakarta EE 11 Platform and Web Profile, Jakarta Authentication 3.1, Jakarta Authorization 3.0, Jakarta Security 4.0, Jakarta Data 1.1 M2 preview, Java 26 support, MCP Server updates, and Jandex index improvements.
+blog_description: This beta introduces Jakarta EE 11 Platform and Web Profile, Jakarta Authentication 3.1, Jakarta Authorization 3.0, Jakarta Security 4.0, Jakarta Data 1.1 M2 preview, Java 26 support, MCP Server updates, and Jandex index improvements.
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+---
+= Jakarta EE 11, Jakarta Security 4.0, Java 26, and more in 26.0.0.4-beta
+Navaneeth S Nair <https://github.com/navaneethsnair1>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+This beta introduces Jakarta EE 11 Platform and Web Profile, Jakarta Authentication 3.1, Jakarta Authorization 3.0, Jakarta Security 4.0, Jakarta Data 1.1 M2 preview, Java 26 support, MCP Server updates, and Jandex index improvements.
+
+The link:{url-about}[Open Liberty] 26.0.0.4-beta includes the following beta features (along with link:{url-prefix}/docs/latest/reference/feature/feature-overview.html[all GA features]):
+
+
+* <<jandex_index, Web module Jandex Indexes can be read from WEB-INF/classes>>
+* <<jakarta_ee, Jakarta EE 11 Platform and Web Profile>>
+* <<jakarta_auth, Jakarta Authentication 3.1>>
+* <<jakarta_authz, Jakarta Authorization 3.0>>
+* <<java_26, Beta support for Java 26>>
+* <<mcp, Updates to `mcpServer-1.0`>>
+* <<jakarta_data, Preview of some Jakarta Data 1.1 M2 capability>>
+* <<jakarta_security, Jakarta Security 4.0>>
+
+
+See also link:{url-prefix}/blog/?search=beta&key=tag[previous Open Liberty beta blog posts].
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/34495
+// Contact/Reviewer: benjamin-confino, tbitonti
+// // // // // // // // 
+[#jandex_index]
+== Web module Jandex Indexes can be read from WEB-INF/classes.
+
+Before this update, within all modules, Jandex indexes were read-only from `META-INF/jandex.idx`. With this update, for web modules, Jandex indexes are also read from `WEB-INF/classes/META-INF/jandex.idx`. This update is consistent with industry practices.
+
+Jandex indexes from the prior location or from the new location are read-only if Jandex use is enabled. For compatibility with earlier versions, reads from the new location must be enabled by a new application property.
+
+=== Benefits
+
+* Improved Compatibility: Improve compatibility with industry standard practices.
+* Faster Startup Times: Continue to benefit from Jandex's efficient annotation indexing.
+
+=== Target Persona
+
+Customers who wish to place Jandex indexes at industry standard locations in their web modules.
+
+=== Target Features
+
+This update applies to the scanning of classes within applications. Class scanning (which includes annotation scanning) is a general purpose function that is used by many features.
+
+=== Problem Description
+
+To gather information about application classes, including annotation data, the application classes must be scanned. This scan is expensive because the entire application must be read and processed.
+
+To improve performance, class scans can be done during application packaging, and the scan results are placed in an index within the application. Jandex provides this capability.
+
+Jandex scan results are usually written to "META-INF/jandex.idx". For JAR files, this location is relative to the root of the JAR file. For WAR files, the "META-INF/jandex.idx" location has two possible interpretations. First, the location can be relative to the root of the WAR file. Second, the location can be relative to the "WEB-INF/classes" folder.
+
+Before this update, Liberty used the location relative to the root of the WAR file. However, industry standards place the location relative to "WEB-INF/classes". This update enables Liberty to also use the "WEB-INF/classes" location.
+
+=== How to Use
+
+Support for reading Jandex indexes under WEB-INF/classes is enabled by a new property of application and application manager elements:
+
+* Property: *useJandexUnderClasses*
+* Description: Enables use of a jandex index for WAR "WEB-INF/classes" under "/WEB-INF/classes/META-INF/jandex.idx".
+* Possible values: true | *false*
+* Default value: false
+
+For example:
+
+[source,xml]
+----
+<applicationManager useJandex="true" useJandexUnderClasses="true"/>
+----
+
+Also for example:
+
+[source,xml]
+----
+<application location="TestServlet40.ear" useJandex="true" useJandexUnderClasses="true"/>
+----
+
+When the new property is placed on an application manager element, the property applies to all web modules of all applications. When the new property is placed on an application element, the property applies to only that application. If the property is set on both the application manager element and an application element, the value on the application element overrides the value on the application manager element for that application.
+
+=== Limitation
+
+Jandex index support requires explicit enablement. See the property *useJandex* on application manager and on application elements. The new property *useJandexUnderClasses* is meaningful only if the property *useJandex* is *true*.
+
+For compatibility with an earlier versions, reads of jandex from the new location requires explicit enablement. See the new property *useJandexUnderClasses*, as documented previously. Explicit enablement is required to prevent applications from accidentally reading an out of date Jandex index from the new location. An out of date Jandex index might cause hard to detect application errors.
+
+The name of the new property, *useJandexUnderClasses*, is subject to revision.
+
+=== Learn More
+
+* link:https://smallrye.io/jandex/jandex/3.5.3/index.html[Jandex Documentation]
+* link:https://openliberty.io/docs/latest/reference/config/applicationManager.html[Application Manager Documentation]
+* link:https://openliberty.io/docs/latest/reference/config/applicationManager.html[Application Documentation]
+* link:https://github.com/OpenLiberty/open-liberty/issues/34231[Open Liberty Jandex Index Format Update]
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
+
+
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/34471
+// Contact/Reviewer: jhanders34
+// // // // // // // // 
+[#jakarta_ee]
+== Jakarta EE 11 Platform and Web Profile
+
+Open Liberty 24.0.0.11-beta was one of the ratifying implementations for Jakarta EE 11 Core Profile. Building on that foundation, the 26.0.0.4-beta releases complete Jakarta EE 11 support, including Jakarta EE Application Client 11.0, Jakarta EE Web Profile 11.0, and Jakarta EE Platform 11.0.
+
+Liberty provides convenience features that bundle all component specifications in the Jakarta EE Web Profile and Jakarta EE Platform. The `webProfile-11.0` Liberty feature includes all Jakarta EE Web Profile functions, including the new Jakarta Data 1.0 component. The `jakartaee-11.0` Liberty feature provides the Jakarta EE Platform version 11 implementation. For Jakarta EE 11 features in the application client, use the `jakartaeeClient-11.0` Liberty feature.
+
+These convenience features enable developers to rapidly develop applications using all APIs in the Web Profile and Platform specifications. Unlike the `jakartaee-10.0` Liberty feature, the `jakartaee-11.0` Liberty feature does not enable Managed Beans feature, as this specification was removed from the platform and the `jakarta.annotation.ManagedBean` annotation was deprecated. Applications relying on `@ManagedBean` must migrate to CDI annotations.
+
+The Jakarta EE 11 Platform specification removes all optional specifications from the platform, meaning Jakarta SOAP with Attachments, XML Binding, XML Web Services, and Enterprise Beans 2.x APIs functions are not included with the `jakartaee-11.0` Liberty feature. To use these capabilities, explicitly add Liberty features to your `server.xml` feature list: `xmlBinding-4.0` for XML Binding, `xmlWS-4.0` for SOAP with Attachments and XML Web Services, and `enterpriseBeansHome-4.0` for Jakarta Enterprise Beans 2.x API. Alternatively, use the versionless features with the `jakartaee-11.0` platform specification.
+
+When using the Liberty application client with the `jakartaeeClient-11.0` feature, Jakarta SOAP with Attachments, XML Binding, and XML Web Services client functions are not available. To continue using these functions in your Liberty application client, enable the `xmlBinding-4.0` and `xmlWSClient-4.0` features in your `client.xml` file.
+
+To enable the Jakarta EE 11 beta features in your Liberty server's `server.xml`:
+
+[source,xml]
+----
+  <featureManager>
+    <feature>jakartaee-11.0</feature>
+  </featureManager>
+----
+
+Or you can add the Web Profile convenience feature to enable all of the Jakarta EE 11 Web Profile beta features at once:
+
+[source,xml]
+----
+  <featureManager>
+    <feature>webProfile-11.0</feature>
+  </featureManager>
+----
+
+You can enable the Jakarta EE 11 features on the Application Client Container in the `client.xml`:
+
+[source,xml]
+----
+ <featureManager>
+       <feature>jakartaeeClient-11.0</feature>
+ </featureManager>
+----
+
+For more information see the link:https://jakarta.ee/specifications/platform/11/jakarta-platform-spec-11.0[Jakarta EE Platform 11 Specification] and the link:https://jakarta.ee/specifications/webprofile/11/jakarta-webprofile-spec-11.0[Jakarta EE Web Profile 11 Specification].
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/34470
+// Contact/Reviewer: jhanders34
+// // // // // // // // 
+[#jakarta_auth]
+== Jakarta Authentication 3.1
+
+Jakarta Authentication defines a general SPI for authentication mechanisms, which are controllers that interact with a caller and the container's environment to obtain and validate the caller's credentials. It then passes an authenticated identity (such as name and groups) to the container.
+
+The 3.1 version of the Jakarta Authentication API removes the deprecated Permission-related fields in the `jakarta.security.auth.message.config.AuthConfigFactory` class. The methods in the class no longer do permission checking also. These changes are part of Jakarta EE 11's removal of SecurityManager support.
+
+You can enable the Jakarta Authentication 3.1 feature by adding the `appAuthentication-3.1` Liberty feature in the `server.xml` file:
+
+[source,xml]
+----
+    <featureManager>
+        <feature>appAuthentication-3.1</feature>
+    </featureManager>
+----
+
+For more information see the Jakarta Authentication 3.1 link:https://jakarta.ee/specifications/authentication/3.1/jakarta-authentication-spec-3.1[specification] and link:https://jakarta.ee/specifications/authentication/3.1/apidocs/jakarta.security.auth.message/module-summary.html[javadoc].
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/34469
+// Contact/Reviewer: jhanders34
+// // // // // // // // 
+[#jakarta_authz]
+== Jakarta Authorization 3.0
+
+Jakarta Authorization defines an SPI for authorization modules, which are repositories of permissions that facilitate subject-based security by determining whether a subject has a specific permission. It also defines algorithms that transform security constraints for specific containers, such as Jakarta Servlet or Jakarta Enterprise Beans, into these permissions.
+
+The 3.0 API introduces the new `jakarta.security.jacc.PolicyFactory` and `jakarta.security.jacc.Policy` classes for doing authorization decisions. These classes are added to remove the dependency on the `java.security.Policy` class, which is deprecated in newer versions of Java. With the new `PolicyFactory` API, now you can have a `Policy` per policy context instead of having a global policy. This design allows separate policies to be maintained for each application.
+
+Additionally, the 3.0 specification defines a mechanism to define `PolicyConfigurationFactory` and `PolicyFactory` classes in your application by using a `web.xml` file. This design allows for an application to have a different configuration than the server-scoped one, but still allow for it to delegate to a server scoped factory for any other applications. Authorization modules can do this delegation by using decorator constructors for both `PolicyConfigurationFactory` and `PolicyFactory` classes.
+
+To configure your authorization modules in `web.xml` file, add specification defined context parameters:
+
+[source,xml]
+----
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app xmlns="https://jakarta.ee/xml/ns/jakartaee"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="https://jakarta.ee/xml/ns/jakartaee https://jakarta.ee/xml/ns/jakartaee/web-app_6_1.xsd"
+  version="6.1">
+
+  <context-param>
+    <param-name>jakarta.security.jacc.PolicyConfigurationFactory.provider</param-name>
+    <param-value>com.example.MyPolicyConfigurationFactory</param-value>
+  </context-param>
+
+  <context-param>
+    <param-name>jakarta.security.jacc.PolicyFactory.provider</param-name>
+    <param-value>com.example.MyPolicyFactory</param-value>
+  </context-param>
+
+</web-app>
+----
+
+Due to Jakarta Authorization 3.0 no longer using the `java.security.Policy` class and introducing a new configuration mechanism for authorization modules, the `com.ibm.wsspi.security.authorization.jacc.ProviderService` Liberty API is no longer provided. This API is not available with the appAuthorization-3.0 feature.
+If a Liberty user feature configures authorization modules, it must be updated to use the `PolicyConfigurationFactory` and `PolicyFactory` `set` methods. These methods configure the modules in the OSGi service. Alternatively you can use a Web Application Bundle (WAB) in your user feature to specify your security modules in a `web.xml` file.
+
+Finally, the 3.0 API adds a new `jakarta.security.jacc.PrincipalMapper` class that you can obtain from the `PolicyContext` class when authorization processing is done in your `Policy` implementation. From this class, you can obtain the roles that are associated with a specific Subject to be able to determine whether the Subject is in the required role.
+
+You can use the `PrincipalMapper` class in your `Policy`'s `implies` or `impliesByRole` method:
+
+[source,java]
+----
+    public boolean impliesByRole(Permission p, Subject subject) {
+        Map<String, PermissionCollection> perRolePermissions =
+            PolicyConfigurationFactory.get().getPolicyConfiguration(contextID).getPerRolePermissions();
+        PrincipalMapper principalMapper = PolicyContext.get(PolicyContext.PRINCIPAL_MAPPER);
+
+        // Check to see if the Permission is in the all authenticated users role (**)
+        if (!principalMapper.isAnyAuthenticatedUserRoleMapped() && !subject.getPrincipals().isEmpty()) {
+            PermissionCollection rolePermissions = perRolePermissions.get("**");
+            if (rolePermissions != null && rolePermissions.implies(p)) {
+                return true;
+            }
+        }
+
+        // Check to see if the roles for the Subject provided imply the permission
+        Set<String> mappedRoles = principalMapper.getMappedRoles(subject);
+        for (String mappedRole : mappedRoles) {
+            PermissionCollection rolePermissions = perRolePermissions.get(mappedRole);
+            if (rolePermissions != null && rolePermissions.implies(p)) {
+                return true;
+            }
+        }
+        return false;
+    }
+----
+
+You can enable the Jakarta Authorization 3.0 feature by adding the `appAuthorization-3.0` Liberty feature in the `server.xml` file:
+
+[source,xml]
+----
+    <featureManager>
+        <feature>appAuthorization-3.0</feature>
+    </featureManager>
+----
+
+For more information see the Jakarta Authorization 3.0 link:https://jakarta.ee/specifications/authorization/3.0/jakarta-authorization-spec-3.0[specification] and link:https://jakarta.ee/specifications/authorization/3.0/apidocs/jakarta.security.jacc/module-summary.html[javadoc].
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/34436
+// Contact/Reviewer: Arunkumar-Kallyodan
+// // // // // // // // 
+[#java_26]
+== Beta support for Java 26
+
+Java 26 is a recent version of Java. It contains new features and enhancements over earlier versions that can be useful to review. This release is not a Long-Term-Support (LTS) release.
+
+There are 10 new features (JEPs) in link:https://openjdk.org/projects/jdk/26/[Java 26]. Five are test features and five are fully delivered.
+
+*Test Features:*
+
+* 524: link:https://openjdk.org/jeps/524[PEM Encodings of Cryptographic Objects (Second Preview)]
+* 525: link:https://openjdk.org/jeps/525[Structured Concurrency (Sixth Preview)]
+* 526: link:https://openjdk.org/jeps/526[Lazy Constants (Second Preview)]
+* 529: link:https://openjdk.org/jeps/529[Vector API (Eleventh Incubator)]
+* 530: link:https://openjdk.org/jeps/530[Primitive Types in Patterns, instanceof, and switch (Fourth Preview)]
+
+*Delivered Features:*
+
+* 500: link:https://openjdk.org/jeps/500[Prepare to Make Final Mean Final]
+* 504: link:https://openjdk.org/jeps/504[Remove the Applet API]
+* 516: link:https://openjdk.org/jeps/516[Ahead-of-Time Object Caching with Any GC]
+* 517: link:https://openjdk.org/jeps/517[HTTP/3 for the HTTP Client API]
+* 522: link:https://openjdk.org/jeps/522[G1 GC: Improve Throughput by Reducing Synchronization]
+
+A new change JEP 500 ("Prepare to Make Final Mean Final") in Java 26 starts enforcing true immutability of final fields by restricting their mutation by using deep reflection.
+In JDK 26, such mutations still work but trigger runtime warnings by default, preparing developers for stricter enforcement.
+Future releases would likely throw exceptions instead, making the final truly nonmutable.
+Developers can opt in early to this stricter behavior by using a JVM flag (for example, `--illegal-final-field-mutation=deny`) to detect issues sooner.
+This change improves program correctness, security, and JVM optimizations.
+
+Take advantage of trying out the new changes now and gain more time to preview how your applications and microservices run with Java 26.
+
+Just link:https://jdk.java.net/26/[download the latest release of Java 26], download and install the link:https://openliberty.io/downloads/#runtime_betas[26.0.0.4-beta] version of Open Liberty, edit your Liberty server's link:https://openliberty.io/docs/latest/reference/config/server-configuration-overview.html#server-env[server.env] file with `JAVA_HOME` set to your Java 26 installation directory and start testing!
+
+For more information on Java 26, see the Java 26 link:https://jdk.java.net/26/release-notes[release notes page], link:https://download.java.net/java/early_access/jdk26/docs/api/[API Javadoc page] or link:https://jdk.java.net/26/[download page].
+For more information on Open Liberty, see our link:https://openliberty.io/docs[documentation page].
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/34314
+// Contact/Reviewer: Azquelt
+// // // // // // // // 
+[#mcp]
+== Updates to `mcpServer-1.0`
+
+The link:https://modelcontextprotocol.io/docs/getting-started/intro[Model Context Protocol (MCP)] is an open standard that enables AI applications to access real-time information from external sources. The Liberty MCP Server feature `mcpServer-1.0` allows developers to expose the business logic of their applications, allowing it to be integrated into agentic AI workflows.
+
+This beta release of Open Liberty includes updates to the `mcpServer-1.0` feature including dynamic registration of tools and support for version `2025-11-25` of the protocol.
+
+=== Dynamically register MCP tools
+
+Tools can now be registered dynamically through an API and by annotating a method. This capability allows the available tools on the server to be changed based on configuration or environment.
+
+Tools can be registered by injecting `ToolManager` and calling its methods to add, remove, and list the available tools on the server. The full Javadoc for `ToolManager` can be found within the liberty beta in `dev/api/ibm/javadoc/io.openliberty.mcp_1.0-javadoc.zip`.
+
+Tools can be registered when the application starts through the CDI `Startup` event. See the following example where the `Startup` event is used to register a weather forecast tool only if a `WeatherClient` bean is available.
+
+[source,java]
+----
+    @Inject
+    ToolManager toolManager;
+
+    @Inject
+    Instance<WeatherClient> weatherClientInstance;
+
+    private void createWeatherTool(@Observes Startup startup) {
+        if (weatherClientInstance.isResolvable()) {
+            WeatherClient weatherClient = weatherClientInstance.get();
+            toolManager.newTool("getForecast")
+                       .setTitle("Weather Forecast Provider")
+                       .setDescription("Get weather forecast for a location")
+                       .addArgument("latitude", "Latitude of the location", true, Double.class)
+                       .addArgument("longitude", "Longitude of the location", true, Double.class)
+                       .setHandler(toolArguments -> {
+                           Double latitude = (Double) toolArguments.args().get("latitude");
+                           Double longitude = (Double) toolArguments.args().get("longitude");
+                           String result = weatherClient.getForecast(
+                                     latitude,
+                                     longitude,
+                                     4,
+                                     "temperature_2m,snowfall,rain,precipitation,precipitation_probability");
+                           return ToolResponse.success(result);
+                       })
+                       .register();
+        }
+    }
+----
+
+Tool registration starts with `newTool()`, then the information about the tool is added, including its title, description, and arguments. The handler supplies the code to run when the tool is called. It has one parameter, which is a `ToolArguments` object, which provides access to the arguments and other information about the tool call request. The handler must always create and return a `ToolResponse`.
+
+=== Accept the 2025-11-25 MCP protocol
+
+The `mcpServer-1.0` feature now accepts MCP protocol version `2025-11-25`, though it doesn't support any of the new features added in this version of the protocol.
+
+There are two main changes as a result of supporting `2025-11-25`:
+
+* Tool names are now restricted to ASCII letters (`A-Z,a-z`), digits (`0-9`), and the underscore (`_`), hyphen ('-') and dot (`.`) characters
+* Invalid arguments passed when calling a tool are now treated as tool execution errors, rather than protocol errors. This allows the LLM to receive feedback that it called the tool incorrectly and make another attempt
+
+=== Paginated results
+
+The result of a `tools/list` call is now paginated with a page size of 20. This means that if there are more than 20 tools deployed on the server, clients make several small calls to retrieve the list of tools, rather than one large call.
+
+=== Bug fixes
+
+* During cancellation of a tool call, we check that both the session id and the authenticated user match the session id and the user that made the tool call. Previously only the session id was checked.
+* Messages that are returned to the MCP client no longer contain OpenLiberty message codes.
+* Structured content is only returned when client is using protocol version `2025-06-18` or later.
+
+=== Further information
+
+* More information about the `mcpServer-1.0` feature and how to get started using the beta, see our link:https://openliberty.io/blog/2025/10/23/mcp-standalone-blog.html[dedicated blog post].
+* More information about Model Context Protocol can be found at link:https://modelcontextprotocol.io/docs/getting-started/intro[modelcontextprotocol.io]
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
+
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/33186
+// Contact/Reviewer: isaacrivriv,mrsaldana,pnicolucci,volosied
+// // // // // // // // 
+[#jakarta_data]
+== Preview of some Jakarta Data 1.1 M2 capability
+
+Previews some new capability at the Jakarta Data 1.1 Milestone 2 level: `Constraint` subtype parameters for repository methods that constraints to repository `@Find` operations and limited use of `Restriction` with repository `@Find` operations. Also included from the prior beta are: retrieving a subset/projection of entity attributes and the `@Is` annotation.
+
+*Feature:* Jakarta Data (data-1.1)
+
+*Target persona:* Application developer
+
+Previously, parameter-based `@Find` methods were not able to filter on conditions other than equality. Now filtration can be achieved at development time by multiple methods. One is by typing the repository method parameter with a `Constraint` subtype or indicating the `Constraint` subtype through the `@Is` annotation. Or, the repository method can include a special parameter of type `Restriction` and the application can supply one or more restrictions at run time when the repository method is started.
+
+In Jakarta Data, you write simple Java objects called *Entities* to represent data, and you write interfaces called *Repositories* to define operations on data. You inject a Repository into your application and use it. The implementation of the Repository is automatically provided.
+
+Start by defining an entity class that corresponds to your data. With relational databases, the entity class corresponds to a database table and the entity properties (public methods and fields of the entity class) generally correspond to the columns of the table. An entity class can be:
+
+* annotated with `jakarta.persistence.Entity` and related annotations from Jakarta Persistence
+* a Java class without entity annotations, in which case the primary key is inferred from an entity property named `id` or ending with `Id` and an entity property named `version` designates an automatically incremented version column.
+
+Here's a simple entity:
+
+[source,java]
+----
+@Entity
+public class Product {
+    @Id
+    public long id;
+
+    public String name;
+
+    public double price;
+
+    public double weight;
+}
+----
+
+After you define the entity to represent the data, it is usually helpful to have your IDE generate a static metamodel class for it. By convention, static metamodel classes begin with the underscore character, followed by the entity name. Because this beta is available well before the release of Jakarta Data 1.1, IDE support for this generation cannot be expected yet. However, a static metamodel class can be provided in the same form that an IDE would generate for the `Product` entity.
+
+[source,java]
+----
+@StaticMetamodel(Product.class)
+public interface _Product {
+    String ID = "id";
+    String NAME = "name";
+    String PRICE = "price";
+    String WEIGHT = "weight";
+
+    NumericAttribute<Product, Long> id = NumericAttribute.of(
+            Product.class, ID, long.class);
+    TextAttribute<Product> name = TextAttribute.of(
+            Product.class, NAME);
+    NumericAttribute<Product, Double> price = NumericAttribute.of(
+            Product.class, PRICE, double.class);
+    NumericAttribute<Product, Double> weight = NumericAttribute.of(
+            Product.class, WEIGHT, double.class);
+}
+----
+
+The first half of the static metamodel class includes constants for each of the entity attribute names so that you don't need to otherwise hardcode string values into your application. The second half of the static metamodel class provides a special instance for each entity attribute, from which you can build restrictions and sorting to apply to queries at run time. This capability enables many powerful operations with repository queries, but those features are deferred to a future beta.
+
+A repository defines operations that are related to the Product entity. Your repository interface can inherit from built-in interfaces such as `BasicRepository` and `CrudRepository` to gain various general-purpose repository methods for inserting, updating, deleting, and querying for entities. In addition to these capabilities, the repository can define custom operations by using the static metamodel and annotations such as @Find or @Delete.
+
+[source,java]
+----
+@Repository(dataStore = "java:app/jdbc/my-example-data")
+public interface Products extends CrudRepository<Product, Long> {
+
+    // Filtering is pre-defined at development time by the @Is annotation,
+    @Find
+    @OrderBy(_Product.PRICE)
+    @OrderBy(_Product.NAME)
+    List<Product> costingUpTo(@By(_Product.PRICE) @Is(AtMost.class) double maxPrice);
+
+    // Constraint types, such as Like, can also pre-define filtering.
+    // Allow additional filtering at run time by including a Restriction,
+    @Find
+    Page<Product> named(@By(_Product.Name) Like namePattern,
+                        Restriction<Product> filter,
+                        Order<Product> sorting,
+                        PageRequest pageRequest);
+
+    // Retrieve a single entity attribute, identified by @Select,
+    @Find
+    @Select(_Product.PRICE)
+    Optional<Double> priceOf(@By(_Product.ID) long productNum);
+
+    // Retrieve multiple entity attributes as a Java record,
+    @Find
+    @Select(_Product.WEIGHT)
+    @Select(_Product.NAME)
+    Optional<WeightInfo> weightAndNameOf(@By(_Product.ID) long productNum);
+
+    static record WeightInfo(double itemWeight, String itemName) {}
+}
+----
+
+Here is an example of using the repository and static metamodel:
+
+[source,java]
+----
+@DataSourceDefinition(name = "java:app/jdbc/my-example-data",
+                      className = "org.postgresql.xa.PGXADataSource",
+                      databaseName = "ExampleDB",
+                      serverName = "localhost",
+                      portNumber = 5432,
+                      user = "${example.database.user}",
+                      password = "${example.database.password}")
+public class MyServlet extends HttpServlet {
+    @Inject
+    Products products;
+
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp)
+            throws ServletException, IOException {
+        // Insert:
+        Product prod = ...
+        prod = products.insert(prod);
+
+        // Filter by supplying values only:
+        List<Product> found = products.costingUpTo(50.0, "%keyboard%");
+
+        // Compute filtering at run time,
+        Page<Product> page1 = products.named(
+                        Like.suffix("printer"),
+                        Restrict.all(_Product.price.times(taxRate).plus(shipping).lessThan(250.0),
+                                     _Product.weight.times(kgToPounds).between(10.0, 20.0)),
+                        Order.by(_Product.price.desc(),
+                                 _Product.name.asc(),
+                                 _Product.id.asc()),
+                        PageRequest.ofSize(10));
+
+        // Find one entity attribute:
+        price = products.priceOf(prod.id).orElseThrow();
+
+        // Find multiple entity attributes as a Java record:
+        WeightInfo info = products.getWeightAndName(prod.id);
+        System.out.println(info.itemName() + " weighs " + info.itemWeight() + " kg.");
+
+        ...
+    }
+}
+----
+
+=== Learn more
+
+* link:https://jakarta.ee/specifications/data/1.1/apidocs[Jakarta Data 1.1 API Javadoc]
+* link:https://jakarta.ee/specifications/data/1.1/[Jakarta Data 1.1 overview page]
+* Maven coordinates for Data 1.1 Milestone 2:
++
+[source,xml]
+----
+<dependency>
+    <groupId>jakarta.data</groupId>
+    <artifactId>jakarta.data-api</artifactId>
+    <version>1.1.0-M2</version>
+</dependency>
+----
++
+NOTE: This beta includes only the Data 1.1 features for entity subsets and projections, the @Is annotation, and Constraint subtypes as parameters for repository Find methods. It also includes limited support for Restriction as a special parameter for repository Find methods. The `navigate` operations are not implemented for restrictions and constraints. Other new Data 1.1 features are not included in this beta.
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/34086
+// Contact/Reviewer: daveywebster
+// // // // // // // // 
+[#jakarta_security]
+== Jakarta Security 4.0
+
+An In-memory Identity Store is a developer-defined store of credential information that is used during the Open Liberty authentication and authorization work flow. It provides a quick, simple, and convenient authentication mechanism for Liberty application testing, debugging, demos, and more.
+
+* Multiple HTTP Authentication Mechanisms (HAMs) can now be defined within the same application. These mechanisms can be specified through built-in Jakarta annotations such as `@FormAuthenticationMechanismDefinition` or through custom implementations of the `HttpAuthenticationMechanism` interface.
+* A new method is added to the `SecurityContext` interface called `getAllDeclaredCallerRoles()`, which returns a list of all static (declared) application roles that the authenticated caller is in.
+* References to the `IdentityStorePermission` class are removed as it was previously deprecated.
+
+All features are available as part of `appSecurity-6.0`.
+
+All feature use cases are targeted towards Jakarta EE web application developers who want to move to a modern Jakarta version and use implementations of the Jakarta Security 4.0 specification.
+
+=== In-memory identity store
+
+Before the new identity store specification was introduced, Jakarta natively supported only two identity stores. They are database and LDAP and used for credential validation. However, these options were regarded as heavy‑weight for testing, debugging, and demonstration scenarios.
+
+A developer can also write a custom identity store, but it requires bespoke coding to gather, validate and store credential information, reducing developer focus from core activities. A built-in, in-memory identity store alleviates this burden for the _non-production_ deployment use cases.
+
+The following example shows an application that uses a single authentication mechanism and three identities, which includes the new in‑memory identity store, all managed by the existing `IdentityStoreHandler` internal implementation. This implementation cycles through each identity store to validate credentials. The identity‑store handler can also be overridden with a user‑defined implementation, which is existing functionality.
+
+image::https://github.com/user-attachments/assets/f3ddf9b1-9d2d-481d-9bf2-be3bad28614c[Application with single authentication mechanism and three identity stores,width=1809,height=1065]
+
+=== Multiple HAMs
+
+It is now possible for multiple authentication mechanisms to logically act as a single HTTP Authentication Mechanism (HAM), providing a more flexible, dynamic, and configurable approach to the authentication workflow.
+
+Access to the `HttpAuthenticationMechanism` is now abstracted by an internal implementation of the new Jakarta `HttpAuthenticationMechanismHandler` interface. This implementation prioritizes custom‑defined HAMs first and then falls back to the built‑in (annotation‑defined) HAMs, in the following order: OpenID, custom form, form, and basic authentication mechanisms.
+
+Developers are free to provide their own implementation of the `HttpAuthenticationMechanismHandler`, allowing them to define a custom prioritization strategy for selecting HAMs. They *must* supply such an implementation if any built‑in HAMs are defined with the optional `qualifiers` attribute set.
+
+The following example illustrates an application with three HAMs (Basic, Form, and Custom). In this case, the internal implementation of the Jakarta `HttpAuthenticationMechanismHandler` selects Custom, as it takes priority over built-in HAMs such as Basic and Form. A custom implementation of the `HttpAuthenticationMechanismHandler` can select any HAM based on a bespoke selection algorithm. The HAM hand-off to the identity‑store handler remains in place.
+
+image::https://github.com/user-attachments/assets/e50a5eaa-fd8b-49c6-84b9-8532f79983e0[Application with three HAMs,width=1855,height=1044]
+
+=== getAllDeclaredCallerRoles()
+
+The `SecurityContext` interface implementation is updated to include a new method, `getAllDeclaredCallerRoles()`, which returns a list of the declared application roles for an authenticated caller. If the caller is not authenticated or has no declared roles, the method returns an empty list.
+
+=== How to use
+
+Enable Jakarta Security 4.0 features within the `server.xml` file by adding the `appSecurity-6.0` feature as shown in the following example:
+
+[source,xml]
+----
+<server description = "Liberty server">
+
+    . . .
+
+    <featureManager>
+        <feature>appSecurity-6.0</feature>
+    </featureManager>
+
+    <webAppSecurity allowInMemoryIdentityStores="true"/>
+
+    . . .
+
+----
+
+NOTE: As shown in the preceding example, when an application defines an in‑memory identity store in code, it must also explicitly enable its use in the `server.xml` configuration. By default, the `allowInMemoryIdentityStores` attribute is set to false, which instructs the Liberty authentication workflows not to use in‑memory identity stores, even when a custom identity store handler is present. For applications that rely on multiple HAMs, the `allowInMemoryIdentityStores` attribute does not need to be set.
+
+==== in-memory identity store
+
+The link:https://jakarta.ee/specifications/security/4.0/jakarta-security-spec-4.0#in-memory-annotation[Jakarta Security Specification 4.0] provides details on how to specify credential information to be used during the authentication workflow through the new `@InMemoryIdentityStoreDefinition` annotation, as shown in the following example:
+
+[source,java]
+----
+. . .
+
+@InMemoryIdentityStoreDefinition (
+    priority = 10,
+    priorityExpression = "${80/20}",
+    useFor = {VALIDATE, PROVIDE_GROUPS},
+    useForExpression = "#{'VALIDATE'}",
+    value = {
+        @Credentials(callerName = "jasmine", password = "secret1", groups = { "caller", "user" } )
+    }
+)
+----
+
+All attributes for the `@InMemoryIdentityStoreDefinition` annotation are shown in the example. The `priority`, `priorityExpression`, `useFor`, and `useForExpression` attributes are optional and set to sensible defaults.
+
+The `@Credentials` annotation maps one or more caller names to a password and optional group values. The `callerName` and `password` attributes are mandatory. If either one is omitted, a compilation error occurs.
+
+The example demonstrates a single caller definition with credential information that uses a plain-text password. However, it is highly recommended that passwords be supplied that uses an Open Liberty–supported encoding mechanism, as illustrated in the next example.
+
+[source,java]
+----
+@InMemoryIdentityStoreDefinition (
+    value = {
+        @Credentials(callerName = "jasmine",  password = "{xor}LDo8LTorbg==", groups = { "caller", "user" } ),
+        @Credentials(callerName = "frank", groups = { "user" }, password = "{hash}ARAAA <sequence shortened> Fyyw=="),
+        @Credentials(callerName = "sally", groups = { "user" }, password = "{aes}ARAFIYJ <sequence shortened> WRQNA==")
+    }
+)
+----
+
+Encrypted and encoded passwords can be created by using the Open Liberty application `securityUtility` found under `wlp/bin/securityUtility`. Encoding a text string by using `xor` is shown in the following example:
+
+[source,bash]
+----
+wlp/bin/securityUtility encode --encoding=xor
+Enter text: <enter text to encode>
+Re-enter text:
+{xor}PTA9Lyg
+----
+
+==== multiple hams
+
+===== application specification
+
+The link:https://jakarta.ee/specifications/security/4.0/jakarta-security-spec-4.0#handling-multiple-authentication-mechanisms[Jakarta Security Specification 4.0] allows multiple HAMs to be implemented within a single application by specifying their details as shown in the following example:
+
+[source,java]
+----
+@BasicAuthenticationMechanismDefinition(realmName="basicAuth")
+
+@FormAuthenticationMechanismDefinition(
+                loginToContinue = @LoginToContinue(errorPage = "/form-login-error.html",
+                loginPage = "/form-login.html"))
+
+@CustomFormAuthenticationMechanismDefinition(
+                loginToContinue = @LoginToContinue(errorPage = "/custom-login-error.html",
+                loginPage = "/custom-login.html"))
+----
+
+This example allows for three HAMs to be defined for the application.
+
+Custom HAMs can also be defined within the same application by having one or more classes, which implement the `HttpAuthenticationMechanism` interface as shown in the following example:
+
+[source,java]
+----
+@ApplicationScoped
+// @Priority is optional and used to control selection priority if multiple custom definitions exist
+@Priority(100)
+public class CustomHAM implements HttpAuthenticationMechanism {
+	
+    @Override
+    public AuthenticationStatus validateRequest(
+        HttpServletRequest request,
+        HttpServletResponse response,
+        HttpMessageContext httpMessageContext) throws AuthenticationException {
+
+    	// implement custom logic here, and return an AuthenticationStatus
+    	return AuthenticationStatus.NOT_DONE;
+    }
+}
+----
+
+So a single application can have a mix of both annotation-defined HAMs and custom ones. In the previous two snippets of code, a total of four HAMs are defined (three by annotation and one custom one).
+
+IMPORTANT: `@Priority` must be used to raise or lower the priority of one custom HAM over another. If not specified, then a default priority is assigned. If more than one custom HAM is defined, their priorities need to be explicitly set to unique values. If the priorities are set to the same value or remain unset and inherit the same default value, an error occurs.
+
+'''
+
+===== HAM resolution
+
+An internal implementation of the Jakarta Security 4.0 `HttpAuthenticationMechanismHandler` interface (the "internal HAM handler") is provided. When an application defines multiple HAMs, this internal handler selects a single HAM to be used in the authentication flow.
+
+The order in which HAMs are considered (when present) is as follows:
+
+. Custom (developer‑provided) HAMs
+** If multiple custom HAMs are defined, their relative order is resolved by using `@Priority`.
+. `OpenIdAuthenticationMechanismDefinition`
+. `CustomFormAuthenticationMechanismDefinition`
+. `FormAuthenticationMechanismDefinition`
+. `BasicAuthenticationMechanismDefinition`
+
+Given this ordering, the Custom HAM is always selected in the authentication workflow if all five HAM types are defined in the application.
+
+IMPORTANT: A developer can provide a custom implementation of the `HttpAuthenticationMechanismHandler` interface (a "custom HAM handler") if the internal HAM handler does not meet their requirements. A custom handler always takes precedence over the internal HAM handler, allowing any tailored algorithm to select a single HAM from multiple available mechanisms. Additional information about creating and using a custom HAM handler is provided in a later section.
+
+'''
+
+===== Qualifiers
+
+HAMs - whether defined through annotations or as custom defined - can also include an optional class‑level qualifier to simplify HAM injection into a custom HAM handler. For example, if you want to define qualified HAMs, you would first declare qualifier interfaces such as:
+
+[source,java]
+----
+@Qualifier
+@Retention(RUNTIME)
+@Target({TYPE, METHOD, FIELD, PARAMETER})
+public @interface Admin {
+}
+----
+
+_(Not shown is the qualifier definitions for `User`, `Fallback` which follow an identical pattern, and are used below)._
+
+Then, import and use the qualifiers in your in-built or custom HAM specifications, such as:
+
+[source,java]
+----
+@CustomFormAuthenticationMechanismDefinition(<existing details not shown>, qualifiers={Admin.class})
+
+@BasicAuthenticationMechanismDefinition(<existing details not shown>, qualifiers={User.class})
+----
+
+and
+
+[source,java]
+----
+@ApplicationScoped
+@Fallback   // add custom qualifier to be used during injection
+public class CustomHAM implements HttpAuthenticationMechanism {
+	
+    @Override
+    public AuthenticationStatus validateRequest (. . .)  {
+         . . .
+    }
+}
+----
+
+The three HAMs defined in the example are available for injection into a custom HAM handler based on their qualifier names. This scenario represents the typical use case for applications that define multiple HAMs.
+
+IMPORTANT: If qualifiers are specified in any of the built-in HAM definitions, a custom HAM handler must be provided; otherwise, an error is raised. This requirement comes directly from the Jakarta Security specification. Details about creating and using a custom HAM handler are explained in the next section.
+
+'''
+
+To implement a custom HAM handler, define a public class that is annotated with `@ApplicationScoped` that implements the `HttpAuthenticationMechanismHandler` interface. Also, inject the qualified HAMs by using standard CDI syntax, as shown in the following section:
+
+[source,java]
+----
+@Default
+@ApplicationScoped
+public class CustomHAMHandler implements HttpAuthenticationMechanismHandler {
+
+    @Inject @Admin // this will be the FormHAM
+    private HttpAuthenticationMechanism adminHAM;
+
+    @Inject @User // this will be the BasicHAM
+    private HttpAuthenticationMechanism userHAM;
+
+    @Inject @Fallback // this will be the Custom HAM
+    private HttpAuthenticationMechanism fallbackHAM;
+
+    public AuthenticationStatus validateRequest(HttpServletRequest request,
+                                                                                     HttpServletResponse response,
+                                                                                     HttpMessageContext context) throws AuthenticationException {
+
+        String path = request.getRequestURI();
+
+        // route to appropriate mechanism based on path, default to my-realm
+        if (path.startsWith("/admin")) { // FormHAM
+            return adminHAM.validateRequest(request, response, context);
+        } else if (path.startsWith("/user")) { // BasicHAM
+            return userHAM.validateRequest(request, response, context);
+        } else { // Custom HAM
+            return fallbackHAM.validateRequest(request, response, context);
+    }
+}
+----
+
+This custom HAM handler takes priority over the internal HAM handler, allowing a different prioritisation algorithm to be implemented.
+
+==== getAllDeclaredCallerRoles()
+
+To use the new `SecurityContext` method, inject the `SecurityContext` implementation into your application and call the method directly, as shown in the following section:
+
+[source,java]
+----
+    @Inject
+    private SecurityContext securityContext;
+
+. . .
+
+    Set<String> allDeclaredCallerRoles = securityContext.getAllDeclaredCallerRoles();
+
+    System.out.println("All declared caller roles for caller ["
+        + securityContext.getCallerPrincipal().getName()
+        + "] are "
+        + allDeclaredCallerRoles.toString());
+----
+
+=== Learn more
+
+Further information can be found in the Jakarta Security Specification 4.0:
+
+* link:https://jakarta.ee/specifications/security/4.0/jakarta-security-spec-4.0#in-memory-annotation[in-memory identity store]
+* link:https://jakarta.ee/specifications/security/4.0/jakarta-security-spec-4.0#handling-multiple-authentication-mechanisms[multiple-hams]
+* link:https://jakarta.ee/specifications/security/4.0/jakarta-security-spec-4.0#retrieving-and-testing-for-caller-data[getAllDeclaredCallerRoles()]
+
+Information about the `securityUtility` can be found in the link:https://www.ibm.com/docs/en/was-liberty/base?topic=applications-securityutility-command[WAS Liberty topic base].
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
+
+[#run]
+=== Try it now
+
+To try out these features, update your build tools to pull the Open Liberty All Beta Features package instead of the main release. The beta works with Java SE 25, Java SE 21, Java SE 17, Java SE 11, and Java SE 8.
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], you can install the All Beta Features package using:
+
+[source,xml]
+----
+<plugin>
+    <groupId>io.openliberty.tools</groupId>
+    <artifactId>liberty-maven-plugin</artifactId>
+    <version>3.12.0</version>
+    <configuration>
+        <runtimeArtifact>
+          <groupId>io.openliberty.beta</groupId>
+          <artifactId>openliberty-runtime</artifactId>
+          <version>26.0.0.4-beta</version>
+          <type>zip</type>
+        </runtimeArtifact>
+    </configuration>
+</plugin>
+----
+
+You must also add dependencies to your `pom.xml` file for the beta version of the APIs that are associated with the beta features that you want to try. For example, the following block adds dependencies for two example beta APIs:
+
+[source,xml]
+----
+<dependency>
+    <groupId>org.example.spec</groupId>
+    <artifactId>exampleApi</artifactId>
+    <version>7.0</version>
+    <type>pom</type>
+    <scope>provided</scope>
+</dependency>
+<dependency>
+    <groupId>example.platform</groupId>
+    <artifactId>example.example-api</artifactId>
+    <version>11.0.0</version>
+    <scope>provided</scope>
+</dependency>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'io.openliberty.tools:liberty-gradle-plugin:4.0.0'
+    }
+}
+apply plugin: 'liberty'
+dependencies {
+    libertyRuntime group: 'io.openliberty.beta', name: 'openliberty-runtime', version: '[26.0.0.4-beta,)'
+}
+----
+
+Or if you're using link:{url-prefix}/docs/latest/container-images.html[container images]:
+
+[source]
+----
+FROM icr.io/appcafe/open-liberty:beta
+----
+
+Or take a look at our link:{url-prefix}/downloads/#runtime_betas[Downloads page].
+
+If you're using link:https://plugins.jetbrains.com/plugin/14856-liberty-tools[IntelliJ IDEA], link:https://marketplace.visualstudio.com/items?itemName=Open-Liberty.liberty-dev-vscode-ext[Visual Studio Code] or link:https://marketplace.eclipse.org/content/liberty-tools[Eclipse IDE], you can also take advantage of our open source link:https://openliberty.io/docs/latest/develop-liberty-tools.html[Liberty developer tools] to enable effective development, testing, debugging and application management all from within your IDE.
+
+For more information on using a beta release, refer to the link:{url-prefix}docs/latest/installing-open-liberty-betas.html[Installing Open Liberty beta releases] documentation.
+
+[#feedback]
+== We welcome your feedback
+
+Let us know what you think on link:https://groups.io/g/openliberty[our mailing list]. If you hit a problem, link:https://stackoverflow.com/questions/tagged/open-liberty[post a question on StackOverflow]. If you hit a bug, link:https://github.com/OpenLiberty/open-liberty/issues[please raise an issue].
