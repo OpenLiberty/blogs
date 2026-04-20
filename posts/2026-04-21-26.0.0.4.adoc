@@ -106,32 +106,33 @@ FROM icr.io/appcafe/open-liberty
 
 Or take a look at our link:{url-prefix}/start/[Downloads page].
 
-If you're using link:https://plugins.jetbrains.com/plugin/14856-liberty-tools[IntelliJ IDEA], link:https://marketplace.visualstudio.com/items?itemName=Open-Liberty.liberty-dev-vscode-ext[Visual Studio Code] or link:https://marketplace.eclipse.org/content/liberty-tools[Eclipse IDE], you can also take advantage of our open source link:https://openliberty.io/docs/latest/develop-liberty-tools.html[Liberty developer tools] to enable effective development, testing, debugging and application management all from within your IDE. 
+If you're using link:https://plugins.jetbrains.com/plugin/14856-liberty-tools[IntelliJ IDEA], link:https://marketplace.visualstudio.com/items?itemName=Open-Liberty.liberty-dev-vscode-ext[Visual Studio Code], or link:https://marketplace.eclipse.org/content/liberty-tools[Eclipse IDE], you can also take advantage of our open source link:https://openliberty.io/docs/latest/develop-liberty-tools.html[Liberty developer tools] to enable effective development, testing, debugging, and application management all from within your IDE. 
 
 [link=https://stackoverflow.com/tags/open-liberty]
 image::img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="center"]
 
 [#TAG_1]
 === File Transfer changes for 26.0.0.4
-Liberty's FileService MBean provided by the `restConnector-2.0` feature now includes an extra attribute `blocklist`. This attribute can be configured by the `server.xml` config element `<blockDir>`. The default value of this attribute is `${server.output.dir}/resources/security`. This behavior change resolves link:https://github.com/advisories/GHSA-c39w-6qgm-5cp7[CVE-2025-14915], by restricting default FileTransfer access to `${server.output.dir}/resources/security`. 
+Liberty's FileService MBean provided by the `restConnector-2.0` feature now includes an extra `blocklist` attribute. This attribute is configured by the `<blockDir>` config element in the `server.xml` file. The default value of this attribute is `${server.output.dir}/resources/security`. This behavior change resolves the security vulnerability link:https://github.com/advisories/GHSA-c39w-6qgm-5cp7[CVE-2025-14915], by restricting default FileTransfer access to `${server.output.dir}/resources/security`. 
 
 If FileTransfer access to `${server.output.dir}/resources/security` is required, the original behavior can be restored by setting an empty blocklist.
 
-For more information, see
- link:https://www.ibm.com/docs/en/was-liberty/nd?topic=liberty-list-provided-mbeans#rwlp_mbeans_list__FileService[]
- link:https://www.ibm.com/docs/en/was-liberty/nd?topic=liberty-list-provided-mbeans#rwlp_mbeans_list__FileTransfer__title__1[]
- link:https://www.ibm.com/docs/en/was-liberty/nd?topic=manually-file-transfer[]
+For more information, see:
+
+* link:https://www.ibm.com/docs/en/was-liberty/nd?topic=liberty-list-provided-mbeans#rwlp_mbeans_list__FileService[]
+* link:https://www.ibm.com/docs/en/was-liberty/nd?topic=liberty-list-provided-mbeans#rwlp_mbeans_list__FileTransfer[]
+* link:https://www.ibm.com/docs/en/was-liberty/nd?topic=manually-file-transfer[]
 
 [#ltpa]
 == Default LTPA keys password removal
 
-The default LTPA keys password is removed to resolve the link:https://www.ibm.com/support/pages/node/7266845[CVE-2025-14917].
+The default LTPA keys password is removed to resolve the security vulnerability link:https://www.ibm.com/support/pages/node/7266845[CVE-2025-14917].
 
 Previously, a default password for the LTPA keys was used when the `keysPassword` attribute was not defined in the `<ltpa />` element. With this change, the default password is no longer supported.
 
-If LTPA keys password is not configured in `server.xml`, the `keystore_password` in `server.env` is used to reencrypt the LTPA keys in the `ltpa.keys` file. The LTPA keys themselves are not impacted. The `keystore_password` is configured in the `server.env` file during server creation unless the `--no-password` option is used with the `server create` command.
+For existing servers, if the LTPA keys password is not configured in the `server.xml` file, the `keystore_password` in the `server.env` file is used. This value re-encrypts the LTPA keys in the `ltpa.keys` file. The LTPA keys themselves are not impacted. The `keystore_password` is configured in the `server.env` file during server creation unless the `--no-password` option is used with the `server create` command.
 
-If a keysPassword is not defined in the `<ltpa />`` element in the `server.xml` file and a `keystore_password` is not defined in the `server.env` file, the LTPA service fails.
+If a `keysPassword` is not defined in the `<ltpa />` element in the `server.xml` file and a `keystore_password` is not defined in the `server.env` file, the LTPA service fails.
 The following error message is displayed:
 
 [source,text]
@@ -139,24 +140,24 @@ The following error message is displayed:
 CWWKS4118E: LTPA configuration error. A keysPassword attribute is not configured on the <ltpa /> element, the 'ltpa_keys_password' environment variable is not set, and the 'keystore_password' environment variable is not set.
 ----
 
-For existing servers, confirm that an LTPA keys password is set up by doing the following steps:
+Confirm that an LTPA keys password is set up by doing the following steps:
 
 . Check to see whether a `keysPassword` attribute is provided for the `<ltpa />` element in the `server.xml` file (for example, `<ltpa keysPassword="myKeysPassword" />`).
 * If it is provided, this update does not affect you and no further action is needed.
 * If it is not provided, do *not* add it and proceed to the next step.
 . Check to see whether the `keystore_password` environment variable exists in the `server.env` file (for example, `keystore_password=myKeystorePassword`).
-* If it exists, then `keystore_password` is used to reencrypt the LTPA keys that were previously encrypted with the default `keysPassword` when the server starts.
+* If it exists, then the `keystore_password` is used to reencrypt the LTPA keys that were previously encrypted with the default `keysPassword` when the server starts.
 * If it does not exist, proceed to the next step.
-. Add the following environment variable to the `server.env` file:
+. Add the following environment variable to the `server.env` file (ensure you use the `keystore_password` here and *not* the `ltpa_keys_password` described in the next section for new servers):
 +
 [source,properties]
 ----
-keystore_password=(your-desired-password)
+keystore_password=your-desired-password
 ----
 +
 * The `keystore_password` is used to reencrypt the LTPA keys that were previously encrypted with the default `keysPassword` when the server starts.
 
-For new servers, a new `ltpa_keys_password` is randomly generated during server creation. It is stored in the `server.env` file unless the `--no-password` option is specified with the `server create` command. The randomly generated `ltpa_keys_password` is used if the `keysPassword` attribute is not defined for the `<ltpa />` element. Do *not* use the `ltpa_keys_password` in place of the `keystore_password` in step 3 of the previous section for existing servers.
+For new servers, a new `ltpa_keys_password` is randomly generated during server creation. It is stored in the `server.env` file unless the `--no-password` option is specified with the `server create` command. The randomly generated `ltpa_keys_password` is used if the `keysPassword` attribute is not defined for the `<ltpa />` element. 
 
 For more information, see the link:https://openliberty.io/docs/latest/reference/config/ltpa.html[LTPA] configuration element.
 
@@ -164,43 +165,45 @@ For more information, see the link:https://openliberty.io/docs/latest/reference/
 [#jwt]
 ==  Support selecting JWT signature and decryption algorithms from JOSE header
 
-JSON Web Tokens (JWTs) can be signed by using various cryptographic signature algorithms. With this release, the JWT Consumer, MicroProfile JWT, OpenID Connect Client, and Social Media Login features support selecting the JWT signature algorithm from the JOSE header. This support allows different signature algorithms to be used based on the token.
+JSON Web Tokens (JWTs) can be signed by using various cryptographic signature algorithms. With this release, the JWT Consumer, MicroProfile JWT, OpenID Connect Client, and Social Media Login features support selecting the JWT signature algorithm from the JOSE header. This support allows different signature algorithms to be used based on the token header.
 
-Earlier, developers and administrators were restricted to configuring a single signature algorithm (for example, `RS256`) in the `server.xml` file. If the incoming JWT was signed with a different algorithm, validation would fail. This update allows the signature algorithm from the JWT header to be used for validation. It provides the flexibility of using different signature algorithms within a single configuration.
+Previously, only one single signature algorithm (for example, `RS256`) was able to be configured for each configuration in the `server.xml` file. If the incoming JWT was signed with a different algorithm, validation would fail. This update allows the signature algorithm from the JWT header to be used for validation. It provides the flexibility of using different signature algorithms within a single configuration.
 
 === How to use
 
 To enable signature algorithm selection from the header, set the `signatureAlgorithm` attribute to `FROM_HEADER` and optionally configure the `allowedSignatureAlgorithms` attribute to specify which algorithms are permitted.
 
-If `allowedSignatureAlgorithms` is not configured, the default list contains all Open Liberty-supported signature algorithms: `RS256, RS384, RS512, HS256, HS384, HS512, ES256, ES384, ES512`.
+If `allowedSignatureAlgorithms` is not configured, the default list contains all Open Liberty-supported signature algorithms: `RS256, RS384, RS512, HS256, HS384, HS512, ES256, ES384`, and `ES512`.
 
-When using `FROM_HEADER` with asymmetric algorithms and a trust store setup, the public keys must be prefixed with their corresponding algorithm (e.g., `RS256_keyalias`) for automatic selection. During validation, the server searches the trust store for an alias that begins with the algorithm specified in the JWT's header. If no algorithm-prefixed key is found, the client falls back to using the key specified by the trustedAlias attribute (for `jwtConsumer`) or trustAliasName attribute (for `openidConnectClient`, `oidcLogin` and `mpjwt`), if configured.
+When using `FROM_HEADER` with asymmetric algorithms and a trust store setup, the public keys must be prefixed with their corresponding algorithm (e.g., `RS256_keyalias`) for automatic selection. During validation, the server searches the trust store for an alias that begins with the algorithm specified in the JWT's header. If no algorithm-prefixed alias is found, the client falls back to using the alias specified by the `trustedAlias` attribute (for `jwtConsumer`) or `trustAliasName` attribute (for `openidConnectClient`, `oidcLogin` and `mpJwt`), if configured.
 
-See the following `server.xml` file example:
+See the following `server.xml` file configurations for examples on how to apply these settings to the supported elements:
 
 [source,xml]
 ----
 <jwtConsumer
     signatureAlgorithm="FROM_HEADER"
-    allowedSignatureAlgorithms="RS256, ES384, HS512" ... />
-
-...
+    allowedSignatureAlgorithms="RS256, ES384, HS512" 
+    ...
+/>
 
 <mpJwt
     signatureAlgorithm="FROM_HEADER"
-    allowedSignatureAlgorithms="RS256, ES384, HS512" ... />
-
-...
+    allowedSignatureAlgorithms="RS256, ES384, HS512"
+    ... 
+/>
 
 <openidConnectClient
     signatureAlgorithm="FROM_HEADER"
-    allowedSignatureAlgorithms="RS256, ES384, HS512" ... />
-
-...
+    allowedSignatureAlgorithms="RS256, ES384, HS512" 
+    ... 
+/>
 
 <oidcLogin
     signatureAlgorithm="FROM_HEADER"
-    allowedSignatureAlgorithms="RS256, ES384, HS512" ... />
+    allowedSignatureAlgorithms="RS256, ES384, HS512" 
+    ... 
+/>
 ----
 
 === Learn more
@@ -264,7 +267,7 @@ For more information on Java 26, see the Java 26 link:https://jdk.java.net/26/re
 == displayCustomizedExceptionText property 
 This release adds documentation and tests for the `displayCustomizedExceptionText` configuration, which allows users to override Liberty’s default error messages (such as SRVE0218E: Forbidden and SRVE0232E: An exception occurred) with clearer, user-defined messages. 
 
-The feature is enabled through simple `server.xml` file configuration, where custom messages can be mapped to specific HTTP status codes (403 and 500). 
+The feature is enabled through simple `server.xml` file configuration, where custom messages can be mapped to specific HTTP status codes (`403` and `500`). 
 
 Testing ensures that these custom messages correctly replace Liberty’s defaults across all supported platforms, confirming that the configured text is returned consistently in all scenarios.
 
@@ -274,8 +277,6 @@ Testing ensures that these custom messages correctly replace Liberty’s default
 ----
 
 // DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
-
-For more details, check the LINK[LINK_DESCRIPTION].
 
 // // // // // // // //
 // In the preceding section:
