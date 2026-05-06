@@ -1,0 +1,276 @@
+---
+layout: post
+title: "MCP server updates and Transport Security in 26.0.0.5-beta"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/navaneethsnair1
+author_github: https://github.com/navaneethsnair1
+seo-title: "MCP server updates and Transport Security in 26.0.0.5-beta- OpenLiberty.io"
+seo-description: This beta release updates the `mcpServer-1.0` feature and simplifies SSL cipher configuration by using JDK defaults and flexible `enabledCiphers` syntax.
+blog_description: This beta release updates the `mcpServer-1.0` feature and simplifies SSL cipher configuration by using JDK defaults and flexible `enabledCiphers` syntax.
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+---
+= MCP server updates and Transport Security in 26.0.0.5-beta
+Navaneeth S Nair <https://github.com/navaneethsnair1>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+This beta release updates the `mcpServer-1.0` feature and simplifies SSL cipher configuration by using JDK defaults and flexible `enabledCiphers` syntax.
+
+// // // // // // // //
+// Change the RELEASE_SUMMARY to an introductory paragraph. This sentence is really
+// important because it is supposed to grab the readers attention.  Make sure to keep the blank lines
+//
+// Throughout the doc, replace RELEASE_VERSION with the version number of Open Liberty, eg: 22.0.0.2-beta
+// // // // // // // //
+
+The link:{url-about}[Open Liberty] 26.0.0.5-beta includes the following beta features (along with link:{url-prefix}/docs/latest/reference/feature/feature-overview.html[all GA features]):
+
+* <<mcp, Updates to `mcpServer-1.0`>>
+* <<transportSecurity, Transport Security>>
+
+// // // // // // // //
+// In the preceding section:
+// Change SUB_FEATURE_TITLE to the feature that is included in this release and
+// change the SUB_TAG_1/2/3 to the heading tags
+//
+// However if there's only 1 new feature, delete the previous section and change it to the following sentence:
+// "The link:{url-about}[Open Liberty] RELEASE_VERSION includes SUB_FEATURE_TITLE"
+// // // // // // // //
+
+See also link:{url-prefix}/blog/?search=beta&key=tag[previous Open Liberty beta blog posts].
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/34763
+// Contact/Reviewer: martindrozdz
+// // // // // // // // 
+[#mcp]
+== Updates to `mcpServer-1.0`
+
+The link:https://modelcontextprotocol.io/docs/getting-started/intro[Model Context Protocol (MCP)] is an open standard that enables AI applications to access real-time information from external sources. The Liberty MCP Server feature `mcpServer-1.0` allows developers to expose the business logic or data from their applications, allowing it to be integrated into agentic AI workflows.
+
+This beta release of Liberty includes important updates to the `mcpServer-1.0` feature, including configurable endpoint paths and notable bug fixes.
+
+=== Prerequisites
+To use the `mcpServer-1.0` feature, it is required to have `Java 17` or later installed on your system.
+
+=== Configure custom MCP endpoint paths 
+Previously, the MCP endpoint was hard-coded to `/mcp` under the web application context root. You can now configure custom endpoint paths to better suit your application architecture and naming conventions.
+
+==== Single Application Configuration
+
+For a single application, configure the endpoint path directly in the `<mcpServer>` element:
+
+[source,xml]
+----
+<server description="Configurable Mcp Path Liberty server">
+
+  <featureManager>
+    <feature>servlet-6.0</feature>
+    <feature>cdi-4.0</feature>
+    <feature>mcpServer-1.0</feature>
+  </featureManager>
+
+  <application location="configurableMcpPathTests.war">
+  	<mcpServer path="/custom-mcp"/>
+  </application>
+
+  <include location="../fatTestPorts.xml" />
+
+</server>
+----
+
+With this configuration, MCP server can be accessed at `/custom-mcp` instead of the default `/mcp` path.
+
+=== Configuration Options
+
+The `<mcpServer>` element supports the following attributes:
+
+- **path** (single app): The custom path for the MCP endpoint (for example, `/custom-mcp`)
+
+=== Notable bug fixes in this release for `mcpServer-1.0`
+
+==== 1) Structured content output schemas now comply with MCP specification
+
+The MCP specification requires that structured content output schemas must have an object type at the root level. Previously, when arrays of objects are returned, the schema incorrectly placed the array at the root level.
+
+*Previous Behavior (Incorrect):*
+[source,json]
+----
+{
+  "outputSchema": {
+    "description": "Returns list of person object",
+    "type": "array",
+    "items": {
+      "$ref": "#/$defs/Person"
+    }
+  }
+}
+----
+
+*Current Behavior (Correct):*
+[source,json]
+----
+{
+  "outputSchema": {
+    "description": "Returns Persons object",
+    "type": "object",
+    "properties": {
+      "persons": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/Person"
+        }
+      }
+    }
+  }
+}
+----
+
+This helps ensure that all structured content responses comply with the link:https://modelcontextprotocol.io/specification/2025-11-25/server/tools#structured-content[MCP structured content specification] and improves compatibility with MCP clients and conformance tests.
+
+==== 2) Authentication failures now return correct HTTP status code
+
+Previously, failed authentication attempts returned a `403 Forbidden` response, which might be confusing as it typically indicates authorization (permission) failures rather than authentication (identity verification) failures.
+
+Now, failed authentication attempts correctly return a `401 Unauthorized` response, making it immediately clear that the issue is with authentication credentials rather than permissions. This behavior follows HTTP specification best practices and makes it easier to troubleshoot authentication configuration problems.
+
+==== 3) Fixed encoder bean isolation in multi-application deployments
+
+Previously, encoder beans from multiple applications were stored in a static list within `McpCdiExtension`, causing beans from different applications to interfere with each other. This behavior could result in encoder beans from one application being incorrectly called in another application, unpredictable behavior in multi-application deployments, and potential security issues with cross-application bean access.
+
+This has been fixed to ensure proper isolation of encoder beans per application, preventing cross-application interference and helping ensure that each application uses only its own encoder beans.
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/34374
+// Contact/Reviewer: rangaran
+// // // // // // // // 
+[#transportSecurity]
+== Transport Security
+
+Liberty uses the default cipher list from the JDK. The `securityLevel` attribute in the SSL configuration is not used anymore. In addition, the `enabledCiphers` attribute in the SSL config is updated to customize the SSL ciphers in a more flexible way.
+
+This change modifies the existing attribute `enabledCiphers` in the `ssl` config.
+
+Liberty's `securityLevel` based cipher categories no longer provide meaningful value. The `MEDIUM` and `LOW` categories contain no remaining ciphers.
+
+The `enabledCiphers` attribute includes a new syntax option to add '+' or remove '–' specific ciphers from the effective JDK cipher list without redefining everything. A static list and +/- syntax in the same `enabledCiphers` entry is not allowed. If the value set in `enabledCiphers` contains a static entry and a +/- entry, an error is logged, and the server ignores the `enabledCiphers` value by returning the effective JDK cipher list.
+
+*Example Usage*
+
+[source,xml]
+----
+<ssl id="defaultSSL" securityLevel="HIGH"/>
+<ssl id="defaultSSL" securityLevel="CUSTOM" enabledCiphers="TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384 TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA256 TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA384..../"> <!-- basically everything except TLS_RSA ciphers from the effective jdk list -->
+<ssl id="defaultSSL" securityLevel="CUSTOM" enabledCiphers="TLS_RSA_WITH_AES_128_GCM_SHA256"/>
+----
+
+*Example with new syntax*
+
+[source,xml]
+----
+<ssl id="defaultSSL" enabledCiphers="-TLS_RSA* +TLS_RSA_WITH_AES_128_GCM_SHA256"/>
+----
+
+To learn more about Transport Security, see link:https://openliberty.io/docs/modules/reference/23.0.0.6/com.ibm.websphere.appserver.api.ssl_1.5-javadoc/com/ibm/websphere/ssl/Constants.html[SSL Constants Javadoc], link:https://openliberty.io/docs/modules/reference/23.0.0.6/com.ibm.websphere.appserver.api.ssl_1.5-javadoc/com/ibm/websphere/ssl/JSSEProvider.html[JSSEProvider Javadoc], and link:https://openliberty.io/docs/latest/reference/config/ssl.html[SSL Configuration Reference].
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
+
+[#run]
+=== Try it now
+
+To try out these features, update your build tools to pull the Open Liberty All Beta Features package instead of the main release. To enable the MCP server feature, follow the instructions from link:https://openliberty.io/blog/2025/10/23/mcp-standalone-blog.html[MCP standalone blog]. The beta works with Java SE 25, Java SE 21, Java SE 17, Java SE 11, and Java SE 8.
+
+// // // // // // // //
+// In the preceding section:
+// Check if a new non-LTS Java SE version is supported that needs to be added to the list (21, 17, 11, and 8 are LTS and will remain for a while)
+// https://openliberty.io/docs/latest/java-se.html
+//
+// In the following section:
+// Check if a new MicroProfile or Jakarta version is in beta that could replace the example values in the codeblock
+// // // // // // // //
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], you can install the All Beta Features package using:
+
+[source,xml]
+----
+<plugin>
+    <groupId>io.openliberty.tools</groupId>
+    <artifactId>liberty-maven-plugin</artifactId>
+    <version>3.12.0</version>
+    <configuration>
+        <runtimeArtifact>
+          <groupId>io.openliberty.beta</groupId>
+          <artifactId>openliberty-runtime</artifactId>
+          <version>26.0.0.5-beta</version>
+          <type>zip</type>
+        </runtimeArtifact>
+    </configuration>
+</plugin>
+----
+
+You must also add dependencies to your `pom.xml` file for the beta version of the APIs that are associated with the beta features that you want to try. For example, the following block adds dependencies for two example beta APIs:
+
+[source,xml]
+----
+<dependency>
+    <groupId>org.example.spec</groupId>
+    <artifactId>exampleApi</artifactId>
+    <version>7.0</version>
+    <type>pom</type>
+    <scope>provided</scope>
+</dependency>
+<dependency>
+    <groupId>example.platform</groupId>
+    <artifactId>example.example-api</artifactId>
+    <version>11.0.0</version>
+    <scope>provided</scope>
+</dependency>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'io.openliberty.tools:liberty-gradle-plugin:4.0.0'
+    }
+}
+apply plugin: 'liberty'
+dependencies {
+    libertyRuntime group: 'io.openliberty.beta', name: 'openliberty-runtime', version: '[26.0.0.5-beta,)'
+}
+----
+// // // // // // // //
+// In the preceding section:
+// Replace the Maven `3.11.5` with the latest version of the plugin: https://search.maven.org/artifact/io.openliberty.tools/liberty-maven-plugin
+// Replace the Gradle `3.9.5` with the latest version of the plugin: https://search.maven.org/artifact/io.openliberty.tools/liberty-gradle-plugin
+// TODO: Update GHA to automatically do the above.  If the maven.org is problematic, then could fallback to using the GH Releases for the plugins
+// // // // // // // //
+
+Or if you're using link:{url-prefix}/docs/latest/container-images.html[container images]:
+
+[source]
+----
+FROM icr.io/appcafe/open-liberty:beta
+----
+
+Or take a look at our link:{url-prefix}/downloads/#runtime_betas[Downloads page].
+
+If you're using link:https://plugins.jetbrains.com/plugin/14856-liberty-tools[IntelliJ IDEA], link:https://marketplace.visualstudio.com/items?itemName=Open-Liberty.liberty-dev-vscode-ext[Visual Studio Code] or link:https://marketplace.eclipse.org/content/liberty-tools[Eclipse IDE], you can also take advantage of our open source link:https://openliberty.io/docs/latest/develop-liberty-tools.html[Liberty developer tools] to enable effective development, testing, debugging and application management all from within your IDE.
+
+For more information on using a beta release, refer to the link:{url-prefix}docs/latest/installing-open-liberty-betas.html[Installing Open Liberty beta releases] documentation.
+
+[#feedback]
+== We welcome your feedback
+
+Let us know what you think on link:https://groups.io/g/openliberty[our mailing list]. If you hit a problem, link:https://stackoverflow.com/questions/tagged/open-liberty[post a question on StackOverflow]. If you hit a bug, link:https://github.com/OpenLiberty/open-liberty/issues[please raise an issue].
