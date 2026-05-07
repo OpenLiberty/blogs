@@ -48,7 +48,7 @@ One of the most exciting additions to Jakarta EE 11 is *Jakarta Data 1.0*, a new
 
 === What is Jakarta Data?
 
-Jakarta Data provides an API for easier data access. A Java developer can split the persistence from the model with several features, such as the ability to compose custom query methods or a Repository interface. Jakarta Data's goal is to provide a familiar and consistent, Jakarta-based programming model for data access while still retaining the particular traits of the underlying data store.
+Jakarta Data provides an API for easier data access. A Java developer can split the details of persistence from the data model with several features, such as the ability to compose custom query methods on a Repository interface. Jakarta Data's goal is to provide a familiar and consistent, Jakarta-based programming model for data access while still retaining the particular traits of the underlying data store. It is designed to be flexible and extensible, allowing developers to use it with various types of databases, including relational databases, NoSQL databases, and even in-memory data stores.
 
 === Key Features of Jakarta Data 1.0
 
@@ -386,12 +386,12 @@ import java.util.concurrent.TimeUnit;
 
 @ApplicationScoped
 @ManagedExecutorDefinition(
-    name = "java:app/concurrent/VirtualThreadExecutor",
+    name = "java:module/concurrent/VirtualThreadExecutor",
     virtual = true
 )
 public class ConcurrencyExample {
     
-    @Resource(lookup = "java:app/concurrent/VirtualThreadExecutor")
+    @Resource(lookup = "java:module/concurrent/VirtualThreadExecutor")
     private ManagedExecutorService executorService;
     
     @Resource
@@ -399,18 +399,7 @@ public class ConcurrencyExample {
     
     public CompletableFuture<String> asyncOperation() {
         // Leverages Virtual Threads on Java 21+
-        return executorService.supplyAsync(() -> {
-            // Long-running operation
-            return processData();
-        });
-    }
-    
-    public void scheduleTask() {
-        // Schedule a task to run periodically
-        scheduledExecutor.scheduleAtFixedRate(
-            () -> performMaintenanceTask(),
-            0, 1, TimeUnit.HOURS
-        );
+        return executorService.supplyAsync(this::processData);;
     }
     
     private String processData() {
@@ -1640,220 +1629,6 @@ public class CustomerRepository {
         } else {
             em.merge(customer);
         }
-    }
-}
-
-// NEW in 3.2: Criteria API Enhancements
-@Stateless
-public class CustomerCriteriaRepository {
-    
-    @PersistenceContext
-    private EntityManager em;
-    
-    // NEW in 3.2: Using CriteriaSelect for type-safe queries
-    public List<Customer> findCustomersByCityUsingCriteria(String city) {
-        CriteriaBuilder cb = em.getCriteriaBuilder();
-        CriteriaQuery<Customer> cq = cb.createQuery(Customer.class);
-        Root<Customer> customer = cq.from(Customer.class);
-        
-        // CriteriaSelect provides enhanced type safety
-        cq.select(customer)
-          .where(cb.equal(customer.get("address").get("city"), city));
-        
-        return em.createQuery(cq).getResultList();
-    }
-    
-    // NEW in 3.2: subquery(EntityType) for correlated subqueries
-    public List<Customer> findCustomersWithMultipleOrders() {
-        CriteriaBuilder cb = em.getCriteriaBuilder();
-        CriteriaQuery<Customer> cq = cb.createQuery(Customer.class);
-        Root<Customer> customer = cq.from(Customer.class);
-        
-        // Create a correlated subquery using the new subquery(EntityType) method
-        Subquery<Long> subquery = cq.subquery(Long.class);
-        Root<Order> order = subquery.correlate(customer).join("orders");
-        subquery.select(cb.count(order));
-        
-        cq.select(customer)
-          .where(cb.greaterThan(subquery, 1L));
-        
-        return em.createQuery(cq).getResultList();
-    }
-    
-    // NEW in 3.2: Joins on EntityType
-    public List<Customer> findCustomersWithRecentOrders(Instant since) {
-        CriteriaBuilder cb = em.getCriteriaBuilder();
-        CriteriaQuery<Customer> cq = cb.createQuery(Customer.class);
-        Root<Customer> customer = cq.from(Customer.class);
-        
-        // Join directly on EntityType
-        Join<Customer, Order> orders = customer.join("orders");
-        
-        cq.select(customer)
-          .where(cb.greaterThanOrEqualTo(orders.get("orderDate"), since))
-          .distinct(true);
-        
-        return em.createQuery(cq).getResultList();
-    }
-}
-
-// NEW in 3.2: Advanced Query Operators
-@Stateless
-public class AdvancedQueryRepository {
-    
-    @PersistenceContext
-    private EntityManager em;
-    
-    // NEW in 3.2: INTERSECT operator
-    public List<Customer> findCustomersInBothActiveAndVIP() {
-        return em.createQuery(
-            "SELECT c FROM Customer c WHERE c.status = 'ACTIVE' " +
-            "INTERSECT " +
-            "SELECT c FROM Customer c WHERE c.vipLevel > 5",
-            Customer.class
-        ).getResultList();
-    }
-    
-    // NEW in 3.2: EXCEPT operator (set difference)
-    public List<Customer> findActiveCustomersExceptVIP() {
-        return em.createQuery(
-            "SELECT c FROM Customer c WHERE c.status = 'ACTIVE' " +
-            "EXCEPT " +
-            "SELECT c FROM Customer c WHERE c.vipLevel > 5",
-            Customer.class
-        ).getResultList();
-    }
-    
-    // NEW in 3.2: CAST operator for type conversion
-    public List<String> getCustomerIdsAsStrings() {
-        return em.createQuery(
-            "SELECT CAST(c.id AS STRING) FROM Customer c",
-            String.class
-        ).getResultList();
-    }
-    
-    // NEW in 3.2: LEFT and RIGHT string functions
-    public List<String> getEmailPrefixes() {
-        return em.createQuery(
-            "SELECT LEFT(c.email, 5) FROM Customer c",
-            String.class
-        ).getResultList();
-    }
-    
-    public List<String> getEmailDomains() {
-        return em.createQuery(
-            "SELECT RIGHT(c.email, 10) FROM Customer c",
-            String.class
-        ).getResultList();
-    }
-    
-    // NEW in 3.2: REPLACE function for string manipulation
-    public List<String> normalizePhoneNumbers() {
-        return em.createQuery(
-            "SELECT REPLACE(c.phone, '-', '') FROM Customer c",
-            String.class
-        ).getResultList();
-    }
-    
-    // NEW in 3.2: id() function to access entity identifier
-    public List<Long> getCustomerIds() {
-        return em.createQuery(
-            "SELECT id(c) FROM Customer c WHERE c.status = 'ACTIVE'",
-            Long.class
-        ).getResultList();
-    }
-    
-    // NEW in 3.2: version() function to access entity version
-    public List<Object[]> getCustomerVersionInfo() {
-        return em.createQuery(
-            "SELECT c.name, version(c) FROM Customer c",
-            Object[].class
-        ).getResultList();
-    }
-}
-
-// NEW in 3.2: NamedNativeQuery with entities(), classes(), and columns()
-@Entity
-@Table(name = "products")
-@NamedNativeQuery(
-    name = "Product.findWithDetails",
-    query = "SELECT p.id, p.name, p.price, c.name as category_name " +
-            "FROM products p JOIN categories c ON p.category_id = c.id",
-    resultSetMapping = "ProductDetailsMapping"
-)
-@SqlResultSetMapping(
-    name = "ProductDetailsMapping",
-    entities = @EntityResult(
-        entityClass = Product.class,
-        fields = {
-            @FieldResult(name = "id", column = "id"),
-            @FieldResult(name = "name", column = "name"),
-            @FieldResult(name = "price", column = "price")
-        },
-        // NEW in 3.2: lockMode() on EntityResult
-        lockMode = LockModeType.OPTIMISTIC
-    ),
-    columns = @ColumnResult(name = "category_name", type = String.class)
-)
-public class Product {
-    
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-    
-    private String name;
-    private Double price;
-    
-    @Version
-    private Long version;
-    
-    @ManyToOne
-    @JoinColumn(name = "category_id")
-    private Category category;
-    
-    // Constructors, getters, setters
-}
-
-@Entity
-@Table(name = "categories")
-public class Category {
-    
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-    
-    private String name;
-    
-    @OneToMany(mappedBy = "category")
-    private List<Product> products;
-    
-    // Constructors, getters, setters
-}
-
-@Stateless
-public class ProductRepository {
-    
-    @PersistenceContext
-    private EntityManager em;
-    
-    // NEW in 3.2: Using NamedNativeQuery with enhanced result mapping
-    public List<Object[]> findProductsWithDetails() {
-        return em.createNamedQuery("Product.findWithDetails")
-                 .getResultList();
-    }
-    
-    // NEW in 3.2: Combining multiple new features
-    public List<Product> findProductsWithComplexCriteria(Double minPrice, String namePattern) {
-        return em.createQuery(
-            "SELECT p FROM Product p " +
-            "WHERE p.price >= :minPrice " +
-            "AND REPLACE(LOWER(p.name), ' ', '') LIKE :pattern " +
-            "ORDER BY p.price NULLS LAST, p.name",
-            Product.class
-        )
-        .setParameter("minPrice", minPrice)
-        .setParameter("pattern", namePattern)
-        .getSingleResultOrNull();  // Returns null if no results
     }
 }
 ----
