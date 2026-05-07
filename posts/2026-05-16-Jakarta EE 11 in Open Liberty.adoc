@@ -20,7 +20,7 @@ Emily Jiang <https://github.com/Emily-Jiang>
 :toc-title: Table of Contents
 :toclevels: 3
 
-link:https://jakarta.ee/release/11/[Jakarta EE 11] marks a significant milestone in the evolution of enterprise Java development. This release delivers enhanced developer productivity, improved performance, and modernized APIs that align with the Java LTS releases: Java SE 17, Java SE 21.
+link:https://jakarta.ee/release/11/[Jakarta EE 11] marks a significant milestone in the evolution of enterprise Java development. This release delivers enhanced developer productivity, improved performance, and modernized APIs that align with the Java LTS releases: Java SE 17, Java SE 21. For more information, see the https://jakarta.ee/specifications/platform/11/[Jakarta EE Platform 11 specification] and https://jakarta.ee/specifications/pages/4.0/[Jakarta Pages 4.0 specification].
 
 == What's New in Jakarta EE 11?
 
@@ -67,8 +67,8 @@ Jakarta Data 1.0 includes:
 
 [source,java]
 ----
-import jakarta.data.Entity;
-import jakarta.data.Id;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
 
 @Entity
 public class Product {
@@ -100,8 +100,9 @@ import jakarta.data.repository.Find;
 import jakarta.data.repository.Query;
 import jakarta.data.repository.Save;
 import jakarta.data.repository.Delete;
-import jakarta.data.repository.Page;
-import jakarta.data.repository.Pageable;
+import jakarta.data.repository.OrderBy;
+import jakarta.data.page.Page;
+import jakarta.data.page.PageRequest;
 import java.util.List;
 import java.util.Optional;
 
@@ -125,10 +126,11 @@ public interface ProductRepository {
     
     List<Product> findByPriceBetween(double minPrice, double maxPrice);
     
-    List<Product> findByNameContaining(String keyword);
+    List<Product> findByNameContains(String keyword);
     
-    // Sorting and pagination
-    Page<Product> findByPriceGreaterThan(double price, Pageable pageable);
+    // Sorting and pagination - requires @OrderBy for pagination
+    @OrderBy("price")
+    Page<Product> findByPriceGreaterThan(double price, PageRequest pageRequest);
     
     // Custom queries using @Query annotation
     @Query("SELECT p FROM Product p WHERE p.stockQuantity < 10")
@@ -136,42 +138,6 @@ public interface ProductRepository {
     
     @Query("SELECT p FROM Product p WHERE p.price > ?1 ORDER BY p.price DESC")
     List<Product> findExpensiveProducts(double minPrice);
-}
-----
-
-==== Using the Repository in a Service
-
-[source,java]
-----
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
-import jakarta.data.repository.Pageable;
-import jakarta.data.repository.Page;
-import java.util.List;
-
-@ApplicationScoped
-public class ProductService {
-    
-    @Inject
-    private ProductRepository productRepository;
-    
-    public Product createProduct(String name, double price) {
-        Product product = new Product(name, price);
-        return productRepository.save(product);
-    }
-    
-    public List<Product> searchProducts(String keyword) {
-        return productRepository.findByNameContaining(keyword);
-    }
-    
-    public Page<Product> getExpensiveProducts(double minPrice, int pageNumber, int pageSize) {
-        Pageable pageable = Pageable.ofSize(pageSize).page(pageNumber);
-        return productRepository.findByPriceGreaterThan(minPrice, pageable);
-    }
-    
-    public List<Product> getLowStockProducts() {
-        return productRepository.findLowStockProducts();
-    }
 }
 ----
 
@@ -183,7 +149,8 @@ import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import jakarta.inject.Inject;
-import jakarta.data.repository.Page;
+import jakarta.data.page.Page;
+import jakarta.data.page.PageRequest;
 import java.util.List;
 
 @Path("/products")
@@ -192,36 +159,34 @@ import java.util.List;
 public class ProductResource {
     
     @Inject
-    private ProductService productService;
+    private ProductRepository productRepository;
     
     @POST
     public Response createProduct(Product product) {
-        Product created = productService.createProduct(
-            product.getName(), 
-            product.getPrice()
-        );
+        Product created = productRepository.save(product);
         return Response.status(Response.Status.CREATED).entity(created).build();
     }
     
     @GET
     @Path("/search")
     public List<Product> searchProducts(@QueryParam("keyword") String keyword) {
-        return productService.searchProducts(keyword);
+        return productRepository.findByNameContains(keyword);
     }
     
     @GET
     @Path("/expensive")
     public Page<Product> getExpensiveProducts(
             @QueryParam("minPrice") @DefaultValue("100.0") double minPrice,
-            @QueryParam("page") @DefaultValue("0") int page,
+            @QueryParam("page") @DefaultValue("1") int page,
             @QueryParam("size") @DefaultValue("20") int size) {
-        return productService.getExpensiveProducts(minPrice, page, size);
+        PageRequest pageRequest = PageRequest.ofPage(page).size(size);
+        return productRepository.findByPriceGreaterThan(minPrice, pageRequest);
     }
     
     @GET
     @Path("/low-stock")
     public List<Product> getLowStockProducts() {
-        return productService.getLowStockProducts();
+        return productRepository.findLowStockProducts();
     }
 }
 ----
@@ -413,13 +378,20 @@ Enhanced concurrency utilities with better Virtual Thread support for Java 21+.
 ----
 import jakarta.enterprise.concurrent.ManagedExecutorService;
 import jakarta.enterprise.concurrent.ManagedScheduledExecutorService;
+import jakarta.enterprise.concurrent.ManagedExecutorDefinition;
 import jakarta.annotation.Resource;
+import jakarta.enterprise.context.ApplicationScoped;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
+@ApplicationScoped
+@ManagedExecutorDefinition(
+    name = "java:app/concurrent/VirtualThreadExecutor",
+    virtual = true
+)
 public class ConcurrencyExample {
     
-    @Resource
+    @Resource(lookup = "java:app/concurrent/VirtualThreadExecutor")
     private ManagedExecutorService executorService;
     
     @Resource
@@ -427,10 +399,10 @@ public class ConcurrencyExample {
     
     public CompletableFuture<String> asyncOperation() {
         // Leverages Virtual Threads on Java 21+
-        return CompletableFuture.supplyAsync(() -> {
+        return executorService.supplyAsync(() -> {
             // Long-running operation
             return processData();
-        }, executorService);
+        });
     }
     
     public void scheduleTask() {
@@ -1096,6 +1068,10 @@ Jakarta Servlet 6.1 defines a server-side API for handling HTTP requests and res
 *Removals:*
 - All references to the SecurityManager and associated APIs have been removed
 
+==== Custom Redirect with Status Code Control
+
+Servlet 6.1 allows you to control the HTTP status code when sending redirects:
+
 [source,java]
 ----
 import jakarta.servlet.ServletException;
@@ -1103,50 +1079,146 @@ import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import jakarta.servlet.AsyncContext;
 import java.io.IOException;
-import java.io.PrintWriter;
 
-@WebServlet(urlPatterns = "/async", asyncSupported = true)
-public class AsyncServletExample extends HttpServlet {
+@WebServlet("/redirect-example")
+public class RedirectServlet extends HttpServlet {
     
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         
-        // Start async processing
-        AsyncContext asyncContext = request.startAsync();
-        asyncContext.setTimeout(30000); // 30 seconds timeout
+        String action = request.getParameter("action");
         
-        // Process in separate thread
-        asyncContext.start(() -> {
-            try {
-                // Simulate long-running operation
-                String result = performLongOperation();
-                
-                HttpServletResponse asyncResponse = 
-                    (HttpServletResponse) asyncContext.getResponse();
-                asyncResponse.setContentType("application/json");
-                
-                PrintWriter writer = asyncResponse.getWriter();
-                writer.write("{\"result\": \"" + result + "\"}");
-                writer.flush();
-                
-                asyncContext.complete();
-            } catch (IOException e) {
-                asyncContext.complete();
-            }
-        });
-    }
-    
-    private String performLongOperation() {
-        // Simulate processing
-        try {
-            Thread.sleep(5000);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+        if ("permanent".equals(action)) {
+            // Send a 301 Moved Permanently redirect
+            response.sendRedirect("/new-location", HttpServletResponse.SC_MOVED_PERMANENTLY);
+        } else if ("temporary".equals(action)) {
+            // Send a 307 Temporary Redirect (preserves request method)
+            response.sendRedirect("/temp-location", HttpServletResponse.SC_TEMPORARY_REDIRECT);
+        } else {
+            // Default 302 Found redirect
+            response.sendRedirect("/default-location");
         }
-        return "Operation completed";
+    }
+}
+----
+
+==== Using Charset Methods
+
+Servlet 6.1 adds overloaded methods that accept `Charset` instead of `String` for better type safety:
+
+[source,java]
+----
+import jakarta.servlet.ServletException;
+import jakarta.servlet.annotation.WebServlet;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
+
+@WebServlet("/charset-example")
+public class CharsetServlet extends HttpServlet {
+    
+    @Override
+    protected void doGet(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        
+        // Use Charset instead of String for character encoding
+        response.setCharacterEncoding(StandardCharsets.UTF_8);
+        response.setContentType("text/html");
+        
+        PrintWriter writer = response.getWriter();
+        writer.println("<html><body>");
+        writer.println("<h1>UTF-8 Encoded Response</h1>");
+        writer.println("<p>Special characters: é, ñ, ü, 中文</p>");
+        writer.println("</body></html>");
+    }
+}
+----
+
+==== ByteBuffer Support
+
+Servlet 6.1 adds `ByteBuffer` support to `ServletInputStream` and `ServletOutputStream`:
+
+[source,java]
+----
+import jakarta.servlet.ServletException;
+import jakarta.servlet.annotation.WebServlet;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.ServletOutputStream;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+
+@WebServlet("/bytebuffer-example")
+public class ByteBufferServlet extends HttpServlet {
+    
+    @Override
+    protected void doGet(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        
+        response.setContentType("application/octet-stream");
+        
+        // Create a ByteBuffer with data
+        String data = "Binary data using ByteBuffer";
+        ByteBuffer buffer = ByteBuffer.wrap(data.getBytes(StandardCharsets.UTF_8));
+        
+        // Write ByteBuffer directly to ServletOutputStream
+        ServletOutputStream outputStream = response.getOutputStream();
+        outputStream.write(buffer);
+        outputStream.flush();
+    }
+}
+----
+
+==== Error Dispatch with Query String
+
+Servlet 6.1 adds a query string attribute to error dispatches:
+
+[source,java]
+----
+import jakarta.servlet.ServletException;
+import jakarta.servlet.annotation.WebServlet;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.RequestDispatcher;
+import java.io.IOException;
+import java.io.PrintWriter;
+
+@WebServlet("/error-handler")
+public class ErrorHandlerServlet extends HttpServlet {
+    
+    @Override
+    protected void doGet(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        
+        response.setContentType("text/html");
+        PrintWriter writer = response.getWriter();
+        
+        // Access error attributes including the new query string attribute
+        Integer statusCode = (Integer) request.getAttribute(RequestDispatcher.ERROR_STATUS_CODE);
+        String message = (String) request.getAttribute(RequestDispatcher.ERROR_MESSAGE);
+        String requestUri = (String) request.getAttribute(RequestDispatcher.ERROR_REQUEST_URI);
+        String queryString = (String) request.getAttribute(RequestDispatcher.ERROR_QUERY_STRING);
+        
+        writer.println("<html><body>");
+        writer.println("<h1>Error Handler</h1>");
+        writer.println("<p>Status Code: " + statusCode + "</p>");
+        writer.println("<p>Message: " + message + "</p>");
+        writer.println("<p>Request URI: " + requestUri + "</p>");
+        
+        // New in Servlet 6.1: Query string is now available in error dispatches
+        if (queryString != null) {
+            writer.println("<p>Query String: " + queryString + "</p>");
+        }
+        
+        writer.println("</body></html>");
     }
 }
 ----
