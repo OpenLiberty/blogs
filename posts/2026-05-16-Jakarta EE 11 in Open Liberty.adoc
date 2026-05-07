@@ -37,6 +37,7 @@ Jakarta EE 11 represents a major step forward for cloud-native enterprise Java a
 * <<websocket-2.2,Jakarta WebSocket 2.2>>
 * <<restful-web-services-4.0,Jakarta RESTful Web Services 4.0>>
 * <<persistence-3.2,Jakarta Persistence 3.2>>
+* <<pages-4.0,Jakarta Pages 4.0>>
 * <<security-4.0,Jakarta Security 4.0>>
 * <<validation-3.1,Jakarta Validation 3.1>>
 
@@ -405,8 +406,10 @@ public class ConcurrencyExample {
     private String processData() {
         return "Processed data";
     }
-    
-    private void performMaintenanceTask() {
+    @Asynchronous(
+            executor = "java:module/concurrent/VirtualExecutor",
+            runAt = @Schedule(cron = "0 3 * * *")) // daily at 3 AM
+    private void performMaintenanceTask(@Observes Startup event) {
         // Maintenance logic
     }
 }
@@ -650,45 +653,38 @@ Support for `java.lang.Optional` is available but disabled by default. To enable
 
 [source,java]
 ----
+
 import jakarta.el.*;
 import java.util.Optional;
 
 public class OptionalELResolverExample {
-    
+
     public static void main(String[] args) {
         // Create EL context
         ExpressionFactory factory = ExpressionFactory.newInstance();
         StandardELContext context = new StandardELContext(factory);
-        
-        // NEW in EL 6.0: Add OptionalELResolver to support Optional
-        // Note: This is disabled by default and must be explicitly added
-        CompositeELResolver resolver = new CompositeELResolver();
-        resolver.add(new OptionalELResolver());
-        resolver.add(new BeanELResolver());
-        resolver.add(new ArrayELResolver());
-        resolver.add(new ListELResolver());
-        resolver.add(new MapELResolver());
-        context.addELResolver(resolver);
-        
+
+        context.addELResolver(new OptionalELResolver());
+
         // Create Optional values
         Optional<String> presentValue = Optional.of("Hello, EL 6.0!");
         Optional<String> emptyValue = Optional.empty();
-        
+
         context.getELResolver().setValue(context, null, "message", presentValue);
-        context.getELResolver().setValue(context, null, "empty", emptyValue);
-        
+        context.getELResolver().setValue(context, null, "emptyValue", emptyValue);
+
         // Access Optional values - automatically unwrapped if present
         ValueExpression messageExpr = factory.createValueExpression(
             context, "${message}", String.class);
         String message = (String) messageExpr.getValue(context);
         System.out.println("Message: " + message); // Output: Hello, EL 6.0!
-        
+
         // Empty Optional returns null
         ValueExpression emptyExpr = factory.createValueExpression(
-            context, "${empty}", String.class);
+            context, "${emptyValue}", String.class);
         String emptyResult = (String) emptyExpr.getValue(context);
-        System.out.println("Empty: " + emptyResult); // Output: null
-        
+        System.out.println("emptyValue: " + emptyResult); // Output: null
+
         // Use with conditional expressions
         ValueExpression hasMsgExpr = factory.createValueExpression(
             context, "${message != null}", Boolean.class);
@@ -1631,6 +1627,533 @@ public class CustomerRepository {
         }
     }
 }
+// NEW in 3.2: Criteria API Enhancements
+@Stateless
+public class CustomerCriteriaRepository {
+    
+    @PersistenceContext
+    private EntityManager em;
+    
+    // NEW in 3.2: Using CriteriaSelect for type-safe queries
+    public List<Customer> findCustomersByCityUsingCriteria(String city) {
+        CriteriaBuilder cb = em.getCriteriaBuilder();
+        CriteriaQuery<Customer> cq = cb.createQuery(Customer.class);
+        Root<Customer> customer = cq.from(Customer.class);
+        
+        // CriteriaSelect provides enhanced type safety
+        cq.select(customer)
+          .where(cb.equal(customer.get("address").get("city"), city));
+        
+        return em.createQuery(cq).getResultList();
+    }
+    
+    // NEW in 3.2: subquery(EntityType) for correlated subqueries
+    public List<Customer> findCustomersWithMultipleOrders() {
+        CriteriaBuilder cb = em.getCriteriaBuilder();
+        CriteriaQuery<Customer> cq = cb.createQuery(Customer.class);
+        Root<Customer> customer = cq.from(Customer.class);
+        
+        // Create a correlated subquery using the new subquery(EntityType) method
+        Subquery<Long> subquery = cq.subquery(Long.class);
+        Root<Order> order = subquery.correlate(customer).join("orders");
+        subquery.select(cb.count(order));
+        
+        cq.select(customer)
+          .where(cb.greaterThan(subquery, 1L));
+        
+        return em.createQuery(cq).getResultList();
+    }
+    
+    // NEW in 3.2: Joins on EntityType
+    public List<Customer> findCustomersWithRecentOrders(Instant since) {
+        CriteriaBuilder cb = em.getCriteriaBuilder();
+        CriteriaQuery<Customer> cq = cb.createQuery(Customer.class);
+        Root<Customer> customer = cq.from(Customer.class);
+        
+        // Join directly on EntityType
+        Join<Customer, Order> orders = customer.join("orders");
+        
+        cq.select(customer)
+          .where(cb.greaterThanOrEqualTo(orders.get("orderDate"), since))
+          .distinct(true);
+        
+        return em.createQuery(cq).getResultList();
+    }
+}
+
+// NEW in 3.2: Advanced Query Operators
+@Stateless
+public class AdvancedQueryRepository {
+    
+    @PersistenceContext
+    private EntityManager em;
+    
+    // NEW in 3.2: INTERSECT operator
+    public List<Customer> findCustomersInBothActiveAndVIP() {
+        return em.createQuery(
+            "SELECT c FROM Customer c WHERE c.status = 'ACTIVE' " +
+            "INTERSECT " +
+            "SELECT c FROM Customer c WHERE c.vipLevel > 5",
+            Customer.class
+        ).getResultList();
+    }
+    
+    // NEW in 3.2: EXCEPT operator (set difference)
+    public List<Customer> findActiveCustomersExceptVIP() {
+        return em.createQuery(
+            "SELECT c FROM Customer c WHERE c.status = 'ACTIVE' " +
+            "EXCEPT " +
+            "SELECT c FROM Customer c WHERE c.vipLevel > 5",
+            Customer.class
+        ).getResultList();
+    }
+    
+    // NEW in 3.2: CAST operator for type conversion
+    public List<String> getCustomerIdsAsStrings() {
+        return em.createQuery(
+            "SELECT CAST(c.id AS STRING) FROM Customer c",
+            String.class
+        ).getResultList();
+    }
+    
+    // NEW in 3.2: LEFT and RIGHT string functions
+    public List<String> getEmailPrefixes() {
+        return em.createQuery(
+            "SELECT LEFT(c.email, 5) FROM Customer c",
+            String.class
+        ).getResultList();
+    }
+    
+    public List<String> getEmailDomains() {
+        return em.createQuery(
+            "SELECT RIGHT(c.email, 10) FROM Customer c",
+            String.class
+        ).getResultList();
+    }
+    
+    // NEW in 3.2: REPLACE function for string manipulation
+    public List<String> normalizePhoneNumbers() {
+        return em.createQuery(
+            "SELECT REPLACE(c.phone, '-', '') FROM Customer c",
+            String.class
+        ).getResultList();
+    }
+    
+    // NEW in 3.2: id() function to access entity identifier
+    public List<Long> getCustomerIds() {
+        return em.createQuery(
+            "SELECT id(c) FROM Customer c WHERE c.status = 'ACTIVE'",
+            Long.class
+        ).getResultList();
+    }
+    
+    // NEW in 3.2: version() function to access entity version
+    public List<Object[]> getCustomerVersionInfo() {
+        return em.createQuery(
+            "SELECT c.name, version(c) FROM Customer c",
+            Object[].class
+        ).getResultList();
+    }
+}
+
+// NEW in 3.2: NamedNativeQuery with entities(), classes(), and columns()
+@Entity
+@Table(name = "products")
+@NamedNativeQuery(
+    name = "Product.findWithDetails",
+    query = "SELECT p.id, p.name, p.price, c.name as category_name " +
+            "FROM products p JOIN categories c ON p.category_id = c.id",
+    resultSetMapping = "ProductDetailsMapping"
+)
+@SqlResultSetMapping(
+    name = "ProductDetailsMapping",
+    entities = @EntityResult(
+        entityClass = Product.class,
+        fields = {
+            @FieldResult(name = "id", column = "id"),
+            @FieldResult(name = "name", column = "name"),
+            @FieldResult(name = "price", column = "price")
+        },
+        // NEW in 3.2: lockMode() on EntityResult
+        lockMode = LockModeType.OPTIMISTIC
+    ),
+    columns = @ColumnResult(name = "category_name", type = String.class)
+)
+public class Product {
+    
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    
+    private String name;
+    private Double price;
+    
+    @Version
+    private Long version;
+    
+    @ManyToOne
+    @JoinColumn(name = "category_id")
+    private Category category;
+    
+    // Constructors, getters, setters
+}
+
+@Entity
+@Table(name = "categories")
+public class Category {
+    
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    
+    private String name;
+    
+    @OneToMany(mappedBy = "category")
+    private List<Product> products;
+    
+    // Constructors, getters, setters
+}
+
+@Stateless
+public class ProductRepository {
+    
+    @PersistenceContext
+    private EntityManager em;
+    
+    // NEW in 3.2: Using NamedNativeQuery with enhanced result mapping
+    public List<Object[]> findProductsWithDetails() {
+        return em.createNamedQuery("Product.findWithDetails")
+                 .getResultList();
+    }
+    
+    // NEW in 3.2: Combining multiple new features
+    public List<Product> findProductsWithComplexCriteria(Double minPrice, String namePattern) {
+        return em.createQuery(
+            "SELECT p FROM Product p " +
+            "WHERE p.price >= :minPrice " +
+            "AND REPLACE(LOWER(p.name), ' ', '') LIKE :pattern " +
+            "ORDER BY p.price NULLS LAST, p.name",
+            Product.class
+        )
+        .setParameter("minPrice", minPrice)
+        .setParameter("pattern", namePattern)
+        .getSingleResultOrNull();  // Returns null if no results
+    }
+}
+----
+
+[#pages-4.0]
+=== Pages 4.0
+
+Jakarta Pages 4.0 (formerly JavaServer Pages or JSP) defines a template engine for web applications. This release modernizes the specification by removing deprecated features and aligning with Jakarta EE 11 requirements.
+
+*New features and changes in Pages 4.0:*
+
+- *Removal of deprecated features*: Removed deprecated JSP 1.x style syntax and features
+- *Updated namespace*: All package names updated from `javax.*` to `jakarta.*`
+- *Expression Language 6.0 integration*: Full integration with the latest Expression Language specification
+- *Improved error handling*: Enhanced error reporting and debugging capabilities
+- *Java 17+ requirement*: Requires Java SE 17 or later as the minimum version
+
+==== Basic JSP Page with EL 6.0 Features
+
+Jakarta Pages 4.0 works seamlessly with Expression Language 6.0, allowing you to use modern Java features like Records and Optional:
+
+[source,jsp]
+----
+<%@ page contentType="text/html;charset=UTF-8" language="java" %>
+<%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Product Catalog - Jakarta Pages 4.0</title>
+</head>
+<body>
+    <h1>Product Catalog</h1>
+    
+    <!-- NEW in Pages 4.0: Using EL 6.0 with Records -->
+    <c:forEach items="${products}" var="product">
+        <div class="product-card">
+            <h2>${product.name}</h2>
+            <p>Price: $${product.price}</p>
+            
+            <!-- NEW in EL 6.0: Access Record components directly -->
+            <c:if test="${not empty product.address}">
+                <p>Location: ${product.address.city}, ${product.address.state}</p>
+            </c:if>
+            
+            <!-- NEW in EL 6.0: Optional support -->
+            <p>Discount: ${product.discount.orElse(0)}%</p>
+            
+            <!-- NEW in EL 6.0: Array length property -->
+            <p>Available in ${product.sizes.length} sizes</p>
+        </div>
+    </c:forEach>
+</body>
+</html>
+----
+
+==== Custom Tag with Jakarta Pages 4.0
+
+Creating custom tags in Jakarta Pages 4.0 with updated namespace:
+
+[source,java]
+----
+package com.example.tags;
+
+import jakarta.servlet.jsp.JspException;
+import jakarta.servlet.jsp.tagext.SimpleTagSupport;
+import java.io.IOException;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+
+// NEW in Pages 4.0: Using jakarta.servlet.jsp namespace
+public class FormatDateTag extends SimpleTagSupport {
+    
+    private LocalDateTime date;
+    private String pattern = "yyyy-MM-dd HH:mm:ss";
+    
+    public void setDate(LocalDateTime date) {
+        this.date = date;
+    }
+    
+    public void setPattern(String pattern) {
+        this.pattern = pattern;
+    }
+    
+    @Override
+    public void doTag() throws JspException, IOException {
+        if (date != null) {
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern(pattern);
+            getJspContext().getOut().write(date.format(formatter));
+        }
+    }
+}
+----
+
+Tag Library Descriptor (TLD) file:
+
+[source,xml]
+----
+<?xml version="1.0" encoding="UTF-8"?>
+<taglib xmlns="https://jakarta.ee/xml/ns/jakartaee"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="https://jakarta.ee/xml/ns/jakartaee
+        https://jakarta.ee/xml/ns/jakartaee/web-jsptaglibrary_4_0.xsd"
+        version="4.0">
+    
+    <tlib-version>1.0</tlib-version>
+    <short-name>custom</short-name>
+    <uri>http://example.com/tags</uri>
+    
+    <tag>
+        <name>formatDate</name>
+        <tag-class>com.example.tags.FormatDateTag</tag-class>
+        <body-content>empty</body-content>
+        <attribute>
+            <name>date</name>
+            <required>true</required>
+            <rtexprvalue>true</rtexprvalue>
+            <type>java.time.LocalDateTime</type>
+        </attribute>
+        <attribute>
+            <name>pattern</name>
+            <required>false</required>
+            <rtexprvalue>true</rtexprvalue>
+        </attribute>
+    </tag>
+</taglib>
+----
+
+==== Using Custom Tags in JSP
+
+[source,jsp]
+----
+<%@ page contentType="text/html;charset=UTF-8" language="java" %>
+<%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<%@ taglib prefix="custom" uri="http://example.com/tags" %>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Order Details</title>
+</head>
+<body>
+    <h1>Order #${order.id}</h1>
+    
+    <!-- Using custom tag with java.time support -->
+    <p>Order Date: <custom:formatDate date="${order.orderDate}" pattern="MMM dd, yyyy"/></p>
+    <p>Delivery Date: <custom:formatDate date="${order.deliveryDate}" pattern="EEEE, MMMM dd, yyyy"/></p>
+    
+    <h2>Items</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Product</th>
+                <th>Quantity</th>
+                <th>Price</th>
+                <th>Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            <c:forEach items="${order.items}" var="item">
+                <tr>
+                    <td>${item.product.name}</td>
+                    <td>${item.quantity}</td>
+                    <td>$${item.product.price}</td>
+                    <td>$${item.quantity * item.product.price}</td>
+                </tr>
+            </c:forEach>
+        </tbody>
+    </table>
+    
+    <!-- NEW in EL 6.0: String concatenation with || -->
+    <p>Total: $${order.total} (${order.items.length} ${order.items.length == 1 ? 'item' : 'items'})</p>
+</body>
+</html>
+----
+
+==== JSP with CDI Integration
+
+Jakarta Pages 4.0 integrates seamlessly with CDI 4.1:
+
+[source,java]
+----
+package com.example.beans;
+
+import jakarta.enterprise.context.RequestScoped;
+import jakarta.inject.Named;
+import jakarta.inject.Inject;
+import java.util.List;
+
+@Named
+@RequestScoped
+public class ProductBean {
+    
+    @Inject
+    private ProductService productService;
+    
+    private String searchTerm;
+    private List<Product> searchResults;
+    
+    public void search() {
+        if (searchTerm != null && !searchTerm.isEmpty()) {
+            searchResults = productService.searchProducts(searchTerm);
+        }
+    }
+    
+    // Getters and setters
+    public String getSearchTerm() {
+        return searchTerm;
+    }
+    
+    public void setSearchTerm(String searchTerm) {
+        this.searchTerm = searchTerm;
+    }
+    
+    public List<Product> getSearchResults() {
+        return searchResults;
+    }
+}
+----
+
+JSP page using the CDI bean:
+
+[source,jsp]
+----
+<%@ page contentType="text/html;charset=UTF-8" language="java" %>
+<%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Product Search</title>
+</head>
+<body>
+    <h1>Search Products</h1>
+    
+    <form method="post" action="search.jsp">
+        <input type="text" name="searchTerm" value="${productBean.searchTerm}"
+               placeholder="Enter product name..."/>
+        <button type="submit">Search</button>
+    </form>
+    
+    <c:if test="${not empty productBean.searchResults}">
+        <h2>Search Results (${productBean.searchResults.length} found)</h2>
+        <ul>
+            <c:forEach items="${productBean.searchResults}" var="product">
+                <li>
+                    <strong>${product.name}</strong> - $${product.price}
+                    <c:if test="${product.stockQuantity < 10}">
+                        <span class="low-stock">Only ${product.stockQuantity} left!</span>
+                    </c:if>
+                </li>
+            </c:forEach>
+        </ul>
+    </c:if>
+    
+    <c:if test="${empty productBean.searchResults and not empty productBean.searchTerm}">
+        <p>No products found matching "${productBean.searchTerm}"</p>
+    </c:if>
+</body>
+</html>
+----
+
+==== Error Handling in Jakarta Pages 4.0
+
+Improved error handling with custom error pages:
+
+[source,jsp]
+----
+<%@ page contentType="text/html;charset=UTF-8" language="java" isErrorPage="true" %>
+<%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Error - ${pageContext.errorData.statusCode}</title>
+</head>
+<body>
+    <h1>An Error Occurred</h1>
+    
+    <div class="error-details">
+        <p><strong>Status Code:</strong> ${pageContext.errorData.statusCode}</p>
+        <p><strong>Request URI:</strong> ${pageContext.errorData.requestURI}</p>
+        
+        <c:if test="${not empty pageContext.exception}">
+            <p><strong>Exception:</strong> ${pageContext.exception.class.name}</p>
+            <p><strong>Message:</strong> ${pageContext.exception.message}</p>
+        </c:if>
+    </div>
+    
+    <p><a href="${pageContext.request.contextPath}/">Return to Home</a></p>
+</body>
+</html>
+----
+
+Configure error page in `web.xml`:
+
+[source,xml]
+----
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app xmlns="https://jakarta.ee/xml/ns/jakartaee"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="https://jakarta.ee/xml/ns/jakartaee
+         https://jakarta.ee/xml/ns/jakartaee/web-app_6_0.xsd"
+         version="6.0">
+    
+    <error-page>
+        <error-code>404</error-code>
+        <location>/error.jsp</location>
+    </error-page>
+    
+    <error-page>
+        <error-code>500</error-code>
+        <location>/error.jsp</location>
+    </error-page>
+    
+    <error-page>
+        <exception-type>java.lang.Exception</exception-type>
+        <location>/error.jsp</location>
+    </error-page>
+</web-app>
 ----
 
 [#websocket-2.2]
@@ -2084,45 +2607,15 @@ Key areas to review:
 - *Validation 3.1*: Leverage Java Records for validated data structures
 - *Concurrency 3.1*: Test async operations, especially if using Java 21 Virtual Threads
 
-== Performance Benefits with Java 21
-
-Jakarta EE 11's support for Java 21 brings significant performance improvements:
-
-[source,java]
-----
-// Virtual Threads example with Jakarta Concurrency
-@ApplicationScoped
-public class VirtualThreadExample {
-    
-    @Resource
-    private ManagedExecutorService executor;
-    
-    public void processLargeDataset(List<Data> dataset) {
-        // Each task runs on a virtual thread
-        List<CompletableFuture<Result>> futures = dataset.stream()
-            .map(data -> CompletableFuture.supplyAsync(
-                () -> processData(data), 
-                executor
-            ))
-            .toList();
-        
-        // Wait for all to complete
-        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
-            .join();
-    }
-    
-    private Result processData(Data data) {
-        // Processing logic
-        return new Result();
-    }
-}
-----
-
 == Conclusion
 
 Jakarta EE 11 in Open Liberty 26.0.0.5 represents a significant advancement in enterprise Java development. The introduction of Jakarta Data 1.0 alone is a game-changer, dramatically reducing boilerplate code and improving developer productivity. Combined with updates across all major specifications, enhanced performance through Java 21 support, and a comprehensive set of modern APIs, Jakarta EE 11 provides a solid foundation for building cloud-native enterprise applications.
 
 The combination of Open Liberty's lightweight, fast runtime and Jakarta EE 11's powerful features makes this an excellent choice for organizations looking to modernize their enterprise Java applications while maintaining compatibility with industry standards.
+
+What's more? Jakarta EE 11 also works with MicroProfile 7.0 and 7.1 in Open Liberty, allowing you to take advantage of the latest microservices features alongside the core Jakarta EE platform. Whether you're building new applications or migrating existing ones, Open Liberty and Jakarta EE 11 provide the tools and capabilities you need to succeed in today's fast-paced development environment.
+
+If you are using Spring Boot, Open Liberty 26.0.0.5 and later release also enables you to use Spring Boot 4.0 with Jakarta EE 11 features, providing even more flexibility in how you build your applications.
 
 == Learn More
 
