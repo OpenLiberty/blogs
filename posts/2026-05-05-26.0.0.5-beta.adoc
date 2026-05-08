@@ -1,24 +1,24 @@
 ---
 layout: post
-title: "MCP server updates and Transport Security in 26.0.0.5-beta"
+title: "Updates to MCP Server and TLS/SSL Cipher Support in 26.0.0.5 Beta"
 # Do NOT change the categories section
 categories: blog
 author_picture: https://avatars3.githubusercontent.com/navaneethsnair1
 author_github: https://github.com/navaneethsnair1
-seo-title: "MCP server updates and Transport Security in 26.0.0.5-beta- OpenLiberty.io"
-seo-description: This beta release updates the `mcpServer-1.0` feature and simplifies SSL cipher configuration by using JDK defaults and flexible `enabledCiphers` syntax.
-blog_description: This beta release updates the `mcpServer-1.0` feature and simplifies SSL cipher configuration by using JDK defaults and flexible `enabledCiphers` syntax.
+seo-title: "Updates to MCP Server and TLS/SSL Cipher Support in 26.0.0.5 Beta- OpenLiberty.io"
+seo-description: This beta release updates the `mcpServer-1.0` feature and simplifies SSL cipher configuration by using the effective JDK cipher list by default and flexible `enabledCiphers` syntax.
+blog_description: This beta release updates the `mcpServer-1.0` feature and simplifies SSL cipher configuration by using the effective JDK cipher list by default and flexible `enabledCiphers` syntax.
 open-graph-image: https://openliberty.io/img/twitter_card.jpg
 open-graph-image-alt: Open Liberty Logo
 ---
-= MCP server updates and Transport Security in 26.0.0.5-beta
+= Updates to MCP Server and TLS/SSL Cipher Support in 26.0.0.5 Beta
 Navaneeth S Nair <https://github.com/navaneethsnair1>
 :imagesdir: /
 :url-prefix:
 :url-about: /
 //Blank line here is necessary before starting the body of the post.
 
-This beta release updates the `mcpServer-1.0` feature and simplifies SSL cipher configuration by using JDK defaults and flexible `enabledCiphers` syntax.
+This beta release updates the `mcpServer-1.0` feature and simplifies SSL cipher configuration by using the effective JDK cipher list by default and flexible `enabledCiphers` syntax.
 
 // // // // // // // //
 // Change the RELEASE_SUMMARY to an introductory paragraph. This sentence is really
@@ -30,7 +30,7 @@ This beta release updates the `mcpServer-1.0` feature and simplifies SSL cipher 
 The link:{url-about}[Open Liberty] 26.0.0.5-beta includes the following beta features (along with link:{url-prefix}/docs/latest/reference/feature/feature-overview.html[all GA features]):
 
 * <<mcp, Updates to `mcpServer-1.0`>>
-* <<transportSecurity, Transport Security>>
+* <<ssl, Update to TLS/SSL Cipher support>>
 
 // // // // // // // //
 // In the preceding section:
@@ -150,28 +150,39 @@ This has been fixed to ensure proper isolation of encoder beans per application,
 // Blog issue: https://github.com/OpenLiberty/open-liberty/issues/34374
 // Contact/Reviewer: rangaran
 // // // // // // // // 
-[#transportSecurity]
-== Transport Security
+[#ssl]
+== Update to TLS/SSL Cipher support
 
-Liberty uses the default cipher list from the JDK. The `securityLevel` attribute in the SSL configuration is not used anymore. In addition, the `enabledCiphers` attribute in the SSL config is updated to customize the SSL ciphers in a more flexible way.
+Liberty uses the effective JDK cipher list from the JDK. The `securityLevel` attribute in the SSL configuration is not used anymore. In addition, the `enabledCiphers` attribute in the SSL config is updated to customize the SSL ciphers in a more flexible way.
 
 This change modifies the existing attribute `enabledCiphers` in the `ssl` config.
 
 Liberty's `securityLevel` based cipher categories no longer provide meaningful value. The `MEDIUM` and `LOW` categories contain no remaining ciphers.
 
-The `enabledCiphers` attribute includes a new syntax option to add '+' or remove '–' specific ciphers from the effective JDK cipher list without redefining everything. A static list and +/- syntax in the same `enabledCiphers` entry is not allowed. If the value set in `enabledCiphers` contains a static entry and a +/- entry, an error is logged, and the server ignores the `enabledCiphers` value by returning the effective JDK cipher list.
+The `enabledCiphers` attribute now has two mutually exclusive modes: (1) Specify a custom list of ciphers separated by spaces, or (2) Specify filter criteria to add (+) or remove (-) cipher suites from the effective JDK cipher list. If the value set in `enabledCiphers` contains a static entry and a +/- entry, an error is logged, and the server ignores the `enabledCiphers` value by returning the effective JDK cipher list.
 
-*Example Usage*
+*Existing Usage - A user sets `securityLevel` as `HIGH`*
 
 [source,xml]
 ----
-<ssl id="defaultSSL" securityLevel="HIGH"/>
-<ssl id="defaultSSL" securityLevel="CUSTOM" enabledCiphers="TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384 TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA256 TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA384..../"> <!-- basically everything except TLS_RSA ciphers from the effective jdk list -->
-<ssl id="defaultSSL" securityLevel="CUSTOM" enabledCiphers="TLS_RSA_WITH_AES_128_GCM_SHA256"/>
+<ssl id="defaultSSL" securityLevel=HIGH/>
 ----
 
-*Example with new syntax*
+*Example with new syntax - `securityLevel` is not required and is ignored if provided*
 
+[source,xml]
+----
+<ssl id="defaultSSL"/>
+----
+
+*Existing Usage - A user specifies all ciphers from the effective jdk list excluding all TLS_RSA ciphers except for one (TLS_RSA_WITH_AES_128_GCM_SHA256)*
+
+[source,xml]
+----
+<ssl id="defaultSSL" securityLevel="CUSTOM" enabledCiphers="TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384 TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256 TLS_DHE_DSS_WITH_AES_256_GCM_SHA384 TLS_DHE_DSS_WITH_AES_128_GCM_SHA256 TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA384 TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256 TLS_DHE_DSS_WITH_AES_256_CBC_SHA256 TLS_DHE_DSS_WITH_AES_128_CBC_SHA256 TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA TLS_DHE_DSS_WITH_AES_256_CBC_SHA TLS_DHE_DSS_WITH_AES_128_CBC_SHA TLS_RSA_WITH_AES_128_GCM_SHA256">
+----
+
+*Example with new syntax - Use wildcards to achieve the same logic*
 [source,xml]
 ----
 <ssl id="defaultSSL" enabledCiphers="-TLS_RSA* +TLS_RSA_WITH_AES_128_GCM_SHA256"/>
