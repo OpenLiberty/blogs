@@ -6,8 +6,8 @@ categories: blog
 author_picture: https://avatars3.githubusercontent.com/emily-jiang
 author_github: https://github.com/Emily-Jiang
 seo-title: Jakarta EE 11 from Newbie to Pro with Open Liberty
-seo-description: Discover Jakarta EE 11's revolutionary features in Open Liberty 26.0.0.5 or later releases, including the game-changing Jakarta Data 1.0 specification that eliminates boilerplate code. Explore comprehensive code examples for updated specifications like CDI 4.1, Persistence 3.2, Security 4.0, and RESTful Web Services 4.0. Learn how Java 21 Records further simplify your applications.
-blog_description: Discover Jakarta EE 11's revolutionary features in Open Liberty 26.0.0.5 or later releases, including the game-changing Jakarta Data 1.0 specification that eliminates boilerplate code. Explore comprehensive code examples for updated specifications like CDI 4.1, Persistence 3.2, Security 4.0, and RESTful Web Services 4.0. Learn how Java 21 Records further simplify your applications.
+seo-description: Discover Jakarta EE 11's revolutionary features in Open Liberty 26.0.0.5 or later releases, including the game-changing Jakarta Data 1.0 specification that eliminates boilerplate code. Explore comprehensive code examples for updated specifications like CDI 4.1, Persistence 3.2, Security 4.0, and RESTful Web Services 4.0. Learn how Java 17 Records further simplify your applications.
+blog_description: Discover Jakarta EE 11's revolutionary features in Open Liberty 26.0.0.5 or later releases, including the game-changing Jakarta Data 1.0 specification that eliminates boilerplate code. Explore comprehensive code examples for updated specifications like CDI 4.1, Persistence 3.2, Security 4.0, and RESTful Web Services 4.0. Learn how Java 17 Records further simplify your applications.
 open-graph-image: https://openliberty.io/img/twitter_card.jpg
 open-graph-image-alt: Open Liberty Logo
 ---
@@ -26,20 +26,22 @@ link:https://jakarta.ee/release/11/[Jakarta EE 11] marks a significant milestone
 
 Jakarta EE 11 represents a major step forward for cloud-native enterprise Java applications. This release includes modernizing and restructuring the Test Compatibility Kits (TCKs), the new Jakarta Data specification, major updates to existing specifications, and support for the latest Java LTS release, which enables developers to leverage enhancements in Java 21, including Virtual Threads, Records. Full lists are:
 
-* <<data-1.0,Jakarta Data 1.0>>
+* <<data-1.0,Data 1.0>>
 * <<authentication-3.1,Authentication 3.1>>
 * <<authorization-3.0,Authorization 3.0>>
 * <<concurrency-3.1,Concurrency 3.1>>
+* <<annotations-3.0,Annotations 3.0>>
+* <<interceptors-2.2,Interceptors 2.2>>
 * <<cdi-4.1,CDI 4.1>>
-* <<faces-4.1,Jakarta Server Faces 4.1>>
+* <<faces-4.1,Server Faces 4.1>>
 * <<expression-language-6.0,Expression Language 6.0>>
-* <<servlet-6.1,Jakarta Servlet 6.1>>
-* <<websocket-2.2,Jakarta WebSocket 2.2>>
-* <<restful-web-services-4.0,Jakarta RESTful Web Services 4.0>>
-* <<persistence-3.2,Jakarta Persistence 3.2>>
-* <<pages-4.0,Jakarta Pages 4.0>>
-* <<security-4.0,Jakarta Security 4.0>>
-* <<validation-3.1,Jakarta Validation 3.1>>
+* <<servlet-6.1,Servlet 6.1>>
+* <<websocket-2.2,WebSocket 2.2>>
+* <<restful-web-services-4.0,RESTful Web Services 4.0>>
+* <<persistence-3.2,Persistence 3.2>>
+* <<pages-4.0,Pages 4.0>>
+* <<security-4.0,Security 4.0>>
+* <<validation-3.1,Validation 3.1>>
 
 
 [#data-1.0]
@@ -226,24 +228,32 @@ import jakarta.security.auth.message.MessagePolicy;
 import jakarta.security.auth.message.module.ServerAuthModule;
 import jakarta.security.auth.message.callback.CallerPrincipalCallback;
 import jakarta.security.auth.message.callback.GroupPrincipalCallback;
-import javax.security.auth.Subject;
-import javax.security.auth.callback.CallbackHandler;
-import javax.security.auth.callback.Callback;
+import jakarta.security.auth.message.callback.Callback;
+import jakarta.security.auth.message.callback.CallbackHandler;
+import jakarta.security.auth.message.callback.UnsupportedCallbackException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.security.Principal;
 import java.util.Map;
+import java.util.Set;
 
 public class CustomServerAuthModule implements ServerAuthModule {
     
     private CallbackHandler handler;
     
     @Override
+    @SuppressWarnings("rawtypes")
     public void initialize(MessagePolicy requestPolicy, MessagePolicy responsePolicy,
                           CallbackHandler handler, Map options) throws AuthException {
         this.handler = handler;
     }
     
     @Override
-    public AuthStatus validateRequest(MessageInfo messageInfo, Subject clientSubject,
-                                      Subject serviceSubject) throws AuthException {
+    public AuthStatus validateRequest(MessageInfo messageInfo,
+                                      jakarta.security.auth.message.callback.Subject clientSubject,
+                                      jakarta.security.auth.message.callback.Subject serviceSubject)
+                                      throws AuthException {
         // Extract credentials from request
         String username = extractUsername(messageInfo);
         String password = extractPassword(messageInfo);
@@ -259,7 +269,7 @@ public class CustomServerAuthModule implements ServerAuthModule {
             
             try {
                 handler.handle(new Callback[]{principalCallback, groupCallback});
-            } catch (Exception e) {
+            } catch (IOException | UnsupportedCallbackException e) {
                 throw new AuthException(e.getMessage());
             }
             
@@ -270,22 +280,27 @@ public class CustomServerAuthModule implements ServerAuthModule {
     }
     
     @Override
-    public AuthStatus secureResponse(MessageInfo messageInfo, Subject serviceSubject)
+    public AuthStatus secureResponse(MessageInfo messageInfo,
+                                     jakarta.security.auth.message.callback.Subject serviceSubject)
             throws AuthException {
         return AuthStatus.SEND_SUCCESS;
     }
     
     @Override
-    public void cleanSubject(MessageInfo messageInfo, Subject subject) throws AuthException {
+    public void cleanSubject(MessageInfo messageInfo,
+                            jakarta.security.auth.message.callback.Subject subject)
+                            throws AuthException {
         if (subject != null) {
-            subject.getPrincipals().clear();
+            Set<Principal> principals = subject.getPrincipals();
+            if (principals != null) {
+                principals.clear();
+            }
         }
     }
     
     @Override
-    public Class[] getSupportedMessageTypes() {
-        return new Class[]{jakarta.servlet.http.HttpServletRequest.class,
-                          jakarta.servlet.http.HttpServletResponse.class};
+    public Class<?>[] getSupportedMessageTypes() {
+        return new Class<?>[]{HttpServletRequest.class, HttpServletResponse.class};
     }
     
     private String extractUsername(MessageInfo messageInfo) {
@@ -400,7 +415,7 @@ public class ConcurrencyExample {
     
     public CompletableFuture<String> asyncOperation() {
         // Leverages Virtual Threads on Java 21+
-        return executorService.supplyAsync(this::processData);;
+        return executorService.supplyAsync(this::processData);
     }
     
     private String processData() {
@@ -414,6 +429,50 @@ public class ConcurrencyExample {
     }
 }
 ----
+
+[#annotations-3.0]
+=== Annotations 3.0
+
+Jakarta Annotations 3.0 defines a collection of annotations representing common semantic concepts that enable a declarative style of programming in the Jakarta EE platform.
+
+*What's New in Annotations 3.0:*
+
+- **N/A** - No new features, enhancements, or additions
+
+*Changes in Annotations 3.0:*
+
+- **Removal of @ManagedBean**: The deprecated `@ManagedBean` annotation has been fully removed from the specification. Developers must migrate to CDI managed beans using `@Named` and appropriate scope annotations.
+
+==== Migrating from @ManagedBean
+
+If your application uses `@ManagedBean`, you must migrate to CDI managed beans. The `@ManagedBean` annotation was deprecated in Java EE 6 and has been removed in Jakarta EE 11.
+
+**Migration Options:**
+
+1. **Use CDI `@Named` for JSF/EL access** - If the bean needs to be accessible from JSF pages or Expression Language
+2. **Use CDI scope annotations without `@Named`** - If the bean is only used for dependency injection
+3. **Use EJB annotations** - If the bean requires transaction management or other EJB services
+
+[#interceptors-2.2]
+=== Interceptors 2.2
+
+Jakarta Interceptors 2.2 defines a means of interposing on business method invocations and specific events in the lifecycle of beans.
+
+*New features, enhancements or additions:*
+
+- **Updated dependencies for Jakarta EE 11**
+  - Jakarta Annotations to 3.0.0
+- **Add standard accessor to interceptor bindings** - Provides a standard way to access interceptor bindings from `InvocationContext`
+- **Provide access to interceptor bindings from InvocationContext** - New method `getInterceptorBindings()` added to `InvocationContext` interface
+- **Improve InvocationContext.getInterceptorBindings() language**
+  - More precise language for `InvocationContext.getInterceptorBindings()` method
+  - Clarify behavior of `InvocationContext.getInterceptorBindings()` in case of inherited/transitive bindings
+
+*Removals, deprecations or backwards incompatible changes:*
+
+- **None**
+
+See the following CDI section for its usage.
 
 [#cdi-4.1]
 === CDI 4.1
@@ -694,7 +753,7 @@ public class OptionalELResolverExample {
 }
 ----
 
-==== Using EL 6.0 in JSF/Facelets
+==== Using EL 6.0 in Faces/Facelets
 
 [source,xhtml]
 ----
@@ -1211,13 +1270,13 @@ public class ErrorHandlerServlet extends HttpServlet {
 [#restful-web-services-4.0]
 === RESTful Web Services 4.0
 
-Jakarta RESTful Web Services 4.0 provides a foundational API to develop web services following the Representational State Transfer (REST) architectural pattern. The goal of this release is to remove the JAXB dependency and ManagedBean support from Jakarta RESTful Web Services and add TCK tests to fill verification gaps while maintaining backward compatibility with earlier releases.
+Jakarta RESTful Web Services 4.0 provides a foundational API to develop web services following the Representational State Transfer (REST) architectural pattern. The full details for this release are as follows.
 
 *New features in RESTful Web Services 4.0:*
 
 - *TCK tests for multipart/form-data API*: Added comprehensive tests for multipart form data handling
 - *TCK tests for default ExceptionMapper*: Added tests to verify default exception mapping behavior
-- *Convenience method for checking header value lists*: New method to easily check if a header contains specific values
+- *Added containsHeaderString method to a few APIs*: New method added to the APIs -ClientRequestContext, ClientResponseContext, ContainerRequestContext, ContainerResponseContext and HttpHeaders to provide an easy way to check whether a header contains specific values
 - *Required TCK for convenience method*: Added required tests for the new convenience method merged in PR 1066
 - *Clarified JavaSE support*: Clarified JavaSE support in Section 2.3 of specification
 - *Added getMatchedResourceTemplate method to UriInfo*: New method to retrieve the matched resource template
@@ -1513,6 +1572,21 @@ Jakarta Persistence 3.2 defines a standard for management of persistence and obj
 - *Query Methods*: Adds `getSingleResultOrNull()` to `Query`, `TypedQuery`, `StoredProcedureQuery`
 - *Named Queries*: Adds `entities()`, `classes()` and `columns()` to `NamedNativeQuery`
 - *Lock Mode*: Adds `lockMode()` to `EntityResult` with the default being `OPTIMISTIC`
+- *Transaction Helpers*: Adds `runInTransaction()` and `callInTransaction()` convenience methods for executing code within transactions
+- *EntityManager Connection Access*: Adds `runWithConnection()` and `callWithConnection()` methods for direct JDBC connection access
+- *Programmatic Configuration API*: Adds `PersistenceConfiguration` for programmatic persistence unit configuration
+- *Schema Management API*: Adds `SchemaManager` for schema creation, validation, truncation, and dropping
+- *DDL Generation Enhancements*: Adds support for comments, check constraints, table options, and second precision in generated DDL
+- *Enum Mapping Enhancements*: Adds `@EnumeratedValue` for custom enum value mapping
+- *Named Query and Graph Factory Access*: Adds APIs for factory-based named query and entity graph creation/access
+
+*Deprecations:*
+- *Temporal Types*: Deprecates usage of `Calendar`, `Date`, `Time`, `Timestamp`, `Temporal`, `MapKeyTemporal`, and `TemporalType` in favor of `java.time` API
+- *multiselect Methods*: Deprecates `multiselect` methods in `CriteriaQuery` in favor of `array` or `tuple` methods defined in `CriteriaBuilder`
+- *Byte[] and Character[] Arrays*: Deprecates use of `Byte[]` and `Character[]` arrays for basic attributes, in favor of primitive array types
+- *Subgraph Methods for Removal*: Deprecates `addSubclassSubgraph()` in `EntityGraph` for removal; `addTreatedSubgraph()` method should be used as direct replacement
+- *Attribute and Class Subgraph Methods*: Deprecates `addSubgraph(Attribute, Class)` and `addKeySubgraph()` in `Graph`/`EntityGraph`/`SubGraph` for removal
+- *Transaction Methods*: Deprecates `jakarta.persistence.spi.PersistenceUnitTransactionType` and `jakarta.persistence.PersistenceUnitUtil.getTransactionType()` methods for removal
 
 [source,java]
 ----
@@ -1838,6 +1912,229 @@ public class ProductRepository {
         .setParameter("minPrice", minPrice)
         .setParameter("pattern", namePattern)
         .getSingleResultOrNull();  // Returns null if no results
+    }
+}
+
+// NEW in 3.2: Transaction Helpers
+@Stateless
+public class TransactionHelperExample {
+    
+    @PersistenceContext
+    private EntityManager em;
+    
+    // NEW in 3.2: runInTransaction() - Execute code within a transaction
+    public void processOrderWithTransaction(Order order) {
+        em.runInTransaction(entityManager -> {
+            // All operations here run in a transaction
+            entityManager.persist(order);
+            
+            // Update inventory
+            for (OrderItem item : order.getItems()) {
+                Product product = entityManager.find(Product.class, item.getProductId());
+                product.setStockQuantity(product.getStockQuantity() - item.getQuantity());
+                entityManager.merge(product);
+            }
+            
+            // No need to explicitly commit - handled automatically
+        });
+    }
+    
+    // NEW in 3.2: callInTransaction() - Execute code and return a result
+    public Order createOrderWithTransaction(OrderRequest request) {
+        return em.callInTransaction(entityManager -> {
+            Order order = new Order();
+            order.setCustomerId(request.getCustomerId());
+            order.setItems(request.getItems());
+            order.setTotal(calculateTotal(request.getItems()));
+            
+            entityManager.persist(order);
+            return order;  // Return value from transaction
+        });
+    }
+    
+    private double calculateTotal(List<OrderItem> items) {
+        return items.stream()
+                   .mapToDouble(item -> item.getPrice() * item.getQuantity())
+                   .sum();
+    }
+}
+
+// NEW in 3.2: EntityManager Connection Access
+@Stateless
+public class ConnectionAccessExample {
+    
+    @PersistenceContext
+    private EntityManager em;
+    
+    // NEW in 3.2: runWithConnection() - Direct JDBC access
+    public void executeBatchUpdate(List<Long> productIds) {
+        em.runWithConnection(connection -> {
+            String sql = "UPDATE products SET last_updated = ? WHERE id = ?";
+            try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+                Instant now = Instant.now();
+                for (Long id : productIds) {
+                    stmt.setObject(1, now);
+                    stmt.setLong(2, id);
+                    stmt.addBatch();
+                }
+                stmt.executeBatch();
+            }
+        });
+    }
+    
+    // NEW in 3.2: callWithConnection() - Direct JDBC access with return value
+    public int getProductCount() {
+        return em.callWithConnection(connection -> {
+            String sql = "SELECT COUNT(*) FROM products WHERE active = true";
+            try (PreparedStatement stmt = connection.prepareStatement(sql);
+                 ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1);
+                }
+                return 0;
+            }
+        });
+    }
+}
+
+// NEW in 3.2: Programmatic Configuration API
+public class ProgrammaticConfigurationExample {
+    
+    public EntityManagerFactory createEntityManagerFactory() {
+        // NEW in 3.2: PersistenceConfiguration for programmatic setup
+        PersistenceConfiguration config = new PersistenceConfiguration("myPersistenceUnit");
+        
+        config.provider("org.hibernate.jpa.HibernatePersistenceProvider")
+              .jtaDataSource("java:comp/env/jdbc/MyDataSource")
+              .managedClass(Product.class)
+              .managedClass(Category.class)
+              .managedClass(Order.class)
+              .property("hibernate.dialect", "org.hibernate.dialect.PostgreSQLDialect")
+              .property("hibernate.show_sql", "true")
+              .property("hibernate.format_sql", "true");
+        
+        return Persistence.createEntityManagerFactory(config);
+    }
+}
+
+// NEW in 3.2: Schema Management API
+@Stateless
+public class SchemaManagementExample {
+    
+    @PersistenceContext
+    private EntityManager em;
+    
+    public void manageSchema() {
+        // NEW in 3.2: SchemaManager for schema operations
+        SchemaManager schemaManager = em.getSchemaManager();
+        
+        // Create schema
+        schemaManager.create(false);  // false = don't drop existing
+        
+        // Validate schema
+        schemaManager.validate();
+        
+        // Truncate all tables (useful for testing)
+        schemaManager.truncate();
+        
+        // Drop schema
+        // schemaManager.drop();
+    }
+}
+
+// NEW in 3.2: Enum Mapping Enhancements with @EnumeratedValue
+public enum OrderStatus {
+    @EnumeratedValue("P")
+    PENDING,
+    
+    @EnumeratedValue("C")
+    CONFIRMED,
+    
+    @EnumeratedValue("S")
+    SHIPPED,
+    
+    @EnumeratedValue("D")
+    DELIVERED,
+    
+    @EnumeratedValue("X")
+    CANCELLED
+}
+
+@Entity
+@Table(name = "orders")
+public class Order {
+    
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    
+    // NEW in 3.2: Custom enum mapping with @EnumeratedValue
+    @Enumerated(EnumType.STRING)
+    private OrderStatus status;  // Stored as "P", "C", "S", "D", "X" in database
+    
+    private Instant orderDate;
+    private Double total;
+    
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL)
+    private List<OrderItem> items;
+    
+    // Constructors, getters, setters
+}
+
+// NEW in 3.2: DDL Generation Enhancements
+@Entity
+@Table(name = "products",
+       comment = "Product catalog table",  // NEW in 3.2: Table comments
+       options = "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4")  // NEW in 3.2: Table options
+@CheckConstraint(name = "price_positive",
+                constraint = "price > 0")  // NEW in 3.2: Check constraints
+public class Product {
+    
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    
+    @Column(nullable = false, comment = "Product name")  // NEW in 3.2: Column comments
+    private String name;
+    
+    @Column(nullable = false)
+    @CheckConstraint(name = "price_range",
+                    constraint = "price BETWEEN 0.01 AND 999999.99")
+    private Double price;
+    
+    @Column(name = "created_at", precision = 6)  // NEW in 3.2: Second precision for timestamps
+    private Instant createdAt;
+    
+    @Column(name = "updated_at", precision = 6)
+    private Instant updatedAt;
+    
+    // Constructors, getters, setters
+}
+
+// NEW in 3.2: Named Query Factory Access
+@Stateless
+public class NamedQueryFactoryExample {
+    
+    @PersistenceContext
+    private EntityManager em;
+    
+    public void demonstrateNamedQueryFactory() {
+        // NEW in 3.2: Factory-based named query access
+        EntityManagerFactory emf = em.getEntityManagerFactory();
+        
+        // Get named query from factory
+        TypedQuery<Customer> query = emf.createNamedQuery("Customer.findByEmail", Customer.class);
+        query.setParameter("email", "user@example.com");
+        Customer customer = query.getSingleResultOrNull();
+        
+        // Get named entity graph from factory
+        EntityGraph<Customer> graph = emf.createEntityGraph(Customer.class);
+        graph.addAttributeNodes("orders", "address");
+        
+        // Use the graph in a query
+        List<Customer> customers = em.createQuery("SELECT c FROM Customer c", Customer.class)
+                                     .setHint("jakarta.persistence.fetchgraph", graph)
+                                     .getResultList();
     }
 }
 ----
@@ -2607,15 +2904,45 @@ Key areas to review:
 - *Validation 3.1*: Leverage Java Records for validated data structures
 - *Concurrency 3.1*: Test async operations, especially if using Java 21 Virtual Threads
 
+== Performance Benefits with Java 21
+
+Jakarta EE 11's support for Java 21 brings significant performance improvements:
+
+[source,java]
+----
+// Virtual Threads example with Jakarta Concurrency
+@ApplicationScoped
+public class VirtualThreadExample {
+    
+    @Resource
+    private ManagedExecutorService executor;
+    
+    public void processLargeDataset(List<Data> dataset) {
+        // Each task runs on a virtual thread
+        List<CompletableFuture<Result>> futures = dataset.stream()
+            .map(data -> CompletableFuture.supplyAsync(
+                () -> processData(data), 
+                executor
+            ))
+            .toList();
+        
+        // Wait for all to complete
+        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
+            .join();
+    }
+    
+    private Result processData(Data data) {
+        // Processing logic
+        return new Result();
+    }
+}
+----
+
 == Conclusion
 
 Jakarta EE 11 in Open Liberty 26.0.0.5 represents a significant advancement in enterprise Java development. The introduction of Jakarta Data 1.0 alone is a game-changer, dramatically reducing boilerplate code and improving developer productivity. Combined with updates across all major specifications, enhanced performance through Java 21 support, and a comprehensive set of modern APIs, Jakarta EE 11 provides a solid foundation for building cloud-native enterprise applications.
 
 The combination of Open Liberty's lightweight, fast runtime and Jakarta EE 11's powerful features makes this an excellent choice for organizations looking to modernize their enterprise Java applications while maintaining compatibility with industry standards.
-
-What's more? Jakarta EE 11 also works with MicroProfile 7.0 and 7.1 in Open Liberty, allowing you to take advantage of the latest microservices features alongside the core Jakarta EE platform. Whether you're building new applications or migrating existing ones, Open Liberty and Jakarta EE 11 provide the tools and capabilities you need to succeed in today's fast-paced development environment.
-
-If you are using Spring Boot, Open Liberty 26.0.0.5 and later release also enables you to use Spring Boot 4.0 with Jakarta EE 11 features, providing even more flexibility in how you build your applications.
 
 == Learn More
 
