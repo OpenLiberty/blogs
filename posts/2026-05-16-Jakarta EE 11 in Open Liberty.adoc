@@ -1099,90 +1099,289 @@ Jakarta Security 4.0 provides an In-memory Identity Store, which is a developer-
 
 *New features in Security 4.0:*
 
-- *Multiple HTTP Authentication Mechanisms (HAMs)* can now be defined within the same application. These mechanisms can be specified through built-in Jakarta annotations such as `@FormAuthenticationMechanismDefinition` or through custom implementations of the `HttpAuthenticationMechanism` interface.
+- *Multiple HTTP Authentication Mechanisms (HAMs)*: Multiple HTTP Authentication Mechanisms can now be defined within the same application. These mechanisms can be specified through built-in Jakarta annotations such as `@FormAuthenticationMechanismDefinition` or through custom implementations of the `HttpAuthenticationMechanism` interface. Prioritisation of multiple HAMs can be managed by a custom implementation of the HttpAuthenticationMechanismHandler instead of relying on the default algorithm provided by Jakarta Security.
 
-- *New `SecurityContext` method*: A new method is added to the `SecurityContext` interface called `getAllDeclaredCallerRoles()`, which returns a list of all static (declared) application roles that the authenticated caller is in.
+- *Qualifiers for Built-in Authentication Mechanisms*: Built-in authentication mechanisms (BASIC, FORM, Custom FORM, OpenID Connect) now have qualifiers by default, whereas before they were unqualified. This enables programmatic selection and injection of specific authentication mechanisms.
 
-- *Removed deprecated class*: References to the `IdentityStorePermission` class are removed as it was previously deprecated.
+- *In-memory Identity Store*: Provides `@InMemoryIdentityStoreDefinition` annotation for defining credential stores directly in code. This is designed for testing, debugging, and demos - not recommended for production use.
 
+- *New SecurityContext method*: A new method `getAllDeclaredCallerRoles()` is added to the `SecurityContext` interface, which returns a list of all static (declared) application roles that the authenticated caller is in.
 
-==== Multiple HTTP Authentication Mechanisms Example
+*Removals and Breaking Changes:*
+- All references to the `SecurityManager` have been removed from the specification
+- Built-in authentication mechanisms now have a qualifier by default, whereas before they were unqualified
+
+==== In-memory Identity Store
+
+Before the introduction of the new identity store specification, Jakarta Security natively supported only two types of identity stores: **database** and **LDAP**, both of which are used for credential validation. While effective for production environments, these options were considered heavyweight for testing, debugging, and demonstration scenarios.
+
+The Jakarta Security Specification 4.0 provides details on how to specify credential information to be used during the authentication workflow through the new `@InMemoryIdentityStoreDefinition` annotation:
 
 [source,java]
 ----
-import jakarta.security.enterprise.authentication.mechanism.http.HttpAuthenticationMechanism;
-import jakarta.security.enterprise.authentication.mechanism.http.HttpMessageContext;
-import jakarta.security.enterprise.credential.UsernamePasswordCredential;
-import jakarta.security.enterprise.identitystore.CredentialValidationResult;
-import jakarta.security.enterprise.identitystore.IdentityStoreHandler;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
-import jakarta.security.enterprise.AuthenticationStatus;
-import jakarta.security.enterprise.AuthenticationException;
-import jakarta.security.enterprise.authentication.mechanism.http.FormAuthenticationMechanismDefinition;
+. . .
 
-// Define a form-based authentication mechanism using annotation
-@FormAuthenticationMechanismDefinition(
-    loginToContinue = @LoginToContinue(
-        loginPage = "/login.jsp",
-        errorPage = "/error.jsp"
-    )
+@InMemoryIdentityStoreDefinition (
+    priority = 10,
+    priorityExpression = "${80/20}",
+    useFor = {VALIDATE, PROVIDE_GROUPS},
+    useForExpression = "#{'VALIDATE'}",
+    value = {
+        @Credentials(callerName = "jasmine", password = "secret1", groups = { "caller", "user" } )
+    }
 )
+----
+
+All attributes for the `@InMemoryIdentityStoreDefinition` annotation are shown in the example. The `priority`, `priorityExpression`, `useFor`, and `useForExpression` attributes are optional and set to sensible defaults.
+
+The `@Credentials` annotation maps one or more caller names to a password and optional group values. The `callerName` and `password` attributes are mandatory. If either one is omitted, a compilation error occurs.
+
+The example demonstrates a single caller definition with credential information that uses a plain-text password. However, it is highly recommended that passwords be supplied using an Open Liberty-supported encoding mechanism, as illustrated in the next example:
+
+[source,java]
+----
+@InMemoryIdentityStoreDefinition (
+    value = {
+        @Credentials(callerName = "jasmine",  password = "{xor}LDo8LTorbg==", groups = { "caller", "user" } ),
+        @Credentials(callerName = "frank", groups = { "user" }, password = "{hash}ARAAA <sequence shortened> Fyyw=="),
+        @Credentials(callerName = "sally", groups = { "user" }, password = "{aes}ARAFIYJ <sequence shortened> WRQNA==")
+    }
+)
+----
+
+Encrypted and encoded passwords can be generated by using the Open Liberty `securityUtility`, which is included under the `wlp/bin/securityUtility` path. The following example demonstrates how to encode a text string by using the `xor` encoding mechanism:
+
+[source,bash]
+----
+wlp/bin/securityUtility encode --encoding=xor
+Enter text: <enter text to encode>
+Re-enter text:
+{xor}PTA9Lyg
+----
+
+==== Multiple HTTP Authentication Mechanisms
+
+The Jakarta Security 4.0 specification allows multiple HTTP Authentication Mechanisms (HAMs) to be defined within a single application:
+
+[source,java]
+----
+@BasicAuthenticationMechanismDefinition(realmName="basicAuth")
+
+@FormAuthenticationMechanismDefinition(
+                loginToContinue = @LoginToContinue(errorPage = "/form-login-error.html",
+                loginPage = "/form-login.html"))
+
+@CustomFormAuthenticationMechanismDefinition(
+                loginToContinue = @LoginToContinue(errorPage = "/custom-login-error.html",
+                loginPage = "/custom-login.html"))
+----
+
+This example demonstrates how three HTTP Authentication Mechanisms (HAMs) can be defined within a single application.
+
+Custom HAMs can also be defined in the same application by implementing the `HttpAuthenticationMechanism` interface in one or more classes:
+
+[source,java]
+----
 @ApplicationScoped
-public class CustomAuthenticationMechanism implements HttpAuthenticationMechanism {
-    
-    @Inject
-    private IdentityStoreHandler identityStoreHandler;
-    
+// @Priority is optional and used to control selection priority if multiple custom definitions exist
+@Priority(100)
+public class CustomHAM implements HttpAuthenticationMechanism {
+
     @Override
     public AuthenticationStatus validateRequest(
-            HttpServletRequest request,
-            HttpServletResponse response,
-            HttpMessageContext context) throws AuthenticationException {
-        
-        String username = request.getParameter("username");
-        String password = request.getParameter("password");
-        
-        if (username != null && password != null) {
-            CredentialValidationResult result = identityStoreHandler.validate(
-                new UsernamePasswordCredential(username, password)
-            );
-            
-            if (result.getStatus() == CredentialValidationResult.Status.VALID) {
-                return context.notifyContainerAboutLogin(result);
-            }
-        }
-        
-        return context.doNothing();
+        HttpServletRequest request,
+        HttpServletResponse response,
+        HttpMessageContext httpMessageContext) throws AuthenticationException {
+
+            // implement custom logic here, and return an AuthenticationStatus
+            return AuthenticationStatus.NOT_DONE;
     }
 }
 ----
 
-==== Using getAllDeclaredCallerRoles() Example
+So a single application can have a mix of both annotation-defined HAMs and custom ones. In the previous two snippets of code, a total of four HAMs are defined (three by annotation and one custom one).
+
+IMPORTANT: `@Priority` must be used to raise or lower the priority of one custom HAM over another. If not specified, then a default priority is assigned. If more than one custom HAM is defined, their priorities need to be explicitly set to unique values. If the priorities are set to the same value or remain unset and inherit the same default value, an error occurs.
+
+===== HAM Resolution
+
+An internal implementation of the Jakarta Security 4.0 `HttpAuthenticationMechanismHandler` interface (the "internal HAM handler") is provided. When an application defines multiple HAMs, this internal handler selects a single HAM to be used in the authentication flow.
+
+The order in which HAMs are considered (when present) is as follows:
+
+1. Custom (developer-provided) HAMs
+   * If multiple custom HAMs are defined, their relative order is resolved by using `@Priority`.
+2. `OpenIdAuthenticationMechanismDefinition`
+3. `CustomFormAuthenticationMechanismDefinition`
+4. `FormAuthenticationMechanismDefinition`
+5. `BasicAuthenticationMechanismDefinition`
+
+Given this ordering, the Custom HAM is always selected in the authentication workflow if all five HAM types are defined in the application.
+
+IMPORTANT: A developer must provide a custom implementation of the `HttpAuthenticationMechanismHandler` interface (a "custom HAM handler") if the internal HAM handler does not meet their requirements. A custom handler always takes precedence over the internal HAM handler, allowing any tailored algorithm to select a single HAM from multiple available mechanisms.
+
+===== Qualifiers
+
+HAMs - whether defined through annotations or as custom defined - can also include an optional class-level qualifier to simplify HAM injection into a custom HAM handler. For example, if you want to define qualified HAMs, you would first declare qualifier interfaces such as:
 
 [source,java]
 ----
-import jakarta.inject.Inject;
-import jakarta.security.enterprise.SecurityContext;
-import jakarta.ws.rs.GET;
-import jakarta.ws.rs.Path;
-import jakarta.ws.rs.Produces;
-import jakarta.ws.rs.core.MediaType;
-import java.util.Set;
+import static java.lang.annotation.ElementType.METHOD;
+import static java.lang.annotation.ElementType.FIELD;
+import static java.lang.annotation.ElementType.PARAMETER;
+import static java.lang.annotation.ElementType.TYPE;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
-@Path("/roles")
-public class RolesResource {
-    
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+import jakarta.inject.Qualifier;
+
+@Qualifier
+@Retention(RUNTIME)
+@Target({TYPE, METHOD, FIELD, PARAMETER})
+public @interface Admin {
+}
+----
+
+[source,java]
+
+----
+import static java.lang.annotation.ElementType.METHOD;
+import static java.lang.annotation.ElementType.FIELD;
+import static java.lang.annotation.ElementType.PARAMETER;
+import static java.lang.annotation.ElementType.TYPE;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+import jakarta.inject.Qualifier;
+
+@Qualifier
+@Retention(RUNTIME)
+@Target({TYPE, METHOD, FIELD, PARAMETER})
+public @interface User {
+}
+----
+
+Now define multiple Basic HTTP Authentication Mechanisms in the main application:
+[source,java]
+----
+import Admin;
+import User;
+
+import jakarta.security.enterprise.authentication.mechanism.http.BasicAuthenticationMechanismDefinition;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.ws.rs.ApplicationPath;
+import jakarta.ws.rs.core.Application;
+
+
+@BasicAuthenticationMechanismDefinition(realmName="admin-realm", qualifiers={Admin.class})
+@BasicAuthenticationMechanismDefinition(realmName="user-realm", qualifiers={User.class})
+
+@ApplicationScoped
+@ApplicationPath("/")
+public class MultipleHAMsApplication extends Application {
+}
+----
+In the example, two Basic HTTP Authentication Mechanisms are defined in the main application. The @BasicAuthenticationMechanismDefinition annotation is used to define the realm name and the qualifier for each mechanism. The qualifiers are used to distinguish between the two mechanisms during injection.
+
+
+
+Now finally, define an implementation of the HttpAuthenticationMechanismHandler to choose which qualified HAM to use:
+
+
+[source,java]
+----
+import Admin;
+import User;
+
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Default;
+import jakarta.inject.Inject;
+import jakarta.security.enterprise.AuthenticationException;
+import jakarta.security.enterprise.AuthenticationStatus;
+import jakarta.security.enterprise.authentication.mechanism.http.HttpAuthenticationMechanism;
+import jakarta.security.enterprise.authentication.mechanism.http.HttpAuthenticationMechanismHandler;
+import jakarta.security.enterprise.authentication.mechanism.http.HttpMessageContext;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+
+@ApplicationScoped
+public class CustomHAMHandler implements HttpAuthenticationMechanismHandler {
+
+    @Inject @Admin
+    private HttpAuthenticationMechanism adminHAM;
+
+    @Inject @User
+    private HttpAuthenticationMechanism userHAM;
+
+    public CustomHAMHandler() {
+    }
+
+    @Override
+    public AuthenticationStatus validateRequest(HttpServletRequest request,
+                                                HttpServletResponse response,
+                                                HttpMessageContext httpMessageContext) throws AuthenticationException {
+        String requestURI = request.getRequestURI();
+        String contextPath = request.getContextPath();
+
+        String path = requestURI;
+        if (contextPath != null && !contextPath.isEmpty()) {
+            path = requestURI.substring(contextPath.length());
+        }
+
+        if (path.startsWith("/resource/admin")) {
+            return adminHAM.validateRequest(request, response, httpMessageContext);
+        } else if (path.startsWith("/resource/user")) {
+            return userHAM.validateRequest(request, response, httpMessageContext);
+        } 
+        return AuthenticationStatus.SEND_FAILURE;
+    }
+}
+
+----
+
+Note, you can also qualifier custom HTTP Authentication Mechanisms (as you could prior to Jakarta Security 4.0) and inject the custom HAM into your custom HAM handler.
+
+
+==== getAllDeclaredCallerRoles()
+
+To use the new `SecurityContext` method, inject the `SecurityContext` implementation into your application and call the method directly:
+
+[source,java]
+----
     @Inject
     private SecurityContext securityContext;
+
+    Set<String> allDeclaredCallerRoles = securityContext.getAllDeclaredCallerRoles();
+
+    System.out.println("All declared caller roles for caller ["
+        + securityContext.getCallerPrincipal().getName()
+        + "] are "
+        + allDeclaredCallerRoles.toString());
     
     @GET
+    @Path("/info")
     @Produces(MediaType.APPLICATION_JSON)
-    public Set<String> getAllRoles() {
-        // Get all declared roles for the authenticated caller
-        return securityContext.getAllDeclaredCallerRoles();
+    public String getSecureInfo() {
+        String username = securityContext.getUserPrincipal().getName();
+        boolean isAdmin = securityContext.isUserInRole("ADMIN");
+        
+        return String.format(
+            "{\"user\": \"%s\", \"isAdmin\": %b}",
+            username,
+            isAdmin
+        );
+    }
+    
+    @GET
+    @Path("/admin")
+    @Produces(MediaType.TEXT_PLAIN)
+    public String adminOnly() {
+        if (!securityContext.isUserInRole("ADMIN")) {
+            throw new SecurityException("Admin access required");
+        }
+        return "Welcome, administrator!";
     }
 }
 ----
