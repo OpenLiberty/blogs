@@ -476,134 +476,226 @@ See the following CDI section for its usage.
 [#cdi-4.1]
 === CDI 4.1
 
-Jakarta Contexts and Dependency Injection (CDI) 4.1 specifies a means for obtaining objects in such a way as to maximize reusability, testability and maintainability compared to traditional approaches such as constructors, factories, and service locators (e.g., JNDI).
+Jakarta Contexts and Dependency Injection (CDI) 4.1 brings important architectural improvements and new APIs to help framework developers build on CDI. CDI allows objects to be bound to lifecycle contexts, injected into application code, be subject to interceptors and decorators, and interact in a loosely coupled fashion via events.
 
-*New features in CDI 4.1:*
+*Key changes in CDI 4.1:*
 
-- *Method invokers* - New API for programmatic method invocation with interceptor support
-- *Executable methods* - Enhanced method execution capabilities
-- *@Priority on producers* - Ability to specify priority on producer methods and fields
-- *Getting interceptor bindings in standard way* - Standardized access to interceptor binding information
-- *Breaking up spec/TCK* - Removed circular dependencies between specification and TCK
-- *Delegate integration requirements* - Delegated integration requirements to Jakarta Platform specifications
-- *Improved managed bean requirements* - Clearer wording and requirements for managed beans
+- *Specification restructuring* - Integration requirements with other Jakarta EE specs moved from CDI specification to Jakarta EE Platform, Web Profile, and Core Profile specifications
+- *Expression Language separation* - EL-related methods moved to new API jar (`jakarta.enterprise.cdi-el-api`) to remove CDI's dependency on EL API
+- *Method Invokers* - New API allowing frameworks to call methods with CDI-managed arguments and instances
+- *Interceptor binding access* - New methods on `InvocationContext` to retrieve interceptor binding annotations
+- *@Priority on producers* - Producer methods and fields can now be annotated with `@Priority` for fine-grained alternative selection
+- *Programmatic assignability rules* - New `BeanContainer` methods to check if beans match injection points
 
-==== Method Invokers Example
+==== Specification Restructuring
 
-Method invokers provide a way to invoke methods programmatically while preserving CDI interceptor behavior:
+One of the major changes in CDI 4.1 is the restructuring of the specification to remove circular dependencies and improve modularity:
+
+**Integration requirements moved to platform specs:**
+Previously, CDI defined requirements for integration with other Jakarta EE specifications including Servlet, Expression Language, Enterprise Beans, Transactions, Security, Validation, and Persistence. These integration requirements have now been moved to the Jakarta EE Platform, Web Profile, and Core Profile specifications as appropriate. This makes it easier to pass the CDI TCK independently and clarifies which integrations are required at each platform level.
+
+**Expression Language separation:**
+The CDI API previously had a direct dependency on the Expression Language (EL) API because `BeanManager` included methods that referenced EL classes. In CDI 4.1:
+
+- EL-related methods on `BeanManager` (`getELResolver()` and `wrapExpressionFactory()`) are deprecated for removal in CDI 5.0
+- A new supplemental API jar `jakarta.enterprise.cdi-el-api` provides `ELAwareBeanManager`, a sub-interface of `BeanManager` with the same methods
+- This allows the core CDI API to remove its dependency on EL in the next major version
+- Existing users will see deprecation warnings and should migrate to `ELAwareBeanManager` before CDI 5.0
+
+==== Method Invokers
+
+Method invokers provide a way to invoke methods programmatically while allowing CDI to look up and inject some of the method parameters. This is particularly useful for frameworks that want to allow users to annotate methods and have those methods called with a mix of framework-provided and CDI-injected arguments.
+
+**Example use case:** An alert system where users can apply `@Alert` to methods on managed bean classes. When an alert happens, the annotated methods are called with the alert ID as the first argument, and other arguments looked up from CDI.
 
 [source,java]
 ----
-import jakarta.enterprise.invoke.Invoker;
-import jakarta.enterprise.invoke.InvokerBuilder;
-import jakarta.inject.Inject;
-import jakarta.enterprise.context.ApplicationScoped;
-
 @ApplicationScoped
-public class InvokerExample {
+public class MyBean {
     
-    @Inject
-    InvokerBuilder<MyService> invokerBuilder;
-    
-    public void demonstrateInvoker() throws Exception {
-        // Build an invoker for a specific method
-        Invoker<MyService, String> invoker = invokerBuilder
-            .setMethod(MyService.class.getMethod("processData", String.class))
-            .build();
-        
-        MyService service = new MyService();
-        
-        // Invoke the method - interceptors will be applied
-        String result = invoker.invoke(service, new Object[]{"input data"});
-        System.out.println("Result: " + result);
+    @Alert
+    public void myAlert1(int id) {
+        // Do something
     }
-}
-
-@ApplicationScoped
-class MyService {
     
-    @Logged  // Custom interceptor binding
-    public String processData(String input) {
-        return "Processed: " + input;
+    @Alert
+    public void myAlert2(int id, MyOtherBean otherBean) {
+        // Do something with otherBean
     }
 }
 ----
 
-==== @Priority on Producers Example
-
-CDI 4.1 allows you to specify priority on producer methods and fields to control which producer is selected when multiple producers exist:
+**Creating invokers** (done within a CDI extension):
 
 [source,java]
 ----
-import jakarta.enterprise.inject.Produces;
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.annotation.Priority;
-
-@ApplicationScoped
-public class ConfigurationProducers {
+public class InvokerExtension implements Extension {
     
-    // Default configuration with lower priority
+    public static record AlertMethod(Invoker<?,?> invoker, int parameterCount) { }
+    List<AlertMethod> alertMethods = new ArrayList<>();
+    
+    public <T> void createInvokers(@Observes @WithAnnotations(Alert.class) ProcessManagedBean<T> pmb) {
+        for (AnnotatedMethod<? super T> m : pmb.getAnnotatedBeanClass().getMethods()) {
+            if (m.isAnnotationPresent(Alert.class)) {
+                validate(m);
+                
+                InvokerBuilder<Invoker<T, ?>> builder = pmb.createInvoker(m);
+                
+                // Look up the bean instance when invoking
+                builder.withInstanceLookup();
+                
+                // Look up all arguments except the first
+                int parameterCount = m.getParameters().size();
+                for (int i = 1; i < parameterCount; i++) {
+                    builder.withArgumentLookup(i);
+                }
+                
+                alertMethods.add(new AlertMethod(builder.build(), parameterCount));
+            }
+        }
+    }
+}
+----
+
+**Calling invokers:**
+
+[source,java]
+----
+public void invokeAlerts(int i) throws Exception {
+    for (AlertMethod method : alertMethods) {
+        // Construct an array of arguments
+        Object[] args = new Object[method.parameterCount];
+        // First argument is the alert id
+        args[0] = i;
+        // All other arguments are looked up from CDI, so we pass in null
+        
+        // Call the method
+        method.invoker.invoke(null, args);
+    }
+}
+----
+
+**Note:** `null` must be passed for any instance or argument that is to be looked up from CDI. In this example, the bean instance and all arguments except the first are looked up from CDI, so we pass `null` for the instance and `null` for arguments at positions 1 and beyond.
+
+==== @Priority on Producer Methods and Fields
+
+Previously, a producer method or field declared as an alternative could only be enabled and have a priority assigned by putting the `@Priority` annotation on the containing bean class. If a class contained several alternative producer methods, there was no way to assign a different priority to each.
+
+CDI 4.1 allows the `@Priority` annotation to be placed directly on the producer field or method, enabling fine-grained control over alternative selection:
+
+**Before CDI 4.1** (priority on class):
+
+[source,java]
+----
+@ApplicationScoped
+@Priority(10)
+public class ProducerClass {
+    
     @Produces
-    @Priority(100)
-    public DatabaseConfig defaultConfig() {
-        DatabaseConfig config = new DatabaseConfig();
-        config.setUrl("jdbc:h2:mem:testdb");
-        return config;
+    @Alternative
+    public String produceString() {
+        return "OK";
     }
-    
-    // Production configuration with higher priority (will be selected)
-    @Produces
-    @Priority(200)
-    public DatabaseConfig productionConfig() {
-        DatabaseConfig config = new DatabaseConfig();
-        config.setUrl("jdbc:postgresql://prod-server:5432/proddb");
-        return config;
-    }
-}
-
-class DatabaseConfig {
-    private String url;
-    public void setUrl(String url) { this.url = url; }
-    public String getUrl() { return url; }
 }
 ----
 
-==== Getting Interceptor Bindings Example
-
-CDI 4.1 provides a standardized way to access interceptor binding information:
+**CDI 4.1** (priority on producer method):
 
 [source,java]
 ----
-import jakarta.enterprise.inject.spi.BeanManager;
-import jakarta.inject.Inject;
-import jakarta.interceptor.InterceptorBinding;
-import jakarta.enterprise.context.ApplicationScoped;
-import java.lang.annotation.Retention;
-import java.lang.annotation.Target;
-import java.lang.annotation.Annotation;
-import java.util.Set;
-import static java.lang.annotation.ElementType.*;
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
-@InterceptorBinding
-@Retention(RUNTIME)
-@Target({TYPE, METHOD})
-public @interface Logged {
-}
-
 @ApplicationScoped
-public class InterceptorBindingExample {
+public class ProducerClass {
     
-    @Inject
-    BeanManager beanManager;
+    @Produces
+    @Alternative
+    @Priority(10)
+    public String produceString() {
+        return "OK";
+    }
+}
+----
+
+This allows different producer methods in the same class to have different priorities, giving you more flexibility when working with alternatives.
+
+==== Programmatic Access to Assignability Rules
+
+CDI defines resolution rules that determine which beans can be injected into each injection point. Previously, there was no way to apply these rules programmatically without re-implementing the logic. CDI 4.1 adds two new methods to `BeanContainer` that implement the matching rules:
+
+[source,java]
+----
+// Check if a bean matches an injection point
+boolean isMatchingBean(Set<Type> beanTypes,
+                      Set<Annotation> beanQualifiers,
+                      Type requiredType,
+                      Set<Annotation> requiredQualifiers);
+
+// Check if an event matches an observer
+boolean isMatchingEvent(Type specifiedType,
+                       Set<Annotation> specifiedQualifiers,
+                       Type observedEventType,
+                       Set<Annotation> observedEventQualifiers);
+----
+
+These methods allow frameworks and extensions to programmatically check whether beans or events match specific requirements using the same rules that CDI uses internally.
+
+==== Retrieve Interceptor Binding Information
+
+CDI 4.1 adds support to allow interceptors to retrieve and inspect the annotations that are used to bind them. Interceptors can now call `InvocationContext.getInterceptorBindings()` or one of the related methods to retrieve the annotations so that they can read values from them. This capability is particularly useful when you need to configure interceptor behavior based on annotation parameters.
+
+For example, you might define a custom `@Logged` annotation with a parameter:
+
+[source,java]
+----
+@Logged("myName")
+public void myMethod() {
+    // ....
+}
+----
+
+Then, an interceptor like this can read the `myName` value from the annotation and include it in the log message:
+
+[source,java]
+----
+@Interceptor
+@Logged("")
+public class LoggedInterceptor {
     
-    public void checkInterceptorBindings() {
-        // Get interceptor bindings for a specific annotation
-        Set<Annotation> bindings = beanManager
-            .resolveInterceptorBindings(Logged.class);
+    @AroundInvoke
+    public Object logInvocation(InvocationContext context) throws Exception {
+        // NEW in CDI 4.1: Retrieve interceptor bindings
+        Set<Annotation> bindings = context.getInterceptorBindings();
         
-        bindings.forEach(binding ->
-            System.out.println("Found binding: " + binding));
+        // Find the @Logged annotation and extract its value
+        String logName = bindings.stream()
+            .filter(a -> a.annotationType().equals(Logged.class))
+            .map(a -> ((Logged) a).value())
+            .findFirst()
+            .orElse("unknown");
+        
+        System.out.println("Invoking method with log name: " + logName);
+        
+        try {
+            Object result = context.proceed();
+            System.out.println("Method completed successfully");
+            return result;
+        } catch (Exception e) {
+            System.out.println("Method failed with exception: " + e.getMessage());
+            throw e;
+        }
+    }
+}
+----
+
+This annotation might be applied to a method on a managed bean like this:
+
+[source,java]
+----
+@ApplicationScoped
+public class MyService {
+    
+    @Logged("myName")
+    public void myMethod() {
+        // Business logic here
     }
 }
 ----
@@ -2903,8 +2995,6 @@ Key areas to review:
 - *Persistence 3.2*: Leverage Java records for embeddable types; update queries to use new operators; test java.time types
 - *Validation 3.1*: Leverage Java Records for validated data structures
 - *Concurrency 3.1*: Test async operations, especially if using Java 21 Virtual Threads
-
-
 
 
 == Conclusion
