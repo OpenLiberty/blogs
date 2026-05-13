@@ -1719,6 +1719,7 @@ class Order {
 ----
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.*;
+import jakarta.json.Json;
 import jakarta.json.JsonMergePatch;
 import jakarta.json.JsonValue;
 import jakarta.json.bind.Jsonb;
@@ -1740,18 +1741,20 @@ public class CustomerResource {
     // NEW in REST 4.0: JSON Merge Patch support (RFC 7396)
     @PATCH
     @Path("/{id}")
-    @Consumes("application/merge-patch+json")
+    @Consumes("MediaType.APPLICATION_MERGE_PATCH_JSON")
     public Response patchCustomer(
             @PathParam("id") Long id,
-            JsonMergePatch patch) {
+            JsonValue patchJson) {
         
         try (Jsonb jsonb = JsonbBuilder.create()) {
             // Convert customer to JsonValue
             JsonValue customerJson = jsonb.fromJson(
                 jsonb.toJson(customer), JsonValue.class);
             
+            // Create merge patch manually from the incoming JSON
+            JsonMergePatch mergePatch = Json.createMergePatch(patchJson);
             // Apply the merge patch
-            JsonValue patchedJson = patch.apply(customerJson);
+            JsonValue patchedJson = mergePatch.apply(customerJson);
             
             // Convert back to Customer object
             Customer patchedCustomer = jsonb.fromJson(
@@ -1948,7 +1951,6 @@ public class Customer {
     
     // Constructors, getters, setters
 }
-
 
 @Stateless
 public class CustomerRepository {
