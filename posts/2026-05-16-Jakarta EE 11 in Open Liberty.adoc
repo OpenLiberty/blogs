@@ -1918,11 +1918,20 @@ public class Customer {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     
+    @Version
+    private Long version;
+    
     @Column(nullable = false)
     private String name;
     
     @Column(unique = true, nullable = false)
     private String email;
+    
+    private String phone;
+    
+    private String status;  // e.g., "ACTIVE", "INACTIVE"
+    
+    private Integer vipLevel;  // VIP tier level
     
     // NEW in 3.2: Embedded record type
     @Embedded
@@ -1939,6 +1948,7 @@ public class Customer {
     
     // Constructors, getters, setters
 }
+
 
 @Stateless
 public class CustomerRepository {
@@ -2204,20 +2214,26 @@ public class ProductRepository {
                  .getResultList();
     }
     
-    // NEW in 3.2: Combining multiple new features
-    public List<Product> findProductsWithComplexCriteria(Double minPrice, String namePattern) {
+    // NEW in 3.2: Combining multiple new features in one query
+    // Demonstrates: CAST, LEFT, REPLACE, ||, UNION, NULLS LAST, id()
+    public List<Product> findFeaturedProducts(String categoryPrefix) {
         return em.createQuery(
+            // First set: Premium products with name manipulation
             "SELECT p FROM Product p " +
-            "WHERE p.price >= :minPrice " +
-            "AND REPLACE(LOWER(p.name), ' ', '') LIKE :pattern " +
-            "ORDER BY p.price NULLS LAST, p.name",
+            "WHERE CAST(p.price AS STRING) LIKE '%.99' " +  // CAST operator
+            "AND LEFT(p.category.name, 3) = :prefix " +     // LEFT function
+            "AND REPLACE(p.name, '-', ' ') IS NOT NULL " +  // REPLACE function
+            "UNION " +                                       // UNION operator
+            // Second set: Discounted products with concatenation
+            "SELECT p FROM Product p " +
+            "WHERE (p.name || ' - ' || p.category.name) LIKE '%Sale%' " +  // || concatenation
+            "ORDER BY p.price NULLS LAST, id(p)",           // NULLS LAST + id() function
             Product.class
         )
-        .setParameter("minPrice", minPrice)
-        .setParameter("pattern", namePattern)
-        .getSingleResultOrNull();  // Returns null if no results
+        .setParameter("prefix", categoryPrefix)
+        .getResultList();  // Returns list of all matching products
     }
-}
+    
 
 // NEW in 3.2: Transaction Helpers
 @Stateless
@@ -2348,20 +2364,23 @@ public class SchemaManagementExample {
 
 // NEW in 3.2: Enum Mapping Enhancements with @EnumeratedValue
 public enum OrderStatus {
-    @EnumeratedValue("P")
-    PENDING,
-    
-    @EnumeratedValue("C")
-    CONFIRMED,
-    
-    @EnumeratedValue("S")
-    SHIPPED,
-    
-    @EnumeratedValue("D")
-    DELIVERED,
-    
-    @EnumeratedValue("X")
-    CANCELLED
+
+    PENDING("P"),
+    CONFIRMED("C"),
+    SHIPPED("S"),
+    DELIVERED("D"),
+    CANCELLED("X");
+
+    @EnumeratedValue
+    private final String code;
+
+    OrderStatus(String code) {
+        this.code = code;
+    }
+
+    public String getCode() {
+        return code;
+    }
 }
 
 @Entity
