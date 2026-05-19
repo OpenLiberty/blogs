@@ -1,17 +1,17 @@
 ---
 layout: post
-title: "Jakarta EE 11, SpringBoot 4.0, and more in 26.0.0.5"
+title: "Jakarta EE 11, Spring Boot 4.0, and more in 26.0.0.5"
 # Do NOT change the categories section
 categories: blog
 author_picture: https://avatars3.githubusercontent.com/navaneethsnair1
 author_github: https://github.com/navaneethsnair1
-seo-title: Jakarta EE 11, SpringBoot 4.0, and more in 26.0.0.5- OpenLiberty.io
-seo-description: This release adds support for Jakarta EE 11 and SpringBoot 4.0, including MicroProfile 7 compatibility with Jakarta EE 11 and support for deploying SpringBoot 4.x applications in both JAR and WAR formats.
-blog_description: This release adds support for Jakarta EE 11 and SpringBoot 4.0, including MicroProfile 7 compatibility with Jakarta EE 11 and support for deploying SpringBoot 4.x applications in both JAR and WAR formats.
+seo-title: Jakarta EE 11, Spring Boot 4.0, and more in 26.0.0.5- OpenLiberty.io
+seo-description: This release introduces official support for Jakarta EE 11, Spring Boot 4.0 applications, and updated TLS/SSL cipher handling in Open Liberty, including enhanced Spring Boot deployment support and simplified SSL cipher configuration.
+blog_description: This release introduces official support for Jakarta EE 11, Spring Boot 4.0 applications, and updated TLS/SSL cipher handling in Open Liberty, including enhanced Spring Boot deployment support and simplified SSL cipher configuration.
 open-graph-image: https://openliberty.io/img/twitter_card.jpg
 open-graph-image-alt: Open Liberty Logo
 ---
-= Jakarta EE 11, SpringBoot 4.0, and more in 26.0.0.5
+= Jakarta EE 11, Spring Boot 4.0, and more in 26.0.0.5
 Navaneeth S Nair <https://github.com/navaneethsnair1>
 :imagesdir: /
 :url-prefix:
@@ -49,7 +49,7 @@ Navaneeth S Nair <https://github.com/navaneethsnair1>
 // change the "IMAGE CAPTION" to a couple words of what the image is
 // // // // // // // //
 
-This release adds support for Jakarta EE 11 and SpringBoot 4.0, including MicroProfile 7 compatibility with Jakarta EE 11 and support for deploying SpringBoot 4.x applications in both JAR and WAR formats.
+This release introduces official support for Jakarta EE 11, Spring Boot 4.0 applications, and updated TLS/SSL cipher handling in Open Liberty, including enhanced Spring Boot deployment support and simplified SSL cipher configuration.
 
 // // // // // // // //
 // In the preceding section:
@@ -67,7 +67,8 @@ This release adds support for Jakarta EE 11 and SpringBoot 4.0, including MicroP
 In link:{url-about}[Open Liberty] 26.0.0.5:
 
 * <<jakarta_ee, Jakarta EE 11 Core Profile, Web Profile, and Platform>>
-* <<springboot, SpringBoot 4.0>>
+* <<springboot, Spring Boot 4.0>>
+* <<ssl, Update to TLS/SSL Cipher support>>
 * <<CVEs, Security Vulnerability (CVE) Fixes>>
 * <<bugs, Notable bug fixes>>
 
@@ -280,10 +281,10 @@ To run Jakarta EE 11 features on the Application Client Container, add the follo
 // Contact/Reviewer: anjumfatima90
 // // // // // // // // 
 [#springboot]
-== SpringBoot 4.0
-Open Liberty currently supports running SpringBoot 1.5, 2.x, and 3.x applications. With the introduction of the new `springBoot-4.0` feature, users can now deploy SpringBoot 4.x applications. While Liberty has consistently supported SpringBoot applications packaged as `WAR` files, this enhancement extends support to both `JAR` and `WAR` formats for SpringBoot 4.x applications.
+== Spring Boot 4.0
+Open Liberty currently supports running Spring Boot 1.5, 2.x, and 3.x applications. With the introduction of the new `springBoot-4.0` feature, users can now deploy Spring Boot 4.x applications. While Liberty has consistently supported Spring Boot applications packaged as `WAR` files, this enhancement extends support to both `JAR` and `WAR` formats for Spring Boot 4.x applications.
 
-The `springBoot-4.0` feature provides complete support for running a SpringBoot 4.x application on Open Liberty, as well as the ability to thin the application when building containerized applications.
+The `springBoot-4.0` feature provides complete support for running a Spring Boot 4.x application on Open Liberty, as well as the ability to thin the application when building containerized applications.
 
 To use this feature, users must be running `Java 17` or later with EE11 features enabled. If the application uses servlets, it must be configured to use `Servlet 6.1`. Include the following features in your `server.xml` file to configure the server.
 
@@ -295,17 +296,59 @@ To use this feature, users must be running `Java 17` or later with EE11 features
 </features>
 ----
 
-The `server.xml` configuration for deploying a SpringBoot application follows the same approach used in earlier Liberty SpringBoot versions.
+The `server.xml` configuration for deploying a Spring Boot application follows the same approach used in earlier Liberty Spring Boot versions.
 
 [source, xml]
 ---- 
 <springBootApplication id="spring-boot-app" location="spring-boot-app-0.1.0.jar" name="spring-boot-app" />
 ----
 
-As in earlier versions, the SpringBoot application JAR can be deployed by placing it in the `/dropins/spring` folder. The `springBootApplication` configuration in the `server.xml` file can be omitted when this deployment method is used.
+As in earlier versions, the Spring Boot application JAR can be deployed by placing it in the `/dropins/spring` folder. The `springBootApplication` configuration in the `server.xml` file can be omitted when this deployment method is used.
 
 // DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
 
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // // 
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/34374
+// Contact/Reviewer: rangaran
+// // // // // // // // 
+[#ssl]
+== Update to TLS/SSL Cipher support
+Liberty now uses the effective cipher list from the JDK for SSL configuration. The `securityLevel` attribute in the SSL configuration is not used anymore. In addition, the `enabledCiphers` attribute in the SSL config is updated to customize the SSL ciphers in a more flexible way.
+
+Liberty's `securityLevel` based cipher categories no longer provide meaningful value. The `MEDIUM` and `LOW` categories contain no remaining ciphers.
+
+The `enabledCiphers` attribute now has two mutually exclusive modes: (1) Specify a custom list of ciphers separated by spaces, or (2) Specify filter criteria to add (+) or remove (-) cipher suites from the effective JDK cipher list. If the value set in `enabledCiphers` contains a static entry and a +/- entry, an error is logged, and the server ignores the `enabledCiphers` value by returning the effective JDK cipher list.
+
+*Existing Usage:* A user sets `securityLevel` as `HIGH`
+
+[source,xml]
+----
+<ssl id="defaultSSL" securityLevel=HIGH/>
+----
+
+The `securityLevel` attribute is now ignored, so the previous `<ssl>` configuration is treated equivalently to the configuration shown here where there is no `securityLevel` attribute configured.
+
+[source,xml]
+----
+<ssl id="defaultSSL"/>
+----
+
+*Existing Usage:* A user specifies all ciphers from the effective JDK list, excluding all TLS_RSA ciphers except for one (TLS_RSA_WITH_AES_128_GCM_SHA256)
+
+[source,xml]
+----
+<ssl id="defaultSSL" securityLevel="CUSTOM" enabledCiphers="TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384 TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256 TLS_DHE_DSS_WITH_AES_256_GCM_SHA384 TLS_DHE_DSS_WITH_AES_128_GCM_SHA256 TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA384 TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256 TLS_DHE_DSS_WITH_AES_256_CBC_SHA256 TLS_DHE_DSS_WITH_AES_128_CBC_SHA256 TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA TLS_DHE_DSS_WITH_AES_256_CBC_SHA TLS_DHE_DSS_WITH_AES_128_CBC_SHA TLS_RSA_WITH_AES_128_GCM_SHA256">
+----
+
+*Example with new syntax:* Use wildcards to achieve the same logic
+[source,xml]
+----
+<ssl id="defaultSSL" enabledCiphers="-TLS_RSA* +TLS_RSA_WITH_AES_128_GCM_SHA256"/>
+----
+
+To learn more about Transport Security, see link:https://openliberty.io/docs/modules/reference/23.0.0.6/com.ibm.websphere.appserver.api.ssl_1.5-javadoc/com/ibm/websphere/ssl/Constants.html[SSL Constants Javadoc], link:https://openliberty.io/docs/modules/reference/23.0.0.6/com.ibm.websphere.appserver.api.ssl_1.5-javadoc/com/ibm/websphere/ssl/JSSEProvider.html[JSSEProvider Javadoc], and link:https://openliberty.io/docs/latest/reference/config/ssl.html[SSL Configuration Reference].
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
 
 [#CVEs]
 == Security vulnerability (CVE) fixes in this release
