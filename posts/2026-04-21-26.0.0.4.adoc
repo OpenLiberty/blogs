@@ -25,11 +25,11 @@ This release introduces support for selecting JWT signature algorithms from JOSE
 
 In link:{url-about}[Open Liberty] 26.0.0.4:
 
-* <<file_transfer, File Transfer changes for 26.0.0.4>>
+* <<file_transfer, Blocklist added to `FileService` MBean>>
 * <<ltpa, Default LTPA keys password removal>>
 * <<jwt,  Support selecting JWT signature and decryption algorithms from JOSE header>>
 * <<java_26, Support for Java 26>>
-* <<displayCustomizedExceptionText, displayCustomizedExceptionText property>>
+* <<displayCustomizedExceptionText, Documentation for `displayCustomizedExceptionText` property in Web Container>>
 * <<CVEs, Security Vulnerability (CVE) Fixes>>
 
 
@@ -115,8 +115,8 @@ If you're using link:https://plugins.jetbrains.com/plugin/14856-liberty-tools[In
 image::img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="center"]
 
 [#file_transfer]
-=== File Transfer changes for 26.0.0.4
-Liberty's FileService MBean provided by the `restConnector-2.0` feature now includes an extra `blocklist` attribute. This attribute is configured by the `<blockDir>` config element in the `server.xml` file. The default value of this attribute is `${server.output.dir}/resources/security`. This behavior change resolves the security vulnerability link:https://github.com/advisories/GHSA-c39w-6qgm-5cp7[CVE-2025-14915], by restricting default FileTransfer access to `${server.output.dir}/resources/security`. 
+== Blocklist added to `FileService` MBean
+The `FileService` MBean provided by the `restConnector-2.0` feature in Liberty now includes a `blocklist` attribute. This attribute is configured by the `<blockDir>` config element in the `server.xml` file. The default value of this attribute is `${server.output.dir}/resources/security`. This enhancement resolves the security vulnerability link:https://github.com/advisories/GHSA-c39w-6qgm-5cp7[CVE-2025-14915] by restricting file transfer access to `${server.output.dir}/resources/security` by default. 
 
 If FileTransfer access to `${server.output.dir}/resources/security` is required, the original behavior can be restored by setting an empty blocklist.
 
@@ -127,7 +127,7 @@ For more information, see the link:https://www.ibm.com/docs/en/was-liberty/nd?to
 
 The default LTPA keys password is removed to resolve the security vulnerability link:https://www.ibm.com/support/pages/node/7266845[CVE-2025-14917].
 
-Previously, a default password for the LTPA keys was used when the `keysPassword` attribute was not defined in the `<ltpa />` element. With this change, the default password is no longer supported.
+Previously, a default password for the LTPA keys was used when the `keysPassword` attribute was not defined in the `<ltpa />` element. With this change, a default password is no longer used when the `keysPassword` attribute is not set.
 
 For existing servers, if the LTPA keys password is not configured in the `server.xml` file, the `keystore_password` in the `server.env` file is used. This value re-encrypts the LTPA keys in the `ltpa.keys` file. The LTPA keys themselves are not impacted. The `keystore_password` is configured in the `server.env` file during server creation unless the `--no-password` option is used with the `server create` command.
 
@@ -156,7 +156,7 @@ keystore_password=your-desired-password
 +
 * The `keystore_password` is used to reencrypt the LTPA keys that were previously encrypted with the default `keysPassword` when the server starts.
 
-For new servers, a new `ltpa_keys_password` is randomly generated during server creation. It is stored in the `server.env` file unless the `--no-password` option is specified with the `server create` command. The randomly generated `ltpa_keys_password` is used if the `keysPassword` attribute is not defined for the `<ltpa />` element. 
+For new servers, an `ltpa_keys_password` value is randomly generated during server creation. It is stored in the `server.env` file unless the `--no-password` option is specified with the `server create` command. The randomly generated `ltpa_keys_password` is used if the `keysPassword` attribute is not defined for the `<ltpa />` element.  
 
 For more information, see the link:https://openliberty.io/docs/latest/reference/config/ltpa.html[LTPA] configuration element.
 
@@ -174,7 +174,7 @@ To enable signature algorithm selection from the header, set the `signatureAlgor
 
 If `allowedSignatureAlgorithms` is not configured, the default list contains all Open Liberty-supported signature algorithms: `RS256, RS384, RS512, HS256, HS384, HS512, ES256, ES384`, and `ES512`.
 
-When using `FROM_HEADER` with asymmetric algorithms and a trust store setup, the public keys must be prefixed with their corresponding algorithm (e.g., `RS256_keyalias`) for automatic selection. During validation, the server searches the trust store for an alias that begins with the algorithm specified in the JWT's header. If no algorithm-prefixed alias is found, the client falls back to using the alias specified by the `trustedAlias` attribute (for `jwtConsumer`) or `trustAliasName` attribute (for `openidConnectClient`, `oidcLogin` and `mpJwt`), if configured.
+When using `FROM_HEADER` with asymmetric algorithms and a truststore setup, the aliases for the corresponding public keys must be prefixed with their corresponding algorithm (e.g., `RS256_keyalias`) for automatic selection. The remainder of the alias name does not matter as long as it begins with the signature algorithm string. During validation, the server searches the truststore for an alias that begins with the algorithm specified in the JWT's header. If no algorithm-prefixed alias is found, the client falls back to using the alias specified by the `trustedAlias` attribute (for `jwtConsumer`) or `trustAliasName` attribute (for `openidConnectClient`, `oidcLogin` and `mpJwt`), if configured. If multiple aliases with the signature algorithm prefix exist within the truststore, Liberty uses the first one found.
 
 See the following `server.xml` file configurations for examples on how to apply these settings to the supported elements:
 
@@ -263,8 +263,8 @@ For more information on Java 26, see the Java 26 link:https://jdk.java.net/26/re
 // Contact/Reviewer: ncpibm
 // // // // // // // // 
 [#displayCustomizedExceptionText]
-== displayCustomizedExceptionText property 
-This release adds documentation and tests for the `displayCustomizedExceptionText` configuration, which allows users to override Liberty’s default error messages (such as SRVE0218E: Forbidden and SRVE0232E: An exception occurred) with clearer, user-defined messages. 
+== Documentation for `displayCustomizedExceptionText` property in Web Container 
+This release adds documentation for the `displayCustomizedExceptionText` attribute in the `<webContainer>` configuration, which allows users to override Liberty’s default error messages (such as SRVE0218E: Forbidden and SRVE0232E: An exception occurred) with clearer, user-defined messages. 
 
 The feature is enabled through simple `server.xml` file configuration, where custom messages can be mapped to specific HTTP status codes (`403` and `500`). 
 
@@ -272,7 +272,7 @@ Testing ensures that these custom messages correctly replace Liberty’s default
 
 [source,xml]
 ----
-<webContainer displaycustomizedexceptiontext="Custom error message"/>
+<webContainer displayCustomizedExceptionText="Custom error message"/>
 ----
 
 // DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC> 
