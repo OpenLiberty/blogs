@@ -1,0 +1,3011 @@
+---
+layout: post
+title: "Jakarta EE 11 from Newbie to Pro with Open Liberty"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/emily-jiang
+author_github: https://github.com/Emily-Jiang
+seo-title: Jakarta EE 11 from Newbie to Pro with Open Liberty
+seo-description: Discover Jakarta EE 11's revolutionary features in Open Liberty 26.0.0.5 or later releases, including the game-changing Jakarta Data 1.0 specification that eliminates boilerplate code. Explore comprehensive code examples for updated specifications like CDI 4.1, Persistence 3.2, Security 4.0, and RESTful Web Services 4.0. Learn how Java 17 Records further simplify your applications.
+blog_description: Discover Jakarta EE 11's revolutionary features in Open Liberty 26.0.0.5 or later releases, including the game-changing Jakarta Data 1.0 specification that eliminates boilerplate code. Explore comprehensive code examples for updated specifications like CDI 4.1, Persistence 3.2, Security 4.0, and RESTful Web Services 4.0. Learn how Java 17 Records further simplify your applications.
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+---
+= Jakarta EE 11 from Newbie to Pro with Open Liberty
+Emily Jiang <https://github.com/Emily-Jiang>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+
+
+link:https://jakarta.ee/release/11/[Jakarta EE 11] marks a significant milestone in the evolution of enterprise Java development. This release delivers enhanced developer productivity, improved performance, and modernized APIs that align with the Java LTS releases: Java SE 17, Java SE 21. For more information, see the https://jakarta.ee/specifications/platform/11/[Jakarta EE Platform 11 specification].
+
+== What's New in Jakarta EE 11?
+
+Jakarta EE 11 represents a major step forward for cloud-native enterprise Java applications. This release includes modernizing and restructuring the Test Compatibility Kits (TCKs), the new Jakarta Data specification, major updates to existing specifications, and support for the latest Java LTS releases, which enables developers to leverage enhancements in Java 21, including Virtual Threads and Records. The new and updated specifications are:
+
+* <<data, Data 1.0>>
+* <<authentication, Authentication 3.1>>
+* <<authorization, Authorization 3.0>>
+* <<concurrency, Concurrency 3.1>>
+* <<annotations, Annotations 3.0>>
+* <<interceptors, Interceptors 2.2>>
+* <<cdi, CDI 4.1>>
+* <<faces, Faces 4.1>>
+* <<el, Expression Language 6.0>>
+* <<servlet, Servlet 6.1>>
+* <<websocket, WebSocket 2.2>>
+* <<restful, RESTful Web Services 4.0>>
+* <<persistence, Persistence 3.2>>
+* <<pages, Pages 4.0>>
+* <<security, Security 4.0>>
+* <<validation, Validation 3.1>>
+
+
+[#data]
+== Jakarta Data 1.0: A Game Changer for Data Access
+
+One of the most exciting additions to Jakarta EE 11 is *Jakarta Data 1.0*, a new specification that revolutionizes how developers interact with databases in enterprise applications.
+
+=== What is Jakarta Data?
+
+Jakarta Data provides an API for easier data access. A Java developer can split the details of persistence from the data model with several features, such as the ability to compose custom query methods on a Repository interface. Jakarta Data's goal is to provide a familiar and consistent, Jakarta-based programming model for data access while still retaining the particular traits of the underlying data store. It is designed to be flexible and extensible, allowing developers to use it with various types of databases, including relational databases, NoSQL databases, and even in-memory data stores.
+
+=== Key Features of Jakarta Data 1.0
+
+Jakarta Data 1.0 includes:
+
+. *Repository Pattern*: Define data access through simple interfaces
+. *Query by Method Name*: Automatic query generation from method names (e.g., `findByType`, `findByName`)
+. *Type Safety with StaticMetamodel*: Enhanced type safety for queries
+. *Pagination Support*: Built-in pagination on Repository
+. *Platform Integrations*: Works with CDI, Persistence, NoSQL, Transactions, and Validation
+. *Entity Support*: Works with persistence and nosql entities
+
+=== Jakarta Data Code Examples
+
+==== Defining an Entity
+
+[source,java]
+----
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+
+@Entity
+public class Product {
+    @Id
+    private Long id;
+    private String name;
+    private String description;
+    private double price;
+    private int stockQuantity;
+    
+    // Constructors, getters, and setters
+    public Product() {}
+    
+    public Product(String name, double price) {
+        this.name = name;
+        this.price = price;
+    }
+    
+    // Getters and setters omitted for brevity
+}
+----
+
+==== Creating a Repository Interface
+
+[source,java]
+----
+import jakarta.data.repository.Repository;
+import jakarta.data.repository.Find;
+import jakarta.data.repository.Query;
+import jakarta.data.repository.Save;
+import jakarta.data.repository.Delete;
+import jakarta.data.repository.OrderBy;
+import jakarta.data.page.Page;
+import jakarta.data.page.PageRequest;
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+public interface ProductRepository {
+    
+    // Basic CRUD operations
+    @Save
+    Product save(Product product);
+    
+    @Find
+    Optional<Product> findById(Long id);
+    
+    @Delete
+    void delete(Product product);
+    
+    // Query by method name - automatically generates query
+    List<Product> findByName(String name);
+    
+    List<Product> findByPriceLessThan(double price);
+    
+    List<Product> findByPriceBetween(double minPrice, double maxPrice);
+    
+    List<Product> findByNameContains(String keyword);
+    
+    // Sorting and pagination - requires @OrderBy for pagination
+    @OrderBy("price")
+    Page<Product> findByPriceGreaterThan(double price, PageRequest pageRequest);
+    
+    // Custom queries using @Query annotation
+    @Query("SELECT p FROM Product p WHERE p.stockQuantity < 10")
+    List<Product> findLowStockProducts();
+    
+    @Query("SELECT p FROM Product p WHERE p.price > ?1 ORDER BY p.price DESC")
+    List<Product> findExpensiveProducts(double minPrice);
+}
+----
+
+==== REST Endpoint Using Jakarta Data
+
+[source,java]
+----
+import jakarta.ws.rs.*;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+import jakarta.inject.Inject;
+import jakarta.data.page.Page;
+import jakarta.data.page.PageRequest;
+import java.util.List;
+
+@Path("/products")
+@Produces(MediaType.APPLICATION_JSON)
+@Consumes(MediaType.APPLICATION_JSON)
+public class ProductResource {
+    
+    @Inject
+    private ProductRepository productRepository;
+    
+    @POST
+    public Response createProduct(Product product) {
+        Product created = productRepository.save(product);
+        return Response.status(Response.Status.CREATED).entity(created).build();
+    }
+    
+    @GET
+    @Path("/search")
+    public List<Product> searchProducts(@QueryParam("keyword") String keyword) {
+        return productRepository.findByNameContains(keyword);
+    }
+    
+    @GET
+    @Path("/expensive")
+    public Page<Product> getExpensiveProducts(
+            @QueryParam("minPrice") @DefaultValue("100.0") double minPrice,
+            @QueryParam("page") @DefaultValue("1") int page,
+            @QueryParam("size") @DefaultValue("20") int size) {
+        PageRequest pageRequest = PageRequest.ofPage(page).size(size);
+        return productRepository.findByPriceGreaterThan(minPrice, pageRequest);
+    }
+    
+    @GET
+    @Path("/low-stock")
+    public List<Product> getLowStockProducts() {
+        return productRepository.findLowStockProducts();
+    }
+}
+----
+
+=== Benefits of Jakarta Data
+
+- *Reduced Boilerplate*: No need to write repetitive DAO/repository implementations
+- *Type Safety*: Compile-time checking of queries and method signatures
+- *Database Flexibility*: Switch between databases without changing application code
+- *Improved Productivity*: Focus on business logic instead of data access code
+- *Standardization*: Vendor-neutral API backed by the Jakarta EE community
+
+== Updated Specifications with Code Examples
+
+[#authentication]
+=== Authentication 3.1
+
+Jakarta Authentication defines a general low-level SPI for authentication mechanisms, which are controllers that interact with a caller and a container's environment to obtain the caller's credentials, validate these, and pass an authenticated identity (such as name and groups) to the container.
+
+*Key changes in Authentication 3.1:*
+
+ - Removes references to the SecurityManager (aligned with Java's deprecation and removal of SecurityManager)
+ - Evolves the API in a smaller way to support the overall goals of Jakarta Security
+ - Consists of several profiles, with each profile telling how a specific container (such as Jakarta Servlet) can integrate with and adapt to this SPI
+
+The 3.1 version removes the deprecated Permission-related fields in the `jakarta.security.auth.message.config.AuthConfigFactory` class. The methods in the class no longer do permission checking. These changes are part of Jakarta EE 11's removal of SecurityManager support.
+
+
+==== Authentication 3.1 Code Example
+
+[source,java]
+----
+import jakarta.security.auth.message.AuthException;
+import jakarta.security.auth.message.AuthStatus;
+import jakarta.security.auth.message.MessageInfo;
+import jakarta.security.auth.message.MessagePolicy;
+import jakarta.security.auth.message.module.ServerAuthModule;
+import jakarta.security.auth.message.callback.CallerPrincipalCallback;
+import jakarta.security.auth.message.callback.GroupPrincipalCallback;
+import jakarta.security.auth.message.callback.Callback;
+import jakarta.security.auth.message.callback.CallbackHandler;
+import jakarta.security.auth.message.callback.UnsupportedCallbackException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.security.Principal;
+import java.util.Map;
+import java.util.Set;
+
+public class CustomServerAuthModule implements ServerAuthModule {
+    
+    private CallbackHandler handler;
+    
+    @Override
+    @SuppressWarnings("rawtypes")
+    public void initialize(MessagePolicy requestPolicy, MessagePolicy responsePolicy,
+                          CallbackHandler handler, Map options) throws AuthException {
+        this.handler = handler;
+    }
+    
+    @Override
+    public AuthStatus validateRequest(MessageInfo messageInfo,
+                                      jakarta.security.auth.message.callback.Subject clientSubject,
+                                      jakarta.security.auth.message.callback.Subject serviceSubject)
+                                      throws AuthException {
+        // Extract credentials from request
+        String username = extractUsername(messageInfo);
+        String password = extractPassword(messageInfo);
+        
+        if (validateCredentials(username, password)) {
+            // Set the caller principal
+            CallerPrincipalCallback principalCallback =
+                new CallerPrincipalCallback(clientSubject, username);
+            
+            // Set the groups
+            GroupPrincipalCallback groupCallback =
+                new GroupPrincipalCallback(clientSubject, new String[]{"users"});
+            
+            try {
+                handler.handle(new Callback[]{principalCallback, groupCallback});
+            } catch (IOException | UnsupportedCallbackException e) {
+                throw new AuthException(e.getMessage());
+            }
+            
+            return AuthStatus.SUCCESS;
+        }
+        
+        return AuthStatus.FAILURE;
+    }
+    
+    @Override
+    public AuthStatus secureResponse(MessageInfo messageInfo,
+                                     jakarta.security.auth.message.callback.Subject serviceSubject)
+            throws AuthException {
+        return AuthStatus.SEND_SUCCESS;
+    }
+    
+    @Override
+    public void cleanSubject(MessageInfo messageInfo,
+                            jakarta.security.auth.message.callback.Subject subject)
+                            throws AuthException {
+        if (subject != null) {
+            Set<Principal> principals = subject.getPrincipals();
+            if (principals != null) {
+                principals.clear();
+            }
+        }
+    }
+    
+    @Override
+    public Class<?>[] getSupportedMessageTypes() {
+        return new Class<?>[]{HttpServletRequest.class, HttpServletResponse.class};
+    }
+    
+    private String extractUsername(MessageInfo messageInfo) {
+        // Extract username from request
+        return "user";
+    }
+    
+    private String extractPassword(MessageInfo messageInfo) {
+        // Extract password from request
+        return "password";
+    }
+    
+    private boolean validateCredentials(String username, String password) {
+        // Validate credentials
+        return username != null && password != null;
+    }
+}
+----
+[#authorization]
+=== Authorization 3.0
+
+Jakarta Authorization defines an SPI for authorization modules, which are repositories of permissions that facilitate subject-based security by determining whether a subject has a specific permission.
+
+*What's New in Authorization 3.0:*
+
+- **New `PolicyFactory` and `Policy` classes**: Introduces `jakarta.security.jacc.PolicyFactory` and `jakarta.security.jacc.Policy` as replacements for the deprecated `java.security.Policy` class. With the new `PolicyFactory` API, you can now have a `Policy` per policy context instead of a global policy, allowing separate policies to be maintained for each application.
+
+- **Programmatic policy provider registration**: Adds the ability to register policy providers programmatically on a per-application basis, making Jakarta Authorization more suitable for cloud deployments. This mirrors the API available in Jakarta Authentication.
+
+- **Standardized context ID for Servlet containers**: Defines a standard format for context IDs used in Servlet container environments.
+
+- **Convenience methods**: Adds several convenience methods to make the API easier to use.
+
+*Removals and Changes in Authorization 3.0:*
+
+- **Removal of `java.security.Policy` dependency**: Eliminates dependency on the deprecated `java.security.Policy` and `java.security.SecurityManager` classes, aligning with Java SE's deprecation and removal of SecurityManager.
+
+- **Breaking API changes**: This is a major breaking update. Applications using Jakarta Authorization 2.x will need to migrate to the new `PolicyFactory` and `Policy` classes.
+
+To configure your authorization modules in your application's `web.xml` file, add specification defined context parameters:
+
+[source,xml]
+----
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app xmlns="https://jakarta.ee/xml/ns/jakartaee"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="https://jakarta.ee/xml/ns/jakartaee https://jakarta.ee/xml/ns/jakartaee https://jakarta.ee/xml/ns/jakartaee/web-app_6_1.xsd"
+  version="6.1">
+
+  <context-param>
+    <param-name>jakarta.security.jacc.PolicyConfigurationFactory.provider</param-name>
+    <param-value>com.example.MyPolicyConfigurationFactory</param-value>
+  </context-param>
+  
+  <context-param>
+    <param-name>jakarta.security.jacc.PolicyFactory.provider</param-name>
+    <param-value>com.example.MyPolicyFactory</param-value>
+  </context-param>
+
+</web-app>
+----
+
+Due to Jakarta Authorization 3.0 no longer using the `java.security.Policy` class and introducing a new configuration mechanism for authorization modules, the `com.ibm.wsspi.security.authorization.jacc.ProviderService` Liberty API is no longer available with the appAuthorization-3.0 feature. If a Liberty user feature configures authorization modules, the OSGi service that provided a `ProviderService` implementation must be updated to use the `PolicyConfigurationFactory` and `PolicyFactory` set methods. These methods configure the modules in the OSGi service. Alternatively, you can use a Web Application Bundle (WAB) in your user feature to specify your security modules in a `web.xml` file.
+
+Finally, the 3.0 API adds a new `jakarta.security.jacc.PrincipalMapper` class that you can obtain from the `PolicyContext` class when authorization processing is done in your `Policy` implementation. From this class, you can obtain the roles that are associated with a specific Subject to be able to determine whether the Subject is in the required role.
+
+You can use the `PrincipalMapper` class in your `Policy` implementation's `impliesByRole` (or `implies`) method, as shown in the following example:
+
+[source,java]
+----
+public boolean impliesByRole(Permission p, Subject subject) {
+    Map<String, PermissionCollection> perRolePermissions =
+        PolicyConfigurationFactory.get().getPolicyConfiguration(contextID).getPerRolePermissions();
+    PrincipalMapper principalMapper = PolicyContext.get(PolicyContext.PRINCIPAL_MAPPER);
+    
+    // Check to see if the Permission is in the all authenticated users role
+    if (!principalMapper.isAnyAuthenticatedUserRoleMapped() && !subject.getPrincipals().isEmpty()) {
+        PermissionCollection rolePermissions = perRolePermissions.get("**");
+        if (rolePermissions != null && rolePermissions.implies(p)) {
+            return true;
+        }
+    }
+    
+    // Check to see if the roles for the Subject provided imply the permission
+    Set<String> mappedRoles = principalMapper.getMappedRoles(subject);
+    for (String mappedRole : mappedRoles) {
+        PermissionCollection rolePermissions = perRolePermissions.get(mappedRole);
+        if (rolePermissions != null && rolePermissions.implies(p)) {
+            return true;
+        }
+    }
+    
+    return false;
+}
+----
+
+[#concurrency]
+=== Concurrency 3.1
+
+Jakarta Concurrency provides asynchronous capabilities to Jakarta EE application components. Jakarta Concurrency 3.1 provides enhanced concurrency utilities with several new features and improvements:
+
+* **Integration with Java 21 Virtual Threads** - Native support for virtual threads to improve scalability
+* **Java Flow/ReactiveStreams and context propagation** - Better integration with reactive programming models
+* **Replace more features from EJB** - Migrated scheduling and asynchronous capabilities (such as `@Schedule` and `@Asynchronous` annotations)
+* **Become more CDI-centric** - Improved integration with Jakarta CDI
+* **Specification bug fixes and clarifications** - Enhanced clarity and resolved ambiguities
+* **TCK fixes and enhancements** - Improved test coverage and reliability
+
+[source,java]
+----
+import jakarta.enterprise.concurrent.ManagedExecutorService;
+import jakarta.enterprise.concurrent.ManagedScheduledExecutorService;
+import jakarta.enterprise.concurrent.ManagedExecutorDefinition;
+import jakarta.annotation.Resource;
+import jakarta.enterprise.context.ApplicationScoped;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+
+@ApplicationScoped
+@ManagedExecutorDefinition(
+    name = "java:module/concurrent/VirtualThreadExecutor",
+    virtual = true
+)
+public class ConcurrencyExample {
+    
+    @Resource(lookup = "java:module/concurrent/VirtualThreadExecutor")
+    private ManagedExecutorService executorService;
+    
+    public CompletableFuture<String> asyncOperation() {
+        // Leverages Virtual Threads on Java 21+
+        return executorService.supplyAsync(this::processData);
+    }
+    
+    private String processData() {
+        return "Processed data";
+    }
+    @Asynchronous(
+            executor = "java:module/concurrent/VirtualThreadExecutor",
+            runAt = @Schedule(cron = "0 3 * * *")) // daily at 3 AM
+    private void performMaintenanceTask(@Observes Startup event) {
+        // Maintenance logic
+    }
+}
+----
+
+[#annotations]
+=== Annotations 3.0
+
+Jakarta Annotations defines a collection of annotations representing common semantic concepts that enable a declarative style of programming in the Jakarta EE platform.
+
+*Changes in Annotations 3.0:*
+
+- **Removal of @ManagedBean**: The deprecated `@ManagedBean` annotation has been fully removed from the specification. Developers must migrate to CDI managed beans using `@Named` and appropriate scope annotations.
+
+==== Migrating from @ManagedBean
+
+If your application uses `@ManagedBean`, you must migrate to CDI managed beans. The `@ManagedBean` annotation was deprecated in an earlier release and has been removed in Jakarta EE 11.
+
+**Migration Options:**
+
+1. **Use CDI `@Named` for Faces or Expression Language access** - If the bean needs to be accessible from Faces pages or Expression Language
+2. **Use CDI scope annotations without `@Named`** - If the bean is only used for dependency injection
+
+[#interceptors]
+=== Interceptors 2.2
+
+Jakarta Interceptors defines a means of interposing on business method invocations and specific events in the lifecycle of beans.
+
+*New features, enhancements or additions:*
+
+- **Updated dependencies for Jakarta EE 11**
+  - Jakarta Annotations to 3.0.0
+- **Provide access to interceptor bindings from InvocationContext** - New method `getInterceptorBindings()` added to `InvocationContext` interface
+
+*Removals, deprecations or backwards incompatible changes:*
+
+- **None**
+
+See the following CDI section for its usage.
+
+[#cdi]
+=== CDI 4.1
+
+Jakarta Contexts and Dependency Injection (CDI) specifies a means for obtaining objects in such a way as to maximize reusability, testability and maintainability compared to traditional approaches such as constructors, factories, and service locators (e.g., JNDI). CDI 4.1 brings important architectural improvements and new APIs to help framework developers build on CDI. CDI allows objects to be bound to lifecycle contexts, injected into application code, be subject to interceptors and decorators, and interact in a loosely coupled fashion via events.
+
+*Key changes in CDI 4.1:*
+
+- *Specification restructuring* - Integration requirements with other Jakarta EE specs moved from CDI specification to Jakarta EE Platform, Web Profile, and Core Profile specifications
+- *Expression Language separation* - EL-related methods moved to new API jar (`jakarta.enterprise.cdi-el-api`) to remove CDI's dependency on EL API
+- *Interceptor binding access* - New methods on `InvocationContext` to retrieve interceptor binding annotations
+- *Method Invokers* - New API allowing frameworks to call methods with CDI-managed arguments and instances
+- *@Priority on producers* - Producer methods and fields can now be annotated with `@Priority` for fine-grained alternative selection
+- *Programmatic assignability rules* - New `BeanContainer` methods to check if beans match injection points
+
+==== Specification Restructuring
+
+One of the major changes in CDI 4.1 is the restructuring of the specification to remove circular dependencies and improve modularity:
+
+**Integration requirements moved to platform specs:**
+Previously, CDI defined requirements for integration with other Jakarta EE specifications including Servlet, Expression Language, Enterprise Beans, Transactions, Security, Validation, and Persistence. These integration requirements have now been moved to the Jakarta EE Platform, Web Profile, and Core Profile specifications as appropriate. This makes it easier to pass the CDI TCK independently and clarifies which integrations are required at each platform level.
+
+**Expression Language separation:**
+The CDI API previously had a direct dependency on the Expression Language (EL) API because `BeanManager` included methods that referenced EL classes. In CDI 4.1:
+
+- EL-related methods on `BeanManager` (`getELResolver()` and `wrapExpressionFactory()`) are deprecated for removal in CDI 5.0
+- A new supplemental API jar `jakarta.enterprise.cdi-el-api` provides `ELAwareBeanManager`, a sub-interface of `BeanManager` with the same methods
+- This allows the core CDI API to remove its dependency on EL in the next major version
+- Existing users will see deprecation warnings and should migrate to `ELAwareBeanManager` before CDI 5.0
+
+==== Retrieve Interceptor Binding Information
+
+CDI 4.1 adds support to allow interceptors to retrieve and inspect the annotations that are used to bind them. Interceptors can now call `InvocationContext.getInterceptorBindings()` or one of the related methods to retrieve the annotations so that they can read values from them. This capability is particularly useful when you need to configure interceptor behavior based on annotation parameters.
+
+For example, you might define a custom `@Logged` annotation with a parameter:
+
+[source,java]
+----
+import jakarta.enterprise.util.Nonbinding;
+import jakarta.interceptor.InterceptorBinding;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
+@InterceptorBinding
+@Target({ElementType.TYPE, ElementType.METHOD})
+@Retention(RetentionPolicy.RUNTIME)
+public @interface Logged {
+    @Nonbinding
+    String value();
+}
+----
+
+Then apply it to a method:
+
+[source,java]
+----
+@Logged("myName")
+public void myMethod() {
+    // ....
+}
+----
+
+An interceptor like this can read the `myName` value from the annotation and include it in the log message:
+
+[source,java]
+----
+@Interceptor
+@Logged("")
+public class LoggedInterceptor {
+    
+    @AroundInvoke
+    public Object logInvocation(InvocationContext context) throws Exception {
+        // NEW in CDI 4.1: Find the @Logged annotation and extract its value
+        String logName = context.getInterceptorBinding(Logged.class).value();
+        
+        System.out.println("Invoking method with log name: " + logName);
+        
+        try {
+            Object result = context.proceed();
+            System.out.println("Method completed successfully");
+            return result;
+        } catch (Exception e) {
+            System.out.println("Method failed with exception: " + e.getMessage());
+            throw e;
+        }
+    }
+}
+----
+
+==== Method Invokers
+
+Method invokers provide a way to invoke methods programmatically while allowing CDI to look up and inject some of the method parameters. This is particularly useful for frameworks that want to allow users to annotate methods and have those methods called with a mix of framework-provided and CDI-injected arguments.
+
+**Example use case:** An alert system where users can apply `@Alert` to methods on managed bean classes. When an alert happens, the annotated methods are called with the alert ID as the first argument, and other arguments looked up from CDI.
+
+[source,java]
+----
+@ApplicationScoped
+public class MyBean {
+    
+    @Alert
+    public void myAlert1(int id) {
+        // Do something
+    }
+    
+    @Alert
+    public void myAlert2(int id, MyOtherBean otherBean) {
+        // Do something with otherBean
+    }
+}
+----
+
+**Creating invokers** (done within a CDI extension):
+
+[source,java]
+----
+public class InvokerExtension implements Extension {
+    
+    public static record AlertMethod(Invoker<?,?> invoker, int parameterCount) { }
+    List<AlertMethod> alertMethods = new ArrayList<>();
+    
+    public <T> void createInvokers(@Observes @WithAnnotations(Alert.class) ProcessManagedBean<T> pmb) {
+        for (AnnotatedMethod<? super T> m : pmb.getAnnotatedBeanClass().getMethods()) {
+            if (m.isAnnotationPresent(Alert.class)) {
+                validate(m);
+                
+                InvokerBuilder<Invoker<T, ?>> builder = pmb.createInvoker(m);
+                
+                // Look up the bean instance when invoking
+                builder.withInstanceLookup();
+                
+                // Look up all arguments except the first
+                int parameterCount = m.getParameters().size();
+                for (int i = 1; i < parameterCount; i++) {
+                    builder.withArgumentLookup(i);
+                }
+                
+                alertMethods.add(new AlertMethod(builder.build(), parameterCount));
+            }
+        }
+    }
+}
+----
+
+**Calling invokers:**
+
+[source,java]
+----
+public void invokeAlerts(int i) throws Exception {
+    for (AlertMethod method : alertMethods) {
+        // Construct an array of arguments
+        Object[] args = new Object[method.parameterCount];
+        // First argument is the alert id
+        args[0] = i;
+        // All other arguments are looked up from CDI, so we pass in null
+        
+        // Call the method
+        method.invoker.invoke(null, args);
+    }
+}
+----
+
+**Note:** `null` must be passed for any instance or argument that is to be looked up from CDI. In this example, the bean instance and all arguments except the first are looked up from CDI, so we pass `null` for the instance and `null` for arguments at positions 1 and beyond.
+
+==== @Priority on Producer Methods and Fields
+
+Previously, a producer method or field declared as an alternative could only be enabled and have a priority assigned by putting the `@Priority` annotation on the containing bean class. If a class contained several alternative producer methods, there was no way to assign a different priority to each.
+
+CDI 4.1 allows the `@Priority` annotation to be placed directly on the producer field or method, enabling fine-grained control over alternative selection:
+
+**Before CDI 4.1** (priority on class):
+
+[source,java]
+----
+@ApplicationScoped
+@Priority(10)
+public class ProducerClass {
+    
+    @Produces
+    @Alternative
+    public String produceString() {
+        return "OK";
+    }
+}
+----
+
+**CDI 4.1** (priority on producer method):
+
+[source,java]
+----
+@ApplicationScoped
+public class ProducerClass {
+    
+    @Produces
+    @Alternative
+    @Priority(10)
+    public String produceString() {
+        return "OK";
+    }
+}
+----
+
+This allows different producer methods in the same class to have different priorities, giving you more flexibility when working with alternatives.
+
+==== Programmatic Access to Assignability Rules
+
+CDI defines resolution rules that determine which beans can be injected into each injection point. Previously, there was no way to apply these rules programmatically without re-implementing the logic. CDI 4.1 adds two new methods to `BeanContainer` that implement the matching rules:
+
+[source,java]
+----
+// Check if a bean matches an injection point
+boolean isMatchingBean(Set<Type> beanTypes,
+                      Set<Annotation> beanQualifiers,
+                      Type requiredType,
+                      Set<Annotation> requiredQualifiers);
+
+// Check if an event matches an observer
+boolean isMatchingEvent(Type specifiedType,
+                       Set<Annotation> specifiedQualifiers,
+                       Type observedEventType,
+                       Set<Annotation> observedEventQualifiers);
+----
+
+These methods allow frameworks and extensions to programmatically check whether beans or events match specific requirements using the same rules that CDI uses internally.
+
+
+[#el]
+=== Expression Language 6.0
+
+Jakarta Expression Language defines an expression language for Java applications. This release makes the dependency on the java.desktop module optional, removes references to the SecurityManager, and provides a small number of usability improvements.
+
+*New features in Expression Language 6.0:*
+
+- *java.desktop module no longer required*: The java.desktop module is no longer required at runtime, improving modularity
+- *New `length` property for arrays*: A new property, `length`, is now supported for arrays, making it easier to get array sizes in EL expressions
+- *Java Records support*: Added support, enabled by default, for `java.lang.Record` instances via the new `RecordELResolver`
+- *Java Optional support*: Added support, disabled by default, for `java.lang.Optional` instances via the new `OptionalELResolver`
+
+*Removals:*
+
+- All code deprecated as of Expression Language 5.0 has been removed, specifically the `getFeatureDescriptors()` method from the `ELResolver` interface
+- All references to the Java SecurityManager and associated APIs have been removed
+
+==== Using the new `length` property for arrays
+
+[source,java]
+----
+import jakarta.el.*;
+import java.util.Arrays;
+
+public class ArrayLengthExample {
+    
+    public static void main(String[] args) {
+        // Create EL context
+        ExpressionFactory factory = ExpressionFactory.newInstance();
+        StandardELContext context = new StandardELContext(factory);
+        
+        // Create an array and add it to the context
+        String[] fruits = {"Apple", "Banana", "Cherry", "Date", "Elderberry"};
+        context.getELResolver().setValue(context, null, "fruits", fruits);
+        
+        // NEW in EL 6.0: Use the 'length' property to get array size
+        ValueExpression lengthExpr = factory.createValueExpression(
+            context, "${fruits.length}", Integer.class);
+        Integer length = (Integer) lengthExpr.getValue(context);
+        
+        System.out.println("Array length: " + length); // Output: 5
+        
+        // You can also use it in conditional expressions
+        ValueExpression hasItemsExpr = factory.createValueExpression(
+            context, "${fruits.length > 0}", Boolean.class);
+        Boolean hasItems = (Boolean) hasItemsExpr.getValue(context);
+        
+        System.out.println("Has items: " + hasItems); // Output: true
+    }
+}
+----
+
+==== Using RecordELResolver for Java Records
+
+Java Records are now supported by default in EL 6.0:
+
+[source,java]
+----
+import jakarta.el.*;
+
+// Define a Java Record
+public record Product(String name, double price, int quantity) {
+    public double totalValue() {
+        return price * quantity;
+    }
+}
+
+public class RecordELResolverExample {
+    
+    public static void main(String[] args) {
+        // Create EL context
+        ExpressionFactory factory = ExpressionFactory.newInstance();
+        StandardELContext context = new StandardELContext(factory);
+        
+        // Create a Record instance
+        Product product = new Product("Laptop", 999.99, 5);
+        context.getELResolver().setValue(context, null, "product", product);
+        
+        // NEW in EL 6.0: Access Record components directly
+        ValueExpression nameExpr = factory.createValueExpression(
+            context, "${product.name}", String.class);
+        String name = (String) nameExpr.getValue(context);
+        System.out.println("Product name: " + name); // Output: Laptop
+        
+        ValueExpression priceExpr = factory.createValueExpression(
+            context, "${product.price}", Double.class);
+        Double price = (Double) priceExpr.getValue(context);
+        System.out.println("Product price: " + price); // Output: 999.99
+        
+        // Access Record methods
+        ValueExpression totalExpr = factory.createValueExpression(
+            context, "${product.totalValue()}", Double.class);
+        Double total = (Double) totalExpr.getValue(context);
+        System.out.println("Total value: " + total); // Output: 4999.95
+    }
+}
+----
+
+==== Using OptionalELResolver for Java Optional
+
+Support for `java.lang.Optional` is available but disabled by default. To enable it, you need to add the `OptionalELResolver` to your EL context:
+
+[source,java]
+----
+
+import jakarta.el.*;
+import java.util.Optional;
+
+public class OptionalELResolverExample {
+
+    public static void main(String[] args) {
+        // Create EL context
+        ExpressionFactory factory = ExpressionFactory.newInstance();
+        StandardELContext context = new StandardELContext(factory);
+
+        context.addELResolver(new OptionalELResolver());
+
+        // Create Optional values
+        Optional<String> presentValue = Optional.of("Hello, EL 6.0!");
+        Optional<String> emptyValue = Optional.empty();
+
+        context.getELResolver().setValue(context, null, "message", presentValue);
+        context.getELResolver().setValue(context, null, "emptyValue", emptyValue);
+
+        // Access Optional values - automatically unwrapped if present
+        ValueExpression messageExpr = factory.createValueExpression(
+            context, "${message}", String.class);
+        String message = (String) messageExpr.getValue(context);
+        System.out.println("Message: " + message); // Output: Hello, EL 6.0!
+
+        // Empty Optional returns null
+        ValueExpression emptyExpr = factory.createValueExpression(
+            context, "${emptyValue}", String.class);
+        String emptyResult = (String) emptyExpr.getValue(context);
+        System.out.println("emptyValue: " + emptyResult); // Output: null
+
+        // Use with conditional expressions
+        ValueExpression hasMsgExpr = factory.createValueExpression(
+            context, "${message != null}", Boolean.class);
+        Boolean hasMessage = (Boolean) hasMsgExpr.getValue(context);
+        System.out.println("Has message: " + hasMessage); // Output: true
+    }
+}
+----
+
+==== Using EL 6.0 in Faces/Facelets
+
+[source,xhtml]
+----
+<!-- Using the new length property for arrays -->
+<h:outputText value="Total items: #{products.length}" />
+
+<h:panelGroup rendered="#{products.length > 0}">
+    <ui:repeat value="#{products}" var="product">
+        <h:outputText value="#{product.name}: $#{product.price}" />
+    </ui:repeat>
+</h:panelGroup>
+
+<!-- Using Records in EL expressions -->
+<h:outputText value="#{productRecord.name}" />
+<h:outputText value="#{productRecord.price}" />
+<h:outputText value="Total: $#{productRecord.totalValue()}" />
+
+<!-- Conditional rendering based on array length -->
+<h:outputText value="No products available"
+              rendered="#{products.length == 0}" />
+----
+
+[#faces]
+=== Faces 4.1
+
+Jakarta Faces defines an MVC framework for building user interfaces for web applications, including UI components, state management, event handling, input validation, page navigation, and support for internationalization and accessibility. This release removes references to the SecurityManager, further aligns with CDI where possible, and provides various small enhancements and clarifications.
+
+*New features in Faces 4.1:*
+
+- *Generic FacesMessage*: Make `FacesMessage#VALUES` / `VALUES_MAP` generic for better type safety
+- *CDI event firing*: Require firing events for `@Initialized`, `@BeforeDestroyed`, `@Destroyed` for build-in scopes
+- *Missing generics*: Add missing generics to API that were missed in Faces 4.0
+- *Flow injection*: Support `@Inject` of current flow like `@Inject Flow currentFlow`
+- *UUIDConverter*: Add new converter for UUID types
+- *ExternalContext enhancement*: Add `setResponseContentLengthLong` method for large content
+- *UIRepeat enhancement*: Add `rowStatePreserved` property to UIRepeat, exactly the same as UIData
+- *Development mode default*: `jakarta.faces.FACELETS_REFRESH_PERIOD` default when ProjectStage is Development
+- *FacesMessage improvements*: Implement `equals()`, `hashcode()`, `toString()` methods
+
+*Removals:*
+
+- Deprecate unused `composite.extension`
+- Remove references to the SecurityManager
+
+==== Using the new UUIDConverter
+
+[source,java]
+----
+import jakarta.faces.view.ViewScoped;
+import jakarta.inject.Named;
+import jakarta.faces.convert.UUIDConverter;
+import java.io.Serializable;
+import java.util.UUID;
+
+@Named
+@ViewScoped
+public class EntityBean implements Serializable {
+    
+    private UUID entityId;
+    private String entityName;
+    
+    public void init() {
+        // NEW in Faces 4.1: UUIDConverter automatically handles UUID conversion
+        // Generate a new UUID for the entity
+        entityId = UUID.randomUUID();
+    }
+    
+    public void saveEntity() {
+        System.out.println("Saving entity with ID: " + entityId);
+        // The UUID is automatically converted to/from String in the view
+    }
+    
+    // Getters and setters
+    public UUID getEntityId() { return entityId; }
+    public void setEntityId(UUID entityId) { this.entityId = entityId; }
+    public String getEntityName() { return entityName; }
+    public void setEntityName(String entityName) { this.entityName = entityName; }
+}
+----
+
+[source,xhtml]
+----
+<!-- The UUID is automatically converted using the new UUIDConverter -->
+<h:form>
+    <h:outputLabel value="Entity ID:" />
+    <h:inputText value="#{entityBean.entityId}" />
+    
+    <h:outputLabel value="Entity Name:" />
+    <h:inputText value="#{entityBean.entityName}" />
+    
+    <h:commandButton value="Save" action="#{entityBean.saveEntity}" />
+</h:form>
+
+<!-- Display UUID -->
+<h:outputText value="Current ID: #{entityBean.entityId}" />
+----
+
+==== Injecting the current Flow
+
+[source,java]
+----
+import jakarta.faces.flow.Flow;
+import jakarta.faces.view.ViewScoped;
+import jakarta.inject.Inject;
+import jakarta.inject.Named;
+import java.io.Serializable;
+
+@Named
+@ViewScoped
+public class FlowAwareBean implements Serializable {
+    
+    // NEW in Faces 4.1: Direct injection of current Flow
+    @Inject
+    private Flow currentFlow;
+    
+    public String getFlowInfo() {
+        if (currentFlow != null) {
+            return "Current flow: " + currentFlow.getId();
+        }
+        return "Not in a flow";
+    }
+    
+    public boolean isInFlow() {
+        return currentFlow != null;
+    }
+    
+    public String getFlowId() {
+        return currentFlow != null ? currentFlow.getId() : null;
+    }
+}
+----
+
+==== Using rowStatePreserved in UIRepeat
+
+[source,xhtml]
+----
+<!-- NEW in Faces 4.1: rowStatePreserved property for UIRepeat -->
+<!-- This preserves the state of each row, similar to UIData -->
+<ui:repeat value="#{productBean.products}" var="product"
+           rowStatePreserved="true">
+    <h:panelGroup>
+        <h:outputText value="#{product.name}: " />
+        <h:inputText value="#{product.quantity}" />
+        <h:commandButton value="Update"
+                        action="#{productBean.updateProduct(product)}" />
+    </h:panelGroup>
+</ui:repeat>
+----
+
+==== Using setResponseContentLengthLong for large files
+
+[source,java]
+----
+import jakarta.faces.context.ExternalContext;
+import jakarta.faces.context.FacesContext;
+import jakarta.inject.Named;
+import jakarta.enterprise.context.RequestScoped;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+
+@Named
+@RequestScoped
+public class FileDownloadBean {
+    
+    public void downloadLargeFile() throws IOException {
+        FacesContext facesContext = FacesContext.getCurrentInstance();
+        ExternalContext externalContext = facesContext.getExternalContext();
+        
+        // Simulate a large file (> 2GB)
+        long fileSize = 3_000_000_000L; // 3GB
+        
+        externalContext.responseReset();
+        externalContext.setResponseContentType("application/octet-stream");
+        externalContext.setResponseHeader("Content-Disposition",
+            "attachment; filename=\"largefile.bin\"");
+        
+        // NEW in Faces 4.1: setResponseContentLengthLong for files > 2GB
+        externalContext.setResponseContentLengthLong(fileSize);
+        
+        try (OutputStream output = externalContext.getResponseOutputStream()) {
+            // Write file content
+            // ... (implementation details)
+        }
+        
+        facesContext.responseComplete();
+    }
+}
+----
+
+==== Generic FacesMessage with improved type safety
+
+[source,java]
+----
+import jakarta.faces.application.FacesMessage;
+import jakarta.faces.context.FacesContext;
+import jakarta.inject.Named;
+import jakarta.enterprise.context.RequestScoped;
+
+@Named
+@RequestScoped
+public class MessageBean {
+    
+    public void demonstrateGenericMessages() {
+        FacesContext context = FacesContext.getCurrentInstance();
+        
+        // NEW in Faces 4.1: FacesMessage.VALUES and VALUES_MAP are now generic
+        // This provides better type safety when working with message severities
+        
+        FacesMessage infoMsg = new FacesMessage(
+            FacesMessage.SEVERITY_INFO,
+            "Information",
+            "This is an info message"
+        );
+        
+        FacesMessage warnMsg = new FacesMessage(
+            FacesMessage.SEVERITY_WARN,
+            "Warning",
+            "This is a warning message"
+        );
+        
+        FacesMessage errorMsg = new FacesMessage(
+            FacesMessage.SEVERITY_ERROR,
+            "Error",
+            "This is an error message"
+        );
+        
+        // NEW in Faces 4.1: FacesMessage now implements equals(), hashCode(), toString()
+        System.out.println(infoMsg.toString());
+        
+        // Compare messages
+        FacesMessage anotherInfoMsg = new FacesMessage(
+            FacesMessage.SEVERITY_INFO,
+            "Information",
+            "This is an info message"
+        );
+        
+        if (infoMsg.equals(anotherInfoMsg)) {
+            System.out.println("Messages are equal");
+        }
+        
+        context.addMessage(null, infoMsg);
+        context.addMessage(null, warnMsg);
+        context.addMessage(null, errorMsg);
+    }
+}
+----
+
+[#security]
+=== Security 4.0
+
+Jakarta Security is the overarching API designed to provide a holistic, vendor-neutral security model for the Jakarta EE platform. It simplifies authentication and authorization by leveraging CDI and annotations to manage three core artifacts: Authentication Mechanisms, Identity Stores, and Permission Stores. 
+
+Jakarta Security 4.0 provides an In-memory Identity Store, which is a developer-defined store of credential information that is used during the Open Liberty authentication and authorization work flow. It provides a quick, simple, and convenient authentication mechanism for Liberty application testing, debugging, demos, and more.
+
+*New features in Security 4.0:*
+
+- *Multiple HTTP Authentication Mechanisms (HAMs)*: Multiple HTTP Authentication Mechanisms can now be defined within the same application. These mechanisms can be specified through built-in Jakarta annotations such as `@FormAuthenticationMechanismDefinition` or through custom implementations of the `HttpAuthenticationMechanism` interface. Prioritisation of multiple HAMs can be managed by a custom implementation of the `HttpAuthenticationMechanismHandler` instead of relying on the default algorithm provided by Jakarta Security.
+
+- *Qualifiers for Built-in Authentication Mechanisms*: Built-in authentication mechanisms (BASIC, FORM, Custom FORM, OpenID Connect) now have qualifiers by default, whereas before they were unqualified. This enables programmatic selection and injection of specific authentication mechanisms.
+
+- *In-memory Identity Store*: Provides `@InMemoryIdentityStoreDefinition` annotation for defining credential stores directly in code. This is designed for testing, debugging, and demos - not recommended for production use.
+
+- *New SecurityContext method*: A new method `getAllDeclaredCallerRoles()` is added to the `SecurityContext` interface, which returns a list of all static (declared) application roles that the authenticated caller is in.
+
+*Removals and Breaking Changes:*
+
+- All references to the `SecurityManager` have been removed from the specification
+- Built-in authentication mechanisms now have a qualifier by default, whereas before they were unqualified
+
+==== In-memory Identity Store
+
+Before the introduction of the new identity store specification, Jakarta Security natively supported only two types of identity stores: **database** and **LDAP**, both of which are used for credential validation. While effective for production environments, these options were considered heavyweight for testing, debugging, and demonstration scenarios.
+
+The Jakarta Security Specification 4.0 provides details on how to specify credential information to be used during the authentication workflow through the new `@InMemoryIdentityStoreDefinition` annotation:
+
+[source,java]
+----
+@InMemoryIdentityStoreDefinition (
+    priority = 10,
+    priorityExpression = "${80/20}",
+    useFor = {VALIDATE, PROVIDE_GROUPS},
+    useForExpression = "#{'VALIDATE'}",
+    value = {
+        @Credentials(callerName = "jasmine", password = "secret1", groups = { "caller", "user" } )
+    }
+)
+----
+
+All attributes for the `@InMemoryIdentityStoreDefinition` annotation are shown in the example. The `priority`, `priorityExpression`, `useFor`, and `useForExpression` attributes are optional and set to sensible defaults.
+
+The `@Credentials` annotation maps one or more caller names to a password and optional group values. The `callerName` and `password` attributes are mandatory. If either one is omitted, a compilation error occurs.
+
+The example demonstrates a single caller definition with credential information that uses a plain-text password. However, it is highly recommended that passwords be supplied using an Open Liberty-supported encoding mechanism, as illustrated in the next example:
+
+[source,java]
+----
+@InMemoryIdentityStoreDefinition (
+    value = {
+        @Credentials(callerName = "jasmine",  password = "{xor}LDo8LTorbg==", groups = { "caller", "user" } ),
+        @Credentials(callerName = "frank", groups = { "user" }, password = "{hash}ARAAA <sequence shortened> Fyyw=="),
+        @Credentials(callerName = "sally", groups = { "user" }, password = "{aes}ARAFIYJ <sequence shortened> WRQNA==")
+    }
+)
+----
+
+Encrypted and encoded passwords can be generated by using the Open Liberty `securityUtility`, which is included under the `wlp/bin/securityUtility` path. The following example demonstrates how to encode a text string by using the `xor` encoding mechanism:
+
+[source,bash]
+----
+wlp/bin/securityUtility encode --encoding=xor
+Enter text: <enter text to encode>
+Re-enter text:
+{xor}PTA9Lyg
+----
+
+IMPORTANT: Since this feature is designed for testing and debugging purpose, when an application defines an in‑memory identity store in code, its use must also be explicitly enabled in the server.xml configuration, as shown below. By default, the allowInMemoryIdentityStores attribute is set to false, which instructs the Liberty authentication workflows not to use in‑memory identity stores, even when a custom identity store handler is present.
+
+[source,xml]
+----
+<server>
+    ...
+    <featureManager>
+        <feature>appSecurity-4.0</feature>
+    </featureManager>       
+    <appSecurity allowInMemoryIdentityStores="true" />
+    ...
+</server>
+----    
+
+==== Multiple HTTP Authentication Mechanisms
+
+The Jakarta Security 4.0 specification allows multiple HTTP Authentication Mechanisms (HAMs) to be defined within a single application:
+
+[source,java]
+----
+@BasicAuthenticationMechanismDefinition(realmName="basicAuth")
+
+@FormAuthenticationMechanismDefinition(
+                loginToContinue = @LoginToContinue(errorPage = "/form-login-error.html",
+                loginPage = "/form-login.html"))
+
+@CustomFormAuthenticationMechanismDefinition(
+                loginToContinue = @LoginToContinue(errorPage = "/custom-login-error.html",
+                loginPage = "/custom-login.html"))
+----
+
+This example demonstrates how three HTTP Authentication Mechanisms (HAMs) can be defined within a single application.
+
+Custom HAMs can also be defined in the same application by implementing the `HttpAuthenticationMechanism` interface in one or more classes:
+
+[source,java]
+----
+@ApplicationScoped
+// @Priority is optional and used to control selection priority if multiple custom definitions exist
+@Priority(100)
+public class CustomHAM implements HttpAuthenticationMechanism {
+
+    @Override
+    public AuthenticationStatus validateRequest(
+        HttpServletRequest request,
+        HttpServletResponse response,
+        HttpMessageContext httpMessageContext) throws AuthenticationException {
+
+            // implement custom logic here, and return an AuthenticationStatus
+            return AuthenticationStatus.NOT_DONE;
+    }
+}
+----
+
+So a single application can have a mix of both annotation-defined HAMs and custom ones. In the previous two snippets of code, a total of four HAMs are defined (three by annotation and one custom one).
+
+IMPORTANT: `@Priority` must be used to raise or lower the priority of one custom HAM over another. If not specified, then a default priority is assigned. If more than one custom HAM is defined, their priorities need to be explicitly set to unique values. If the priorities are set to the same value or remain unset and inherit the same default value, an error occurs.
+
+===== HAM Resolution
+
+An internal implementation of the Jakarta Security 4.0 `HttpAuthenticationMechanismHandler` interface (the "internal HAM handler") is provided. When an application defines multiple HAMs, this internal handler selects a single HAM to be used in the authentication flow.
+
+The order in which HAMs are considered (when present) is as follows:
+
+1. Custom (developer-provided) HAMs
+   * If multiple custom HAMs are defined, their relative order is resolved by using `@Priority`.
+2. `OpenIdAuthenticationMechanismDefinition`
+3. `CustomFormAuthenticationMechanismDefinition`
+4. `FormAuthenticationMechanismDefinition`
+5. `BasicAuthenticationMechanismDefinition`
+
+Given this ordering, the Custom HAM is always selected in the authentication workflow if all five HAM types are defined in the application.
+
+IMPORTANT: A developer must provide a custom implementation of the `HttpAuthenticationMechanismHandler` interface (a "custom HAM handler") if the internal HAM handler does not meet their requirements. A custom handler always takes precedence over the internal HAM handler, allowing any tailored algorithm to select a single HAM from multiple available mechanisms.
+
+===== Qualifiers
+
+HAMs, whether defined through annotations or as custom defined, can also include an optional class-level qualifier to simplify HAM injection into a custom HAM handler. For example, if you want to define qualified HAMs, you would first declare qualifier interfaces such as:
+
+[source,java]
+----
+import static java.lang.annotation.ElementType.METHOD;
+import static java.lang.annotation.ElementType.FIELD;
+import static java.lang.annotation.ElementType.PARAMETER;
+import static java.lang.annotation.ElementType.TYPE;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+import jakarta.inject.Qualifier;
+
+@Qualifier
+@Retention(RUNTIME)
+@Target({TYPE, METHOD, FIELD, PARAMETER})
+public @interface Admin {
+}
+----
+
+[source,java]
+
+----
+import static java.lang.annotation.ElementType.METHOD;
+import static java.lang.annotation.ElementType.FIELD;
+import static java.lang.annotation.ElementType.PARAMETER;
+import static java.lang.annotation.ElementType.TYPE;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+import jakarta.inject.Qualifier;
+
+@Qualifier
+@Retention(RUNTIME)
+@Target({TYPE, METHOD, FIELD, PARAMETER})
+public @interface User {
+}
+----
+
+Now define multiple Basic HTTP Authentication Mechanisms in the main application:
+[source,java]
+----
+import Admin;
+import User;
+
+import jakarta.security.enterprise.authentication.mechanism.http.BasicAuthenticationMechanismDefinition;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.ws.rs.ApplicationPath;
+import jakarta.ws.rs.core.Application;
+
+
+@BasicAuthenticationMechanismDefinition(realmName="admin-realm", qualifiers={Admin.class})
+@BasicAuthenticationMechanismDefinition(realmName="user-realm", qualifiers={User.class})
+
+@ApplicationScoped
+@ApplicationPath("/")
+public class MultipleHAMsApplication extends Application {
+}
+----
+In the example, two Basic HTTP Authentication Mechanisms are defined in the main application. The @BasicAuthenticationMechanismDefinition annotation is used to define the realm name and the qualifier for each mechanism. The qualifiers are used to distinguish between the two mechanisms during injection.
+
+
+
+Now finally, define an implementation of the `HttpAuthenticationMechanismHandler` to choose which qualified HAM to use:
+
+
+[source,java]
+----
+import Admin;
+import User;
+
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Default;
+import jakarta.inject.Inject;
+import jakarta.security.enterprise.AuthenticationException;
+import jakarta.security.enterprise.AuthenticationStatus;
+import jakarta.security.enterprise.authentication.mechanism.http.HttpAuthenticationMechanism;
+import jakarta.security.enterprise.authentication.mechanism.http.HttpAuthenticationMechanismHandler;
+import jakarta.security.enterprise.authentication.mechanism.http.HttpMessageContext;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+
+@ApplicationScoped
+public class CustomHAMHandler implements HttpAuthenticationMechanismHandler {
+
+    @Inject @Admin
+    private HttpAuthenticationMechanism adminHAM;
+
+    @Inject @User
+    private HttpAuthenticationMechanism userHAM;
+
+    public CustomHAMHandler() {
+    }
+
+    @Override
+    public AuthenticationStatus validateRequest(HttpServletRequest request,
+                                                HttpServletResponse response,
+                                                HttpMessageContext httpMessageContext) throws AuthenticationException {
+        String requestURI = request.getRequestURI();
+        String contextPath = request.getContextPath();
+
+        String path = requestURI;
+        if (contextPath != null && !contextPath.isEmpty()) {
+            path = requestURI.substring(contextPath.length());
+        }
+
+        if (path.startsWith("/resource/admin")) {
+            return adminHAM.validateRequest(request, response, httpMessageContext);
+        } else if (path.startsWith("/resource/user")) {
+            return userHAM.validateRequest(request, response, httpMessageContext);
+        } 
+        return AuthenticationStatus.SEND_FAILURE;
+    }
+}
+
+----
+
+Note, you can also add a qualifier to custom HTTP Authentication Mechanisms (as you could prior to Jakarta Security 4.0) and inject the custom HAM into your custom HAM handler.
+
+
+==== getAllDeclaredCallerRoles()
+
+To use the new `SecurityContext` method, inject the `SecurityContext` implementation into your application and call the method directly:
+
+[source,java]
+----
+    @Inject
+    private SecurityContext securityContext;
+
+    Set<String> allDeclaredCallerRoles = securityContext.getAllDeclaredCallerRoles();
+
+    System.out.println("All declared caller roles for caller ["
+        + securityContext.getCallerPrincipal().getName()
+        + "] are "
+        + allDeclaredCallerRoles.toString());
+    
+    @GET
+    @Path("/info")
+    @Produces(MediaType.APPLICATION_JSON)
+    public String getSecureInfo() {
+        String username = securityContext.getUserPrincipal().getName();
+        boolean isAdmin = securityContext.isUserInRole("ADMIN");
+        
+        return String.format(
+            "{\"user\": \"%s\", \"isAdmin\": %b}",
+            username,
+            isAdmin
+        );
+    }
+    
+    @GET
+    @Path("/admin")
+    @Produces(MediaType.TEXT_PLAIN)
+    public String adminOnly() {
+        if (!securityContext.isUserInRole("ADMIN")) {
+            throw new SecurityException("Admin access required");
+        }
+        return "Welcome, administrator!";
+    }
+}
+----
+
+[#servlet]
+=== Servlet 6.1
+
+Jakarta Servlet defines a server-side API for handling HTTP requests and responses. This release removes references to the SecurityManager and provides various small enhancements and clarifications.
+
+*New features in Servlet 6.1:*
+
+- Allow control of status code and response body when sending a redirect
+- Add a query string attribute to error dispatches
+- Add constants for new HTTP status codes
+- Add overloaded methods that use `Charset` rather than `String`
+- Add `ByteBuffer` support to `ServletInputStream` and `ServletOutputStream`
+- Various clarifications throughout the specification
+
+*Removals:*
+
+- All references to the SecurityManager and associated APIs have been removed
+
+==== Custom Redirect with Status Code Control
+
+Servlet 6.1 allows you to control the HTTP status code when sending redirects:
+
+[source,java]
+----
+import jakarta.servlet.ServletException;
+import jakarta.servlet.annotation.WebServlet;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+
+@WebServlet("/redirect-example")
+public class RedirectServlet extends HttpServlet {
+    
+    @Override
+    protected void doGet(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        
+        String action = request.getParameter("action");
+        
+        if ("permanent".equals(action)) {
+            // Send a 301 Moved Permanently redirect
+            response.sendRedirect("/new-location", HttpServletResponse.SC_MOVED_PERMANENTLY);
+        } else if ("temporary".equals(action)) {
+            // Send a 307 Temporary Redirect (preserves request method)
+            response.sendRedirect("/temp-location", HttpServletResponse.SC_TEMPORARY_REDIRECT);
+        } else {
+            // Default 302 Found redirect
+            response.sendRedirect("/default-location");
+        }
+    }
+}
+----
+
+==== Using Charset Methods
+
+Servlet 6.1 adds overloaded methods that accept `Charset` instead of `String` for better type safety:
+
+[source,java]
+----
+import jakarta.servlet.ServletException;
+import jakarta.servlet.annotation.WebServlet;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
+
+@WebServlet("/charset-example")
+public class CharsetServlet extends HttpServlet {
+    
+    @Override
+    protected void doGet(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        
+        // Use Charset instead of String for character encoding
+        response.setCharacterEncoding(StandardCharsets.UTF_8);
+        response.setContentType("text/html");
+        
+        PrintWriter writer = response.getWriter();
+        writer.println("<html><body>");
+        writer.println("<h1>UTF-8 Encoded Response</h1>");
+        writer.println("<p>Special characters: é, ñ, ü, 中文</p>");
+        writer.println("</body></html>");
+    }
+}
+----
+
+==== ByteBuffer Support
+
+Servlet 6.1 adds `ByteBuffer` support to `ServletInputStream` and `ServletOutputStream`:
+
+[source,java]
+----
+import jakarta.servlet.ServletException;
+import jakarta.servlet.annotation.WebServlet;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.ServletOutputStream;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+
+@WebServlet("/bytebuffer-example")
+public class ByteBufferServlet extends HttpServlet {
+    
+    @Override
+    protected void doGet(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        
+        response.setContentType("application/octet-stream");
+        
+        // Create a ByteBuffer with data
+        String data = "Binary data using ByteBuffer";
+        ByteBuffer buffer = ByteBuffer.wrap(data.getBytes(StandardCharsets.UTF_8));
+        
+        // Write ByteBuffer directly to ServletOutputStream
+        ServletOutputStream outputStream = response.getOutputStream();
+        outputStream.write(buffer);
+        outputStream.flush();
+    }
+}
+----
+
+==== Error Dispatch with Query String
+
+Servlet 6.1 adds a query string attribute to error dispatches:
+
+[source,java]
+----
+import jakarta.servlet.ServletException;
+import jakarta.servlet.annotation.WebServlet;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.RequestDispatcher;
+import java.io.IOException;
+import java.io.PrintWriter;
+
+@WebServlet("/error-handler")
+public class ErrorHandlerServlet extends HttpServlet {
+    
+    @Override
+    protected void doGet(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        
+        response.setContentType("text/html");
+        PrintWriter writer = response.getWriter();
+        
+        // Access error attributes including the new query string attribute
+        Integer statusCode = (Integer) request.getAttribute(RequestDispatcher.ERROR_STATUS_CODE);
+        String message = (String) request.getAttribute(RequestDispatcher.ERROR_MESSAGE);
+        String requestUri = (String) request.getAttribute(RequestDispatcher.ERROR_REQUEST_URI);
+        String queryString = (String) request.getAttribute(RequestDispatcher.ERROR_QUERY_STRING);
+        
+        writer.println("<html><body>");
+        writer.println("<h1>Error Handler</h1>");
+        writer.println("<p>Status Code: " + statusCode + "</p>");
+        writer.println("<p>Message: " + message + "</p>");
+        writer.println("<p>Request URI: " + requestUri + "</p>");
+        
+        // New in Servlet 6.1: Query string is now available in error dispatches
+        if (queryString != null) {
+            writer.println("<p>Query String: " + queryString + "</p>");
+        }
+        
+        writer.println("</body></html>");
+    }
+}
+----
+
+[#restful]
+=== RESTful Web Services 4.0
+
+Jakarta RESTful Web Services provides a foundational API to develop web services following the Representational State Transfer (REST) architectural pattern. The full details for this release are as follows.
+
+*New features in RESTful Web Services 4.0:*
+
+- *TCK tests for multipart/form-data API*: Added comprehensive tests for multipart form data handling
+- *TCK tests for default ExceptionMapper*: Added tests to verify default exception mapping behavior
+- *Added containsHeaderString method to a few APIs*: New method added to the APIs -ClientRequestContext, ClientResponseContext, ContainerRequestContext, ContainerResponseContext and HttpHeaders to provide an easy way to check whether a header contains specific values
+- *Required TCK for convenience method*: Added required tests for the new convenience method merged in PR 1066
+- *Clarified JavaSE support*: Clarified JavaSE support in Section 2.3 of specification
+- *Added getMatchedResourceTemplate method to UriInfo*: New method to retrieve the matched resource template
+- *Added JSON Merge Patch support*: Support for RFC 7396 JSON Merge Patch
+
+*Removals:*
+
+- *Remove JAXB dependency*: Jakarta REST no longer depends on JAXB
+- *Remove ManagedBean support*: ManagedBean support has been removed from Jakarta REST
+
+==== Basic REST Resource Example
+
+[source,java]
+----
+import jakarta.ws.rs.*;
+import jakarta.ws.rs.core.*;
+import java.util.List;
+import java.util.ArrayList;
+
+@Path("/products")
+@Produces(MediaType.APPLICATION_JSON)
+@Consumes(MediaType.APPLICATION_JSON)
+public class ProductResource {
+    
+    private static List<Product> products = new ArrayList<>();
+    
+    @GET
+    public Response getAllProducts() {
+        return Response.ok(products).build();
+    }
+    
+    @GET
+    @Path("/{id}")
+    public Response getProduct(@PathParam("id") Long id) {
+        Product product = products.stream()
+            .filter(p -> p.getId().equals(id))
+            .findFirst()
+            .orElse(null);
+        
+        if (product == null) {
+            return Response.status(Response.Status.NOT_FOUND).build();
+        }
+        
+        return Response.ok(product).build();
+    }
+    
+    @POST
+    public Response createProduct(Product product) {
+        products.add(product);
+        return Response.status(Response.Status.CREATED)
+            .entity(product)
+            .build();
+    }
+    
+    @PUT
+    @Path("/{id}")
+    public Response updateProduct(@PathParam("id") Long id, Product updatedProduct) {
+        Product product = products.stream()
+            .filter(p -> p.getId().equals(id))
+            .findFirst()
+            .orElse(null);
+        
+        if (product == null) {
+            return Response.status(Response.Status.NOT_FOUND).build();
+        }
+        
+        products.remove(product);
+        products.add(updatedProduct);
+        
+        return Response.ok(updatedProduct).build();
+    }
+    
+    @DELETE
+    @Path("/{id}")
+    public Response deleteProduct(@PathParam("id") Long id) {
+        boolean removed = products.removeIf(p -> p.getId().equals(id));
+        
+        if (!removed) {
+            return Response.status(Response.Status.NOT_FOUND).build();
+        }
+        
+        return Response.noContent().build();
+    }
+}
+
+class Product {
+    private Long id;
+    private String name;
+    private Double price;
+    
+    // Constructors, getters, setters
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+    public Double getPrice() { return price; }
+    public void setPrice(Double price) { this.price = price; }
+}
+----
+
+==== Using getMatchedResourceTemplate (NEW in 4.0)
+
+[source,java]
+----
+import jakarta.ws.rs.*;
+import jakarta.ws.rs.core.*;
+
+@Path("/api/users")
+public class UserResource {
+    
+    @Context
+    private UriInfo uriInfo;
+    
+    @GET
+    @Path("/{userId}/orders/{orderId}")
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response getUserOrder(
+            @PathParam("userId") Long userId,
+            @PathParam("orderId") Long orderId) {
+        
+        // NEW in REST 4.0: getMatchedResourceTemplate method
+        String template = uriInfo.getMatchedResourceTemplate();
+        System.out.println("Matched template: " + template);
+        // Output: /api/users/{userId}/orders/{orderId}
+        
+        // Use the template for logging, metrics, or routing decisions
+        return Response.ok()
+            .entity(new Order(orderId, userId))
+            .header("X-Resource-Template", template)
+            .build();
+    }
+}
+
+class Order {
+    private Long orderId;
+    private Long userId;
+    
+    public Order(Long orderId, Long userId) {
+        this.orderId = orderId;
+        this.userId = userId;
+    }
+    
+    public Long getOrderId() { return orderId; }
+    public Long getUserId() { return userId; }
+}
+----
+
+==== JSON Merge Patch Support (NEW in 4.0)
+
+[source,java]
+----
+import jakarta.ws.rs.*;
+import jakarta.ws.rs.core.*;
+import jakarta.json.Json;
+import jakarta.json.JsonMergePatch;
+import jakarta.json.JsonValue;
+import jakarta.json.bind.Jsonb;
+import jakarta.json.bind.JsonbBuilder;
+
+@Path("/customers")
+@Produces(MediaType.APPLICATION_JSON)
+@Consumes(MediaType.APPLICATION_JSON)
+public class CustomerResource {
+    
+    private static Customer customer = new Customer(1L, "John Doe", "john@example.com");
+    
+    @GET
+    @Path("/{id}")
+    public Response getCustomer(@PathParam("id") Long id) {
+        return Response.ok(customer).build();
+    }
+    
+    // NEW in REST 4.0: JSON Merge Patch support (RFC 7396)
+    @PATCH
+    @Path("/{id}")
+    @Consumes(MediaType.APPLICATION_MERGE_PATCH_JSON)
+    public Response patchCustomer(
+            @PathParam("id") Long id,
+            JsonValue patchJson) {
+        
+        try (Jsonb jsonb = JsonbBuilder.create()) {
+            // Convert customer to JsonValue
+            JsonValue customerJson = jsonb.fromJson(
+                jsonb.toJson(customer), JsonValue.class);
+            
+            // Create merge patch manually from the incoming JSON
+            JsonMergePatch mergePatch = Json.createMergePatch(patchJson);
+            // Apply the merge patch
+            JsonValue patchedJson = mergePatch.apply(customerJson);
+            
+            // Convert back to Customer object
+            Customer patchedCustomer = jsonb.fromJson(
+                patchedJson.toString(), Customer.class);
+            
+            customer = patchedCustomer;
+            
+            return Response.ok(customer).build();
+        } catch (Exception e) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                .entity("Invalid patch: " + e.getMessage())
+                .build();
+        }
+    }
+}
+
+class Customer {
+    private Long id;
+    private String name;
+    private String email;
+    
+    public Customer() {}
+    
+    public Customer(Long id, String name, String email) {
+        this.id = id;
+        this.name = name;
+        this.email = email;
+    }
+    
+    // Getters and setters
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+    public String getEmail() { return email; }
+    public void setEmail(String email) { this.email = email; }
+}
+----
+
+==== Multipart Form Data Handling
+
+[source,java]
+----
+import jakarta.ws.rs.*;
+import jakarta.ws.rs.core.*;
+import java.io.InputStream;
+import java.io.IOException;
+/**
+ * Demonstrates multipart/form-data handling in Jakarta REST 4.0
+ * using the standard EntityPart API (new in REST 4.0)
+ */
+@Path("/upload")
+public class FileUploadResource {
+    @POST
+    @Consumes(MediaType.MULTIPART_FORM_DATA)
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response uploadFile(
+            @FormParam("file") EntityPart filePart,
+            @FormParam("description") String description) {
+        if (filePart == null) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                .entity(new UploadResponse(null, 0, "No file provided"))
+                .build();
+        }
+        try {
+            String fileName = filePart.getFileName().orElse("unknown");
+            // Read the file content to get size
+            long fileSize = 0;
+            try (InputStream is = filePart.getContent()) {
+                byte[] buffer = new byte[8192];
+                int bytesRead;
+                while ((bytesRead = is.read(buffer)) != -1) {
+                    fileSize += bytesRead;
+                }
+            }
+            // Process the file
+            System.out.println("Uploading file: " + fileName);
+            System.out.println("File size: " + fileSize);
+            System.out.println("Description: " + description);
+            System.out.println("Content-Type: " + filePart.getMediaType());
+            return Response.ok()
+                .entity(new UploadResponse(fileName, fileSize, "Upload successful"))
+                .build();
+        } catch (IOException e) {
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                .entity(new UploadResponse(null, 0, "Error processing file: " + e.getMessage()))
+                .build();
+        }
+    }
+}
+
+class UploadResponse {
+    private String fileName;
+    private long fileSize;
+    private String message;
+    
+    public UploadResponse(String fileName, long fileSize, String message) {
+        this.fileName = fileName;
+        this.fileSize = fileSize;
+        this.message = message;
+    }
+    
+    // Getters
+    public String getFileName() { return fileName; }
+    public long getFileSize() { return fileSize; }
+    public String getMessage() { return message; }
+}
+----
+
+[#persistence]
+=== Persistence 3.2
+
+Jakarta Persistence defines a standard for management of persistence and object/relational mapping in Java environments.
+
+*New features in Persistence 3.2:*
+
+- *Java Record Support*: Adds support for Java record types as embeddable classes
+- *java.time Support*: Adds support for `java.time.Instant` and `java.time.Year` with clarified JDBC mappings for basic types
+- *New Query Operators*: Adds `union`, `intersect`, `except`, `cast`, `left`, `right`, and `replace` operators for Jakarta Persistence QL and criteria queries
+- *String Concatenation*: Adds `||` as a concatenation operator and `id` and `version` functions to Jakarta Persistence QL
+- *Criteria API Enhancements*: Adds `CriteriaSelect`, `subquery(EntityType)` and joins on `EntityType` to Criteria API
+- *Null Precedence*: Adds support for specifying null precedence when ordering Jakarta Persistence QL and criteria queries
+- *Query Methods*: Adds `getSingleResultOrNull()` to `Query`, `TypedQuery`, `StoredProcedureQuery`
+- *Named Queries*: Adds `entities()`, `classes()` and `columns()` to `NamedNativeQuery`
+- *Lock Mode*: Adds `lockMode()` to `EntityResult` with the default being `OPTIMISTIC`
+- *Transaction Helpers*: Adds `runInTransaction()` and `callInTransaction()` convenience methods for executing code within transactions
+- *EntityManager Connection Access*: Adds `runWithConnection()` and `callWithConnection()` methods for direct JDBC connection access
+- *Programmatic Configuration API*: Adds `PersistenceConfiguration` for programmatic persistence unit configuration
+- *Schema Management API*: Adds `SchemaManager` for schema creation, validation, truncation, and dropping
+- *DDL Generation Enhancements*: Adds support for comments, check constraints, table options, and second precision in generated DDL
+- *Enum Mapping Enhancements*: Adds `@EnumeratedValue` for custom enum value mapping
+- *Named Query and Graph Factory Access*: Adds APIs for factory-based named query and entity graph creation/access
+
+*Deprecations:*
+
+- *Temporal Types*: Deprecates usage of `Calendar`, `Date`, `Time`, `Timestamp`, `Temporal`, `MapKeyTemporal`, and `TemporalType` in favor of `java.time` API
+- *multiselect Methods*: Deprecates `multiselect` methods in `CriteriaQuery` in favor of `array` or `tuple` methods defined in `CriteriaBuilder`
+- *Byte[] and Character[] Arrays*: Deprecates use of `Byte[]` and `Character[]` arrays for basic attributes, in favor of primitive array types
+- *Subgraph Methods for Removal*: Deprecates `addSubclassSubgraph()` in `EntityGraph` for removal; `addTreatedSubgraph()` method should be used as direct replacement
+- *Attribute and Class Subgraph Methods*: Deprecates `addSubgraph(Attribute, Class)` and `addKeySubgraph()` in `Graph`/`EntityGraph`/`SubGraph` for removal
+- *Transaction Methods*: Deprecates `jakarta.persistence.spi.PersistenceUnitTransactionType` and `jakarta.persistence.PersistenceUnitUtil.getTransactionType()` methods for removal
+
+[source,java]
+----
+import jakarta.persistence.*;
+import java.time.Instant;
+import java.time.Year;
+import java.util.List;
+
+// NEW in 3.2: Java Record as Embeddable
+@Embeddable
+public record Address(
+    String street,
+    String city,
+    String state,
+    String zipCode
+) {}
+
+@Entity
+@Table(name = "customers")
+@NamedQuery(name = "Customer.findByEmail",
+            query = "SELECT c FROM Customer c WHERE c.email = :email")
+public class Customer {
+    
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    
+    @Version
+    private Long version;
+    
+    @Column(nullable = false)
+    private String name;
+    
+    @Column(unique = true, nullable = false)
+    private String email;
+    
+    private String phone;
+    
+    private String status;  // e.g., "ACTIVE", "INACTIVE"
+    
+    private Integer vipLevel;  // VIP tier level
+    
+    // NEW in 3.2: Embedded record type
+    @Embedded
+    private Address address;
+    
+    // NEW in 3.2: java.time.Instant support
+    private Instant createdAt;
+    
+    // NEW in 3.2: java.time.Year support
+    private Year memberSince;
+    
+    @OneToMany(mappedBy = "customer", cascade = CascadeType.ALL)
+    private List<Order> orders;
+    
+    // Constructors, getters, setters
+}
+
+@Stateless
+public class CustomerRepository {
+    
+    @PersistenceContext
+    private EntityManager em;
+    
+    public Customer findById(Long id) {
+        return em.find(Customer.class, id);
+    }
+    
+    public Customer findByEmail(String email) {
+        return em.createNamedQuery("Customer.findByEmail", Customer.class)
+                 .setParameter("email", email)
+                 .getSingleResult();
+    }
+    
+    // NEW in 3.2: getSingleResultOrNull() method
+    public Customer findByEmailOrNull(String email) {
+        return em.createQuery("SELECT c FROM Customer c WHERE c.email = :email", Customer.class)
+                 .setParameter("email", email)
+                 .getSingleResultOrNull();  // Returns null instead of throwing exception
+    }
+    
+    // NEW in 3.2: String concatenation with || operator
+    public List<String> getFullNames() {
+        return em.createQuery(
+            "SELECT c.name || ' (' || c.email || ')' FROM Customer c",
+            String.class
+        ).getResultList();
+    }
+    
+    // NEW in 3.2: UNION operator
+    public List<Customer> findActiveAndVIPCustomers() {
+        return em.createQuery(
+            "SELECT c FROM Customer c WHERE c.status = 'ACTIVE' " +
+            "UNION " +
+            "SELECT c FROM Customer c WHERE c.vipLevel > 5",
+            Customer.class
+        ).getResultList();
+    }
+    
+    // NEW in 3.2: Null precedence in ordering
+    public List<Customer> findCustomersOrderedByCity() {
+        return em.createQuery(
+            "SELECT c FROM Customer c ORDER BY c.address.city NULLS LAST",
+            Customer.class
+        ).getResultList();
+    }
+    
+    public List<Customer> findCustomersWithOrders() {
+        // Using JOIN FETCH for efficient loading
+        return em.createQuery(
+            "SELECT DISTINCT c FROM Customer c LEFT JOIN FETCH c.orders",
+            Customer.class
+        ).getResultList();
+    }
+    
+    public void save(Customer customer) {
+        if (customer.getId() == null) {
+            em.persist(customer);
+        } else {
+            em.merge(customer);
+        }
+    }
+}
+// NEW in 3.2: Criteria API Enhancements
+@Stateless
+public class CustomerCriteriaRepository {
+    
+    @PersistenceContext
+    private EntityManager em;
+    
+    // NEW in 3.2: Using CriteriaSelect for type-safe queries
+    public List<Customer> findCustomersByCityUsingCriteria(String city) {
+        CriteriaBuilder cb = em.getCriteriaBuilder();
+        CriteriaQuery<Customer> cq = cb.createQuery(Customer.class);
+        Root<Customer> customer = cq.from(Customer.class);
+        
+        // CriteriaSelect provides enhanced type safety
+        cq.select(customer)
+          .where(cb.equal(customer.get("address").get("city"), city));
+        
+        return em.createQuery(cq).getResultList();
+    }
+    
+    // NEW in 3.2: subquery(EntityType) for correlated subqueries
+    public List<Customer> findCustomersWithMultipleOrders() {
+        CriteriaBuilder cb = em.getCriteriaBuilder();
+        CriteriaQuery<Customer> cq = cb.createQuery(Customer.class);
+        Root<Customer> customer = cq.from(Customer.class);
+        
+        // Create a correlated subquery using the new subquery(EntityType) method
+        Subquery<Long> subquery = cq.subquery(Long.class);
+        Root<Order> order = subquery.correlate(customer).join("orders");
+        subquery.select(cb.count(order));
+        
+        cq.select(customer)
+          .where(cb.greaterThan(subquery, 1L));
+        
+        return em.createQuery(cq).getResultList();
+    }
+    
+    // NEW in 3.2: Joins on EntityType
+    public List<Customer> findCustomersWithRecentOrders(Instant since) {
+        CriteriaBuilder cb = em.getCriteriaBuilder();
+        CriteriaQuery<Customer> cq = cb.createQuery(Customer.class);
+        Root<Customer> customer = cq.from(Customer.class);
+        
+        // Join directly on EntityType
+        Join<Customer, Order> orders = customer.join("orders");
+        
+        cq.select(customer)
+          .where(cb.greaterThanOrEqualTo(orders.get("orderDate"), since))
+          .distinct(true);
+        
+        return em.createQuery(cq).getResultList();
+    }
+}
+
+// NEW in 3.2: Advanced Query Operators
+@Stateless
+public class AdvancedQueryRepository {
+    
+    @PersistenceContext
+    private EntityManager em;
+    
+    // NEW in 3.2: INTERSECT operator
+    public List<Customer> findCustomersInBothActiveAndVIP() {
+        return em.createQuery(
+            "SELECT c FROM Customer c WHERE c.status = 'ACTIVE' " +
+            "INTERSECT " +
+            "SELECT c FROM Customer c WHERE c.vipLevel > 5",
+            Customer.class
+        ).getResultList();
+    }
+    
+    // NEW in 3.2: EXCEPT operator (set difference)
+    public List<Customer> findActiveCustomersExceptVIP() {
+        return em.createQuery(
+            "SELECT c FROM Customer c WHERE c.status = 'ACTIVE' " +
+            "EXCEPT " +
+            "SELECT c FROM Customer c WHERE c.vipLevel > 5",
+            Customer.class
+        ).getResultList();
+    }
+    
+    // NEW in 3.2: CAST operator for type conversion
+    public List<String> getCustomerIdsAsStrings() {
+        return em.createQuery(
+            "SELECT CAST(c.id AS STRING) FROM Customer c",
+            String.class
+        ).getResultList();
+    }
+    
+    // NEW in 3.2: LEFT and RIGHT string functions
+    public List<String> getEmailPrefixes() {
+        return em.createQuery(
+            "SELECT LEFT(c.email, 5) FROM Customer c",
+            String.class
+        ).getResultList();
+    }
+    
+    public List<String> getEmailDomains() {
+        return em.createQuery(
+            "SELECT RIGHT(c.email, 10) FROM Customer c",
+            String.class
+        ).getResultList();
+    }
+    
+    // NEW in 3.2: REPLACE function for string manipulation
+    public List<String> normalizePhoneNumbers() {
+        return em.createQuery(
+            "SELECT REPLACE(c.phone, '-', '') FROM Customer c",
+            String.class
+        ).getResultList();
+    }
+    
+    // NEW in 3.2: id() function to access entity identifier
+    public List<Long> getCustomerIds() {
+        return em.createQuery(
+            "SELECT id(c) FROM Customer c WHERE c.status = 'ACTIVE'",
+            Long.class
+        ).getResultList();
+    }
+    
+    // NEW in 3.2: version() function to access entity version
+    public List<Object[]> getCustomerVersionInfo() {
+        return em.createQuery(
+            "SELECT c.name, version(c) FROM Customer c",
+            Object[].class
+        ).getResultList();
+    }
+}
+
+// NEW in 3.2: NamedNativeQuery with entities(), classes(), and columns()
+@Entity
+@Table(name = "products")
+@NamedNativeQuery(
+    name = "Product.findWithDetails",
+    query = "SELECT p.id, p.name, p.price, c.name as category_name " +
+            "FROM products p JOIN categories c ON p.category_id = c.id",
+    resultSetMapping = "ProductDetailsMapping"
+)
+@SqlResultSetMapping(
+    name = "ProductDetailsMapping",
+    entities = @EntityResult(
+        entityClass = Product.class,
+        fields = {
+            @FieldResult(name = "id", column = "id"),
+            @FieldResult(name = "name", column = "name"),
+            @FieldResult(name = "price", column = "price")
+        },
+        // NEW in 3.2: lockMode() on EntityResult
+        lockMode = LockModeType.OPTIMISTIC
+    ),
+    columns = @ColumnResult(name = "category_name", type = String.class)
+)
+public class Product {
+    
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    
+    private String name;
+    private Double price;
+    
+    @Version
+    private Long version;
+    
+    @ManyToOne
+    @JoinColumn(name = "category_id")
+    private Category category;
+    
+    // Constructors, getters, setters
+}
+
+@Entity
+@Table(name = "categories")
+public class Category {
+    
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    
+    private String name;
+    
+    @OneToMany(mappedBy = "category")
+    private List<Product> products;
+    
+    // Constructors, getters, setters
+}
+
+@Stateless
+public class ProductRepository {
+    
+    @PersistenceContext
+    private EntityManager em;
+    
+    // NEW in 3.2: Using NamedNativeQuery with enhanced result mapping
+    public List<Object[]> findProductsWithDetails() {
+        return em.createNamedQuery("Product.findWithDetails")
+                 .getResultList();
+    }
+    
+    // NEW in 3.2: Combining multiple new features in one query
+    // Demonstrates: CAST, LEFT, REPLACE, ||, UNION, NULLS LAST, id()
+    public List<Product> findFeaturedProducts(String categoryPrefix) {
+        return em.createQuery(
+            // First set: Premium products with name manipulation
+            "SELECT p FROM Product p " +
+            "WHERE CAST(p.price AS STRING) LIKE '%.99' " +  // CAST operator
+            "AND LEFT(p.category.name, 3) = :prefix " +     // LEFT function
+            "AND REPLACE(p.name, '-', ' ') IS NOT NULL " +  // REPLACE function
+            "UNION " +                                       // UNION operator
+            // Second set: Discounted products with concatenation
+            "SELECT p FROM Product p " +
+            "WHERE (p.name || ' - ' || p.category.name) LIKE '%Sale%' " +  // || concatenation
+            "ORDER BY p.price NULLS LAST, id(p)",           // NULLS LAST + id() function
+            Product.class
+        )
+        .setParameter("prefix", categoryPrefix)
+        .getResultList();  // Returns list of all matching products
+    }
+    
+
+// NEW in 3.2: Transaction Helpers
+@Stateless
+public class TransactionHelperExample {
+    
+    @PersistenceContext
+    private EntityManager em;
+    
+    // NEW in 3.2: runInTransaction() - Execute code within a transaction
+    public void processOrderWithTransaction(Order order) {
+        em.runInTransaction(entityManager -> {
+            // All operations here run in a transaction
+            entityManager.persist(order);
+            
+            // Update inventory
+            for (OrderItem item : order.getItems()) {
+                Product product = entityManager.find(Product.class, item.getProductId());
+                product.setStockQuantity(product.getStockQuantity() - item.getQuantity());
+                entityManager.merge(product);
+            }
+            
+            // No need to explicitly commit - handled automatically
+        });
+    }
+    
+    // NEW in 3.2: callInTransaction() - Execute code and return a result
+    public Order createOrderWithTransaction(OrderRequest request) {
+        return em.callInTransaction(entityManager -> {
+            Order order = new Order();
+            order.setCustomerId(request.getCustomerId());
+            order.setItems(request.getItems());
+            order.setTotal(calculateTotal(request.getItems()));
+            
+            entityManager.persist(order);
+            return order;  // Return value from transaction
+        });
+    }
+    
+    private double calculateTotal(List<OrderItem> items) {
+        return items.stream()
+                   .mapToDouble(item -> item.getPrice() * item.getQuantity())
+                   .sum();
+    }
+}
+
+// NEW in 3.2: EntityManager Connection Access
+@Stateless
+public class ConnectionAccessExample {
+    
+    @PersistenceContext
+    private EntityManager em;
+    
+    // NEW in 3.2: runWithConnection() - Direct JDBC access
+    public void executeBatchUpdate(List<Long> productIds) {
+        em.runWithConnection(connection -> {
+            String sql = "UPDATE products SET last_updated = ? WHERE id = ?";
+            try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+                Instant now = Instant.now();
+                for (Long id : productIds) {
+                    stmt.setObject(1, now);
+                    stmt.setLong(2, id);
+                    stmt.addBatch();
+                }
+                stmt.executeBatch();
+            }
+        });
+    }
+    
+    // NEW in 3.2: callWithConnection() - Direct JDBC access with return value
+    public int getProductCount() {
+        return em.callWithConnection(connection -> {
+            String sql = "SELECT COUNT(*) FROM products WHERE active = true";
+            try (PreparedStatement stmt = connection.prepareStatement(sql);
+                 ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1);
+                }
+                return 0;
+            }
+        });
+    }
+}
+
+// NEW in 3.2: Programmatic Configuration API
+public class ProgrammaticConfigurationExample {
+    
+    public EntityManagerFactory createEntityManagerFactory() {
+        // NEW in 3.2: PersistenceConfiguration for programmatic setup
+        PersistenceConfiguration config = new PersistenceConfiguration("myPersistenceUnit");
+        
+        config.provider("org.hibernate.jpa.HibernatePersistenceProvider")
+              .jtaDataSource("java:comp/env/jdbc/MyDataSource")
+              .managedClass(Product.class)
+              .managedClass(Category.class)
+              .managedClass(Order.class)
+              .property("hibernate.dialect", "org.hibernate.dialect.PostgreSQLDialect")
+              .property("hibernate.show_sql", "true")
+              .property("hibernate.format_sql", "true");
+        
+        return Persistence.createEntityManagerFactory(config);
+    }
+}
+
+// NEW in 3.2: Schema Management API
+@Stateless
+public class SchemaManagementExample {
+    
+    @PersistenceContext
+    private EntityManager em;
+    
+    public void manageSchema() {
+        // NEW in 3.2: SchemaManager for schema operations
+        SchemaManager schemaManager = em.getSchemaManager();
+        
+        // Create schema
+        schemaManager.create(false);  // false = don't drop existing
+        
+        // Validate schema
+        schemaManager.validate();
+        
+        // Truncate all tables (useful for testing)
+        schemaManager.truncate();
+        
+        // Drop schema
+        // schemaManager.drop();
+    }
+}
+
+// NEW in 3.2: Enum Mapping Enhancements with @EnumeratedValue
+public enum OrderStatus {
+
+    PENDING("P"),
+    CONFIRMED("C"),
+    SHIPPED("S"),
+    DELIVERED("D"),
+    CANCELLED("X");
+
+    @EnumeratedValue
+    private final String code;
+
+    OrderStatus(String code) {
+        this.code = code;
+    }
+
+    public String getCode() {
+        return code;
+    }
+}
+
+@Entity
+@Table(name = "orders")
+public class Order {
+    
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    
+    // NEW in 3.2: Custom enum mapping with @EnumeratedValue
+    @Enumerated(EnumType.STRING)
+    private OrderStatus status;  // Stored as "P", "C", "S", "D", "X" in database
+    
+    private Instant orderDate;
+    private Double total;
+    
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL)
+    private List<OrderItem> items;
+    
+    // Constructors, getters, setters
+}
+
+// NEW in 3.2: DDL Generation Enhancements
+@Entity
+@Table(name = "products",
+       comment = "Product catalog table",  // NEW in 3.2: Table comments
+       options = "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4")  // NEW in 3.2: Table options
+@CheckConstraint(name = "price_positive",
+                constraint = "price > 0")  // NEW in 3.2: Check constraints
+public class Product {
+    
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    
+    @Column(nullable = false, comment = "Product name")  // NEW in 3.2: Column comments
+    private String name;
+    
+    @Column(nullable = false)
+    @CheckConstraint(name = "price_range",
+                    constraint = "price BETWEEN 0.01 AND 999999.99")
+    private Double price;
+    
+    @Column(name = "created_at", precision = 6)  // NEW in 3.2: Second precision for timestamps
+    private Instant createdAt;
+    
+    @Column(name = "updated_at", precision = 6)
+    private Instant updatedAt;
+    
+    // Constructors, getters, setters
+}
+
+// NEW in 3.2: Named Query Factory Access
+@Stateless
+public class NamedQueryFactoryExample {
+    
+    @PersistenceContext
+    private EntityManager em;
+    
+    public void demonstrateNamedQueryFactory() {
+        // NEW in 3.2: Factory-based named query access
+        EntityManagerFactory emf = em.getEntityManagerFactory();
+        
+        // Get named query from factory
+        TypedQuery<Customer> query = emf.createNamedQuery("Customer.findByEmail", Customer.class);
+        query.setParameter("email", "user@example.com");
+        Customer customer = query.getSingleResultOrNull();
+        
+        // Get named entity graph from factory
+        EntityGraph<Customer> graph = emf.createEntityGraph(Customer.class);
+        graph.addAttributeNodes("orders", "address");
+        
+        // Use the graph in a query
+        List<Customer> customers = em.createQuery("SELECT c FROM Customer c", Customer.class)
+                                     .setHint("jakarta.persistence.fetchgraph", graph)
+                                     .getResultList();
+    }
+}
+----
+
+[#pages]
+=== Pages 4.0
+Jakarta Pages defines a template engine for web applications. This release removes deprecated code and provides updates necessary to align with changes in the Jakarta Servlet and Expression Language specifications.
+
+*New features and enhancements in Pages 4.0:*
+
+- *Enhanced ErrorData*: Updated link:https://jakarta.ee/specifications/pages/4.0/apidocs/jakarta.servlet.jsp/jakarta/servlet/jsp/errordata[`ErrorData`] to add support for new servlet error attributes:
+  - `jakarta.servlet.error.query_string` - Access the query string from error pages
+  - `jakarta.servlet.error.method` - Access the HTTP method from error pages
+
+*Removals and deprecations:*
+
+All code deprecated as of Jakarta Server Pages 3.1 has been removed:
+
+- *ELResolver methods*: Removed methods that override link:https://jakarta.ee/specifications/expression-language/6.0/apidocs/jakarta.el/jakarta/el/elresolver#getFeatureDescriptors()[`ELResolver.getFeatureDescriptors()`] as that method is removed in EL 6.0
+- *isThreadSafe directive*: Removed the `isThreadSafe` page directive attribute as the related Servlet API interface `SingleThreadModel` has been removed in Servlet 6.0
+- *jsp:plugin action*: Removed the `jsp:plugin` action and related actions as the associated HTML elements are no longer supported by any major browser
+- *JspException.getRootCause()*: Removed deprecated link:https://jakarta.ee/specifications/pages/3.1/apidocs/jakarta.servlet.jsp/jakarta/servlet/jsp/jspexception#getRootCause()[`JspException.getRootCause()`]method
+
+==== Enhanced Error Handling with ErrorData
+
+Jakarta Pages 4.0 adds new error attributes to link:https://jakarta.ee/specifications/pages/4.0/apidocs/jakarta.servlet.jsp/jakarta/servlet/jsp/errordata[`ErrorData`] for better error page diagnostics:
+
+[source,jsp]
+----
+<%@ page contentType="text/html;charset=UTF-8" language="java" isErrorPage="true" %>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Error Page - Jakarta Pages 4.0</title>
+</head>
+<body>
+    <h1>An Error Occurred</h1>
+    
+    <!-- Standard error attributes -->
+    <p><strong>Status Code:</strong> ${pageContext.errorData.statusCode}</p>
+    <p><strong>Request URI:</strong> ${pageContext.errorData.requestURI}</p>
+    <p><strong>Servlet Name:</strong> ${pageContext.errorData.servletName}</p>
+    
+    <!-- NEW in Pages 4.0: Access HTTP method that caused the error -->
+    <p><strong>HTTP Method:</strong> ${pageContext.request.getAttribute('jakarta.servlet.error.method')}</p>
+    
+    <!-- NEW in Pages 4.0: Access query string from the error request -->
+    <p><strong>Query String:</strong> ${pageContext.request.getAttribute('jakarta.servlet.error.query_string')}</p>
+    
+    <!-- Exception details if available -->
+    <c:if test="${not empty pageContext.errorData.throwable}">
+        <h2>Exception Details</h2>
+        <p><strong>Type:</strong> ${pageContext.errorData.throwable.class.name}</p>
+        <p><strong>Message:</strong> ${pageContext.errorData.throwable.message}</p>
+    </c:if>
+</body>
+</html>
+----
+
+
+[#websocket]
+=== WebSocket 2.2
+
+Jakarta WebSocket defines an API for Server and Client Endpoints for the WebSocket protocol (RFC6455). This release removes references to the SecurityManager and provides some minor updates and clarifications.
+
+*New features in WebSocket 2.2:*
+
+- *Clarified ping/pong responsibilities*: The specification now clearly defines the responsibilities for sending ping and pong messages between client and server
+- *New `getSession()` method*: Added `getSession()` method to `SendResult` class to retrieve the session associated with a send operation
+- *Clarified `maxMessageSize` behavior*: Clarified the behavior when `@OnMessage.maxMessageSize` is set to a value larger than `Integer.MAX_VALUE`
+
+*Removals:*
+
+- All references to the SecurityManager have been removed
+
+==== Using the new getSession() method in SendResult
+
+The new `getSession()` method allows you to retrieve the WebSocket session associated with a send operation, which is particularly useful when handling asynchronous message sending:
+
+[source,java]
+----
+import jakarta.websocket.*;
+import jakarta.websocket.server.ServerEndpoint;
+import jakarta.websocket.server.PathParam;
+import java.io.IOException;
+import java.util.Set;
+import java.util.concurrent.CopyOnWriteArraySet;
+import java.util.concurrent.Future;
+
+@ServerEndpoint("/notifications/{userId}")
+public class NotificationWebSocket {
+    
+    private static final Set<Session> sessions = new CopyOnWriteArraySet<>();
+    
+    @OnOpen
+    public void onOpen(Session session, @PathParam("userId") String userId) {
+        sessions.add(session);
+        session.getUserProperties().put("userId", userId);
+        System.out.println("User " + userId + " connected");
+    }
+    
+    @OnMessage
+    public void onMessage(String message, Session session) {
+        String userId = (String) session.getUserProperties().get("userId");
+        System.out.println("Received message from " + userId + ": " + message);
+        
+        // Echo the message back
+        sendAsyncMessage(session, "Echo: " + message);
+    }
+    
+    @OnClose
+    public void onClose(Session session, @PathParam("userId") String userId) {
+        sessions.remove(session);
+        System.out.println("User " + userId + " disconnected");
+    }
+    
+    @OnError
+    public void onError(Session session, Throwable throwable) {
+        System.err.println("WebSocket error: " + throwable.getMessage());
+        throwable.printStackTrace();
+    }
+    
+    // Demonstrates the new getSession() method in SendResult
+    private void sendAsyncMessage(Session session, String message) {
+        try {
+            RemoteEndpoint.Async asyncRemote = session.getAsyncRemote();
+            Future<Void> future = asyncRemote.sendText(message);
+            
+            // Add a callback to handle the send result
+            future.get(); // Wait for completion
+            
+            // In a real application, you might use a SendHandler instead
+            asyncRemote.sendText(message, new SendHandler() {
+                @Override
+                public void onResult(SendResult result) {
+                    // NEW in WebSocket 2.2: getSession() method
+                    Session resultSession = result.getSession();
+                    
+                    if (result.isOK()) {
+                        String userId = (String) resultSession.getUserProperties().get("userId");
+                        System.out.println("Message sent successfully to user: " + userId);
+                    } else {
+                        System.err.println("Failed to send message to session: " +
+                            resultSession.getId());
+                        System.err.println("Error: " + result.getException().getMessage());
+                    }
+                }
+            });
+        } catch (Exception e) {
+            System.err.println("Error sending async message: " + e.getMessage());
+        }
+    }
+    
+    // Broadcast message to all connected sessions
+    public void broadcastToAll(String message) {
+        sessions.forEach(session -> {
+            if (session.isOpen()) {
+                session.getAsyncRemote().sendText(message, new SendHandler() {
+                    @Override
+                    public void onResult(SendResult result) {
+                        // Use the new getSession() method to identify which session
+                        Session resultSession = result.getSession();
+                        if (!result.isOK()) {
+                            System.err.println("Failed to broadcast to session: " +
+                                resultSession.getId());
+                        }
+                    }
+                });
+            }
+        });
+    }
+}
+----
+
+==== Ping/Pong Message Handling
+
+WebSocket 2.2 clarifies the responsibilities for ping and pong messages:
+
+[source,java]
+----
+import jakarta.websocket.*;
+import jakarta.websocket.server.ServerEndpoint;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+
+@ServerEndpoint("/ping-pong")
+public class PingPongWebSocket {
+    
+    @OnOpen
+    public void onOpen(Session session) {
+        System.out.println("WebSocket opened: " + session.getId());
+        
+        // Send a ping message to the client
+        try {
+            session.getBasicRemote().sendPing(ByteBuffer.wrap("ping".getBytes()));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+    
+    @OnMessage
+    public void onPongMessage(PongMessage pong, Session session) {
+        // Handle pong messages received from the client
+        ByteBuffer data = pong.getApplicationData();
+        byte[] bytes = new byte[data.remaining()];
+        data.get(bytes);
+        String pongData = new String(bytes);
+        
+        System.out.println("Received pong from " + session.getId() + ": " + pongData);
+    }
+    
+    @OnMessage
+    public void onTextMessage(String message, Session session) {
+        System.out.println("Received text message: " + message);
+        
+        // Send a pong message in response
+        try {
+            session.getBasicRemote().sendPong(ByteBuffer.wrap("pong".getBytes()));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+    
+    @OnClose
+    public void onClose(Session session) {
+        System.out.println("WebSocket closed: " + session.getId());
+    }
+    
+    @OnError
+    public void onError(Session session, Throwable throwable) {
+        System.err.println("WebSocket error: " + throwable.getMessage());
+    }
+}
+----
+
+[#validation]
+=== Validation 3.1
+
+Jakarta Validation defines a metadata model and API for JavaBean and method validation. This release has clarified support for Records introduced by JEP 395.
+
+*Key changes in Validation 3.1:*
+
+- Clarify Java Records support for validation
+- Update dependencies for Jakarta EE 11
+- No removals, deprecations, or backwards incompatible changes
+
+[source,java]
+----
+import jakarta.validation.constraints.*;
+import jakarta.validation.Constraint;
+import jakarta.validation.ConstraintValidator;
+import jakarta.validation.ConstraintValidatorContext;
+import jakarta.validation.Payload;
+import jakarta.validation.Valid;
+import jakarta.validation.Validator;
+import jakarta.validation.ConstraintViolation;
+import jakarta.inject.Inject;
+import jakarta.ws.rs.*;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+import java.lang.annotation.*;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+// NEW in 3.1: Java Record with validation support
+public record UserProfile(
+    @NotNull(message = "Username is required")
+    @Size(min = 3, max = 20, message = "Username must be between 3 and 20 characters")
+    @Pattern(regexp = "^[a-zA-Z0-9_]+$", message = "Username can only contain letters, numbers, and underscores")
+    String username,
+    
+    @NotNull(message = "Email is required")
+    @Email(message = "Invalid email format")
+    String email,
+    
+    @NotNull(message = "Age is required")
+    @Min(value = 18, message = "Must be at least 18 years old")
+    @Max(value = 120, message = "Age must be realistic")
+    Integer age
+) {}
+
+// Traditional class with validation
+public class UserRegistration {
+    
+    @NotNull(message = "Username is required")
+    @Size(min = 3, max = 20, message = "Username must be between 3 and 20 characters")
+    @Pattern(regexp = "^[a-zA-Z0-9_]+$", message = "Username can only contain letters, numbers, and underscores")
+    private String username;
+    
+    @NotNull(message = "Email is required")
+    @Email(message = "Invalid email format")
+    private String email;
+    
+    @NotNull(message = "Password is required")
+    @Size(min = 8, message = "Password must be at least 8 characters")
+    @StrongPassword
+    private String password;
+    
+    @NotNull(message = "Age is required")
+    @Min(value = 18, message = "Must be at least 18 years old")
+    @Max(value = 120, message = "Age must be realistic")
+    private Integer age;
+    
+    @Future(message = "Subscription end date must be in the future")
+    private LocalDate subscriptionEndDate;
+    
+    // Getters and setters
+}
+
+// Custom validation annotation
+@Target({ElementType.FIELD, ElementType.PARAMETER})
+@Retention(RetentionPolicy.RUNTIME)
+@Constraint(validatedBy = StrongPasswordValidator.class)
+@Documented
+public @interface StrongPassword {
+    String message() default "Password must contain at least one uppercase letter, one lowercase letter, one digit, and one special character";
+    Class<?>[] groups() default {};
+    Class<? extends Payload>[] payload() default {};
+}
+
+// Custom validator implementation
+public class StrongPasswordValidator 
+        implements ConstraintValidator<StrongPassword, String> {
+    
+    @Override
+    public boolean isValid(String password, ConstraintValidatorContext context) {
+        if (password == null) {
+            return false;
+        }
+        
+        boolean hasUppercase = password.chars().anyMatch(Character::isUpperCase);
+        boolean hasLowercase = password.chars().anyMatch(Character::isLowerCase);
+        boolean hasDigit = password.chars().anyMatch(Character::isDigit);
+        boolean hasSpecial = password.chars()
+            .anyMatch(ch -> "!@#$%^&*()_+-=[]{}|;:,.<>?".indexOf(ch) >= 0);
+        
+        return hasUppercase && hasLowercase && hasDigit && hasSpecial;
+    }
+}
+
+// Using validation in a REST endpoint
+@Path("/users")
+public class UserResource {
+    
+    @Inject
+    private Validator validator;
+    
+    @POST
+    @Path("/register")
+    @Consumes(MediaType.APPLICATION_JSON)
+    public Response registerUser(@Valid UserRegistration user) {
+        // Validation happens automatically via @Valid
+        // If validation fails, a ConstraintViolationException is thrown
+        
+        // Process registration
+        return Response.status(Response.Status.CREATED)
+                      .entity("User registered successfully")
+                      .build();
+    }
+    
+    // Manual validation example
+    @POST
+    @Path("/validate")
+    @Consumes(MediaType.APPLICATION_JSON)
+    public Response validateUser(UserRegistration user) {
+        Set<ConstraintViolation<UserRegistration>> violations = 
+            validator.validate(user);
+        
+        if (!violations.isEmpty()) {
+            List<String> errors = violations.stream()
+                .map(ConstraintViolation::getMessage)
+                .collect(Collectors.toList());
+            
+            return Response.status(Response.Status.BAD_REQUEST)
+                          .entity(errors)
+                          .build();
+        }
+        
+        return Response.ok("Validation passed").build();
+    }
+}
+----
+
+== Getting Started with Jakarta EE 11 on Open Liberty
+
+To use Jakarta EE 11 features in Open Liberty 26.0.0.5, you can enable the Jakarta EE 11 Platform feature in your `server.xml`:
+
+[source,xml]
+----
+<server>
+    <featureManager>
+        <feature>jakartaee-11.0</feature>
+    </featureManager>
+    
+    ...
+</server>
+----
+
+
+You can also enable individual features as needed:
+
+[source,xml]
+----
+<featureManager>
+    <platform>jakartaee-11.0</platform>
+    <feature>servlet</feature>
+    <feature>cdi</feature>
+    <feature>persistence</feature>
+    <feature>faces</feature>
+    <feature>data</feature>
+    <feature>websocket</feature>
+    <feature>validation</feature>
+</featureManager>
+----
+
+=== Maven Dependencies
+
+Add Jakarta EE 11 dependencies to your `pom.xml`:
+
+[source,xml]
+----
+<dependencies>
+    <!-- Jakarta EE 11 API -->
+    <dependency>
+        <groupId>jakarta.platform</groupId>
+        <artifactId>jakarta.jakartaee-api</artifactId>
+        <version>11.0.0</version>
+        <scope>provided</scope>
+    </dependency>
+    
+    <!-- Jakarta Data (if using separately) -->
+    <dependency>
+        <groupId>jakarta.data</groupId>
+        <artifactId>jakarta.data-api</artifactId>
+        <version>1.0.0</version>
+        <scope>provided</scope>
+    </dependency>
+</dependencies>
+----
+
+Check out link:{url-prefix}/blog/2026/05/19/26.0.0.5.html[26.0.0.5 blog] to learn more on the full details of Jakarta EE 11 on Open Liberty 26.0.0.5.
+
+== Integration with MicroProfile
+
+This Open Liberty release provides a great ecosystem of enabling Jakarta EE 11 working with MicroProfile 7.0 and 7.1, allowing you to take advantage of the latest microservices features. You can enable MicroProfile and Jakarta EE 11 features in your `server.xml` as needed:  
+[source,xml]
+----
+<featureManager>
+    <feature>microprofile-7.1</feature>
+    <feature>jakartaee-11.0</feature>
+</featureManager>
+
+----
+    
+== Spring Boot 4.0 
+
+Open Liberty also enables Spring Boot 4.0 applications, allowing you to leverage the latest features and improvements in the Jakarta EE 11 release. You can enable the Spring Boot 4.0 feature in your `server.xml`:
+[source,xml]
+----
+<featureManager>
+    <feature>springBoot-4.0</feature>
+    <feature>servlet-6.1</feature>
+</featureManager>
+----
+
+== Migration Considerations
+
+When migrating from Jakarta EE 10 to Jakarta EE 11, review the updated specifications to understand the changes and enhancements. Most applications should migrate smoothly, but it's important to test thoroughly, especially if you're using features that have been updated.
+
+Key areas to review:
+
+- *Jakarta Data 1.0*: Consider migrating existing DAO/repository code to Jakarta Data for improved productivity and reduced boilerplate
+- *Annotations 3.0*: Migrate from `@ManagedBean` to CDI beans
+- *Authentication 3.1*: Remove any SecurityManager dependencies from authentication modules
+- *Authorization 3.0*: Switch to use the new `PolicyFactory` and `Policy` interfaces for your authorization modules
+- *CDI 4.1*: Review dependency injection configurations, especially if using custom interceptors or producers
+- *Servlet 6.1*: Remove any SecurityManager dependencies; test redirect handling and error dispatches
+- *Persistence 3.2*: Leverage Java records for embeddable types; update queries to use new operators; test java.time types
+- *Validation 3.1*: Leverage Java Records for validated data structures
+- *Concurrency 3.1*: Test async operations, especially if using Java 21 Virtual Threads
+
+
+== Conclusion
+
+Jakarta EE 11 in Open Liberty 26.0.0.5 represents a significant advancement in enterprise Java development. The introduction of Jakarta Data 1.0 alone is a game-changer, dramatically reducing boilerplate code and improving developer productivity. Combined with updates across all major specifications, enhanced performance through Java 21 support, and a comprehensive set of modern APIs, Jakarta EE 11 provides a solid foundation for building cloud-native enterprise applications.
+
+The combination of Open Liberty's lightweight, fast runtime and Jakarta EE 11's powerful features makes this an excellent choice for organizations looking to modernize their enterprise Java applications while maintaining compatibility with industry standards.
+
+What's more? Jakarta EE 11 also works with MicroProfile 7.0 and 7.1 in Open Liberty, allowing you to take advantage of the latest microservices features alongside the core Jakarta EE platform. Whether you're building new applications or migrating existing ones, Open Liberty and Jakarta EE 11 provide the tools and capabilities you need to succeed in today's fast-paced development environment.
+
+If you are using Spring Boot, Open Liberty 26.0.0.5 and later release also enables you to use Spring Boot 4.0 with Jakarta EE 11 features, providing even more flexibility in how you build your applications.
+
+== Acknowledgements
+
+Many thanks to the Jakarta EE community for their hard work in bringing Jakarta EE 11 to life and to the Open Liberty teams for ensuring it runs smoothly on Open Liberty. The contributions from the community, including feedback, testing, and code contributions, have been invaluable in making this release a success. I also want to thank my colleagues in the Open Liberty team who provided valuable feedback to this blog: Andrew Rouse, Anija K A, David Webster, Jared Anderson, Nathan Rauh, Paul Nicolucci, Mark Swatosh, Kyle Aure, Jim Krueger, Neena P Jacob, Volodymyr Siedlecki, Phu Dinh and many others.
+
+== Learn More
+
+- link:https://jakarta.ee/specifications/platform/11/[Jakarta EE 11 Specifications]
+- link:https://jakarta.ee/specifications/data/1.0/[Jakarta Data Specification]
+- link:https://jakarta.ee/community/[Jakarta EE Community]
+- link:https://openliberty.io/docs/[Open Liberty Documentation]
+- link:https://github.com/OpenLiberty/open-liberty[Open Liberty GitHub]
+
+---
+
+*Open Liberty is an open-source, lightweight, and fast Java runtime that implements Jakarta EE and MicroProfile specifications. It's designed for cloud-native applications and provides a flexible, modular architecture that allows you to use only the features you need.*
+
+// // // // // // // //
+// LINKS
+//
+// OpenLiberty.io site links:
+// link:/guides/microprofile-rest-client.html[Consuming RESTful Java microservices]
+// 
+// Off-site links:
+// link:https://openapi-generator.tech/docs/installation#jar[Download Instructions]
+//
+// // // // // // // //
