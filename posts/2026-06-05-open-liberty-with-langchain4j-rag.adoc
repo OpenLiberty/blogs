@@ -51,9 +51,9 @@ Siaa G <https://github.com/SiaaG-dev>
 
 Artificial Intelligence (AI) and generative AI have significantly impacted the economy and transformed how businesses operate. Generative AI uses Large Language Models (LLMs) to generate text through probabilistic methods. These models are often trained on historical data, and the training data may lack domain-specific or specialized knowledge. To address this limitation, Retrieval-Augmented Generation (RAG) can be used to provide relevant and up-to-date information efficiently and effectively. The data used in RAG can come from various sources, including websites, vector databases, and images. As a result, multiple forms of RAG have emerged. For example, multimodal RAG works with different types of unstructured data, such as text and images, while Graph RAG uses knowledge graphs as the information source.
 
-This post demonstrates how to build a RAG application using LangChain4j to connect to AI provider models and store textual data in a MongoDB Atlas database. In this sample application, a local MongoDB Atlas deployment is used, although the database can also be connected through other methods, such as a cloud connection string.
+This post demonstrates how to build a RAG application using LangChain4j to connect to AI provider models and store textual data in a MongoDB Atlas database. In this sample application, a local MongoDB Atlas deployment is used.
 This example also uses a vector database. Vector databases play an important role in developing a wide range of use cases, including natural language search and recommendation systems.
-MongoDB Atlas Vector Search provides unified data storage by keeping vector and operational data in one place, an efficient hybrid search mechanism that combines vector search with full-text search for metadata, and powerful aggregation pipelines. Additionally, MongoDB Atlas scales vector search independently from the core database, improving performance for production-heavy workloads.
+Moreover, MongoDB Atlas Vector Search provides the option for hybrid search mechanism that combines vector search with full-text search. Additionally, MongoDB Atlas scales vector search independently from the core database which can help with performance in production environments.
 
 * <<what_is_RAG, Find out how RAG works>>
 * <<tryout, Try out the RAG with JakartaEE and MicroProfile as an application>>
@@ -61,17 +61,17 @@ MongoDB Atlas Vector Search provides unified data storage by keeping vector and 
 
 [#what_is_RAG]
 == What is Retrieval Augmented Generation (RAG)? 
-Retrieval Augmented Generation (RAG) is an approach that the application uses to generate consistent, and relevant information from a model without the need to retrain a model which can become expensive and time-consuming. Without RAG, the LLM limits to general or outdated information rather than showing relevant domain specific information. 
+Retrieval Augmented Generation (RAG) is an architectural approach that combines information retrieval with generative AI to deliver accurate and context-aware responses while avoiding costly retraining. Without RAG, an LLM is limited to the information available during training and cannot reliably access proprietary business knowledge, including internal policies of a company, processes, and domain-specific documentation.
 There are different RAG techniques such as naive, advanced, and modular RAG. To learn more, visit https://www.ibm.com/think/topics/rag-techniques[RAG techniques] or https://docs.langchain4j.dev/tutorials/rag/[LangChain4j tutorials]. The focus of this tutorial is to learn the technique of data retrieval from the vector database. +
 
 This sample application contains two demonstrations. The vertical flow of the architecture diagram illustrates management of the database; this will be the first demonstration. Likewise, the horizontal flow of the architecture diagram depicts inference or data retrieval from database to LLM; this will be the second demonstration. + 
 
 In the vertical flow, the first step is to process and store the content as embeddings (vectors) inside the database. Each embedding corresponds to some text data. +
 
-The horizontal flow starts when the user sends a message to the LLM. Upon the user query, the query is converted to an embedding. The query embedding and the knowledge base embeddings are compared; similar database embeddings are obtained from vector search and their respective content is obtained.
-The similar content (from the knowledge base) is appended to the user query. This becomes the augmented message sent to the LLM. The LLM now gains access to the relevant content from the knowledge base and is able to generate a specific response based on the information.
+The horizontal flow starts when the user sends a message to the AI application. Upon the user query, the query is converted to an embedding; notice the `user message embedding` on the diagram. The query embedding and the knowledge base embeddings are compared, as shown in the interaction between the `vector search` block and the `database`. Similar database embeddings are obtained from the `vector search` block output and their respective content is obtained, as shown in the circled `list of similar content`.
+Following the arrow direction in the figure, the similar content (from the knowledge base) is appended to the user query. This becomes the augmented message sent to the Chat Agent which is responsible for calling the LLM. The LLM now gains access to the relevant content from the knowledge base and can generate a specific response based on the information.
 
-The sample RAG application consists of two parts: the OpenAPI UI where the API requests can be made to manage the vector database and the data retrieval phase that occurs when using the chat application.
+Note that sample RAG application consists of two parts: the OpenAPI UI where the API requests can be made to manage the vector database (vertical flow in the figure) and the data retrieval phase that occurs when using the chat application (horizontal flow in the figure).
 
 image::/img/blog/sample-langchain4j-rag-diagram.png[Diagram of How RAG Works,width=70%,align="center"] 
 
@@ -96,27 +96,27 @@ To try out the sample application using your own knowledge base, check out this 
 === Prerequisites
 Before you clone and run the sample application, make sure to install the following: +
 
-* https://git-scm.com/book/en/v2/Getting-Started-Installing-Git[Git] to access the repository remotely
+1. https://git-scm.com/book/en/v2/Getting-Started-Installing-Git[Git] to access the repository remotely
 
-* https://developer.ibm.com/languages/java/semeru-runtimes/downloads[Java 21 IBM Semeru Runtime]
+2. https://developer.ibm.com/languages/java/semeru-runtimes/downloads[Java 21 IBM Semeru Runtime]
 
 ** Ensure that `JAVA_HOME` environment variable is set: `export JAVA_HOME=<your Java 21 home path>`
 
-* Embedding Model
+3. Embedding Model
 
 ** Download and install https://ollama.com/download[Ollama].
 
 ** Pull the following embedding model: `ollama pull nomic-embed-text`
 
-** Ensure that Ollama is running successfully: curl http://localhost:11434
+** Ensure that Ollama is running: curl http://localhost:11434
 
-* Ensure that the provided `ENCRYPTION_KEY` environment variable is set: `export ENCRYPTION_KEY=customEncryptionKey1`
+4. The encryption key for this sample application is required for Liberty to decrypt the `mongo.pass.encoded`. Ensure that the provided `ENCRYPTION_KEY` environment variable is set: `export ENCRYPTION_KEY=customEncryptionKey1`
 
-* LLM Provider: Chat Model
+5. LLM Provider: Chat Model
 
 ** The application can use a variety of chat model providers. You can choose any of them and follow their instructions: <<github_setup, GitHub>>, <<ollama_setup, Ollama>>, <<mistral_setup, Mistral>>.
 
-* https://www.docker.com/get-started/[Docker]
+6. https://www.docker.com/get-started/[Docker]
 
 ** Follow the instructions in the official https://docs.docker.com/engine/installation[Docker documentation] to install Docker, and setup your Docker environment. This tutorial runs an instance of MongoDB Atlas using Docker. For more information about the `mongodb/mongodb-atlas-local` image, see https://hub.docker.com/r/mongodb/mongodb-atlas-local[mongodb/mongodb-atlas-local] in Docker Hub.
 
@@ -126,7 +126,7 @@ Before you clone and run the sample application, make sure to install the follow
 ==== GitHub
 1. Sign up and sign in to https://github.com
 2. Go to your https://github.com/settings/tokens[Personal access tokens]
-3. Generate a new token with the `models` account permission
+3. Generate a new fine-grained personal access token. You will need to add the `Models` read-only permission.
 4. Set the GitHub key environment variable:
      * `export GITHUB_API_KEY=<your GitHub API token>` or `set GITHUB_API_KEY=<your GitHub API token>`
 
@@ -197,7 +197,6 @@ When you see the following message, the application is ready:
 [#access_app]
 === Access the application
 
-Ensure that one of the following model providers are used: GitHub, Ollama or MistralAI.
 Once the application has started, experiment with the chat application at http://localhost:9081/ as shown below by trying out different prompts and http://localhost:9081/openapi/ui/ by trying out different requests.
 Detailed instructions are found in the https://github.com/OpenLiberty/sample-langchain4j/blob/main/rag-db/README.md[README]. 
 
@@ -270,7 +269,7 @@ services:
       - 27017:27017
 ----
 
-Inside the https://github.com/OpenLiberty/sample-langchain4j/tree/main/rag-db/src/main/java/io/openliberty/sample/langchain4j/mongo[mongo] directory, `MongoProducer` class produces a `MongoDatabase` object that is used in other classes, and https://github.com/OpenLiberty/sample-langchain4j/blob/main/rag-db/src/main/java/io/openliberty/sample/langchain4j/mongo/AtlasMongoDB.java[AtlasMongoDB.java] file contains methods to create search indexes, retrieve similar content, remove, update, or delete the database contents.
+Inside the https://github.com/OpenLiberty/sample-langchain4j/tree/main/rag-db/src/main/java/io/openliberty/sample/langchain4j/mongo[mongo] directory, https://github.com/OpenLiberty/sample-langchain4j/blob/main/rag-db/src/main/java/io/openliberty/sample/langchain4j/mongo/MongoProducer.java[`MongoProducer`]  class produces a `MongoDatabase` object that is used in other classes, and https://github.com/OpenLiberty/sample-langchain4j/blob/main/rag-db/src/main/java/io/openliberty/sample/langchain4j/mongo/AtlasMongoDB.java[AtlasMongoDB.java] file contains methods to create search indexes, retrieve similar content, remove, update, or delete the database contents.
 
 In https://github.com/OpenLiberty/sample-langchain4j/blob/main/rag-db/src/main/java/io/openliberty/sample/langchain4j/mongo/MongoProducer.java[MongoProducer.java], various configuration properties information is injected from the `microprofile-config.properties`. 
 
@@ -333,17 +332,17 @@ public class EmbeddingApplication extends Application {
 
 You can explore the REST APIs that are available on http://localhost:9081/openapi/ui/.
 This tutorial explores the two different POST requests: one request adds a document with summary and content while the other initializes the database with the knowledge base.
-Moreover, this post further elucidates how the PUT and the DELETE request are implemented. 
+Moreover, this post further elucidates how the PUT and the DELETE requests are implemented. 
 
-The https://github.com/OpenLiberty/sample-langchain4j/blob/main/rag-db/src/main/java/io/openliberty/sample/langchain4j/EmbeddingService.java#L75-L110[EmbeddingService.java] implements various REST APIs upon request at the application path `/embedding`.
-Additionally, the `AtlasMongoDB` class provides relevant functions such as creating search indexes, or retrieving similar content that is used by the `EmbeddingService` class.
+The https://github.com/OpenLiberty/sample-langchain4j/blob/main/rag-db/src/main/java/io/openliberty/sample/langchain4j/EmbeddingService.java#L75-L110[EmbeddingService.java] implements various REST APIs at the application path `/embedding`.
+Additionally, the https://github.com/OpenLiberty/sample-langchain4j/blob/main/rag-db/src/main/java/io/openliberty/sample/langchain4j/mongo/AtlasMongoDB.java[`AtlasMongoDB`]  class provides relevant functions such as creating search indexes, or retrieving similar content that is used by the https://github.com/OpenLiberty/sample-langchain4j/blob/main/rag-db/src/main/java/io/openliberty/sample/langchain4j/EmbeddingService.java[`EmbeddingService`] class.
 
 ==== POST request at /api/embedding
 
 After the user inputs their own summary and content for the POST request, the method below is invoked. 
 
 A new BSON `Document` object is created and contains three keys: "Summary", "Content", and "Vector" with their respective values. The content entered by the user is converted to a vector using LangChain4j APIs such as `embed`, `content`, and `vector`. 
-The `insertOne` method then inserts this `Document` object for the existing collection.
+The `insertOne` method then inserts this `Document` object into the existing collection.
 To explore how the `insertOne` method works, visit https://github.com/OpenLiberty/sample-langchain4j/blob/main/rag-db/src/main/java/io/openliberty/sample/langchain4j/mongo/AtlasMongoDB.java#L101-L103[AtlasMongoDB.java].
 
 [source]
@@ -470,11 +469,11 @@ The https://github.com/OpenLiberty/sample-langchain4j/blob/main/rag-db/src/main/
 === Retrieving data from the vector database
 
 In the first step, the user interacts with the RAG Chat Application.
-The `ChatService` class controls what happens upon any action on the http://localhost:9081/.
+The https://github.com/OpenLiberty/sample-langchain4j/blob/main/rag-db/src/main/java/io/openliberty/sample/langchain4j/ChatService.java[`ChatService`]  class controls what happens upon any action on the http://localhost:9081/.
 
 When a message is sent by the user, the `onMessage()` function is executed. 
 The user query is converted to an embedding vector which is a `List<Float>`. 
-Then the `retrieveContent`, method of `AtlasMongoDB` class, performs the vector search and returns 
+Then the `retrieveContent`, method of https://github.com/OpenLiberty/sample-langchain4j/blob/main/rag-db/src/main/java/io/openliberty/sample/langchain4j/mongo/AtlasMongoDB.java[`AtlasMongoDB`]  class, performs the vector search and returns 
 the text segments that are similar to the user query. 
 
 The message is appended with these results and sent to the AI using the `agent.chat(sessionId, message)`;
@@ -532,15 +531,7 @@ A few advantages for using RAG in an AI powered application include:
 * **Increased context understanding** - Relevant answers based on context compared to regular search mechanisms
 * **Efficient in terms of time and cost** - RAG provides an easy way to get relevant answers which is time and cost effective compared to training large models on proprietary information.
 * **Hallucination reduction** - With more information provided to the LLM, the AI is better equipped to generate accurate and reliable content. 
-* **Saves manual effort** - Productivity is increased as the user does not need to search the entire knowledge base and then provide the information to the LLM. Instead, the relevant information is automatically searched based on the context and provided to the LLM for efficient retrieval.
 * **Customized response** - Control the response based on industry or domain-specific information
-
-Several approaches that can be taken to extend this sample application include: 
-
-* Developing a hybrid search approach such as vector search combined with a full text based search to improve search results
-* Enhancing the pre-retrieval stages to rewrite the query optimally or compressing the documents so that only the most relevant information is sent to the LLM
-* Implementing a Graph RAG to understand relationships between more interconnected context
-* Developing Agentic RAG with multi-step reasoning 
 
 As various versions of RAG evolve with even more capabilities, context-aware insights in intelligent AI applications open the horizon for enriching the quality of AI generated responses.
 
