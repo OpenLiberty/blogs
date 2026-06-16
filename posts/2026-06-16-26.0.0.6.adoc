@@ -206,59 +206,11 @@ We’ve spent some time fixing bugs. The following sections describe the issues 
 * link:https://github.com/OpenLiberty/open-liberty/issues/34857[FFDC for AlreadyBound exception in EJBRemoteRuntimeImpl during application start]
 * link:https://github.com/OpenLiberty/open-liberty/issues/34802[fix AES encryption issues with featureUtility]
 * link:https://github.com/OpenLiberty/open-liberty/issues/34773[java9.options not loaded on Windows when JAVA_HOME not set]
-+
-On Windows, the server.bat script fails to load java9.options (and java24.options) when JAVA_HOME is not explicitly set, even though Java can be successfully located via JRE_HOME or WLP_DEFAULT_JAVA_HOME environment variables. The script uses these variables to find and execute the java binary, but never sets JAVA_HOME from them. Without JAVA_HOME set, the Java version detection logic (lines 768-795) cannot locate the release file or lib\modules directory, preventing java9.options from being loaded.
-+
-This results in missing critical JVM options like --add-opens and --add-exports that are required for Java 9+ module system compatibility, potentially causing module access errors at runtime.
-
 * link:https://github.com/OpenLiberty/open-liberty/issues/34573[io.openliberty.mpTelemetry.2.0.thirdparty is missing metric APIs (and a few others). Similarly for the stable io.openliberty.io.opentelemetry.2.1 jar]
-+
-The Bundle `io.openliberty.mpTelemetry.2.0.thirdparty` does not export metric APIs (and a few others packages) as defined by the `io.openliberty.mpTelemetry-2.0` feature file.
-+
-During runtime, these are however, are loaded and made available via the  `io.openliberty.io.opentelemetry.2.0` jar/bundle.
-+
-The stable `io.openliberty.io.opentelemetry.2.1` jar is also impacted.
-
 * link:https://github.com/OpenLiberty/open-liberty/issues/34288[An NPE occurs in the TCP Channel Layer during Socket read due to a race condition seen in HTTP/2 connections]
-+
-HTTP/2's multiplexing allows concurrent read operations on the same TCP connection. The NPE occurs due to a race condition in concurrent buffer management during HTTP/2 operations.
-+
-Thread A gets buffer reference to do a TCP read. +
-Thread B concurrently executes cleanup logic when an immediate read.returns 0 bytes and releases JIT-allocated buffers. +
-Thread A proceeds to do a read with stale reference, causing NPE
-
 * link:https://github.com/OpenLiberty/open-liberty/issues/33515[A race condition in SocketRWChannelSelector causes CancelledKeyException]
-+
-Unhandled CancelledKeyException occurs in `SocketRWChannelSelector.updateSelector()` when updating SelectionKey interest operations.
-+
-java.nio.channels.CancelledKeyException
-+
-** at java.base/sun.nio.ch.SelectionKeyImpl.ensureValid(SelectionKeyImpl.java:75) +
-** at java.base/sun.nio.ch.SelectionKeyImpl.interestOps(SelectionKeyImpl.java:104) +
-** at com.ibm.ws.tcpchannel.internal.SocketRWChannelSelector.updateSelector(SocketRWChannelSelector.java:258) +
-** at com.ibm.ws.tcpchannel.internal.ChannelSelector.run(ChannelSelector.java:272) +
-** at java.base/java.lang.Thread.run(Thread.java:1474)
-
 * link:https://github.com/OpenLiberty/open-liberty/issues/31630[HTTP/2 Intermittent server quiesce failure when the same connection stream is attempted to be closed multiple threads]
-+
-Intermittent warnings are seen on the server during quiesce when multiple threads concurrently tries to close the same connection.
-+
-Thread A: calls `close()` on a connection. +
-Thread B: calls `close()` on the same connection. +
-Thread A: executes `close()` and cleans up the connection and decrements the number of active connections. +
-Thread B: executes `close()` but throws a 'Null Pointer Exception' because the connection was already closed but still decrements the active connections counter and as a result the counter decremented twice for same connection.
-+
-The active connection not being 0 causes a prorblem during the quiesce operation and thus causes the warning we see:
-+
-** CWWKE1102W: The quiesce operation did not complete. The server will now stop. +
-** CWWKE1106W: 1 shutdown operations did not complete during the quiesce period.
-
-
 * link:https://github.com/OpenLiberty/open-liberty/issues/30564[WINDOWS_SERVICE_STOP_TIMEOUT not used in stop command for Windows Service]
-+
-On Windows, there is a 'server registerWinService <SERVER_NAME>' command that adds the Liberty server to the registry along with commands to start and stop the server. The registered "server stop" command does not have the --timeout option, which means it always uses the default timeout of 30 seconds. This problem only applies to stopping the services using Windows Services interface. If stopping the service using the "server stopWinService" command, the server script polls, correctly waiting for the server to stop using the environment variable, WINDOWS_SERVICE_STOP_TIMEOUT.
-+
-So even though there is a --timeout option on the server stop command, allowing you to set a longer wait for the server to stop, that option was omitted from the windows service registration. If you use Windows Services interface to stop the server, the option is not available to you.
 
 // // // // // // // //
 // In the preceding section:
