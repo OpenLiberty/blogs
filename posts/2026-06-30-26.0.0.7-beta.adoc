@@ -1,17 +1,17 @@
 ---
 layout: post
-title: "Netty‑based HTTP transport in 26.0.0.7-beta"
+title: "Jakarta Data 1.1 Beta Features and MicroProfile Health Endpoint Controls in 26.0.0.7-beta"
 # Do NOT change the categories section
 categories: blog
 author_picture: https://avatars3.githubusercontent.com/navaneethsnair1
 author_github: https://github.com/navaneethsnair1
-seo-title: "Netty‑based HTTP transport in 26.0.0.7-beta - OpenLiberty.io"
+seo-title: "Jakarta Data 1.1 Beta Features and MicroProfile Health Endpoint Controls in 26.0.0.7-beta - OpenLiberty.io"
 seo-description: This beta introduces new Jakarta Data 1.1 beta capabilities, including stateful repositories, enhanced query restrictions, and the @First annotation. It also adds configuration-based control over MicroProfile Health REST endpoints when file-based health checks are enabled.
 blog_description: This beta introduces new Jakarta Data 1.1 beta capabilities, including stateful repositories, enhanced query restrictions, and the @First annotation. It also adds configuration-based control over MicroProfile Health REST endpoints when file-based health checks are enabled.
 open-graph-image: https://openliberty.io/img/twitter_card.jpg
 open-graph-image-alt: Open Liberty Logo
 ---
-= Netty‑based HTTP transport in 26.0.0.7-beta
+= Jakarta Data 1.1 Beta Features and MicroProfile Health Endpoint Controls in 26.0.0.7-beta
 Navaneeth S Nair <https://github.com/navaneethsnair1>
 :imagesdir: /
 :url-prefix:
@@ -28,7 +28,7 @@ This beta introduces new Jakarta Data 1.1 beta capabilities, including stateful 
 // // // // // // // //
 The link:{url-about}[Open Liberty] 26.0.0.7-beta includes the following beta features (along with link:{url-prefix}/docs/latest/reference/feature/feature-overview.html[all GA features]):
 
-* <<jakarta_data, Preview of some Jakarta Data 1.1 M3 capability>>
+* <<jakarta_data, Preview of some Jakarta Data 1.1 M3 capabilities>>
 * <<mpHealth_4_0, Disabling mpHealth-4.0 REST endpoints when file-based health checks are enabled>>
 
 // // // // // // // //
@@ -47,22 +47,36 @@ See also link:{url-prefix}/blog/?search=beta&key=tag[previous Open Liberty beta 
 // Contact/Reviewer: njr-11
 // // // // // // // // 
 [#jakarta_data]
-== Preview of some Jakarta Data 1.1 M3 capability
+== Preview of some Jakarta Data 1.1 M3 capabilities
 
-The beta release previews some new capability at the Jakarta Data 1.1 Milestone 3 level: stateful repositories, the `@First` annotation, `Restriction` parameters on repository `@Find` and `@Delete` methods, `Constraint` subtype parameters on repository `@Find` and `@Delete` methods. Also included in prior betas are: retrieving a subset or projection of entity attributes and the `@Is` annotation.
+The beta release previews some new capabilities at the Jakarta Data 1.1 Milestone 3 level:
 
-Previously, parameter-based `@Find` and `@Delete` methods had no way to filter on conditions other than equality. This limitation can now be overcome by typing the repository method parameter with a Constraint subtype or indicating the Constraint subtype by using the `@Is` annotation. Or, the repository method can include a special parameter of type `Restriction`, and the application can supply one or more restrictions at run time when it starts the repository method. Also, before this point, all Jakarta Data repositories were stateless, in that they operate without externalizing a persistence context to the application. Now, you can define a repository as stateful by using the repository lifecycle method annotations in the `jakarta.data.repository.stateful` package, and the repository operates with a persistence context. Also, repository `Find` methods cannot enforce returning only the first result or the first few results. That capability is now available with the `First` annotation.
+* Stateful repositories
+* The `@First` annotation
+* `Restriction` parameters on repository `@Find` and `@Delete` methods
+* `Constraint` subtype parameters on repository `@Find` and `@Delete` methods
+
+Also included in prior betas are:
+
+* Retrieving a subset or projection of entity attributes
+* The `@Is` annotation
+
+Previously, parameter-based `@Find` and `@Delete` methods had no way to filter on conditions other than equality. This limitation can now be overcome by typing the repository method parameter with a Constraint subtype or by indicating the Constraint subtype using the `@Is` annotation. Alternatively, the repository method can include a special parameter of type `Restriction`, allowing the application to supply one or more restrictions at run time when it invokes the repository method.
+
+Prior to this release, all Jakarta Data repositories were stateless, operating without externalizing a persistence context to the application. Now, you can define a repository as stateful by using the repository lifecycle method annotations in the `jakarta.data.repository.stateful` package, enabling the repository to operate with a persistence context.
+
+Previously, repository `Find` methods could not enforce returning only the first result or the first few results. That capability is now available with the `@First` annotation.
 
 In Jakarta Data, you write simple Java objects that are called *Entities* to represent data, and interfaces that are called *Repositories* to define operations on data. You inject a Repository into your application and use it. The implementation of the Repository is automatically provided for you!
 
-Start by defining an entity class that corresponds to your data. With relational databases, the entity class corresponds to a database table and the entity properties (public methods and fields of the entity class) generally correspond to the columns of the table. 
+Start by defining an entity class that corresponds to your data. With relational databases, the entity class corresponds to a database table. The entity properties, which include the public methods and fields of the entity class, generally correspond to the columns of the table.
 
 An entity class can be:
 
 * annotated with `jakarta.persistence.Entity` and related annotations from Jakarta Persistence.
 * a Java class without entity annotations, in which case the primary key is inferred from an entity property named `id` or ending with `Id`. Entity property named `version` designates an automatically incremented version column.
 
-Following shows an example of a simple entity. 
+The following shows an example of a simple entity:
 
 [source,java]
 ----
@@ -106,9 +120,10 @@ public interface _Product {
 }
 ----
 
-The first half of the static metamodel class includes constants for each of the entity attribute names so that you don't need to otherwise hardcode string values into your application. The second half of the static metamodel class provides a special instance for each entity attribute, from which you can build restrictions and sorting to apply to queries at run time. You can do many powerful things with these repository queries.
+The first half of the static metamodel class includes constants for each of the entity attribute names so that you don't need to otherwise hardcode string values into your application. The second half of the static metamodel class provides a special instance for each entity attribute, from which you can build restrictions and sorting to apply to queries at run time. These repository queries enable powerful and flexible data operations.
 
-Built-in interfaces like BasicRepository and CrudRepository can be inherited to add general-purpose methods for inserting, updating, deleting, and querying entities. When a stateful repository is composed such as the following, the built-in interface `DataRepository` can be inherited. With this interface, you can define at least one stateful repository method by using the `Detach`, `Merge`, `Persist`, `Refresh`, or `Remove` annotations. After the repository is made stateful, the repository finds methods that you define to return entities that also operate within a persistence context.
+Built-in interfaces like `BasicRepository` and `CrudRepository` can be extended to add general-purpose methods for inserting, updating, deleting, and querying entities.
+To compose a stateful repository, extend the built-in `DataRepository` interface. This interface allows you to define at least one stateful repository method using the `@Detach`, `@Merge`, `@Persist`, `@Refresh`, or `@Remove` annotations. Once the repository is stateful, any find methods you define will return entities that operate within a persistence context.
 
 [source,java]
 ----
@@ -233,17 +248,20 @@ To learn more about this feature, see the following resources:
 [#mpHealth_4_0]
 == Disabling mpHealth-4.0 REST endpoints when file-based health checks are enabled
  
-The `mpHealth-4.0` feature enables a MicroProfile Health 4.0 runtime for the OpenLiberty server. This runtime supports file-based health check mechanism as an alternative health check strategy to the `/health/` REST endpoints. When the file-based health check mechanism is enabled, you can now disable the health check `/health/started, /health/live, /health/ready` REST endpoints, with server configuration attributes.
+The mpHealth-4.0 feature enables a MicroProfile Health 4.0 runtime for the Open Liberty server. This runtime supports a file-based health check mechanism as an alternative to the `/health/` REST endpoints. When the file-based health check mechanism is enabled, you can now disable the `/health/started`, `/health/live`, and `/health/ready` REST endpoints using server configuration attributes.
 
-Previously, when file‑based health checks were enabled, the REST‑based MicroProfile Health endpoints were still registered and accessible. This behavior was often redundant for Kubernetes deployments that rely on file‑based health checks, where users typically configure probes by using the exec strategy rather than httpGet or gRPC. In these scenarios, the REST health endpoints are not used.
+Previously, when file-based health checks were enabled, the REST-based MicroProfile Health endpoints were still registered and accessible. This behavior was often redundant for Kubernetes deployments that rely on file-based health checks, where users typically configure probes using the `exec` strategy rather than `httpGet` or `gRPC`. In these scenarios, the REST health endpoints are not used.
 
-To address this redundancy, the beta release introduces a new optional mpHealth server configuration attribute that allows REST health endpoints to be disabled when file‑based health checks are enabled.
+To address this redundancy, the beta release introduces a new optional `mpHealth` server configuration attribute that allows REST health endpoints to be disabled when file-based health checks are enabled.
 
-The `mpHealth-4.0` feature adds a new optional `enableEndpoints="false"` attribute to the `mpHealth` server configuration element in `server.xml`. An equivalent environment variable, `MP_HEALTH_ENABLE_ENDPOINTS=false`, is also supported. When this option is set to `false` and file-based health checks are enabled, the server does not register or expose the MicroProfile Health REST endpoints (`/health, /health/live, /health/ready, /health/started`). File-based health checks can be enabled with the `checkInterval` configuration attribute or the `MP_HEALTH_CHECK_INTERVAL` environment variable. Requests to these endpoints return 404 – Not Found.
+The `mpHealth-4.0` feature adds a new optional `enableEndpoints="false"` attribute to the `mpHealth` server configuration element in `server.xml` file. An equivalent environment variable, `MP_HEALTH_ENABLE_ENDPOINTS=false`, is also supported. 
 
-If both the environment variable and server.xml configuration are specified, the server.xml setting takes precedence at runtime.
+When this option is set to `false` and file-based health checks are enabled, the server does not register or expose the MicroProfile Health REST endpoints (`/health, /health/live, /health/ready, /health/started`). Requests to these endpoints return '404 Not Found' response. 
 
-server.xml
+File-based health checks can be enabled with the `checkInterval` configuration attribute or the `MP_HEALTH_CHECK_INTERVAL` environment variable. 
+
+If both the environment variable and `server.xml` file configuration are specified, the `server.xml` setting takes precedence at runtime.
+
 [source,xml]
 ----
 <server>
@@ -257,7 +275,7 @@ server.xml
 </server>
 ----
 
-If either the `enableEndpoints` configuration attribute or the MP_HEALTH_ENABLE_ENDPOINTS environment variable is NOT set, the default value is true, and the health check REST endpoints are enabled and exposed.
+If either the `enableEndpoints` configuration attribute or the `MP_HEALTH_ENABLE_ENDPOINTS` environment variable is not set, the default value is `true`, and the health check REST endpoints are enabled and exposed.
 
 *Note*: This capability is supported only when the file‑based health check mechanism is enabled. If file-based health checks are not enabled and the new `enableEndpoints` configuration attribute or environment variable is specified, a warning message is logged. The REST health endpoints remain enabled by default.
 
