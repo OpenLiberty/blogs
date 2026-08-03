@@ -58,7 +58,7 @@ The AI agent reads the descriptions to understand what the tool does and what va
 
 === Add the MCP API dependency
 
-The `mcpServer-1.0` feature uses the https://github.com/mcp-java/java-mcp-annotations[`mcp-java` shared API] (`org.mcpjava:mcp-server-api`), which is available on Maven Central.
+The `mcpServer-1.0` feature uses the https://github.com/mcp-java/java-mcp-annotations[`mcp-java` API] (`org.mcpjava:mcp-server-api`), which is available on Maven Central.
 
 Add the following dependency to your `pom.xml`:
 
@@ -70,6 +70,30 @@ Add the following dependency to your `pom.xml`:
     <artifactId>mcp-server-api</artifactId>
     <version>1.0.0</version>
     <scope>provided</scope>
+</dependency>
+----
+
+Some features - such as `@Schema`, `DefaultValueConverter`, `ToolManager`, and `ToolResponseEncoder` - are provided by the `io.openliberty.mcp` jar that ships with Liberty. To make these available on the build path, add a `system`-scoped dependency inside your `pom.xml` file that points to the jar inside your Liberty installation:
+
+[source,xml]
+----
+<properties>
+    <wlp-dir-path>replace-with-path-to-wlp-dir</wlp-dir-path>
+    <mcp-jar-version>replace-with-version-number</mcp-jar-version>
+</properties>
+----
+
+Find the `io.openliberty.mcp_*.jar` in `<wlp>/dev/api/ibm/` and record the version suffix (e.g. `1.0.106`). Then add:
+
+[source,xml]
+----
+<!-- Liberty MCP extensions (io.openliberty.mcp) -->
+<dependency>
+    <groupId>io.openliberty.mcp</groupId>
+    <artifactId>mcp-core</artifactId>
+    <version>${mcp-jar-version}</version>
+    <scope>system</scope>
+    <systemPath>${wlp-dir-path}/dev/api/ibm/io.openliberty.mcp_${mcp-jar-version}.jar</systemPath>
 </dependency>
 ----
 
@@ -99,7 +123,7 @@ You can connect any MCP client that supports the https://modelcontextprotocol.io
 
 === Connect an AI client
 
-To connect an AI agent to your MCP server, provide the MCP endpoint URL from the `CWMCM0008I` log message in the client's configuration. For example, to add your MCP server to https://www.ibm.com/products/watsonx-ai[IBM Bob], open `~/.bob/settings/mcp.json` and add an entry to the `mcpServers` object:
+To connect an AI agent to your MCP server, provide the MCP endpoint URL from the `CWMCM0008I` log message in the client's configuration. For example, to add your MCP server to https://bob.ibm.com/[IBM Bob], open `~/.bob/settings/mcp.json` and add an entry to the `mcpServers` object:
 
 [source,json]
 ----
@@ -286,7 +310,7 @@ public class ConfigTools {
 
 === Returning content objects
 
-Tool methods can return `String`, POJO objects (serialised to JSON), or typed content objects from the `org.mcpjava.server.content` package: https://www.javadoc.io/doc/org.mcpjava/mcp-server-api/latest/org/mcpjava/server/content/TextContent.html[`TextContent`], https://www.javadoc.io/doc/org.mcpjava/mcp-server-api/latest/org/mcpjava/server/content/ImageContent.html[`ImageContent`], https://www.javadoc.io/doc/org.mcpjava/mcp-server-api/latest/org/mcpjava/server/content/AudioContent.html[`AudioContent`], `EmbeddedResource`, and `ResourceLink`.
+Tool methods can return `String`, POJO objects (serialised to JSON), or typed content objects from the `org.mcpjava.server.content` package: https://www.javadoc.io/doc/org.mcpjava/mcp-server-api/latest/org/mcpjava/server/content/TextContent.html[`TextContent`], https://www.javadoc.io/doc/org.mcpjava/mcp-server-api/latest/org/mcpjava/server/content/ImageContent.html[`ImageContent`], https://www.javadoc.io/doc/org.mcpjava/mcp-server-api/latest/org/mcpjava/server/content/AudioContent.html[`AudioContent`], https://www.javadoc.io/static/org.mcpjava/mcp-server-api/1.0.0/org/mcpjava/server/content/EmbeddedResource.html[`EmbeddedResource`], and https://www.javadoc.io/static/org.mcpjava/mcp-server-api/1.0.0/org/mcpjava/server/content/ResourceLink.html[`ResourceLink`].
 
 For fine-grained control over the full tool response, return a https://www.javadoc.io/doc/org.mcpjava/mcp-server-api/latest/org/mcpjava/server/tools/ToolResponse.html[`ToolResponse`] directly. This also lets you signal a business-logic error to the AI without throwing an exception:
 
@@ -419,7 +443,7 @@ public class AuditTools {
 
 Tool methods can return a `CompletionStage<T>` to execute asynchronously without holding a thread for the duration of the call. The return type `T` follows the same rules as synchronous tools:
 
-NOTE: The special parameters https://www.javadoc.io/doc/org.mcpjava/mcp-server-api/latest/org/mcpjava/server/Cancellation.html[`Cancellation`] and https://www.javadoc.io/doc/org.mcpjava/mcp-server-api/latest/org/mcpjava/server/progress/Progress.html[`Progress`] are also supported on async tool methods.
+NOTE: The special parameters https://www.javadoc.io/doc/org.mcpjava/mcp-server-api/latest/org/mcpjava/server/Cancellation.html[`Cancellation`] and https://www.javadoc.io/doc/org.mcpjava/mcp-server-api/latest/org/mcpjava/server/McpRequest.html[`McpRequest`] are also supported on async tool methods.
 
 [source,java]
 ----
@@ -580,7 +604,7 @@ By default, `mcpServer-1.0` maintains sessions to associate requests from the sa
 </application>
 ----
 
-In stateless mode, each request is handled independently with no per-client state between calls.
+In stateless mode, each request is handled independently with no per-client state between calls.However, the stateless mode also disables MCP features that rely on session tracking or linking separate HTTP requests together, such as canceling a tool call.
 
 === Async tool timeout
 
@@ -592,8 +616,6 @@ By default, asynchronous tool executions are limited to **30 seconds**. For tool
     <mcpServer asyncTimeout="2m"/>
 </application>
 ----
-
-The `asyncTimeout` can be updated dynamically — changing `server.xml` while the server is running applies the new value immediately without a restart.
 
 == Supported MCP protocol versions
 
@@ -649,27 +671,6 @@ This produces two independent endpoints:
 * `\http://localhost:9080/reporting/reporting-mcp`
 
 Each module also logs its own `CWMCM0008I` message at startup, so you can find each endpoint URL in the messages log.
-
-== Connecting desktop AI clients with OAuth
-
-When connecting desktop MCP clients (such as Claude Desktop or VS Code with GitHub Copilot) to a Liberty MCP server over the internet, you typically need an authenticated connection. Liberty supports https://datatracker.ietf.org/doc/rfc9728/[OAuth 2.0 Protected Resource Metadata (RFC 9728)], which enables automatic OAuth login flows in interactive clients. When Liberty is configured as an OAuth or OIDC resource server alongside `mcpServer-1.0`, MCP clients can automatically discover which authorisation server to use to obtain an access token.
-
-To enable this, add the OIDC resource server features alongside `mcpServer-1.0`:
-
-[source,xml]
-----
-<featureManager>
-    <feature>servlet-6.0</feature>
-    <feature>cdi-4.0</feature>
-    <feature>mcpServer-1.0</feature>
-    <!-- OIDC resource server support -->
-    <feature>oidcClient-1.0</feature>
-    <feature>appSecurity-5.0</feature>
-    <feature>transportSecurity-1.0</feature>
-</featureManager>
-----
-
-NOTE: This feature is currently in beta. A detailed step-by-step configuration guide for desktop MCP clients will be published as a separate blog post.
 
 == Feedback and more information
 
