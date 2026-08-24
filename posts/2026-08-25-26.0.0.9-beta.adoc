@@ -1,0 +1,268 @@
+---
+layout: post
+title: "MCP Java API support and MBean name updates in mcpServer-1.0 for Open Liberty 26.0.0.9-beta"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/IsmathBadsha
+author_github: https://github.com/IsmathBadsha
+seo-title: "MCP Java API support and MBean name updates in mcpServer-1.0 for Open Liberty 26.0.0.9-beta - OpenLiberty.io"
+seo-description: This beta release updates mcpServer-1.0 to use the MCP Java API (org.mcpjava), changes JMX MBean ObjectName keys for MCP metrics, and includes a bug fix for the MCP endpoint URL log message.
+blog_description: This beta release updates mcpServer-1.0 to use the MCP Java API (org.mcpjava), changes JMX MBean ObjectName keys for MCP metrics, and includes a bug fix for the MCP endpoint URL log message.
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+---
+= MCP Java API support and MBean name updates in mcpServer-1.0 for Open Liberty 26.0.0.9-beta
+Ismath Badsha <https://github.com/IsmathBadsha>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+This beta release updates `mcpServer-1.0` to use the MCP Java API (`org.mcpjava`), improves MCP metrics MBean naming, and fixes the MCP endpoint URL log message. Open Liberty 26.0.0.9-beta is targeted at application developers building MCP-enabled Liberty applications.
+
+// // // // // // // //
+// Change the RELEASE_SUMMARY to an introductory paragraph. This sentence is really
+// important because it is supposed to grab the readers attention.  Make sure to keep the blank lines
+//
+// Throughout the doc, replace RELEASE_VERSION with the version number of Open Liberty, eg: 22.0.0.2-beta
+// // // // // // // //
+The link:{url-about}[Open Liberty] 26.0.0.9-beta includes the following beta features (along with link:{url-prefix}/docs/latest/reference/feature/feature-overview.html[all GA features]):
+
+* <<mcp_java_api,  MCP Java API support in `mcpServer-1.0`>>
+* <<mcp_mbean_names, MCP metrics: MBean names now use individual JMX ObjectName keys>>
+
+// // // // // // // //
+// In the preceding section:
+// Change SUB_FEATURE_TITLE to the feature that is included in this release and
+// change the SUB_TAG_1/2/3 to the heading tags
+//
+// However if there's only 1 new feature, delete the previous section and change it to the following sentence:
+// "The link:{url-about}[Open Liberty] RELEASE_VERSION includes SUB_FEATURE_TITLE"
+// // // // // // // //
+
+See also link:{url-prefix}/blog/?search=beta&key=tag[previous Open Liberty beta blog posts].
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/TODO
+// Contact/Reviewer: martindrozdz
+// // // // // // // //
+[#mcp_java_api]
+== MCP Java API support in `mcpServer-1.0`
+
+The link:https://modelcontextprotocol.io/docs/getting-started/intro[Model Context Protocol (MCP)] is an open standard that enables AI applications to access real-time data and business logic from external sources. The `mcpServer-1.0` feature lets application developers expose application tools and data for use in agentic AI workflows.
+
+`mcpServer-1.0` now uses the link:https://central.sonatype.com/artifact/org.mcpjava/mcp-server-api[MCP Java API] (`org.mcpjava`), which is published on Maven Central. Previously, the types used to write MCP tools were in Open Liberty API packages.
+
+Since this is a significant change, a new blog post about the MCP feature, with examples of the new API, has also been published. See link:{url-prefix}/blog/2026/08/25/mcp-tools.html[Getting started with mcpServer-1.0] for detailed instructions on how to get started with this feature.
+
+NOTE: This is a breaking change. Existing code will not compile against the new API. In most cases, only the imports need to change.
+
+=== Add the dependency to your project
+
+For Maven, add the following to your `pom.xml`:
+
+[source,xml]
+----
+<dependency>
+    <groupId>org.mcpjava</groupId>
+    <artifactId>mcp-server-api</artifactId>
+    <version>1.0.0</version>
+    <scope>provided</scope>
+</dependency>
+----
+
+For Gradle, add the following to your `build.gradle`:
+
+[source,gradle]
+----
+compileOnly("org.mcpjava:mcp-server-api:1.0.0")
+----
+
+=== Import changes
+
+The core annotations and types have moved from `io.openliberty.mcp.*` to `org.mcpjava.server.*`:
+
+[cols="2,2", options="header"]
+|===
+|Before (26.0.0.8-beta) |After (26.0.0.9-beta)
+
+|`io.openliberty.mcp.tools.Tool`
+|`org.mcpjava.server.tools.Tool`
+
+|`io.openliberty.mcp.tools.ToolArg`
+|`org.mcpjava.server.tools.ToolArg`
+
+|`io.openliberty.mcp.tools.ToolResponse`
+|`org.mcpjava.server.tools.ToolResponse`
+
+|`io.openliberty.mcp.content.TextContent`
+|`org.mcpjava.server.content.TextContent`
+
+|`io.openliberty.mcp.content.ImageContent`
+|`org.mcpjava.server.content.ImageContent`
+
+|`io.openliberty.mcp.content.AudioContent`
+|`org.mcpjava.server.content.AudioContent`
+
+|`io.openliberty.mcp.content.ContentBlock`
+|`org.mcpjava.server.content.ContentBlock`
+|===
+
+The following Liberty-specific types remain in their existing packages and are unchanged:
+
+* `io.openliberty.mcp.tools.ToolCallException`
+* `io.openliberty.mcp.tools.ToolManager`
+* `io.openliberty.mcp.annotations.Schema`
+* `io.openliberty.mcp.annotations.DefaultValueConverter`
+
+=== Builder pattern for content types
+
+A notable change in the MCP Java API is that content types are now created using builders rather than constructors. The `TextContent.of(...)` static factory method is still available for simple cases, but richer types such as `ImageContent`, which support annotations, now use a builder:
+
+[source,java]
+----
+// Before
+ImageContent image = new ImageContent(data, "image/png");
+
+// After — simple case
+ImageContent image = ImageContent.of(data, "image/png");
+
+// After — with annotations
+ImageContent image = ImageContent.builder(data, "image/png")
+                                 .setAnnotations(annotations)
+                                 .build();
+----
+
+See the link:https://central.sonatype.com/artifact/org.mcpjava/mcp-server-api[MCP Java API Javadoc] for the full API reference.
+
+NOTE: Although the MCP Java API includes types for prompts and resources, `mcpServer-1.0` currently supports only tools. The prompt and resource parts of the API are not yet supported in Liberty.
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/TODO
+// Contact/Reviewer: martindrozdz
+// // // // // // // //
+[#mcp_mbean_names]
+== MCP metrics: MBean names now use individual JMX ObjectName keys
+
+Open Liberty 26.0.0.9-beta updates the MCP metrics MBeans introduced in 26.0.0.8-beta. Each `McpOperationStatisticsMXBean` and `McpSessionStatisticsMXBean` instance is now registered with its MCP attributes as individual keys in the JMX `ObjectName`, rather than encoded into a single opaque `name` value.
+
+Before (26.0.0.8-beta):
+
+[source]
+----
+WebSphere:type=McpOperation,name="mcpMethod:tools/call;rpcStatus:ok;netProto:HTTP"
+----
+
+After (26.0.0.9-beta):
+
+[source]
+----
+WebSphere:type=McpOperation,mcpMethod=tools/call,rpcStatus=ok,netProto=HTTP,...
+----
+
+This change makes it easier to filter and query these MBeans based on their individual attribute values.
+
+NOTE: This is a breaking change from 26.0.0.8-beta. If you have existing JMX queries or scripts written against the 26.0.0.8-beta MBean names, you must update them.
+
+=== Bug fixes
+
+==== MCP server endpoint URL log message updated
+
+The info message that includes the MCP endpoint URL has been updated to include a message code. It now looks like this:
+
+[source]
+----
+CWMCM0008I: The MCP server endpoint: http://localhost:9080/myApp/mcp
+----
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+[#run]
+== Try it now
+
+To try out these features, update your build tools to pull the Open Liberty All Beta Features package instead of the main release. To enable the MCP server feature, see link:{url-prefix}/blog/2026/08/25/mcp-tools.html[Getting started with mcpServer-1.0] for detailed instructions. Note that `mcpServer-1.0` requires Java SE 17 or later. The beta works with Java SE 25, Java SE 21, Java SE 17, Java SE 11, and Java SE 8.
+
+// // // // // // // //
+// In the preceding section:
+// Check if a new non-LTS Java SE version is supported that needs to be added to the list (21, 17, 11, and 8 are LTS and will remain for a while)
+// https://openliberty.io/docs/latest/java-se.html
+//
+// In the following section:
+// Check if a new MicroProfile or Jakarta version is in beta that could replace the example values in the codeblock
+// // // // // // // //
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], you can install the All Beta Features package using:
+
+[source,xml]
+----
+<plugin>
+    <groupId>io.openliberty.tools</groupId>
+    <artifactId>liberty-maven-plugin</artifactId>
+    <version>3.12.2</version>
+    <configuration>
+        <runtimeArtifact>
+          <groupId>io.openliberty.beta</groupId>
+          <artifactId>openliberty-runtime</artifactId>
+          <version>26.0.0.9-beta</version>
+          <type>zip</type>
+        </runtimeArtifact>
+    </configuration>
+</plugin>
+----
+
+You must also add dependencies to your `pom.xml` file for the beta version of the APIs that are associated with the beta features that you want to try. For `mcpServer-1.0`, add the MCP Java API dependency:
+
+[source,xml]
+----
+<dependency>
+    <groupId>org.mcpjava</groupId>
+    <artifactId>mcp-server-api</artifactId>
+    <version>1.0.0</version>
+    <scope>provided</scope>
+</dependency>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'io.openliberty.tools:liberty-gradle-plugin:4.0.1'
+    }
+}
+apply plugin: 'liberty'
+dependencies {
+    libertyRuntime group: 'io.openliberty.beta', name: 'openliberty-runtime', version: '[26.0.0.9-beta,)'
+}
+----
+// // // // // // // //
+// In the preceding section:
+// Replace the Maven `3.12.1` with the latest version of the plugin: https://search.maven.org/artifact/io.openliberty.tools/liberty-maven-plugin
+// Replace the Gradle `4.0.0` with the latest version of the plugin: https://search.maven.org/artifact/io.openliberty.tools/liberty-gradle-plugin
+// TODO: Update GHA to automatically do the above.  If the maven.org is problematic, then could fallback to using the GH Releases for the plugins
+// // // // // // // //
+
+Or if you're using link:{url-prefix}/docs/latest/container-images.html[container images]:
+
+[source]
+----
+FROM icr.io/appcafe/open-liberty:beta
+----
+
+Or take a look at our link:{url-prefix}/downloads/#runtime_betas[Downloads page].
+
+If you're using link:https://plugins.jetbrains.com/plugin/14856-liberty-tools[IntelliJ IDEA], link:https://marketplace.visualstudio.com/items?itemName=Open-Liberty.liberty-dev-vscode-ext[Visual Studio Code] or link:https://marketplace.eclipse.org/content/liberty-tools[Eclipse IDE], you can also take advantage of our open source link:{url-prefix}/docs/latest/develop-liberty-tools.html[Liberty developer tools] to enable effective development, testing, debugging and application management all from within your IDE.
+
+For more information on using a beta release, refer to the link:{url-prefix}/docs/latest/installing-open-liberty-betas.html[Installing Open Liberty beta releases] documentation.
+
+[#feedback]
+== We welcome your feedback
+
+Let us know what you think on link:https://groups.io/g/openliberty[our mailing list]. If you hit a problem, link:https://stackoverflow.com/questions/tagged/open-liberty[post a question on StackOverflow]. If you hit a bug, link:https://github.com/OpenLiberty/open-liberty/issues[please raise an issue].
