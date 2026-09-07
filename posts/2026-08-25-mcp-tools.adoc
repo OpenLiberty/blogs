@@ -6,7 +6,7 @@ author_picture: https://avatars3.githubusercontent.com/TheoGkoumas
 author_github: https://github.com/TheoGkoumas
 seo-title: Support for the Model Context Protocol within Open Liberty - OpenLiberty.io
 seo-description: Learn how to use the MCP Server feature within your Liberty application to allow your business logic to be utilized within an agentic AI workflow.
-blog_description: Learn how to use the MCP Server feature within your Liberty application to allow your business logic to be utilized within an agentic AI workflow.
+blog_description: "Learn how to use the MCP Server feature within your Liberty application to allow your business logic to be utilized within an agentic AI workflow."
 open-graph-image: https://openliberty.io/img/twitter_card.jpg
 open-graph-image-alt: Open Liberty Logo
 ---
@@ -20,7 +20,7 @@ Theo Gkoumas <https://github.com/TheoGkoumas>
 
 == What is MCP?
 
-https://modelcontextprotocol.io/[Model Context Protocol (MCP)] is an open standard that enables AI applications to interact with and utilise external systems. The `mcpServer-1.0` feature for Open Liberty allows developers to expose the business logic of their applications, making it discoverable, understandable, and invocable by AI applications.
+https://modelcontextprotocol.io/[Model Context Protocol (MCP)] is an open standard that enables AI applications to interact with and utilise external systems. The `mcp-1.0` feature for Open Liberty allows developers to expose the business logic of their applications, making it discoverable, understandable, and invocable by AI applications.
 
 == The power of MCP
 
@@ -28,7 +28,7 @@ MCP has emerged as the standard for AI applications to access real-time informat
 
 Consider a scenario where your company provides weather forecasting services that require continuous updates from multiple data sources. Live or frequently changing data can't be included in the training of the model directly, instead we can let the AI retrieve this live data directly, through *tools* - functions the AI can invoke at will to retrieve up-to-date information whenever it needs it.
 
-This is exactly what the Liberty `mcpServer-1.0` feature enables. Your existing Java application already contains the business logic that an AI agent needs: it fetches data, performs calculations, writes to databases, and calls external services. With `mcpServer-1.0`, you can expose that logic to any MCP-compatible AI agent with a few annotations.
+This is exactly what the Liberty `mcp-1.0` feature enables. Your existing Java application already contains the business logic that an AI agent needs: it fetches data, performs calculations, writes to databases, and calls external services. With `mcp-1.0`, you can expose that logic to any MCP-compatible AI agent with a few annotations.
 
 A plain Java method like this:
 
@@ -58,7 +58,7 @@ The AI agent reads the descriptions to understand what the tool does and what va
 
 === Add the MCP API dependency
 
-The `mcpServer-1.0` feature uses the https://github.com/mcp-java/java-mcp-annotations[`mcp-java` API] (`org.mcpjava:mcp-server-api`), which is available on Maven Central.
+The `mcp-1.0` feature uses the https://github.com/mcp-java/java-mcp-annotations[`mcp-java` API] (`org.mcpjava:mcp-server-api`), which is available on Maven Central.
 
 Add the following dependency to your `pom.xml`:
 
@@ -73,48 +73,35 @@ Add the following dependency to your `pom.xml`:
 </dependency>
 ----
 
-Some features - such as `@Schema`, `DefaultValueConverter`, `ToolManager`, and `ToolResponseEncoder` - are provided by the `io.openliberty.mcp` jar that ships with Liberty. To make these available on the build path, you need to add a `system`-scoped dependency in your `pom.xml` that points to this jar.
-
-First, locate the `io.openliberty.mcp_*.jar` in `<wlp>/dev/api/ibm/` and note the version suffix (e.g. `1.0.106`). Then define the following properties in your `pom.xml`:
+Some features - such as `@Schema`, `DefaultValueConverter`, `ToolManager`, and `ToolResponseEncoder` - are provided by the Liberty MCP API, available on Maven Central. Add it as a `provided`-scoped dependency in your `pom.xml`:
 
 [source,xml]
 ----
-<properties>
-    <wlp-dir-path>replace-with-path-to-wlp-dir</wlp-dir-path>
-    <mcp-jar-version>replace-with-version-number</mcp-jar-version>
-</properties>
-----
-
-Then add the dependency:
-
-[source,xml]
-----
-<!-- Liberty MCP extensions (io.openliberty.mcp) -->
+<!-- Liberty MCP API -->
 <dependency>
-    <groupId>io.openliberty.mcp</groupId>
-    <artifactId>mcp-core</artifactId>
-    <version>${mcp-jar-version}</version>
-    <scope>system</scope>
-    <systemPath>${wlp-dir-path}/dev/api/ibm/io.openliberty.mcp_${mcp-jar-version}.jar</systemPath>
+    <groupId>io.openliberty</groupId>
+    <artifactId>io.openliberty.mcp</artifactId>
+    <version>1.2.117</version>
+    <scope>provided</scope>
 </dependency>
 ----
 
 === Enable the feature
 
-Add `mcpServer-1.0` to your `server.xml`:
+Add `mcp-1.0` to your `server.xml`:
 
 [source,xml]
 ----
 <featureManager>
     <feature>servlet-6.0</feature>
     <feature>cdi-4.0</feature>
-    <feature>mcpServer-1.0</feature>
+    <feature>mcp-1.0</feature>
 </featureManager>
 ----
 
 === Find your MCP endpoint URL
 
-Once your application is deployed, the `mcpServer-1.0` feature logs the full MCP endpoint URL in your Liberty messages log:
+Once your application is deployed, the `mcp-1.0` feature logs the full MCP endpoint URL in your Liberty messages log:
 
 [source]
 ----
@@ -219,6 +206,7 @@ A parameter is treated as optional if `required = false`, `defaultValue` is set,
 
 [source,java]
 ----
+import java.util.Optional;
 import org.mcpjava.server.tools.Tool;
 import org.mcpjava.server.tools.ToolArg;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -458,7 +446,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 @ApplicationScoped
 public class RemoteTools {
 
-    @javax.annotation.Resource
+    @jakarta.annotation.Resource
     ManagedExecutorService executor;
 
     @Tool(name = "fetchRemoteData",
@@ -597,7 +585,7 @@ During MCP initialisation, the server sends a `serverInfo` block to clients cont
 
 === Stateless mode
 
-By default, `mcpServer-1.0` maintains sessions to associate requests from the same client. In horizontally scaled or clustered deployments where requests may be routed to different server instances, enable stateless mode to remove this session affinity:
+By default, `mcp-1.0` maintains sessions to associate requests from the same client. In horizontally scaled or clustered deployments where requests may be routed to different server instances, enable stateless mode to remove this session affinity:
 
 [source,xml]
 ----
@@ -606,7 +594,7 @@ By default, `mcpServer-1.0` maintains sessions to associate requests from the sa
 </application>
 ----
 
-In stateless mode, each request is handled independently with no per-client state between calls. However, the stateless mode also disables MCP features that rely on session tracking or linking separate HTTP requests together, such as canceling a tool call.
+In stateless mode, each request is handled independently with no per-client state between calls. However, the stateless mode also disables MCP features that rely on session tracking or linking separate HTTP requests together, such as cancelling a tool call.
 
 === Async tool timeout
 
@@ -621,7 +609,7 @@ By default, asynchronous tool executions are limited to **30 seconds**. For tool
 
 == Supported MCP protocol versions
 
-The `mcpServer-1.0` feature supports the following specification versions, negotiated automatically with the client at connection time:
+The `mcp-1.0` feature supports the following specification versions, negotiated automatically with the client at connection time:
 
 * https://modelcontextprotocol.io/specification/2025-11-25[`2025-11-25`]
 * https://modelcontextprotocol.io/specification/2025-06-18[`2025-06-18`]
@@ -629,16 +617,16 @@ The `mcpServer-1.0` feature supports the following specification versions, negot
 
 == Monitoring MCP server metrics
 
-The `mcpServer-1.0` feature exports operational metrics that let you monitor tool call throughput, duration, and session lifecycle using Liberty's existing observability stack.
+The `mcp-1.0` feature exports operational metrics that let you monitor tool call throughput, duration, and session lifecycle using Liberty's existing observability stack.
 
-Add `monitor-1.0` alongside `mcpServer-1.0` in your `server.xml`. Optionally, add `mpTelemetry-2.1` to export metrics to an OpenTelemetry collector:
+Add `monitor-1.0` alongside `mcp-1.0` in your `server.xml`. Optionally, add `mpTelemetry-2.1` to export metrics to an OpenTelemetry collector:
 
 [source,xml]
 ----
 <featureManager>
     <feature>servlet-6.0</feature>
     <feature>cdi-4.0</feature>
-    <feature>mcpServer-1.0</feature>
+    <feature>mcp-1.0</feature>
     <feature>monitor-1.0</feature>
     <!-- Optional: export to OpenTelemetry -->
     <feature>mpTelemetry-2.1</feature>
@@ -676,6 +664,6 @@ Each module also logs its own `CWMCM0008I` message at startup, so you can find e
 
 == Feedback and more information
 
-We are actively developing the `mcpServer-1.0` feature toward its General Availability release. If you encounter a bug or want to request additional functionality, https://github.com/OpenLiberty/open-liberty/issues/new/choose[raise an issue in the Open Liberty GitHub repository].
+If you encounter a bug or want to request additional functionality, https://github.com/OpenLiberty/open-liberty/issues/new/choose[raise an issue in the Open Liberty GitHub repository].
 
 For more information about the Model Context Protocol, see the https://modelcontextprotocol.io[official MCP documentation].
