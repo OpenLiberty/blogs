@@ -1,17 +1,17 @@
 ---
 layout: post
-title: "Configurable Quiesce Timeout and Support for Java 27 in 26.0.0.10"
+title: "Configurable Quiesce Timeout and Java 27 Support in 26.0.0.10"
 # Do NOT change the categories section
 categories: blog
 author_picture: https://avatars3.githubusercontent.com/IsmathBadsha
 author_github: https://github.com/IsmathBadsha
-seo-title: Configurable Quiesce Timeout and Support for Java 27 in 26.0.0.10 - OpenLiberty.io
+seo-title: Configurable Quiesce Timeout and Java 27 Support in 26.0.0.10 
 seo-description: Open Liberty 26.0.0.10 introduces configurable quiesce timeout on the server element and adds support for Java 27.
 blog_description: Open Liberty 26.0.0.10 introduces configurable quiesce timeout on the server element and adds support for Java 27.
 open-graph-image: https://openliberty.io/img/twitter_card.jpg
 open-graph-image-alt: Open Liberty Logo
 ---
-= Configurable Quiesce Timeout and Support for Java 27 in 26.0.0.10
+= Configurable Quiesce Timeout and Java 27 Support in 26.0.0.10
 Ismath Badsha <https://github.com/IsmathBadsha>
 :imagesdir: /
 :url-prefix:
@@ -49,7 +49,7 @@ Ismath Badsha <https://github.com/IsmathBadsha>
 // change the "IMAGE CAPTION" to a couple words of what the image is
 // // // // // // // //
 
-Open Liberty 26.0.0.10 introduces a configurable quiesce timeout on the `server` element to give administrators fine-grained control over graceful shutdown behavior and adds support for Java 27.
+Open Liberty 26.0.0.10 introduces a configurable quiesce timeout on the `<server>` element to give administrators fine-grained control over graceful shutdown behavior. This release also adds support for Java 27.
 
 // // // // // // // //
 // In the preceding section:
@@ -66,9 +66,9 @@ Open Liberty 26.0.0.10 introduces a configurable quiesce timeout on the `server`
 
 In link:{url-about}[Open Liberty] 26.0.0.10:
 
-* <<quiesce_timeout, Configurable quiesce timeout on the server element>>
+* <<quiesce_timeout, Configurable quiesce timeout on the <server> element>>
 * <<support_java27, Support for Java 27>>
-* <<CVEs, Security Vulnerability (CVE) Fixes>>
+* <<CVEs, Security vulnerability (CVE) fixes>>
 * <<bugs, Notable bug fixes>>
 
 // // // // // // // //
@@ -164,24 +164,24 @@ image::img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="cent
 [#quiesce_timeout]
 == Configurable quiesce timeout on the server element
 
-When you stop a Liberty server, it enters a quiesce phase — a grace period during which it waits for active work to finish before the JVM exits. During this phase, Liberty notifies registered shutdown listeners (allowing features to drain connections and complete in-flight requests) and then waits for any remaining active threads in the executor service to complete. Previously, this grace period was hardcoded at 30 seconds with no way to adjust it. For operations teams running workloads with long-lived requests — such as batch jobs, large file transfers, or complex transactions — 30 seconds was often not enough, leaving work abruptly interrupted at shutdown.
+When you stop a Liberty server, it enters a quiesce phase — a grace period during which it waits for active work to finish before the Java Virtual Machine (JVM) exits. During this phase, Liberty notifies registered shutdown listeners, which enables features to drain connections and complete in-flight requests, and then waits for any remaining active threads in the executor service to complete. Previously, this grace period was hard-coded at 30 seconds and was not configurable. For operations teams running workloads with long-lived requests — such as batch jobs, large file transfers, or complex transactions — 30 seconds was frequently insufficient, causing work to be interrupted abruptly at shutdown.
 
-The configurable quiesce timeout feature lets server administrators set the quiesce grace period to any value of 30 seconds or greater, directly in `server.xml`.
+The configurable quiesce timeout feature enables server administrators to set the quiesce grace period to any value of 30 seconds or more in `server.xml`.
 
-Target persona: Server administrators and operations teams who manage Liberty server lifecycle and need control over graceful shutdown behaviour.
+Target persona: Server administrators and operations teams who manage Liberty server lifecycle and need control over graceful shutdown behavior.
 
 === What changed and why it matters
 
-Before this update, there was no supported way to extend the shutdown grace period. Workloads that needed more than 30 seconds to drain cleanly would be cut off, potentially leaving transactions incomplete or connections in an inconsistent state.
+Before this update, the shutdown grace period could not be extended. Workloads that needed more than 30 seconds to drain cleanly would be cut off, which could result in incomplete transactions or connections in an inconsistent state.
 
-With this update, you can configure the `quiesceTimeout` attribute on the `<server>` element. Liberty uses that duration as the budget for a two-stage shutdown sequence:
+With this update, you You can now configure the `quiesceTimeout` attribute on the `<server>` element. Liberty uses that duration to control a two-stage shutdown sequence:
 
 * *Pre-phase listeners* — Liberty first notifies pre-phase `ServerQuiesceListener` components, such as the channel framework stopping inbound network connections. These have the full configured timeout available to them.
 * *Default-phase listeners and thread drain* — Liberty then notifies default-phase listeners, which drain in-flight application work, and waits for active threads in the shared executor service to finish. These share whatever time remains from the original budget.
 
-IMPORTANT: If pre-phase listeners consume more than half of the configured timeout, Liberty gives the default-phase listeners a fresh window of half the configured timeout rather than the leftover time. This means the actual elapsed shutdown time can be up to 1.5× the value you configure. If you need your application code to complete within a strict wall-clock deadline at shutdown, set `quiesceTimeout` conservatively enough to account for this.
+IMPORTANT: If pre-phase listeners use more than half of the configured timeout, Liberty allocates a new interval of half the configured timeout to the default-phase listeners instead of the remaining time. The actual elapsed shutdown time can therefore be up to 1.5 times the configured timeout value. If your application must complete within a specific time limit at shutdown, set the `quiesceTimeout` value low enough to account for the potential 1.5 times elapsed shutdown time.
 
-If all listeners and threads complete within the timeout, Liberty logs `CWWKE1101I: Server quiesce complete.` and proceeds with a clean shutdown. If the timeout expires before everything finishes, Liberty logs `CWWKE1102W` and proceeds anyway — companion messages `CWWKE1106W` and `CWWKE1107W` identify which listeners and how many threads were still running, giving you a clear signal that the timeout needs to be increased.
+If all listeners and threads complete within the timeout, Liberty logs message `CWWKE1101I (Server quiesce complete.)` and proceeds with a normal shutdown. If the timeout expires before all listeners and threads complete, Liberty logs CWWKE1102W and still proceeds with shutdown. The related messages `CWWKE1106W` and `CWWKE1107W` identify the listeners and threads that had not yet completed. Use these messages to determine whether the configured timeout value must be increased.
 
 === How to use it
 
@@ -194,7 +194,7 @@ Add the `quiesceTimeout` attribute to the `<server>` element in your `server.xml
 </server>
 ----
 
-The value uses Liberty's standard duration syntax — specify a positive integer followed by a time unit: `h` (hours), `m` (minutes), `s` (seconds), or `ms` (milliseconds). Units can be combined:
+The `quiesceTimeout` attribute uses Liberty's standard duration syntax. Specify a positive integer followed by a time unit: `h` (hours), `m` (minutes), `s` (seconds), or `ms` (milliseconds). You can combine units:
 
 [source,xml]
 ----
@@ -209,7 +209,7 @@ The value uses Liberty's standard duration syntax — specify a positive integer
 <server quiesceTimeout="120">
 ----
 
-The minimum allowed value is `30s`. Values below the minimum, or values that cannot be parsed, fall back to the default of `30s` and log warning message `CWWKG0111W`.
+The minimum value is `30s`. Values that are below the minimum or that cannot be parsed, revert to the default value of `30s` and log warning message `CWWKG0111W`.
 
 NOTE: *Note for beta users:* In the beta, this attribute was configured on the `<executor>` element (`<executor quiesceTimeout="1m30s"/>`). In the GA release it has moved to the `<server>` element. Update your `server.xml` accordingly.
 
@@ -217,7 +217,7 @@ The timeout can be updated dynamically — change it in `server.xml` while the s
 
 === What you see at shutdown
 
-When the server begins quiescing, audit message `CWWKE1100I` is emitted showing your configured timeout:
+When the server begins quiescing, the audit message `CWWKE1100I` is emitted showing your configured timeout:
 
 [source]
 ----
@@ -249,7 +249,7 @@ For more information, see the link:{url-prefix}/docs/latest/reference/config/ser
 [#support_java27]
 == Support for Java 27
 
-Java 27 is the latest version of Java. It contains a few new features and enhancements over previous versions of Java that you will want to review. This is not a Long-Term-Support (LTS) release.
+Java 27 is the latest version of Java. It contains a few new features and enhancements over previous versions of Java that you need to review. This is not a Long-Term-Support (LTS) release.
 
 There are 9 new features (JEPs) in Java 27. Five are test features and four are fully delivered:
 
@@ -268,13 +268,14 @@ There are 9 new features (JEPs) in Java 27. Five are test features and four are 
 * 534: link:https://openjdk.org/jeps/534[Compact Object Headers by Default]
 * 536: link:https://openjdk.org/jeps/536[JFR In-Process Data Redaction]
 
-An important note about JEP 523 — Make G1 the Default Garbage Collector in All Environments. In Java 27, G1 GC is now the default garbage collector in all environments, including those previously using Serial or Parallel GC (e.g. single-CPU or low-memory environments such as containers). Users running Liberty in constrained environments may notice different GC behaviour compared to earlier Java versions. You can revert to the previous default using `-XX:+UseSerialGC` or `-XX:+UseParallelGC`.
+An important note about JEP 523 — JEP 523 changes the default garbage collector in Java 27. The G1 garbage collector (GC) is now the default in all environments, including environments that previously used the Serial or Parallel GC, for example, single-CPU or low-memory environments such as containers. If you run Liberty in constrained environments, you might notice different GC behavior compared to earlier Java releases. To revert to the previous garbage collector, use `-XX:+UseSerialGC` or `-XX:+UseParallelGC`.
 
-Take advantage of trying out the new changes now and get more time to preview your applications and microservices running with Java 27.
+Try out the new changes now and get more time to preview your applications and microservices running with Java 27.
 
-Just download the latest release of link:https://developer.ibm.com/languages/java/semeru-runtimes/downloads/[IBM Semeru Runtimes 27] or link:https://adoptium.net/temurin/releases/[Temurin 27], download and install the 26.0.0.10 version of Open Liberty, edit your Liberty server's link:{url-prefix}/docs/latest/reference/config/server-configuration-overview.html#server-env[`server.env`] file with `JAVA_HOME` set to your Java 27 installation directory and start testing!
+Download link:https://developer.ibm.com/languages/java/semeru-runtimes/downloads/[IBM Semeru Runtimes 27] or link:https://jdk.java.net/27/[Java 27], download and install the link:https://openliberty.io/downloads/#runtime_releases[26.0.0.10], set `JAVA_HOME` to your Java 27 installation directory in your Liberty server's link:https://openliberty.io/docs/latest/reference/config/server-configuration-overview.html#server-env[`server.env`] file, and start testing.
 
-For more information on Java 27, see the link:https://jdk.java.net/27/release-notes[Java 27 release notes page] and link:https://download.java.net/java/early_access/jdk27/docs/api/[API Javadoc page].
+For more information about Java 27, see the Java 27 link:https://jdk.java.net/27/release-notes[release notes page], link:https://download.java.net/java/early_access/jdk27/docs/api/[Javadoc] or link:https://jdk.java.net/27/[download page].
+For more information about Open Liberty, see our link:https://openliberty.io/docs[documentation page].
 
 [#CVEs]
 == Security vulnerability (CVE) fixes in this release
