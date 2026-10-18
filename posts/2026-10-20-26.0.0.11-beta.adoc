@@ -50,11 +50,11 @@ See also link:{url-prefix}/blog/?search=beta&key=tag[previous Open Liberty beta 
 [#jwt_builder]
 == Workload identity and JWK rotation support for JWT Builder
 
-A link:https://www.rfc-editor.org/info/rfc7519/[JSON Web Token (JWT)] is a compact, signed token that carries claims about a subject, and a link:https://www.rfc-editor.org/info/rfc7517/[JSON Web Key (JWK)] is a key that consumers use to verify the token's signature. The JWT Builder now supports automatic workload identity injection into the JWTs that it generates, so JWT consumers can identify the workload or application that generated a JWT. The JWT Builder also lets you configure how often it rotates its JWKs and how many JWKs it publishes on the JWK endpoint (the default rotation interval is 12 hours). Publishing more JWKs ensures that previously issued JWTs remain verifiable after rotation.
+A link:https://www.rfc-editor.org/info/rfc7519/[JSON Web Token (JWT)] is a compact, signed token that carries claims about a subject, and a link:https://www.rfc-editor.org/info/rfc7517/[JSON Web Key (JWK)] is a key that consumers use to verify the token's signature. The JWT Builder now supports automatic workload identity injection into the JWTs that it generates, so JWT consumers can identify the workload or application that generated a JWT. The JWT Builder also now lets you configure how often it rotates its JWKs and the maximum number of JWKs it publishes on the JWK endpoint (the default rotation interval is 12 hours and the default maximum of JWKs is 2). When the maximum number of JWKs is reached, the oldest JWK is discarded after the next rotation. Publishing more JWKs ensures that previously issued JWTs remain verifiable after rotation. Alternatively, the maximum number of JWKs can be set to 1 to invalidate all previously issued JWTs after each JWK rotation.
 
 These capabilities are configured through the `workloadIdentityClaim`, `jwkRotationTime`, and `jwkMaxKeys` attributes in the `jwtBuilder` element of the JSON Web Token 1.0 (`jwt-1.0`) feature. This feature is intended for server administrators and application developers.
 
-Previously, developers had to generate a workload identity themselves and inject it into the JWTs by using the `JwtBuilder` API. Now, the `JwtBuilder` API automatically injects a workload identity into the JWTs it builds. Because the injected identity cannot be modified, it provides a verifiable attestation of the originating workload. Previously, the JWT Builder's JWKs were rotated every 12 hours, and the JWK endpoint published a maximum of 2 JWKs. Now, server administrators can specify the rotation interval based on their security requirements and the maximum number of JWKs that the JWK endpoint publishes, reducing disruption when JWKs are rotated.
+Previously, developers had to generate a workload identity themselves and inject it into the JWTs by using the `JwtBuilder` API. Now, the `JwtBuilder` API can automatically inject a workload identity into the JWTs it builds. Once the `workloadIdentityClaim` property is set on the `jwtBuilder` element, the claim designated by that property cannot be modified by `JwtBuilder` APIs which reference that `jwtBuilder` element, providing a verifiable attestation of the originating workload. Previously, the JWT Builder's JWKs were rotated every 12 hours, and the JWK endpoint published a maximum of 2 JWKs. Now, server administrators can specify the rotation interval based on their security requirements and the maximum number of JWKs that the JWK endpoint publishes, reducing disruption when JWKs are rotated.
 
 === Enable workload identity
 
@@ -65,7 +65,7 @@ To enable workload identity in the JWT Builder, set the `workloadIdentityClaim` 
 <jwtBuilder id="myJwtBuilder" workloadIdentityClaim="workload-identity" />
 ----
 
-When you use the `JwtBuilder` API to create a JWT, it automatically injects the `workload identity` into the workload-identity claim. For example:
+Then, when use the `JwtBuilder` API to create a JWT, it automatically injects the `workload identity` into the workload-identity claim. For example:
 
 [source, java]
 ----
@@ -84,7 +84,7 @@ This code creates a JWT with the following payload:
   "token_type": "Bearer",
   "aud": "server",
   "sub": "jdoe",
-  "email": "jdoe@ibm.com",
+  "email": "jdoe@example.com",
   "workload-identity": "myHost,/wlp/usr/,myServer,myApp",
   "iss": "https://localhost:9443/jwt/myJwtBuilder",
   "exp": 1790280039,
