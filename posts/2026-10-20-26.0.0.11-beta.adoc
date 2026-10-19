@@ -1,0 +1,272 @@
+---
+layout: post
+title: "Workload identity and JWK rotation for JWT Builder, configurable quiesce timeout, and Netty transport in 26.0.0.11-beta"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/IsmathBadsha
+author_github: https://github.com/IsmathBadsha
+seo-title: "Workload identity and JWK rotation for JWT Builder, configurable quiesce timeout, and Netty transport in 26.0.0.11-beta - OpenLiberty.io"
+seo-description: Open Liberty 26.0.0.11-beta adds workload identity and JWK rotation support to the JWT Builder, a configurable quiesce timeout on the server element, and a beta preview of the Netty-based HTTP transport.
+blog_description: Open Liberty 26.0.0.11-beta adds workload identity and JWK rotation support to the JWT Builder, a configurable quiesce timeout on the server element, and a beta preview of the Netty-based HTTP transport.
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+---
+= Workload identity and JWK rotation for JWT Builder, configurable quiesce timeout, and Netty transport in 26.0.0.11-beta
+Ismath Badsha <https://github.com/IsmathBadsha>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+Open Liberty 26.0.0.11-beta adds workload identity injection and JWK rotation settings to the JWT Builder, makes the server quiesce timeout configurable on the `server` element, and previews a Netty-based HTTP transport.
+
+// // // // // // // //
+// Change the RELEASE_SUMMARY to an introductory paragraph. This sentence is really
+// important because it is supposed to grab the readers attention.  Make sure to keep the blank lines
+//
+// Throughout the doc, replace RELEASE_VERSION with the version number of Open Liberty, eg: 22.0.0.2-beta
+// // // // // // // //
+The link:{url-about}[Open Liberty] 26.0.0.11-beta includes the following beta features (along with link:{url-prefix}/docs/latest/reference/feature/feature-overview.html[all GA features]):
+
+* <<jwt_builder, Workload identity and JWK rotation support for JWT Builder>>
+* <<quiesce_timeout, Configurable quiesce timeout on the server element>>
+* <<netty, Netty on Open Liberty>>
+
+// // // // // // // //
+// In the preceding section:
+// Change SUB_FEATURE_TITLE to the feature that is included in this release and
+// change the SUB_TAG_1/2/3 to the heading tags
+//
+// However if there's only 1 new feature, delete the previous section and change it to the following sentence:
+// "The link:{url-about}[Open Liberty] RELEASE_VERSION includes SUB_FEATURE_TITLE"
+// // // // // // // //
+
+See also link:{url-prefix}/blog/?search=beta&key=tag[previous Open Liberty beta blog posts].
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/TODO
+// Contact/Reviewer: TODO
+// // // // // // // //
+[#jwt_builder]
+== Workload identity and JWK rotation support for JWT Builder
+
+A link:https://www.rfc-editor.org/info/rfc7519/[JSON Web Token (JWT)] is a compact, signed token that carries claims about a subject, and a link:https://www.rfc-editor.org/info/rfc7517/[JSON Web Key (JWK)] is a key that consumers use to verify the token's signature. The JWT Builder now supports automatic workload identity injection into the JWTs that it generates, so JWT consumers can identify the workload or application that generated a JWT. The JWT Builder also now lets you configure how often it rotates its JWKs and the maximum number of JWKs it publishes on the JWK endpoint (the default rotation interval is 12 hours and the default maximum of JWKs is 2). When the maximum number of JWKs is reached, the oldest JWK is discarded after the next rotation. Publishing more JWKs ensures that previously issued JWTs remain verifiable after rotation. Alternatively, the maximum number of JWKs can be set to 1 to invalidate all previously issued JWTs after each JWK rotation.
+
+These capabilities are configured through the `workloadIdentityClaim`, `jwkRotationTime`, and `jwkMaxKeys` attributes in the `jwtBuilder` element of the JSON Web Token 1.0 (`jwt-1.0`) feature. This feature is intended for server administrators and application developers.
+
+Previously, developers had to generate a workload identity themselves and inject it into the JWTs by using the `JwtBuilder` API. Now, the `JwtBuilder` API can automatically inject a workload identity into the JWTs it builds. Once the `workloadIdentityClaim` property is set on the `jwtBuilder` element, the claim designated by that property cannot be modified by `JwtBuilder` APIs which reference that `jwtBuilder` element, providing a verifiable attestation of the originating workload. Previously, the JWT Builder's JWKs were rotated every 12 hours, and the JWK endpoint published a maximum of 2 JWKs. Now, server administrators can specify the rotation interval based on their security requirements and the maximum number of JWKs that the JWK endpoint publishes, reducing disruption when JWKs are rotated.
+
+=== Enable workload identity
+
+To enable workload identity in the JWT Builder, set the `workloadIdentityClaim` attribute in the `jwtBuilder` element to your desired claim name. For example:
+
+[source, xml]
+----
+<jwtBuilder id="myJwtBuilder" workloadIdentityClaim="workload-identity" />
+----
+
+Then, when use the `JwtBuilder` API to create a JWT, it automatically injects the `workload identity` into the workload-identity claim. For example:
+
+[source, java]
+----
+JwtBuilder.create("myJwtBuilder")
+    .subject("jdoe")
+    .audience(List.of("server"))
+    .claim("email", "jdoe@example.com")
+    .buildJwt();
+----
+
+This code creates a JWT with the following payload:
+
+[source, json]
+----
+{
+  "token_type": "Bearer",
+  "aud": "server",
+  "sub": "jdoe",
+  "email": "jdoe@example.com",
+  "workload-identity": "myHost,/wlp/usr/,myServer,myApp",
+  "iss": "https://localhost:9443/jwt/myJwtBuilder",
+  "exp": 1790280039,
+  "iat": 1790272839
+}
+----
+
+The format of the workload identity claim's value is `<host-name>,<path-to-usr-dir>,<server-name>,<app-name>`. In a containerized environment, you can use the `CONTAINER_HOST` and `CONTAINER_NAME` environment variables to customize the `<host-name>` and `<server-name>` values.
+
+=== Configure JWK rotation
+
+To configure the JWK rotation interval and the maximum number of JWKs published on the JWK endpoint, set the `jwkRotationTime` and `jwkMaxKeys` attributes in the `jwtBuilder` element. For example:
+
+[source, xml]
+----
+<jwtBuilder jwkRotationTime="30m" jwkMaxKeys="4" />
+----
+
+In this example, the JWKs are rotated every 30 minutes and the JWK endpoint publishes a maximum of 4 JWKs.
+
+For more information, see the following resources:
+
+* link:{url-prefix}/docs/latest/reference/feature/jwt-1.0.html[JSON Web Token 1.0 (`jwt-1.0`) feature]
+* link:{url-prefix}/docs/latest/reference/config/jwtBuilder.html[`jwtBuilder` configuration reference]
+* link:{url-prefix}/docs/latest/reference/javadoc/api/jwt-1.0.com.ibm.websphere.security.jwt.html?path=26.0.0.9/com.ibm.websphere.appserver.api.jwt_1.1-javadoc/com/ibm/websphere/security/jwt/JwtBuilder.html[`JwtBuilder` Javadoc]
+* link:https://www.rfc-editor.org/info/rfc7519/[RFC 7519: JSON Web Token (JWT)]
+* link:https://www.rfc-editor.org/info/rfc7517/[RFC 7517: JSON Web Key (JWK)]
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/25523
+// Contact/Reviewer: TODO
+// // // // // // // //
+[#quiesce_timeout]
+== Configurable quiesce timeout on the server element
+
+When the server shuts down, Liberty enters a quiesce stage, which prevents services from accepting new requests and allows existing requests to complete. Previously, the quiesce stage was fixed at 30 seconds. You can now configure the server quiesce timeout (`quiesceTimeout`) directly on the `server` element in the `server.xml` file.
+
+This update is intended for developers and operators who experience problems during server shutdown when 30 seconds is not long enough for services to complete existing requests.
+In 26.0.0.10-beta, you could configure the quiesce timeout on the `executor` element. This setting is now promoted to the `server` element, which is the appropriate location for a server-wide shutdown setting. If `quiesceTimeout` is configured on the `server` element, and `chainQuiesceTimeout` is configured on the `channelfw` element, the value on the `server` element takes precedence.
+
+To configure the quiesce timeout, add the `quiesceTimeout` attribute to the `server` element in the `server.xml` file:
+
+[source, xml]
+----
+<server quiesceTimeout="1m30s">
+    ...
+</server>
+----
+
+The timeout value is a positive duration, which is a number followed by a unit of time: hours (`h`), minutes (`m`), or seconds (`s`). You can combine units in a single value; for example, `1m30s` is equivalent to 90 seconds. The minimum value is 30 seconds. If you specify a shorter duration, the minimum of `30s` is used instead.
+
+For more information, see the Liberty configuration reference for the link:{url-prefix}/docs/latest/reference/config/server.html[`server` element] and the related GitHub issue link:https://github.com/OpenLiberty/open-liberty/issues/25523[Make Quiesce time configurable (#25523)].
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/TODO
+// Contact/Reviewer: TODO
+// // // // // // // //
+[#netty]
+== Netty on Open Liberty
+
+Open Liberty now provides a Netty-based HTTP transport as a beta preview. This is an internal implementation swap of the underlying transport that is used for HTTP/1.1, HTTP/2, WebSocket, JMS, and SIP communications. It is designed for zero migration: your applications and `server.xml` file should continue to behave the same. We are looking forward to your feedback before GA.
+
+This update is targeted at application developers, performance engineers, and operations and site engineers who validate behavior, throughput, and observability. Netty's event-driven I/O gives Open Liberty a modern foundation for long-term scalability, easier maintenance, and future performance work, all without asking you to change APIs or configuration.
+
+=== Try the Netty-based transport
+
+No changes are required to benefit from the Netty-based transport. Use the All Beta Features runtime for this release. To help us validate parity and performance for your real-world scenarios, you can try the following areas:
+
+* HTTP/1.1 and HTTP/2: large uploads and downloads, chunked transfers, compression-enabled content, and keep-alive behavior.
+* WebSocket: long-lived communications and backpressure scenarios.
+* Timeouts: read, write, and keep-alive timeouts under load.
+* Access logging: verify the formatting and log results compared to previous builds.
+* JMS communications: message send and receive throughput, and durable subscriptions.
+
+=== Limitations of the beta
+
+**HTTP**
+
+* HTTP requests with a content length greater than the maximum integer value fail because of internal limitations on request size with Netty.
+* If the `http` option `maxKeepAliveRequests` has no limit, there is a maximum limit of 50 pipelined requests on HTTP/1.1.
+* Because of internal limitations of the Netty library, the `http` option `MessageSizeLimit` is capped at the maximum integer value for HTTP/2.0 connections.
+* Because of internal differences with Netty, the `http` option `ThrowIOEForInboundConnections` might behave differently from the Channel Framework implementation.
+
+**ALPN**
+
+* The Netty implementation supports only the native JDK ALPN implementation. For information about the ALPN implementations that the Channel Framework supports but the Netty beta does not, see link:https://www.ibm.com/docs/en/was-liberty/base?topic=40-alpn-support[ALPN support].
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+[#run]
+== Try it now
+
+To try out these features, update your build tools to pull the Open Liberty All Beta Features package instead of the main release. The beta works with Java SE versions 27, 25, 21, 17, 11, and 8.
+// // // // // // // //
+// In the preceding section:
+// Check if a new non-LTS Java SE version is supported that needs to be added to the list (21, 17, 11, and 8 are LTS and will remain for a while)
+// https://openliberty.io/docs/latest/java-se.html
+//
+// In the following section:
+// Check if a new MicroProfile or Jakarta version is in beta that could replace the example values in the codeblock
+// // // // // // // //
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], you can install the All Beta Features package using:
+
+[source,xml]
+----
+<plugin>
+    <groupId>io.openliberty.tools</groupId>
+    <artifactId>liberty-maven-plugin</artifactId>
+    <version>3.12.4</version>
+    <configuration>
+        <runtimeArtifact>
+          <groupId>io.openliberty.beta</groupId>
+          <artifactId>openliberty-runtime</artifactId>
+          <version>26.0.0.11-beta</version>
+          <type>zip</type>
+        </runtimeArtifact>
+    </configuration>
+</plugin>
+----
+
+You must also add dependencies to your pom.xml file for the beta version of the APIs that are associated with the beta features that you want to try. For example, the following block adds dependencies for two example beta APIs:
+
+[source,xml]
+----
+<dependency>
+    <groupId>org.example.spec</groupId>
+    <artifactId>exampleApi</artifactId>
+    <version>7.0</version>
+    <type>pom</type>
+    <scope>provided</scope>
+</dependency>
+<dependency>
+    <groupId>example.platform</groupId>
+    <artifactId>example.example-api</artifactId>
+    <version>11.0.0</version>
+    <scope>provided</scope>
+</dependency>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'io.openliberty.tools:liberty-gradle-plugin:4.0.3'
+    }
+}
+apply plugin: 'liberty'
+dependencies {
+    libertyRuntime group: 'io.openliberty.beta', name: 'openliberty-runtime', version: '[26.0.0.11-beta,)'
+}
+----
+// // // // // // // //
+// In the preceding section:
+// Replace the Maven `3.8.2` with the latest version of the plugin: https://search.maven.org/artifact/io.openliberty.tools/liberty-maven-plugin
+// Replace the Gradle `3.6.2` with the latest version of the plugin: https://search.maven.org/artifact/io.openliberty.tools/liberty-gradle-plugin
+// TODO: Update GHA to automatically do the above.  If the maven.org is problematic, then could fallback to using the GH Releases for the plugins
+// // // // // // // //
+
+Or if you're using link:{url-prefix}/docs/latest/container-images.html[container images]:
+
+[source]
+----
+FROM icr.io/appcafe/open-liberty:beta
+----
+
+Or take a look at our link:{url-prefix}/downloads/#runtime_betas[Downloads page].
+
+If you're using link:https://plugins.jetbrains.com/plugin/14856-liberty-tools[IntelliJ IDEA], link:https://marketplace.visualstudio.com/items?itemName=Open-Liberty.liberty-dev-vscode-ext[Visual Studio Code] or link:https://marketplace.eclipse.org/content/liberty-tools[Eclipse IDE], you can also take advantage of our open source link:https://openliberty.io/docs/latest/develop-liberty-tools.html[Liberty developer tools] to enable effective development, testing, debugging and application management all from within your IDE.
+
+For more information on using a beta release, refer to the link:{url-prefix}docs/latest/installing-open-liberty-betas.html[Installing Open Liberty beta releases] documentation.
+
+[#feedback]
+== We welcome your feedback
+
+Let us know what you think on link:https://groups.io/g/openliberty[our mailing list]. If you hit a problem, link:https://stackoverflow.com/questions/tagged/open-liberty[post a question on StackOverflow]. If you hit a bug, link:https://github.com/OpenLiberty/open-liberty/issues[please raise an issue].
