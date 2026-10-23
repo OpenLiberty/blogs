@@ -73,6 +73,7 @@ In link:{url-about}[Open Liberty] 26.0.0.8:
 
 * <<CVEs, Security Vulnerability (CVE) Fixes>>
 * <<bugs, Notable bug fixes>>
+* <<jsonlimits, Default parsing limits added to JSON Parsers>>
 
 // // // // // // // //
 // If there were updates to guides since last release, keep the following, otherwise remove section.
@@ -180,19 +181,19 @@ image::img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="cent
 |7.5
 |Denial of service
 |17.0.0.3-26.0.0.7
-|Affects the `jaxrs-2.1`, `restfulWS-3.0`, `restfulWS-3.1`, `restfulWS-4.0`, `json-1.0`, `jsonp-1.0`, `jsonp-1.1`, `jsonp-2.0`, `jsonp-2.1`, `jaxws-2.2`, `xmlWS-3.0`, and `xmlWS-4.0` features
+|Affects the `jaxrs-2.0`, `jaxrs-2.1`, `restfulWS-3.0`, `restfulWS-3.1`, `restfulWS-4.0`, `json-1.0`, `jsonp-1.0`, `jsonp-1.1`, `jsonp-2.0`, `jsonp-2.1`, `jaxws-2.2`, `xmlWS-3.0`, and `xmlWS-4.0` features
 
 |https://www.cve.org/CVERecord?id=CVE-2026-9322[CVE-2026-9322]
 |7.5
 |Denial of service
 |17.0.0.3-26.0.0.7
-|Affects the `jaxrs-2.1`, `restfulWS-3.0`, `restfulWS-3.1`, `restfulWS-4.0`, `json-1.0`, `jsonp-1.0`, `jsonp-1.1`, `jsonp-2.0`, `jsonp-2.1`, `jaxws-2.2`, `xmlWS-3.0`, and `xmlWS-4.0` features
+|Affects the `jaxrs-2.0`, `jaxrs-2.1`, `restfulWS-3.0`, `restfulWS-3.1`, `restfulWS-4.0`, `json-1.0`, `jsonp-1.0`, `jsonp-1.1`, `jsonp-2.0`, `jsonp-2.1`, `jaxws-2.2`, `xmlWS-3.0`, and `xmlWS-4.0` features
 
 |https://www.cve.org/CVERecord?id=CVE-2026-9171[CVE-2026-9171]
 |7.5
 |Denial of service
 |17.0.0.3-26.0.0.7
-|Affects the `jaxrs-2.1`, `restfulWS-3.0`, `restfulWS-3.1`, `restfulWS-4.0`, `json-1.0`, `jsonp-1.0`, `jsonp-1.1`, `jsonp-2.0`, `jsonp-2.1`, `jaxws-2.2`, `xmlWS-3.0`, and `xmlWS-4.0` features
+|Affects the `jaxrs-2.0`, `jaxrs-2.1`, `restfulWS-3.0`, `restfulWS-3.1`, `restfulWS-4.0`, `json-1.0`, `jsonp-1.0`, `jsonp-1.1`, `jsonp-2.0`, `jsonp-2.1`, `jaxws-2.2`, `xmlWS-3.0`, and `xmlWS-4.0` features
 
 |https://www.cve.org/CVERecord?id=CVE-2026-9563[CVE-2026-9563]
 |7.5
@@ -256,7 +257,77 @@ We’ve spent some time fixing bugs. The following sections describe the issues 
 // For inspiration about how to write this section look at previous blogs e.g- 20.0.0.10 or 21.0.0.12 (https://openliberty.io/blog/2021/11/26/jakarta-ee-9.1.html#bugs)
 // // // // // // // //
 
+[#jsonlimits]
+== Default parsing limits added to JSON Parsers
 
+The JSON parsers that Liberty uses internally now enforce default limits on the size and structure of the JSON it parses. This helps resolve a denial of service security vulnerability in which a specially crafted JSON payload could consume excessive memory and cause the server to stop. JSON that exceeds a limit is now rejected instead of being parsed.
+
+If an application processes JSON that exceeds a default limit, parsing stops and an exception is thrown. To raise a limit, set the corresponding system property, for example in the `jvm.options` file:
+
+=== JSON4J
+
+[cols="2*"]
+|===
+|System property |Default
+
+|`com.ibm.json4j.max.array.size`
+|100000
+
+|`com.ibm.json4j.max.object.members`
+|10000
+
+|`com.ibm.json4j.max.nesting.depth`
+|500
+
+|`com.ibm.json4j.max.string.length`
+|1048576
+
+|`com.ibm.json4j.max.number.length`
+|100
+
+|`com.ibm.json4j.max.total.size`
+|104857600 (100 MB)
+|===
+
+=== Eclipse Parsson
+
+[cols="2*"]
+|===
+|System property |Default
+
+|`org.eclipse.parsson.maxBigIntegerScale`
+|100000
+
+|`org.eclipse.parsson.maxBigDecimalLength`
+|1100
+
+|`org.eclipse.parsson.maxDepth`
+|1000
+
+|`org.eclipse.parsson.maxParsingLimit`
+|15000000 characters (roughly 10 MB of JSON)
+|===
+
+=== Glassfish
+
+[cols="2*"]
+|===
+|System property |Default
+
+|`org.glassfish.json.maxBigIntegerScale`
+|100000
+
+|`org.glassfish.json.maxBigDecimalLength`
+|1100
+
+|`org.glassfish.json.maxDepth`
+|1000
+
+|`org.glassfish.json.maxParsingLimit`
+|15000000 characters (roughly 10 MB of JSON)
+|===
+
+Each property must be set to a positive number. For more information, see the security bulletins for link:https://www.ibm.com/support/pages/node/7278576[CVE-2026-9322] and link:https://www.ibm.com/support/pages/node/7279284[CVE-2026-9563].
 
 == Get Open Liberty 26.0.0.8 now
 
