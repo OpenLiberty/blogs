@@ -1,0 +1,100 @@
+---
+layout: post
+title: "Copy-paste your Maven and Gradle dependencies straight from the Open Liberty feature docs"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/Jozef-Vargas
+author_github: https://github.com/Jozef-Vargas
+seo-title: Maven and Gradle dependency snippets now on Open Liberty feature reference pages - OpenLiberty.io
+seo-description: Open Liberty feature reference pages now include ready-to-use Maven and Gradle dependency snippets for both the Liberty feature itself and its upstream API — no more hunting for the right groupId or version.
+blog_description: "Open Liberty feature reference pages now include ready-to-use Maven and Gradle dependency snippets for both the Liberty feature itself and its upstream API — no more hunting for the right groupId or version."
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+---
+= Copy-paste your Maven and Gradle dependencies straight from the Open Liberty feature docs
+Jozef Vargas <https://github.com/Jozef-Vargas>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+You know the drill. You're adding a new Liberty feature to your app, you flip over to the feature reference page to remind yourself of the config, and then you spend the next ten minutes on Maven Central trying to figure out which `groupId` goes with the MicroProfile Health API and whether version `4.0.0` or `4.0.1` is the one that actually exists.
+
+Not anymore.
+
+Starting with Open Liberty 26.0.0.12, every feature reference page on link:https://openliberty.io/docs/latest/reference/feature/[openliberty.io] includes ready-to-copy Maven and Gradle dependency snippets — both for the Liberty feature itself and for the upstream API your code compiles against.
+
+== What you'll see on the page
+
+Take `mpHealth-4.0` as an example. In the "Enabling this feature" section you'll now find four blocks right after the `server.xml` snippet:
+
+A Maven block to pull in the Liberty feature POM (which resolves transitive runtime dependencies):
+
+[source,xml]
+----
+<dependency>
+    <groupId>io.openliberty.features</groupId>
+    <artifactId>mpHealth-4.0</artifactId>
+    <version>26.0.0.12</version>
+    <type>pom</type>
+    <scope>provided</scope>
+</dependency>
+----
+
+A Maven block for the MicroProfile Health API itself (the jar your application code compiles against):
+
+[source,xml]
+----
+<dependency>
+    <groupId>org.eclipse.microprofile.health</groupId>
+    <artifactId>microprofile-health-api</artifactId>
+    <version>4.0.1</version>
+    <scope>provided</scope>
+</dependency>
+----
+
+And the same two things again for Gradle users:
+
+[source,groovy]
+----
+providedCompile 'io.openliberty.features:mpHealth-4.0:26.0.0.12@pom'
+----
+
+[source,groovy]
+----
+compileOnly 'org.eclipse.microprofile.health:microprofile-health-api:4.0.1'
+----
+
+The API snippet only shows up when the feature actually provides a compile-time API — features that are purely runtime have just the Liberty feature blocks.
+
+== Why this took a little longer than you'd think
+
+This one was trickier than it sounds. Liberty features aren't flat — a public feature like `mpHealth-4.0` is actually a thin shell that delegates to a chain of private sub-features one or two levels deep. The actual Maven coordinate for the MicroProfile Health API was declared way down in `io.openliberty.org.eclipse.microprofile.health-4.0`, which is a private sub-feature you'd never see in your `server.xml`.
+
+The original implementation of the feature list generator only looked at direct constituents of the public feature manifest, so it found coordinates for the ~57 features that had them declared right at the top level — but silently came up empty for all the MicroProfile and Jakarta EE spec features, which is exactly the set of features most applications actually use.
+
+The fix was to make the generator walk the full private sub-feature tree recursively, skipping other public features along the way (those get their own pages) and using a visited-set to guard against cycles. The result: around 150 additional features — basically the entire MicroProfile and Jakarta EE specification surface — now surface their correct API coordinates.
+
+== For senior devs: where this actually lives
+
+The change is split across two repositories:
+
+* link:https://github.com/OpenLiberty/open-liberty/pull/36051[open-liberty #36051] — `FeatureList.java` in the kernel feature cmdline project. The new `collectMavenCoordinates()` method recurses through `features` and `coreFeatures` maps (the same maps used by the existing `searchContent()` logic), collecting `mavenCoordinates` attributes from bundle constituents at every depth. It writes the deduplicated results as `<mavenCoordinates>` child elements inside each `<feature>` entry in `featureList.xml`.
+
+* link:https://github.com/websphere/WS-CD-Open/pull/37581[WS-CD-Open #37581] — `GenerateAdocForFeatures.java` in the docgen pipeline reads those elements and emits the AsciiDoc code blocks you see on the page. This side needed no changes to support recursive coordinates — it already read whatever `<mavenCoordinates>` elements were present. The WS-CD work in this branch added the rendering in the first place, including the Gradle blocks, the correct `<type>pom</type>` for the feature dependency, and getting the positioning of the sections right per reviewer feedback.
+
+Zero changes to your application or server configuration are needed. It's purely a documentation improvement.
+
+== What's covered
+
+Pretty much everything you'd actually use:
+
+- All MicroProfile features (`mpHealth`, `mpConfig`, `mpMetrics`, `mpJWT`, `mpTelemetry`, etc.)
+- Jakarta EE spec features (`restfulWS`, `jsonp`, `jsonb`, `cdi`, `faces`, `persistence`, `batch`, etc.)
+- Any feature that had coordinates directly in its public manifest already (those were already working)
+
+== Try it out
+
+Head to any feature reference page — for example link:{url-prefix}/docs/latest/reference/feature/mpHealth-4.0.html[MicroProfile Health 4.0] or link:{url-prefix}/docs/latest/reference/feature/restfulWS-3.1.html[Jakarta RESTful Web Services 3.1] — and scroll to the "Enabling this feature" section. The snippets are syntax-highlighted and copy-button-ready.
+
+If you spot a feature where the coordinates look wrong or are missing when you'd expect them, feel free to open an issue in the link:https://github.com/OpenLiberty/open-liberty[open-liberty repo] — the coordinates come from the feature manifests themselves, so a missing or incorrect value there would be the place to fix it.
