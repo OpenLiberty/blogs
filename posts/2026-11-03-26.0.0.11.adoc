@@ -1,0 +1,296 @@
+---
+layout: post
+title: "Configurable quiesce timeout and security enhancements in Open Liberty 26.0.0.11"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/Arjun-Aravind-dev
+author_github: https://github.com/Arjun-Aravind-dev
+seo-title: Configurable quiesce timeout and security enhancements in Open Liberty 26.0.0.11 - OpenLiberty.io
+seo-description: Open Liberty 26.0.0.11 introduces a configurable quiesce timeout on the server element, giving operations teams control over the graceful shutdown grace period, along with a security fix for CVE-2026-10844 that blocks unvalidated form login error page redirects to external hosts.
+blog_description: Open Liberty 26.0.0.11 introduces a configurable quiesce timeout on the server element, giving operations teams control over the graceful shutdown grace period, along with a security fix for CVE-2026-10844 that blocks unvalidated form login error page redirects to external hosts.
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+---
+= Configurable quiesce timeout and security enhancements in Open Liberty 26.0.0.11
+AUTHOR_NAME <https://github.com/Arjun-Aravind-dev>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+Open Liberty 26.0.0.11 gives server administrators direct control over the graceful shutdown grace period through a new `quiesceTimeout` attribute on the `<server>` element, eliminating the previous hardcoded 30-second limit that could leave long-lived workloads abruptly interrupted at shutdown. This release also addresses CVE-2026-10844 by adding validation for form login error page redirects to external hosts.
+
+In link:{url-about}[Open Liberty] 26.0.0.11:
+
+* <<quiesce_timeout, Configurable quiesce timeout on the server element>>
+* <<form_login_redirect, Additional validation for form login error page redirects>>
+* <<CVEs, Security vulnerability (CVE) fixes>>
+* <<bugs, Notable bug fixes>>
+
+Along with the new features and functions added to the runtime, we've also made <<guides, updates to our guides>>.
+
+View the list of fixed bugs in link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A260011+label%3A%22release+bug%22[26.0.0.11].
+
+<<run,Try it now in 26.0.0.11>>
+
+Check out link:{url-prefix}/blog/?search=release&search!=beta[previous Open Liberty GA release blog posts].
+
+
+[#quiesce_timeout]
+== Configurable quiesce timeout on the server element
+
+When you stop a Liberty server, it enters a quiesce phase — a grace period during which it waits for active work to finish before the JVM exits. During this phase, Liberty notifies registered shutdown listeners, allowing features to drain connections and complete in-flight requests, and then waits for any remaining active threads in the executor service to complete. Previously, this grace period was hardcoded at 30 seconds with no way to adjust it. For operations teams running workloads with long-lived requests — such as batch jobs, large file transfers, or complex transactions — 30 seconds was often insufficient, leaving work abruptly interrupted at shutdown.
+
+The configurable quiesce timeout feature lets server administrators set the quiesce grace period to any value of 30 seconds or greater by using the `quiesceTimeout` attribute on the `<server>` element in `server.xml`.
+
+=== Two-stage shutdown sequence
+
+The configured timeout governs a two-stage shutdown sequence:
+
+. *Pre-phase listeners* — Liberty first notifies pre-phase `ServerQuiesceListener` components, such as the channel framework, which stops inbound network connections. These listeners have the full configured timeout available to them.
+. *Default-phase listeners and thread drain* — Liberty then notifies default-phase listeners, which drain in-flight application work, and waits for active threads in the shared executor service to finish. These share whatever time remains from the original budget.
+
+[NOTE]
+====
+If pre-phase listeners consume more than half of the configured timeout, Liberty grants the default-phase listeners a fresh window equal to half the configured timeout, rather than the remaining time. This means the actual elapsed shutdown time can be up to 1.5× the configured value. If your application code must complete within a strict wall-clock deadline at shutdown, set `quiesceTimeout` conservatively enough to account for this behaviour.
+====
+
+=== Configuration
+
+Add the `quiesceTimeout` attribute to the `<server>` element in your `server.xml`:
+
+[source,xml]
+----
+<server quiesceTimeout="2m">
+    <!-- your existing configuration -->
+</server>
+----
+
+The value uses Liberty's standard duration syntax — specify a positive integer followed by a time unit: `h` (hours), `m` (minutes), `s` (seconds), or `ms` (milliseconds). Units can be combined:
+
+[source,xml]
+----
+<!-- 2 minutes -->
+<server quiesceTimeout="2m">
+
+<!-- 90 seconds — two equivalent forms -->
+<server quiesceTimeout="1m30s">
+<server quiesceTimeout="90s">
+
+<!-- plain integer is interpreted as seconds -->
+<server quiesceTimeout="120">
+----
+
+The minimum allowed value is `30s`. Values below the minimum, or values that cannot be parsed, fall back to the default of 30 seconds and log warning message `CWWKG0111W`.
+
+The timeout can be updated dynamically — change it in `server.xml` while the server is running and the next shutdown will use the new value without a restart.
+
+[NOTE]
+====
+*Beta users:* In the beta release, this attribute was configured on the `<executor>` element (`<executor quiesceTimeout="1m30s"/>`). In 26.0.0.11, it has moved to the `<server>` element. Update your `server.xml` accordingly.
+====
+
+=== Shutdown log messages
+
+When the server begins quiescing, audit message `CWWKE1100I` is emitted showing the configured timeout:
+
+----
+CWWKE1100I: Waiting for up to 120 seconds for the server to quiesce.
+----
+
+On a clean shutdown, this is followed by:
+
+----
+CWWKE1101I: Server quiesce complete.
+----
+
+If the timeout expires before all listeners and threads finish, Liberty proceeds with shutdown and logs the following messages:
+
+----
+CWWKE1102W: The quiesce operation did not complete. The server will now stop.
+CWWKE1106W: 2 shutdown operations did not complete during the quiesce period. ...
+CWWKE1107W: A total of 3 threads did not complete during the quiesce period.
+----
+
+`CWWKE1102W` is the signal to increase `quiesceTimeout`. The accompanying `CWWKE1106W` and `CWWKE1107W` messages identify specifically which listeners and how many threads were still running, providing the information needed to choose an appropriate value.
+
+For more information, see the link:{url-prefix}/docs/latest/reference/config/server.html[Liberty server element configuration reference] and link:https://openliberty.io/docs/latest/server-configuration-overview.html[Configuring Liberty server shutdown].
+
+
+[#form_login_redirect]
+== Additional validation for form login error page redirects
+
+Form login error page redirects to external hosts are now blocked unless the target host is listed in the `wasReqURLRedirectDomainNames` attribute of the `<webAppSecurity />` element. This validation is consistent with the existing check applied to `WASReqURL` redirects.
+
+This change applies when the form login error page is specified by using either the `error_page` request parameter or the `loginErrorURL` attribute of the `<webAppSecurity />` element in the `server.xml` file. The host in the error page URL must be either the host of the current login request or a host listed in the `wasReqURLRedirectDomainNames` attribute of the `<webAppSecurity />` element. If not, the redirect to an external host is blocked, with the `CWWKS9134E` error being logged. To allow the redirect, add the trusted host to this attribute.
+
+For more information, see the link:{url-prefix}/docs/latest/reference/config/webAppSecurity.html[`webAppSecurity` configuration element].
+
+
+[#CVEs]
+== Security vulnerability (CVE) fixes in this release
+
+[cols="5*"]
+|===
+|CVE |CVSS Score |Vulnerability Assessment |Versions Affected |Notes
+
+|https://www.cve.org/CVERecord?id=CVE-2026-101294[CVE-2026-101294]
+|8.7
+|Improper verification of cryptographic signature
+|17.0.0.3-26.0.0.10
+|Affects the `openidConnectClient-1.0`, `openidConnectServer-1.0`, `socialLogin-1.0`, `jwt-1.0`, and `jwtSso-1.0` features
+
+|https://www.cve.org/CVERecord?id=CVE-2026-103320[CVE-2026-103320]
+|4.3
+|Information disclosure
+|17.0.0.3-26.0.0.10
+|Affects the `restConnector-2.0` feature
+
+|https://www.cve.org/CVERecord?id=CVE-2026-103499[CVE-2026-103499]
+|7.5
+|Denial of service
+|17.0.0.3-26.0.0.10
+|Affects the `servlet-3.1`, `servlet-4.0`, `servlet-5.0`, `servlet-6.0`, and `servlet-6.1` features
+
+|https://www.cve.org/CVERecord?id=CVE-2026-105442[CVE-2026-105442]
+|7.5
+|Denial of service
+|17.0.0.3-26.0.0.10
+|Affects the `messagingServer-3.0` and `wasJmsServer-1.0` features
+
+|https://www.cve.org/CVERecord?id=CVE-2026-108284[CVE-2026-108284]
+|6.5
+|Information disclosure
+|17.0.0.3-26.0.0.10
+|Affects the `restConnector-2.0` feature
+
+|https://www.cve.org/CVERecord?id=CVE-2026-10844[CVE-2026-10844]
+|4.3
+|Open redirect
+|17.0.0.3-26.0.0.10
+|Affects the `appSecurity-1.0`, `appSecurity-2.0`, `appSecurity-3.0`, `appSecurity-4.0`, `appSecurity-5.0`, and `appSecurity-6.0` features
+
+|https://www.cve.org/CVERecord?id=CVE-2026-11547[CVE-2026-11547]
+|4.3
+|Server-side request forgery
+|17.0.0.3-26.0.0.10
+|Affects the `adminCenter-1.0` feature
+
+|https://www.cve.org/CVERecord?id=CVE-2026-17615[CVE-2026-17615]
+|7.5
+|Improper restriction of XML external entity reference
+|17.0.0.3-26.0.0.10
+|Affects the `restfulWS-3.0`, `restfulWS-3.1`, and `restfulWS-4.0` features
+
+|https://www.cve.org/CVERecord?id=CVE-2026-76646[CVE-2026-76646]
+|7.5
+|Denial of service
+|17.0.0.3-26.0.0.10
+|Affects the `jsf-2.2`, `faces-3.0`, `faces-4.0`, and `faces-4.1` features
+
+|https://www.cve.org/CVERecord?id=CVE-2026-78636[CVE-2026-78636]
+|4.3
+|Information disclosure
+|17.0.0.3-26.0.0.10
+|Affects the `restConnector-2.0` feature
+
+|https://www.cve.org/CVERecord?id=CVE-2026-93895[CVE-2026-93895]
+|9.1
+|Authorization bypass
+|17.0.0.3-26.0.0.10
+|Affects the `grpc-1.0` feature
+
+|https://www.cve.org/CVERecord?id=CVE-2026-93905[CVE-2026-93905]
+|8.2
+|Deserialization of untrusted data
+|17.0.0.3-26.0.0.10
+|Affects the `batchManagement-1.0` feature
+
+|https://www.cve.org/CVERecord?id=CVE-2026-93909[CVE-2026-93909]
+|9.1
+|Authentication bypass
+|17.0.0.3-26.0.0.10
+|Affects the `samlWeb-2.0` feature
+
+|===
+
+For a list of past security vulnerability fixes, reference the link:{url-prefix}/docs/latest/security-vulnerabilities.html[Security vulnerability (CVE) list].
+
+
+[#bugs]
+== Notable bugs fixed in this release
+
+We've spent some time fixing bugs. The following sections describe just some of the issues resolved in this release. If you're interested, here's the link:https://github.com/OpenLiberty/open-liberty/issues?q=label%3Arelease%3A260011+label%3A%22release+bug%22[full list of bugs fixed in 26.0.0.11].
+
+* link:https://github.com/OpenLiberty/open-liberty/issues/36013[Don't force class initialisation from within overrides of ObjectInputStream.resolveClass()]
+* link:https://github.com/OpenLiberty/open-liberty/issues/36010[WSRdbManagedConnectionImpl.destroy() skips poolConn.close() when connection is aborted, leaving DB2 XA session open with no UOW_STOP_TIME]
+* link:https://github.com/OpenLiberty/open-liberty/issues/35992[GeneratePluginConfigMBean.serverStopping() 20s wait is shorter than the 30s quiesce deadline, causing intermittent CWWKE1102W on server stop]
+* link:https://github.com/OpenLiberty/open-liberty/issues/35944[IllegalAccessException for com.ibm.crypto.plus.provider when using collective features with FIPS 140-3 on z/OS IBM Semeru Java 17/21]
+* link:https://github.com/OpenLiberty/open-liberty/issues/35889[Wrong 400-BadRequest response on some valid HTTP/1.1 request on 26.0.0.9]
+* link:https://github.com/OpenLiberty/open-liberty/issues/35864[MCP operation MBeans not removed after app unload due to ConfigurationPolicy.REQUIRE in McpMonitorAppStateListener]
+* link:https://github.com/OpenLiberty/open-liberty/issues/35856[Deadlock in Scheduled Executor and Equinox threads with Threading=all trace]
+* link:https://github.com/OpenLiberty/open-liberty/issues/35807[JAX-WS: Neethi upgrade Java 2 sec fix]
+* link:https://github.com/OpenLiberty/open-liberty/issues/35800[Re-attempt coordinator registration on retried server request]
+* link:https://github.com/OpenLiberty/open-liberty/issues/35799[Prevent transaction stranding during server quiesce]
+* link:https://github.com/OpenLiberty/open-liberty/issues/35712[Intermittent ORB initialization failure with ClassNotFoundException for org.apache.yoko.orb.CORBA.ORB]
+* link:https://github.com/OpenLiberty/open-liberty/issues/35271[HttpServletRequest.getDateHeader interprets 2-digit year with base 2000 instead of a dynamic base]
+* link:https://github.com/OpenLiberty/open-liberty/issues/34899[EclipseLink unable to EXTRACT DATE and TIME from LocalDateTime column on H2]
+* link:https://github.com/OpenLiberty/open-liberty/issues/29751[Unexpected JSESSIONID returned from Rest endpoints]
+
+
+[#guides]
+== New and updated guides since the previous release
+As Open Liberty features and functionality continue to grow, we continue to add link:https://openliberty.io/guides/?search=new&key=tag[new guides to openliberty.io] on those topics to make their adoption as easy as possible.  Existing guides also receive updates to address any reported bugs/issues, keep their content current, and expand what their topic covers.
+
+* link:https://openliberty.io/guides/jakarta-data.html[Data Persistence with Jakarta Data]
++
+Learn how to use Jakarta Data to store data and query it using methods named by convention, annotation-driven queries, and the Jakarta Data Query Language (JDQL).
+
+
+[#run]
+
+== Develop and run your apps using 26.0.0.11
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], include the following in your `pom.xml` file:
+
+[source,xml]
+----
+<plugin>
+    <groupId>io.openliberty.tools</groupId>
+    <artifactId>liberty-maven-plugin</artifactId>
+    <version>3.12.4</version>
+</plugin>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle], include the following in your `build.gradle` file:
+
+[source,gradle]
+----
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'io.openliberty.tools:liberty-gradle-plugin:4.0.3'
+    }
+}
+apply plugin: 'liberty'
+----
+
+Or if you're using link:{url-prefix}/docs/latest/container-images.html[container images]:
+
+[source]
+----
+FROM icr.io/appcafe/open-liberty
+----
+
+Or take a look at our link:{url-prefix}/start/[Downloads page].
+
+If you're using link:https://plugins.jetbrains.com/plugin/14856-liberty-tools[IntelliJ IDEA], link:https://marketplace.visualstudio.com/items?itemName=Open-Liberty.liberty-dev-vscode-ext[Visual Studio Code] or link:https://marketplace.eclipse.org/content/liberty-tools[Eclipse IDE], you can also take advantage of our open source link:https://openliberty.io/docs/latest/develop-liberty-tools.html[Liberty developer tools] to enable effective development, testing, debugging and application management all from within your IDE.
+
+[link=https://stackoverflow.com/tags/open-liberty]
+image::img/blog/blog_btn_stack.svg[Ask a question on Stack Overflow, align="center"]
+
+== Get Open Liberty 26.0.0.11 now
+
+Available through <<run,Maven, Gradle, Docker, and as a downloadable archive>>.
