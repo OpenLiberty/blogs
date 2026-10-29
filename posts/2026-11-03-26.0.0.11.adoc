@@ -18,7 +18,7 @@ Arjun Aravind <https://github.com/Arjun-Aravind-dev>
 :url-about: /
 //Blank line here is necessary before starting the body of the post.
 
-Open Liberty 26.0.0.11 gives server administrators direct control over the graceful shutdown grace period through a new `quiesceTimeout` attribute on the `<server>` element, eliminating the previous hardcoded 30-second limit that could leave long-lived workloads abruptly interrupted at shutdown. This release also addresses CVE-2026-10844 by adding validation for form login error page redirects to external hosts.
+Open Liberty 26.0.0.11 gives server administrators direct control over the graceful shutdown period with a new `quiesceTimeout` attribute on the `<server>` element. This eliminates the previous hardcoded 30-second limit that could abruptly interrupt long-running workloads during shutdown. This release also addresses CVE-2026-10844 by adding validation for form login error page redirects to external hosts.
 
 In link:{url-about}[Open Liberty] 26.0.0.11:
 
@@ -39,9 +39,9 @@ Check out link:{url-prefix}/blog/?search=release&search!=beta[previous Open Libe
 [#quiesce_timeout]
 == Configurable quiesce timeout on the server element
 
-When you stop a Liberty server, it enters a quiesce phase — a grace period during which it waits for active work to finish before the JVM exits. During this phase, Liberty notifies registered shutdown listeners, allowing features to drain connections and complete in-flight requests, and then waits for any remaining active threads in the executor service to complete. Previously, this grace period was hardcoded at 30 seconds with no way to adjust it. For operations teams running workloads with long-lived requests — such as batch jobs, large file transfers, or complex transactions — 30 seconds was often insufficient, leaving work abruptly interrupted at shutdown.
+When you stop an Open Liberty server, it enters a quiesce phase—a grace period during which it waits for active work to finish before the JVM exits. During this phase, Liberty notifies registered shutdown listeners, allowing features to drain connections and complete in-flight requests, and then waits for any remaining active threads in the executor service to finish. Previously, this grace period was hardcoded to 30 seconds with no way to adjust it. For teams running workloads with long-lived requests—such as batch jobs, large file transfers, or complex transactions—30 seconds was often insufficient, leaving work abruptly interrupted at shutdown.
 
-The configurable quiesce timeout feature lets server administrators set the quiesce grace period to any value of 30 seconds or greater by using the `quiesceTimeout` attribute on the `<server>` element in `server.xml`.
+You can now configure the quiesce grace period to any value of 30 seconds or greater by using the `quiesceTimeout` attribute on the `<server>` element in your `server.xml` file.
 
 === Two-stage shutdown sequence
 
@@ -57,7 +57,7 @@ If pre-phase listeners consume more than half of the configured timeout, Liberty
 
 === Configuration
 
-Add the `quiesceTimeout` attribute to the `<server>` element in your `server.xml`:
+Add the `quiesceTimeout` attribute to the `<server>` element in your `server.xml` file:
 
 [source,xml]
 ----
@@ -66,7 +66,7 @@ Add the `quiesceTimeout` attribute to the `<server>` element in your `server.xml
 </server>
 ----
 
-The value uses Liberty's standard duration syntax — specify a positive integer followed by a time unit: `h` (hours), `m` (minutes), `s` (seconds), or `ms` (milliseconds). Units can be combined:
+The value uses Liberty's standard duration syntax — specify a positive integer followed by a time unit: `h` (hours), `m` (minutes), `s` (seconds), or `ms` (milliseconds). You can also combine units:
 
 [source,xml]
 ----
@@ -81,24 +81,24 @@ The value uses Liberty's standard duration syntax — specify a positive integer
 <server quiesceTimeout="120">
 ----
 
-The minimum allowed value is `30s`. Values below the minimum, or values that cannot be parsed, fall back to the default of 30 seconds and log warning message `CWWKG0111W`.
+The minimum allowed value is `30s`. Values less than this threshold, or values that cannot be parsed, fall back to the default of 30 seconds and log warning message `CWWKG0111W`.
 
-The timeout can be updated dynamically — change it in `server.xml` while the server is running and the next shutdown will use the new value without a restart.
+The timeout can be updated dynamically. If you change it in `server.xml` while the server is running, the next shutdown automatically uses the new value without requiring a server restart.
 
 [NOTE]
 ====
-*Beta users:* In the beta release, this attribute was configured on the `<executor>` element (`<executor quiesceTimeout="1m30s"/>`). In 26.0.0.11, it has moved to the `<server>` element. Update your `server.xml` accordingly.
+*For Beta users:* In the beta release, this attribute was configured on the `<executor>` element (for example, `<executor quiesceTimeout="1m30s"/>`). In 26.0.0.11, it is configured on `<server>` element. Update your `server.xml` accordingly.
 ====
 
 === Shutdown log messages
 
-When the server begins quiescing, audit message `CWWKE1100I` is emitted showing the configured timeout:
+When the server begins quiescing, it logs an audit message `CWWKE1100I`, which displays the configured timeout:
 
 ----
 CWWKE1100I: Waiting for up to 120 seconds for the server to quiesce.
 ----
 
-On a clean shutdown, this is followed by:
+On a clean shutdown, message `CWWKE1101I` follows:
 
 ----
 CWWKE1101I: Server quiesce complete.
@@ -114,17 +114,17 @@ CWWKE1107W: A total of 3 threads did not complete during the quiesce period.
 
 `CWWKE1102W` is the signal to increase `quiesceTimeout`. The accompanying `CWWKE1106W` and `CWWKE1107W` messages identify specifically which listeners and how many threads were still running, providing the information needed to choose an appropriate value.
 
-For more information, see the link:{url-prefix}/docs/latest/reference/config/server.html[Liberty server element configuration reference] and link:https://openliberty.io/docs/latest/server-configuration-overview.html[Configuring Liberty server shutdown].
+For more information, see the link:https://openliberty.io/docs/latest/reference/config/server-configuration-overview.html[Liberty server element configuration reference] and link:https://github.com/OpenLiberty/open-liberty/issues/26746[Configuring Liberty server shutdown].
 
 
 [#form_login_redirect]
 == Additional validation for form login error page redirects
 
-Form login error page redirects to external hosts are now blocked unless the target host is listed in the `wasReqURLRedirectDomainNames` attribute of the `<webAppSecurity />` element. This validation is consistent with the existing check applied to `WASReqURL` redirects.
+Open Liberty now blocks form login error page redirects to external hosts unless the target host is listed in the `wasReqURLRedirectDomainNames` attribute of the `<webAppSecurity/>` element. This validation is consistent with the existing check that is applied to `WASReqURL` redirects.
 
-This change applies when the form login error page is specified by using either the `error_page` request parameter or the `loginErrorURL` attribute of the `<webAppSecurity />` element in the `server.xml` file. The host in the error page URL must be either the host of the current login request or a host listed in the `wasReqURLRedirectDomainNames` attribute of the `<webAppSecurity />` element. If not, the redirect to an external host is blocked, with the `CWWKS9134E` error being logged. To allow the redirect, add the trusted host to this attribute.
+This change applies whenever you specify a form login error page. You can configure this error page by using either the `error_page` request parameter or the `loginErrorURL` attribute of the `<webAppSecurity/>` element in your `server.xml` file. The host in the error page URL must match either the host of the current login request or a host that is listed in the `wasReqURLRedirectDomainNames` attribute of the `<webAppSecurity/>` element. Otherwise, the redirect to an external host is blocked, and Liberty logs the error message `CWWKS9134E`. To allow the redirect, add the trusted host to this attribute.
 
-For more information, see the link:{url-prefix}/docs/latest/reference/config/webAppSecurity.html[`webAppSecurity`] configuration element.
+For more information, see the link:https://openliberty.io/docs/latest/reference/config/webAppSecurity.html[`webAppSecurity`] configuration element.
 
 
 [#CVEs]
