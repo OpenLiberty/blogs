@@ -30,12 +30,12 @@ The moment an MCP server authorizes a person to perform an action, it should kno
 
 The source code is at https://github.com/martindrozdz/liberty-mcp-oauth-keycloak[github.com/martindrozdz/liberty-mcp-oauth-keycloak]. To run the demo, you run `jbang Setup.java` from the project root. That script sets up the certificates and Keycloak for you. You then start Liberty with `./mvnw liberty:dev` in a new terminal (see <<Connecting and debugging>>). The Keycloak sections in this post explain what the script does, so that you understand the configuration.
 
-This post explains how a task server demo that we created does that and covers:
+This post explains what a task server does in a demo that we created and covers:
 
 - the Open Liberty MCP server setup
 - Java code demonstrating authorization decisions
 - the Keycloak authorization server setup, which the `Setup.java` script performs
-- how to get the Bob GUI app to trust the Open Liberty MCP server and Keycloak
+- how to get IBM Bob to trust the Open Liberty MCP server and Keycloak
 - the purpose of OAuth in authorization
 
 == Open Liberty
@@ -57,9 +57,9 @@ To enable security, add the `appSecurity` and `openidConnectClient-1.0` features
 [[liberty-config]]
 === Configuring Liberty to accept OAuth access tokens
 
-Open Liberty (Liberty) is not configured to log users in or issue access tokens itself in this example. Keycloak does that.
+Open Liberty is not configured to log users in or issue access tokens itself in this example. Keycloak does that.
 
-The `openidConnectClient` element in the https://github.com/martindrozdz/liberty-mcp-oauth-keycloak/blob/main/src/main/liberty/config/server.xml[`server.xml`] file configures Liberty:
+The `openidConnectClient` element in the https://github.com/martindrozdz/liberty-mcp-oauth-keycloak/blob/main/src/main/liberty/config/server.xml[`server.xml`] file configures the OpenID Connect client behavior in Liberty:
 
 .openidConnectClient and authFilter in server.xml
 [source,xml]
@@ -70,8 +70,7 @@ The `openidConnectClient` element in the https://github.com/martindrozdz/liberty
     clientSecret="${OAUTH_CLIENT_SECRET}"
     discoveryEndpointUrl="https://localhost:8443/realms/liberty-demo/.well-known/openid-configuration"
     authFilterRef="mcp-auth-filter"
-    signatureAlgorithm="FROM_HEADER"
-    allowedSignatureAlgorithms="RS256"
+    signatureAlgorithm="RS256"
     audiences="liberty-mcp-server"
     inboundPropagation="required"
     tokenReuse="true">
@@ -83,35 +82,31 @@ The `openidConnectClient` element in the https://github.com/martindrozdz/liberty
 </authFilter>
 ----
 
-The above config helps Liberty to know: 
+The OpenID Connect configuration helps Liberty to know:
 
 - where to find Keycloak
 
-`protectedResourceMetadata`:: Publishes metadata that tells MCP clients which authorization server and scopes to use. This is what makes the <<detailed-flow,five-phase discovery sequence>> possible. It also shows which servers Liberty trusts to act as authorization servers for the AI assistants.
+`protectedResourceMetadata`: Publishes metadata that tells MCP clients which authorization server and scopes to use. This is what makes the <<detailed-flow,five-phase discovery sequence>> possible. It also shows which servers Liberty trusts to act as authorization servers for the AI assistants.
 
-`discoveryEndpointUrl`:: Liberty reads Keycloak's discovery document at startup and learns the token endpoint and signing keys.
+`discoveryEndpointUrl`: Liberty reads Keycloak's discovery document at startup and learns the token endpoint and signing keys.
 
 - which access tokens to accept
 
-`audiences`:: Rejects any token whose `aud` claim does not include `liberty-mcp-server`. This stops a token issued for another service from working here.
+`audiences`: Rejects any token whose `aud` claim does not include `liberty-mcp-server`. This stops a token issued for another service from working here.
 
-- which claims are important to get roles for a user (in this case the roles are stored in the `groupIds` claim)
+- which scopes are important to get roles for a user (in this case the roles are stored in the `groupIds` claim)
 
-`advertisedScopes`:: in protectedResourceMetadata, advertisedScopes show that the mcp-demo-server & profile claims are needed to find role information.
+`advertisedScopes`: show that the `mcp-demo-server` and `profile` scopes are needed to find role information.
 
+Other important configuration elements:
+
+`clientId` and `clientSecret`::
+Liberty's own identity in Keycloak. The secret comes from the `src/main/liberty/config/server.env` file so it is not committed in the XML. `SetupLocalKeycloak.java` generates that file, and it is gitignored. The file contains a single line: `OAUTH_CLIENT_SECRET=<value>`.
 +
 [WARNING]
 ====
 Never commit `server.env`. It is gitignored in this project because it contains the client secret.
 ====
-
-Other important configuration elements: 
-
-`clientId` and `clientSecret`::
-Liberty's own identity in Keycloak. The secret comes from the `src/main/liberty/config/server.env` file so it is not committed in the XML. `SetupLocalKeycloak.java` generates that file, and it is gitignored. The file contains a single line: `OAUTH_CLIENT_SECRET=<value>`.
-+
-`allowedSignatureAlgorithms`::
-Keycloak's default token signing algorithm is `RS256`, so Liberty accepts access tokens signed with it. If the Keycloak signing algorithm changes, update it here as well.
 
 `inboundPropagation="required"`::
 Liberty accepts only tokens that the client already holds. It never starts a browser login itself.
@@ -160,7 +155,7 @@ The tools are in https://github.com/martindrozdz/liberty-mcp-oauth-keycloak/blob
 
 === Authorization Pattern 1: Identity preservation
 
-This pattern records the task owner so that only authorized users can access it. Liberty reads the `sub` claim from the validated token (see callout 1 below) via `getUserPrincipal().getName()`, and the tool stores it as the immutable owner of the new task. For user-facing feedback, `getDisplayName()` extracts the `preferred_username` claim directly from the validated Bearer token payload.
+This pattern records the task owner so that only authorized users can access it. Liberty reads the `sub` claim from the validated token (see callout 1) via `getUserPrincipal().getName()`, and the tool stores it as the immutable owner of the new task. For user-facing feedback, `getDisplayName()` extracts the `preferred_username` claim directly from the validated Bearer token payload.
 
 .createTask: identity preservation
 [source,java]
@@ -189,6 +184,7 @@ public class TaskTools {
         try {
             String auth = httpRequest.getHeader("Authorization");
             if (auth != null && auth.startsWith("Bearer ")) {
+                // Liberty has already validated this token. Never read claims from an unvalidated token.
                 byte[] payload = Base64.getUrlDecoder().decode(auth.substring(7).split("\\.")[1]);
                 try (JsonReader r = Json.createReader(new ByteArrayInputStream(payload))) {
                     return r.readObject().getString("preferred_username", httpRequest.getUserPrincipal().getName());
@@ -203,6 +199,8 @@ public class TaskTools {
 <2> The response displays the friendly `preferred_username` (e.g. `testadmin`) extracted from the token payload.
 
 `getUserPrincipal().getName()` returns the `sub` claim (the unique user ID) from the token (the default in Open Liberty). This ensures each user is uniquely and permanently identified in backend storage per the OpenID Connect specification, while `getDisplayName()` provides human-friendly output for responses.
+
+`getDisplayName()` decodes the token payload without validating it again, because Liberty has already validated the token before the tool runs (see <<liberty-config>>). If a token fails validation, the request never reaches `TaskTools`. Always validate a token before you read anything from it, and use `getDisplayName()` only for display, never for authorization decisions.
 
 The owner field is used for identity checks in these tools:
 
