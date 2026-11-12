@@ -1,0 +1,491 @@
+---
+layout: post
+title: "Jakarta Data 1.1 Milestone 4, Jakarta Persistence 4.0 Container, and Netty transport in 26.0.0.12-beta"
+# Do NOT change the categories section
+categories: blog
+author_picture: https://avatars3.githubusercontent.com/Arjun-Aravind-dev
+author_github: https://github.com/Arjun-Aravind-dev
+seo-title: "Jakarta Data 1.1 Milestone 4, Jakarta Persistence 4.0 Container, and Netty transport in 26.0.0.12-beta - OpenLiberty.io"
+seo-description: Open Liberty 26.0.0.12-beta previews Jakarta Data 1.1 Milestone 4 with null ordering, path-based sorting, and zero-based offsets, adds the Jakarta Persistence 4.0 Container feature for third-party persistence providers, and continues the beta preview of the Netty-based HTTP transport.
+blog_description: Open Liberty 26.0.0.12-beta previews Jakarta Data 1.1 Milestone 4 with null ordering, path-based sorting, and zero-based offsets, adds the Jakarta Persistence 4.0 Container feature for third-party persistence providers, and continues the beta preview of the Netty-based HTTP transport.
+open-graph-image: https://openliberty.io/img/twitter_card.jpg
+open-graph-image-alt: Open Liberty Logo
+---
+= Jakarta Data 1.1 Milestone 4, Jakarta Persistence 4.0 Container, and Netty transport in 26.0.0.12-beta
+Arjun Aravind <https://github.com/Arjun-Aravind-dev>
+:imagesdir: /
+:url-prefix:
+:url-about: /
+//Blank line here is necessary before starting the body of the post.
+
+Open Liberty 26.0.0.12-beta previews Jakarta Data 1.1 Milestone 4 with control over null ordering, sorting by embeddable attributes, and zero-based offsets, introduces container-managed persistence for Jakarta Persistence 4.0 providers such as Hibernate 8, and continues the beta preview of a Netty-based HTTP transport.
+
+The link:{url-about}[Open Liberty] 26.0.0.12-beta includes the following beta features (along with link:{url-prefix}/docs/latest/reference/feature/feature-overview.html[all GA features]):
+
+* <<data, Jakarta Data 1.1 Milestone 4>>
+* <<netty, Netty on Open Liberty>>
+* <<persistence, Jakarta Persistence 4.0 Container>>
+
+
+See also link:{url-prefix}/blog/?search=beta&key=tag[previous Open Liberty beta blog posts].
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/TODO
+// Contact/Reviewer: TODO
+// // // // // // // //
+[#data]
+== Jakarta Data 1.1 Milestone 4
+
+Jakarta Data provides an API for simplified data access. You write simple Java objects, called entities, to represent data, and you write interfaces, called repositories, to define operations on that data. You inject a repository into your application and use it, and the implementation of the repository is provided automatically.
+
+This beta previews the new capabilities that are included in Jakarta Data 1.1 Milestone 4: sorting by nullable entity attributes, sorting by path attributes, and zero-based offsets. It also includes the capabilities that were previewed in prior betas: the `@Is` annotation and `Constraint` subtype parameters on repository `@Find` and `@Delete` methods, the `Restriction` special parameter for supplying constraints at run time, the `@First` annotation, retrieval of a subset or projection of entity attributes, and stateful repositories. The feature is Jakarta Data (`data-1.1`) and is intended for application developers.
+
+Previously, it was not possible to decide whether null values are ordered first or last when sorting by nullable entity attributes. It was also not possible to navigate static metamodel `Attribute` subtypes to specify embeddable attributes upon which to sort, and users who prefer to think in terms of zero-based indices for pagination and limits found the one-based conventions awkward. This beta adds API and implementation support for these capabilities.
+
+=== Define an entity
+
+Start by defining an entity class that corresponds to your data. With relational databases, the entity class corresponds to a database table, and the entity properties (the public methods and fields of the entity class) generally correspond to the columns of the table. An entity class can be either of the following:
+
+* Annotated with `jakarta.persistence.Entity` and related annotations from Jakarta Persistence.
+* A Java class without entity annotations, in which case the primary key is inferred from an entity property named `id` or ending with `Id`, and an entity property named `version` designates an automatically incremented version column.
+
+The following example is a simple entity:
+
+[source, java]
+----
+@Entity
+public class Product {
+    @Id
+    public long id;
+
+    public String name;
+
+    public boolean onSale;
+
+    public Double price;
+
+    public double weight;
+}
+----
+
+=== Define a static metamodel
+
+After you define the entity, it is usually helpful to have your IDE generate a static metamodel class for it. By convention, static metamodel classes begin with the underscore character, followed by the entity name. Because this beta is available well before the release of Jakarta Data 1.1, IDEs cannot be expected to generate the class yet. The following example is the static metamodel class that an IDE is expected to generate for the `Product` entity:
+
+[source, java]
+----
+@StaticMetamodel(Product.class)
+public interface _Product {
+    String ID = "id";
+    String NAME = "name";
+    String ONSALE = "onSale";
+    String PRICE = "price";
+    String WEIGHT = "weight";
+
+    NumericAttribute<Product, Long> id = NumericAttribute.of(
+            Product.class, ID, long.class);
+    TextAttribute<Product> name = TextAttribute.of(
+            Product.class, NAME);
+    BooleanAttribute<Product> onSale = BooleanAttribute.of(
+            Product.class, ONSALE, boolean.class);
+    NumericAttribute<Product, Double> price = NumericAttribute.of(
+            Product.class, PRICE, Double.class);
+    NumericAttribute<Product, Double> weight = NumericAttribute.of(
+            Product.class, WEIGHT, double.class);
+}
+----
+
+The first half of the static metamodel class includes constants for each of the entity attribute names, so that you do not need to hard-code string values into your application. The second half of the class provides a special instance for each entity attribute, from which you can build restrictions and sorting to apply to queries at run time.
+
+=== Define a repository
+
+When you compose a stateless repository, you can inherit from built-in interfaces such as `BasicRepository` and `CrudRepository` to gain a variety of general-purpose repository methods for inserting, updating, deleting, and querying for entities. When you compose a stateful repository, which operates within a persistence context, you can inherit from the built-in `DataRepository` interface and use the `Detach`, `Merge`, `Persist`, `Refresh`, or `Remove` annotations. The following example is a stateless repository:
+
+[source, java]
+----
+@Repository(dataStore = "java:app/jdbc/my-example-data")
+public interface Products extends CrudRepository<Product, Long> {
+
+    // Filtering is pre-defined at development time by the @Is annotation,
+    @Find
+    @First
+    @OrderBy(value = _Product.PRICE, nullOrdering = Nulls.LAST)
+    @OrderBy(_Product.NAME)
+    Optional<Product> leastExpensiveUpTo(
+        @By(_Product.PRICE) @Is(AtMost.class) double maxPrice,
+        @By(_Product.NAME) @Is(Like.class) String namePattern);
+
+    // Constraint types, such as Like, can also pre-define filtering.
+    // Allow additional filtering at run time by including a Restriction,
+    @Find
+    Page<Product> named(@By(_Product.NAME) Like namePattern,
+                        Restriction<Product> filter,
+                        Order<Product> sorting,
+                        PageRequest pageRequest);
+
+    // Retrieve multiple entity attributes as a Java record,
+    @Find
+    @Select(_Product.WEIGHT)
+    @Select(_Product.NAME)
+    Optional<WeightInfo> weightAndNameOf(@By(_Product.ID) long productNum);
+
+    // Retrieve a single entity attribute, identified by @Select,
+    @Find
+    @Select(_Product.WEIGHT)
+    Optional<Double> weightOf(@By(_Product.ID) long productNum);
+
+    static record WeightInfo(double itemWeight, String itemName) {}
+}
+----
+
+=== Use the repository and static metamodel
+
+The following example injects the repository into a servlet and uses the static metamodel to compute filtering and ordering at run time, including how to sort null values, and to paginate by using a zero-based index:
+
+[source, java]
+----
+@DataSourceDefinition(name = "java:app/jdbc/my-example-data",
+                      className = "org.postgresql.xa.PGXADataSource",
+                      databaseName = "ExampleDB",
+                      serverName = "localhost",
+                      portNumber = 5432,
+                      user = "${example.database.user}",
+                      password = "${example.database.password}")
+public class MyServlet extends HttpServlet {
+    @Inject
+    Products products;
+
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp)
+            throws ServletException, IOException {
+
+        // Insert:
+        Product prod = Product.of(1, name, false, 99.99, 10.5);
+        products.insert(prod);
+
+        // Compute filtering at run time
+        List<Restriction<Product>> filter = new ArrayList<>();
+        filter.add(_Product.price.times(taxRate).plus(shipping).lessThan(250.0));
+        filter.add(_Product.weight.times(kgToPounds).between(10.0, 20.0));
+
+        // Compute ordering at run time, including how to sort nulls
+        List<Sort<Product>> sorts = new ArrayList<>();
+        sorts.add(_Product.price.desc().nullsLast());
+        sorts.add(_Product.name.asc());
+        sorts.add(_Product.id.asc());
+
+        // Use pagination with a 0-based index
+        Page<Product> firstPage = products.named(
+            Like.suffix("printer"),
+            Restrict.all(filter),
+            Order.by(sorts),
+            PageRequest.ofSize(10).pageOffset(0));
+
+        // Find one entity attribute:
+        weight = products.weightOf(prod.id).orElseThrow();
+
+        // Find multiple entity attributes as a Java record:
+        products.weightAndNameOf(prod.id).ifPresent(info ->
+                System.out.println(info.itemName() + " weighs " +
+                                   info.itemWeight() + " kg.")
+        );
+    }
+}
+----
+
+To enable the new beta feature in your app, add it to your `server.xml`:
+
+[source, xml]
+----
+<server>
+  <featureManager>
+    <feature>data-1.1</feature>
+  </featureManager>
+</server>
+----
+
+For more information, see the following resources:
+
+* link:https://jakarta.ee/specifications/data/1.1/apidocs[Jakarta Data 1.1 API Javadoc]
+* link:https://jakarta.ee/specifications/data/1.1/[Jakarta Data 1.1 overview page]
+
+The Maven coordinates for Jakarta Data 1.1 Milestone 4 are:
+
+[source, xml]
+----
+<dependency>
+    <groupId>jakarta.data</groupId>
+    <artifactId>jakarta.data-api</artifactId>
+    <version>1.1.0-M4</version>
+</dependency>
+----
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/TODO
+// Contact/Reviewer: TODO
+// // // // // // // //
+[#netty]
+== Netty on Open Liberty
+
+Open Liberty now provides a Netty-based HTTP transport as a beta preview. This is an internal implementation swap of the underlying transport that is used for HTTP/1.1, HTTP/2, WebSocket, JMS, and SIP communications. It is designed for zero migration: your applications and `server.xml` file should continue to behave the same. We are looking forward to your feedback before GA.
+
+This update is targeted at application developers, performance engineers, and operations and site engineers who validate behavior, throughput, and observability. Netty's event-driven I/O gives Open Liberty a modern foundation for long-term scalability, easier maintenance, and future performance work, all without asking you to change APIs or configuration.
+
+=== Try the Netty-based transport
+
+No changes are required to benefit from the Netty-based transport. Use the All Beta Features runtime for this release. To help us validate parity and performance for your real-world scenarios, you can try the following areas:
+
+* HTTP/1.1 and HTTP/2: large uploads and downloads, chunked transfers, compression-enabled content, and keep-alive behavior.
+* WebSocket: long-lived communications and backpressure scenarios.
+* Timeouts: read, write, and keep-alive timeouts under load.
+* Access logging: verify the formatting and log results compared to previous builds.
+* JMS communications: message send and receive throughput, and durable subscriptions.
+
+=== Limitations of the beta
+
+**HTTP**
+
+* HTTP requests with a content length greater than the maximum integer value fail because of internal limitations on request size with Netty.
+* If the `httpOptions` `maxKeepAliveRequests` has no limit, there is a maximum limit of 50 pipelined requests on HTTP/1.1.
+* Because of internal limitations of the Netty library, the `httpOptions` `MessageSizeLimit` is capped at the maximum integer value for HTTP/2.0 connections.
+* Because of internal differences with Netty, the `httpOptions` `ThrowIOEForInboundConnections` might behave differently from the Channel Framework implementation.
+
+**ALPN**
+
+* The Netty implementation supports only the native JDK ALPN implementation. For information about the ALPN implementations that the Channel Framework supports but the Netty beta does not, see link:https://www.ibm.com/docs/en/was-liberty/base?topic=40-alpn-support[ALPN support].
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+// // // // DO NOT MODIFY THIS COMMENT BLOCK <GHA-BLOG-TOPIC> // // // //
+// Blog issue: https://github.com/OpenLiberty/open-liberty/issues/TODO
+// Contact/Reviewer: TODO
+// // // // // // // //
+[#persistence]
+== Jakarta Persistence 4.0 Container
+
+This beta previews container-managed persistence for the Jakarta Persistence 4.0 specification, which is targeted for Jakarta EE 12. Applications can now run next-generation third-party persistence providers, such as Hibernate 8, within Open Liberty with container-managed entity managers, JTA transaction coordination, and `DataSource` integration. The feature is Jakarta Persistence 4.0 Container (`persistenceContainer-4.0`) and is intended for application developers.
+
+Previously, Open Liberty supported container-managed persistence up to Jakarta Persistence 3.2 (Jakarta EE 11). Developers who wanted to explore upcoming Jakarta Persistence 4.0 features, or to use Jakarta Persistence 4.0-compatible providers such as Hibernate 8, could not use container-managed persistence, `@PersistenceContext` injection, or integration with Liberty's JTA transactions and connection pooling. The `persistenceContainer-4.0` beta feature provides full container lifecycle management for Jakarta Persistence 4.0 providers.
+
+In Jakarta Persistence, you define entity classes to model your relational data, and you use an `EntityManager` to perform queries, persist entities, and manage transactions. With container-managed persistence, Open Liberty automatically manages the lifecycle of `EntityManager` instances, injects them into your application components, and coordinates transactions with the application server.
+
+=== Configure the server
+
+To use `persistenceContainer-4.0` with a third-party persistence provider such as Hibernate 8, configure the feature and supply the provider library in the `server.xml` file:
+
+[source, xml]
+----
+<server description="Jakarta Persistence 4.0 Beta Server">
+  <featureManager>
+    <feature>persistenceContainer-4.0</feature>
+    <feature>cdi-4.1</feature>
+  </featureManager>
+
+  <!-- Third-party Jakarta Persistence 4.0 provider JARs (e.g. Hibernate 8) -->
+  <library id="HibernateLib">
+    <fileset dir="${server.config.dir}/hibernate" includes="*.jar"/>
+  </library>
+
+  <application location="myApp.war">
+    <classloader commonLibraryRef="HibernateLib"/>
+  </application>
+
+  <dataSource id="DefaultDataSource" jndiName="jdbc/myDS">
+    <jdbcDriver libraryRef="DerbyLib"/>
+    <properties.derby.embedded databaseName="memory:myDB" createDatabase="create"/>
+  </dataSource>
+</server>
+----
+
+=== Define the persistence unit
+
+Define your persistence unit in the `META-INF/persistence.xml` file:
+
+[source, xml]
+----
+<?xml version="1.0" encoding="UTF-8"?>
+<persistence xmlns="https://jakarta.ee/xml/ns/persistence"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xsi:schemaLocation="https://jakarta.ee/xml/ns/persistence https://jakarta.ee/xml/ns/persistence/persistence_4_0.xsd"
+             version="4.0">
+  <persistence-unit name="myPersistenceUnit" transaction-type="JTA">
+    <jta-data-source>jdbc/myDS</jta-data-source>
+    <provider>org.hibernate.jpa.HibernatePersistenceProvider</provider>
+    <exclude-unlisted-classes>false</exclude-unlisted-classes>
+  </persistence-unit>
+</persistence>
+----
+
+=== Define an entity
+
+Define your entity class:
+
+[source, java]
+----
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+
+@Entity
+@Table(name = "PRODUCTS")
+public class Product {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String name;
+    private Double price;
+
+    public Product() {}
+
+    public Product(String name, Double price) {
+        this.name = name;
+        this.price = price;
+    }
+
+    public Long getId() { return id; }
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+    public Double getPrice() { return price; }
+    public void setPrice(Double price) { this.price = price; }
+}
+----
+
+=== Inject the container-managed EntityManager
+
+Inject the container-managed `EntityManager` by using `@PersistenceContext` into your CDI bean or REST resource:
+
+[source, java]
+----
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import jakarta.persistence.TypedQuery;
+import jakarta.transaction.Transactional;
+import java.util.List;
+
+@ApplicationScoped
+public class ProductService {
+
+    @PersistenceContext(unitName = "myPersistenceUnit")
+    private EntityManager em;
+
+    @Transactional
+    public Product createProduct(String name, Double price) {
+        Product product = new Product(name, price);
+        em.persist(product);
+        return product;
+    }
+
+    public Product findProduct(Long id) {
+        return em.find(Product.class, id);
+    }
+
+    public List<Product> findProductsByPrice(Double minPrice) {
+        TypedQuery<Product> query = em.createQuery(
+            "SELECT p FROM Product p WHERE p.price >= :minPrice ORDER BY p.price ASC", Product.class);
+        query.setParameter("minPrice", minPrice);
+        return query.getResultList();
+    }
+}
+----
+
+For more information, see the following resources:
+
+* link:https://jakarta.ee/specifications/persistence/4.0/apidocs[Jakarta Persistence 4.0 API Javadoc]
+* link:https://jakarta.ee/specifications/persistence/4.0/[Jakarta Persistence 4.0 overview page]
+
+The Maven coordinates for the Jakarta Persistence 4.0 API are:
+
+[source, xml]
+----
+<dependency>
+    <groupId>jakarta.persistence</groupId>
+    <artifactId>jakarta.persistence-api</artifactId>
+    <version>4.0.0-M7</version>
+</dependency>
+----
+
+// DO NOT MODIFY THIS LINE. </GHA-BLOG-TOPIC>
+
+[#run]
+== Try it now
+
+To try out these features, update your build tools to pull the Open Liberty All Beta Features package instead of the main release. The beta works with Java SE versions 27, 25, 21, 17, 11, and 8.
+
+If you're using link:{url-prefix}/guides/maven-intro.html[Maven], you can install the All Beta Features package using:
+
+[source,xml]
+----
+<plugin>
+    <groupId>io.openliberty.tools</groupId>
+    <artifactId>liberty-maven-plugin</artifactId>
+    <version>3.12.4</version>
+    <configuration>
+        <runtimeArtifact>
+          <groupId>io.openliberty.beta</groupId>
+          <artifactId>openliberty-runtime</artifactId>
+          <version>26.0.0.12-beta</version>
+          <type>zip</type>
+        </runtimeArtifact>
+    </configuration>
+</plugin>
+----
+
+You must also add dependencies to your pom.xml file for the beta version of the APIs that are associated with the beta features that you want to try. For example, the following block adds dependencies for two example beta APIs:
+
+[source,xml]
+----
+<dependency>
+    <groupId>jakarta.data</groupId>
+    <artifactId>jakarta.data-api</artifactId>
+    <version>1.1.0-M4</version>
+    <scope>provided</scope>
+</dependency>
+<dependency>
+    <groupId>jakarta.persistence</groupId>
+    <artifactId>jakarta.persistence-api</artifactId>
+    <version>4.0.0-M7</version>
+    <scope>provided</scope>
+</dependency>
+----
+
+Or for link:{url-prefix}/guides/gradle-intro.html[Gradle]:
+
+[source,gradle]
+----
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'io.openliberty.tools:liberty-gradle-plugin:4.0.3'
+    }
+}
+apply plugin: 'liberty'
+dependencies {
+    libertyRuntime group: 'io.openliberty.beta', name: 'openliberty-runtime', version: '[26.0.0.12-beta,)'
+}
+----
+
+Or if you're using link:{url-prefix}/docs/latest/container-images.html[container images]:
+
+[source]
+----
+FROM icr.io/appcafe/open-liberty:beta
+----
+
+Or take a look at our link:{url-prefix}/downloads/#runtime_betas[Downloads page].
+
+If you're using link:https://plugins.jetbrains.com/plugin/14856-liberty-tools[IntelliJ IDEA], link:https://marketplace.visualstudio.com/items?itemName=Open-Liberty.liberty-dev-vscode-ext[Visual Studio Code] or link:https://marketplace.eclipse.org/content/liberty-tools[Eclipse IDE], you can also take advantage of our open source link:https://openliberty.io/docs/latest/develop-liberty-tools.html[Liberty developer tools] to enable effective development, testing, debugging and application management all from within your IDE.
+
+For more information on using a beta release, refer to the link:{url-prefix}/docs/latest/installing-open-liberty-betas.html[Installing Open Liberty beta releases] documentation.
+
+[#feedback]
+== We welcome your feedback
+
+Let us know what you think on link:https://groups.io/g/openliberty[our mailing list]. If you hit a problem, link:https://stackoverflow.com/questions/tagged/open-liberty[post a question on StackOverflow]. If you hit a bug, link:https://github.com/OpenLiberty/open-liberty/issues[please raise an issue].
